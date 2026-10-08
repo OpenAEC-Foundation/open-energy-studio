@@ -158,6 +158,18 @@ async fn health_and_version_identify_the_build() {
     let v2024 = editions.iter().find(|item| item["id"] == "2024").unwrap();
     assert_eq!(v2024["implemented"], true);
     assert_eq!(v2024["registrationEligible"], false);
+    let v2023 = editions.iter().find(|item| item["id"] == "2023").unwrap();
+    assert_eq!(v2023["implemented"], true);
+    assert_eq!(v2023["registrationEligible"], false);
+    let v2022 = editions.iter().find(|item| item["id"] == "2022").unwrap();
+    assert_eq!(v2022["implemented"], true);
+    assert_eq!(v2022["registrationEligible"], false);
+    let v2020 = editions
+        .iter()
+        .find(|item| item["id"] == "2020+A1")
+        .unwrap();
+    assert_eq!(v2020["implemented"], true);
+    assert_eq!(v2020["registrationEligible"], false);
 }
 
 #[tokio::test]
@@ -385,4 +397,222 @@ async fn cors_is_off_by_default_and_configurable() {
         .unwrap();
     let (_, headers, _) = send(app_with(config), other).await;
     assert!(headers.get(header::ACCESS_CONTROL_ALLOW_ORIGIN).is_none());
+}
+
+/// A route the edition lacks is refused with 422 and a project gap at the
+/// project input (the example office has LED lighting from 2017 and PV per
+/// panel, neither of which NTA 8800:2020+A1 has).
+#[tokio::test]
+async fn refused_route_is_a_project_gap() {
+    let mut office = without_nulls(fixture("nta8800-example-office.json"));
+    office["ntaCalculation"]["normVersion"] = json!("2020+A1");
+    let (status, body) = post(
+        "/v1/nta8800/project/performance",
+        json!({ "project": office }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+    let gaps = body["gaps"].as_array().unwrap();
+    assert!(
+        gaps.iter().any(|gap| gap["code"] == "route_not_in_edition"
+            && gap["path"] == "ntaCalculation.pvSystems[0].peakPower.panelPeakPowerW"
+            && gap["detail"] == "derivedInput.pvSystems[0].peakPower.panelPeakPowerW"),
+        "{body}"
+    );
+}
+
+/// The option sweep of the kernel (crates/nta8800-core/tests/option_coverage.rs)
+/// through the HTTP layer, for a few options of each outcome and every
+/// edition: a calculated input answers 200 with a calculated status, a refused
+/// one 422 with at least one code, a malformed one 400 with the error
+/// envelope, and nothing answers 500 (non_finite_result, kernel_panic). The
+/// first two options are the two NaN refusals the sweep found.
+#[tokio::test]
+async fn option_sweep_keeps_the_http_error_model() {
+    let terraced = without_nulls(fixture("nta8800-example-terraced-dwelling.json"));
+    let mut options: Vec<(&str, Value)> = Vec::new();
+    let mut basement = terraced.clone();
+    basement["ntaCalculation"]["groundFloors"][0]["heatedBasement"] = json!({
+        "wallDepths": [{ "lengthM": 10.0, "depthM": 1.5 }],
+        "wallResistanceM2kPerW": 2.5
+    });
+    options.push(("heated basement with depth per wall part", basement));
+    let mut shutters = terraced.clone();
+    shutters["ntaCalculation"]["windowSolar"]["movableShading"] = json!({
+        "device": { "kind": "external_roller_shutter", "colour": "white" },
+        "control": "manual_residential",
+        "sourceReference": "table 7.5 device"
+    });
+    options.push(("table 7.5 shading device", shutters));
+    options.push((
+        "example office",
+        without_nulls(fixture("nta8800-example-office.json")),
+    ));
+    let mut unknown = terraced.clone();
+    unknown["ntaCalculation"]["generator"]["kind"] = json!("not_a_generator");
+    options.push(("unknown generator kind", unknown));
+    let mut without = terraced.clone();
+    without.as_object_mut().unwrap().remove("ntaCalculation");
+    options.push(("without ntaCalculation", without));
+    for (label, project) in options {
+        for edition in ["2025+C1", "2024", "2023", "2022", "2020+A1"] {
+            let mut project = project.clone();
+            if project.get("ntaCalculation").is_some() {
+                project["ntaCalculation"]["normVersion"] = json!(edition);
+            }
+            let (status, body) = post(
+                "/v1/nta8800/project/performance",
+                json!({ "project": project }),
+            )
+            .await;
+            let context = format!("{label} {edition}: {status} {body}");
+            match status {
+                StatusCode::OK => assert!(
+                    body["status"].as_str().unwrap().starts_with("calculated"),
+                    "{context}"
+                ),
+                StatusCode::UNPROCESSABLE_ENTITY => {
+                    // The refusal names its cause in the project gaps, also
+                    // for a route the building calculation refuses.
+                    let codes: Vec<&Value> = body["gaps"]
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .map(|entry| &entry["code"])
+                        .collect();
+                    assert!(!codes.is_empty(), "{context}");
+                    assert!(
+                        codes.iter().all(|code| *code != "non_finite_result"),
+                        "{context}"
+                    );
+                }
+                _ => panic!("{context}"),
+            }
+        }
+    }
+    // A shape error of the survey (an unknown variant) is the error envelope.
+    for edition in ["2025+C1", "2020+A1"] {
+        let mut survey = fixture("nta8800-opname-1930-terraced.json");
+        survey["normVersion"] = json!(edition);
+        let (status, body) = post(
+            "/v1/nta8800/opname/residential",
+            json!({ "survey": survey.clone() }),
+        )
+        .await;
+        // An older edition may refuse a route of the survey, with its codes.
+        match status {
+            StatusCode::OK => {}
+            StatusCode::UNPROCESSABLE_ENTITY => assert!(
+                body["issues"]
+                    .as_array()
+                    .is_some_and(|issues| !issues.is_empty()),
+                "{edition}: {body}"
+            ),
+            _ => panic!("{edition}: {status} {body}"),
+        }
+        survey["dwelling"] = json!("not_a_dwelling");
+        let (status, body) = post(
+            "/v1/nta8800/opname/residential",
+            json!({ "survey": survey }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{edition}: {body}");
+        assert_envelope(&body, "invalid_request_shape");
+    }
+}
+
+fn project_request(project: &Value) -> Request<Body> {
+    Request::post("/v1/nta8800/project/performance")
+        .header("content-type", "application/json")
+        .body(Body::from(json!({ "project": project }).to_string()))
+        .unwrap()
+}
+
+/// A calculation that takes longer than the configured timeout is withheld
+/// with 503 `calculation_timeout`, or `server_busy` when the request never
+/// got a slot. With one slot and a normal timeout, simultaneous requests
+/// queue and both calculate.
+#[tokio::test]
+async fn calculation_timeout_and_busy_use_the_error_envelope() {
+    let project = without_nulls(fixture("nta8800-example-office.json"));
+    let strict = app_with(HttpConfig {
+        max_concurrent_calculations: 1,
+        calculation_timeout: std::time::Duration::from_millis(1),
+        ..HttpConfig::default()
+    });
+    let (first, second) = tokio::join!(
+        send(strict.clone(), project_request(&project)),
+        send(strict.clone(), project_request(&project)),
+    );
+    for (status, headers, body) in [first, second] {
+        assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE, "{body}");
+        let code = body["code"].as_str().unwrap_or_default().to_string();
+        assert!(
+            ["calculation_timeout", "server_busy"].contains(&code.as_str()),
+            "{body}"
+        );
+        assert_envelope(&body, &code);
+        let retry: u64 = headers[header::RETRY_AFTER]
+            .to_str()
+            .unwrap()
+            .parse()
+            .unwrap();
+        assert!((1..=60).contains(&retry), "{retry}");
+    }
+
+    let queued = app_with(HttpConfig {
+        max_concurrent_calculations: 1,
+        ..HttpConfig::default()
+    });
+    let (first, second) = tokio::join!(
+        send(queued.clone(), project_request(&project)),
+        send(queued.clone(), project_request(&project)),
+    );
+    for (status, _, body) in [first, second] {
+        assert_eq!(status, StatusCode::OK, "{}", body["gaps"]);
+    }
+}
+
+/// The queue is bounded before the body is read: with one slot and no
+/// waiting places, a second simultaneous request is refused at once with
+/// `server_busy` and a `Retry-After`, while the first calculates.
+#[tokio::test]
+async fn full_queue_is_refused_before_the_body_is_read() {
+    let project = without_nulls(fixture("nta8800-example-office.json"));
+    let no_queue = app_with(HttpConfig {
+        max_concurrent_calculations: 1,
+        max_waiting_requests: 0,
+        ..HttpConfig::default()
+    });
+    let (first, second) = tokio::join!(
+        send(no_queue.clone(), project_request(&project)),
+        send(no_queue.clone(), project_request(&project)),
+    );
+    assert_eq!(first.0, StatusCode::OK, "{}", first.2["gaps"]);
+    assert_eq!(second.0, StatusCode::SERVICE_UNAVAILABLE, "{}", second.2);
+    assert_envelope(&second.2, "server_busy");
+    assert!(second.1.contains_key(header::RETRY_AFTER));
+}
+
+/// The queue wait and the calculation have their own timeouts: a request
+/// that cannot get a slot within the queue timeout is refused with
+/// `server_busy` and starts no calculation; the one that has the slot gets
+/// the full calculation timeout and calculates.
+#[tokio::test]
+async fn queue_timeout_is_separate_from_the_calculation_timeout() {
+    let project = without_nulls(fixture("nta8800-example-office.json"));
+    let short_queue = app_with(HttpConfig {
+        max_concurrent_calculations: 1,
+        max_waiting_requests: 1,
+        queue_timeout: std::time::Duration::from_millis(1),
+        ..HttpConfig::default()
+    });
+    let (first, second) = tokio::join!(
+        send(short_queue.clone(), project_request(&project)),
+        send(short_queue.clone(), project_request(&project)),
+    );
+    assert_eq!(first.0, StatusCode::OK, "{}", first.2["gaps"]);
+    assert_eq!(second.0, StatusCode::SERVICE_UNAVAILABLE, "{}", second.2);
+    assert_envelope(&second.2, "server_busy");
+    assert!(second.1.contains_key(header::RETRY_AFTER));
 }

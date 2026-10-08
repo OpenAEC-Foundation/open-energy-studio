@@ -1,0 +1,5 @@
+# Scripts keep LF on every checkout: a shebang line ending in CR breaks node and sh.
+*.mjs text eol=lf
+*.mts text eol=lf
+*.sh text eol=lf
+*.py text eol=lf

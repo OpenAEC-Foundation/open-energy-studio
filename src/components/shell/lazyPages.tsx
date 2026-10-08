@@ -12,6 +12,7 @@ export const ReportView = lazy(() => import('../ReportView/ReportView').then((m)
 export const PrintPreviewDialog = lazy(() => import('../dialogs/PrintPreviewDialog/PrintPreviewDialog').then((m) => ({ default: m.PrintPreviewDialog })));
 export const UValueCalculator = lazy(() => import('../UValueCalculator/UValueCalculator').then((m) => ({ default: m.UValueCalculator })));
 export const ThermalBridgeCalculator = lazy(() => import('../ThermalBridgeCalculator/ThermalBridgeCalculator').then((m) => ({ default: m.ThermalBridgeCalculator })));
+export const ManualView = lazy(() => import('../ManualView/ManualView').then((m) => ({ default: m.ManualView })));
 export const HeatPumpSizingCalculator = lazy(() => import('../HeatPumpSizingCalculator/HeatPumpSizingCalculator').then((m) => ({ default: m.HeatPumpSizingCalculator })));
 
 function Loading() {

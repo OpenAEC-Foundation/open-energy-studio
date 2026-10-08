@@ -26,10 +26,17 @@
 //! adviser's review. Insulation on the inside or of elements outside the
 //! thermal zone is 6b and cannot be seen in the data, so allowed
 //! insulation changes carry a confirmation note.
+//!
+//! A relabel is calculated with the method and software version of the
+//! original survey (W §4.2.4 p. 23–24, U §4.2.4 p. 19–20), so the current
+//! project must keep the original's NTA 8800 edition
+//! (`ntaCalculation.normVersion`); a different edition is not allowed.
 
 use serde::Serialize;
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
+
+use crate::norm_versions::{self, NormVersion};
 
 pub const RELABEL_SOURCE_W: &str =
     "BRL 9500-W (29-05-2026) §4.2.3–4.2.4 (p. 23–24), Bijlage 6a (p. 67) and 6b (p. 68)";
@@ -85,6 +92,24 @@ pub struct RelabelAssessment {
     /// [`label_input_hash`] of the compared project; a registration whose
     /// project hashes differently has an out-of-date comparison.
     pub current_label_input_hash: String,
+    /// Edition of the original project: the relabel is assessed and
+    /// calculated in it (W §4.2.4 p. 23–24, U p. 19–20).
+    pub norm_version: NormVersion,
+    /// Label of [`Self::norm_version`].
+    pub target_norm_version: &'static str,
+    /// Edition of the current project; must equal `normVersion`.
+    pub current_norm_version: NormVersion,
+}
+
+const NORM_VERSION_PATH: &str = "/ntaCalculation/normVersion";
+
+/// Edition of a project (`ntaCalculation.normVersion`, default 2025+C1).
+pub fn project_norm_version(project: &Value) -> NormVersion {
+    project
+        .pointer(NORM_VERSION_PATH)
+        .filter(|value| !value.is_null())
+        .and_then(|value| serde_json::from_value(value.clone()).ok())
+        .unwrap_or_default()
 }
 
 /// Keys whose change says nothing about the building.
@@ -600,10 +625,19 @@ fn review_shares_next_to_added_generators(changes: &mut [RelabelChange]) {
 /// project per Bijlage 6a/6b. The registration block is compared only for
 /// the survey date, which must stay the original one (§4.2.4).
 pub fn assess_relabel(original: &Value, current: &Value) -> RelabelAssessment {
+    let version = project_norm_version(original);
+    norm_versions::with_version(version, || assess_relabel_in_edition(original, current))
+}
+
+fn assess_relabel_in_edition(original: &Value, current: &Value) -> RelabelAssessment {
     // The app leaves null members out of the NTA block before a kernel
     // call; a null and an absent member are the same input here.
     let original = &without_null_members(original);
     let current = &without_null_members(current);
+    let (original_version, current_version) = (
+        project_norm_version(original),
+        project_norm_version(current),
+    );
     let scheme = match current
         .get("buildingFunction")
         .or_else(|| original.get("buildingFunction"))
@@ -626,6 +660,19 @@ pub fn assess_relabel(original: &Value, current: &Value) -> RelabelAssessment {
         );
     }
     review_shares_next_to_added_generators(&mut changes);
+    // The edition is compared as an edition (absent is 2025+C1), not as
+    // text: the method of the original survey applies.
+    changes.retain(|change| change.path != NORM_VERSION_PATH);
+    if original_version != current_version {
+        changes.push(RelabelChange {
+            path: NORM_VERSION_PATH.into(),
+            before: Some(Value::String(original_version.id().into())),
+            after: Some(Value::String(current_version.id().into())),
+            verdict: RelabelVerdict::NotAllowed,
+            cluster: "relabel uses the method and software version of the original survey: NTA 8800 edition changed",
+            note: None,
+        });
+    }
     let survey_date = |project: &Value| project.pointer("/registration/surveyDate").cloned();
     let (before, after) = (survey_date(original), survey_date(current));
     if before.is_some() && before != after {
@@ -653,6 +700,9 @@ pub fn assess_relabel(original: &Value, current: &Value) -> RelabelAssessment {
         changes,
         original_label_input_hash: label_input_hash(original),
         current_label_input_hash: label_input_hash(current),
+        norm_version: original_version,
+        target_norm_version: original_version.label(),
+        current_norm_version: current_version,
     }
 }
 
@@ -1278,5 +1328,46 @@ mod tests {
         let mut logged = project.clone();
         logged["importLog"] = serde_json::json!([{"tool": "UNIEC3"}]);
         assert_eq!(label_input_hash(&project), label_input_hash(&logged));
+    }
+
+    /// A relabel keeps the original's edition (W §4.2.4 p. 23–24): another
+    /// edition is not allowed; an absent and an explicit 2025+C1 are equal.
+    #[test]
+    fn relabel_keeps_the_original_edition() {
+        let original = json!({
+            "buildingFunction": "residential",
+            "ntaCalculation": {"normVersion": "2024", "calculationScope": "residential"}
+        });
+        let mut same = original.clone();
+        same["ntaCalculation"]["calculationScope"] = json!("residential");
+        let result = assess_relabel(&original, &same);
+        assert!(result.allowed);
+        assert_eq!(result.norm_version, NormVersion::V2024);
+        assert_eq!(result.current_norm_version, NormVersion::V2024);
+        assert_eq!(result.target_norm_version, "NTA 8800:2024 met INT-V1:2024");
+
+        let mut newer = original.clone();
+        newer["ntaCalculation"]
+            .as_object_mut()
+            .unwrap()
+            .remove("normVersion");
+        let result = assess_relabel(&original, &newer);
+        assert!(!result.allowed);
+        let change = result
+            .changes
+            .iter()
+            .find(|change| change.path == "/ntaCalculation/normVersion")
+            .unwrap();
+        assert_eq!(change.verdict, RelabelVerdict::NotAllowed);
+        assert_eq!(change.before, Some(json!("2024")));
+        assert_eq!(change.after, Some(json!("2025+C1")));
+        assert_eq!(result.current_norm_version, NormVersion::V2025C1);
+
+        let plain = json!({"buildingFunction": "residential", "ntaCalculation": {}});
+        let explicit = json!({"buildingFunction": "residential",
+            "ntaCalculation": {"normVersion": "2025+C1"}});
+        let result = assess_relabel(&plain, &explicit);
+        assert!(result.changes.is_empty(), "{:?}", result.changes);
+        assert_eq!(result.norm_version, NormVersion::V2025C1);
     }
 }

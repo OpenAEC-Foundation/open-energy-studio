@@ -1,0 +1,1625 @@
+{
+  "id": "public-comparison-h",
+  "name": "Vergelijking openbaar rapport H (utiliteitsgebouw met sportschool)",
+  "description": "Fictieve herbouw van een openbaar BENG-rapport (Uniec 3.2.9.2, NTA 8800:2023); niet het echte gebouw.",
+  "buildingFunction": "other",
+  "address": "Fictief adres",
+  "city": "Fictief",
+  "zones": [
+    {
+      "id": "rz1",
+      "name": "RZ-1",
+      "floorArea": 117.8,
+      "volume": 353.4,
+      "height": 3.0,
+      "surfaces": [
+        {
+          "id": "rz1-vloer",
+          "name": "Begane grond vloer",
+          "type": "floor",
+          "thermalBoundary": "ground",
+          "area": 93.05,
+          "orientation": "horizontal",
+          "constructionId": "c-vloer",
+          "zoneId": "rz1",
+          "windows": []
+        },
+        {
+          "id": "rz1-vg",
+          "name": "Voorgevel",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 18.69,
+          "orientation": "S",
+          "constructionId": "c-gevel",
+          "zoneId": "rz1",
+          "windows": [
+            {
+              "id": "rz1-D-1",
+              "name": "Merk D",
+              "area": 3.54,
+              "uValue": 1.7,
+              "gValue": 0.6,
+              "orientation": "S",
+              "surfaceId": "rz1-vg"
+            },
+            {
+              "id": "rz1-D-2",
+              "name": "Merk D",
+              "area": 3.54,
+              "uValue": 1.7,
+              "gValue": 0.6,
+              "orientation": "S",
+              "surfaceId": "rz1-vg"
+            }
+          ]
+        },
+        {
+          "id": "rz1-vgt",
+          "name": "Voorgevel terugliggend",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 16.12,
+          "orientation": "S",
+          "constructionId": "c-gevel",
+          "zoneId": "rz1",
+          "windows": [
+            {
+              "id": "rz1-A-deur",
+              "name": "Merk A deuren",
+              "area": 2.4,
+              "uValue": 1.7,
+              "gValue": 0.6,
+              "orientation": "S",
+              "surfaceId": "rz1-vgt"
+            },
+            {
+              "id": "rz1-A-zl",
+              "name": "Merk A zijlicht links",
+              "area": 1.18,
+              "uValue": 1.7,
+              "gValue": 0.6,
+              "orientation": "S",
+              "surfaceId": "rz1-vgt"
+            },
+            {
+              "id": "rz1-A-zr",
+              "name": "Merk A zijlicht rechts",
+              "area": 1.18,
+              "uValue": 1.7,
+              "gValue": 0.6,
+              "orientation": "S",
+              "surfaceId": "rz1-vgt"
+            },
+            {
+              "id": "rz1-A1",
+              "name": "Merk A1",
+              "area": 2.73,
+              "uValue": 1.7,
+              "gValue": 0.6,
+              "orientation": "S",
+              "surfaceId": "rz1-vgt"
+            }
+          ]
+        },
+        {
+          "id": "rz1-lz",
+          "name": "Linker zijgevel",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 34.66,
+          "orientation": "W",
+          "constructionId": "c-gevel",
+          "zoneId": "rz1",
+          "windows": [
+            {
+              "id": "rz1-E1",
+              "name": "Merk E1",
+              "area": 6.49,
+              "uValue": 1.7,
+              "gValue": 0.6,
+              "orientation": "W",
+              "surfaceId": "rz1-lz"
+            }
+          ]
+        },
+        {
+          "id": "rz1-lzt",
+          "name": "Linker zijgevel terugliggend",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 32.21,
+          "orientation": "W",
+          "constructionId": "c-gevel",
+          "zoneId": "rz1",
+          "windows": [
+            {
+              "id": "rz1-B-l",
+              "name": "Merk B links",
+              "area": 5.2,
+              "uValue": 1.7,
+              "gValue": 0.6,
+              "orientation": "W",
+              "surfaceId": "rz1-lzt"
+            },
+            {
+              "id": "rz1-C",
+              "name": "Merk C paneel",
+              "area": 2.26,
+              "uValue": 1.7,
+              "gValue": 0.0,
+              "orientation": "W",
+              "surfaceId": "rz1-lzt"
+            },
+            {
+              "id": "rz1-B-r",
+              "name": "Merk B rechts",
+              "area": 5.2,
+              "uValue": 1.7,
+              "gValue": 0.6,
+              "orientation": "W",
+              "surfaceId": "rz1-lzt"
+            }
+          ]
+        },
+        {
+          "id": "rz1-dak",
+          "name": "Hellend dak linker zijgevel",
+          "type": "roof",
+          "thermalBoundary": "outdoor",
+          "area": 56.55,
+          "orientation": "W",
+          "constructionId": "c-dak",
+          "zoneId": "rz1",
+          "windows": []
+        }
+      ],
+      "thermalBridges": [
+        {
+          "id": "rz1-tb1",
+          "name": "psi 0.14",
+          "psiValue": 0.14,
+          "length": 1.67,
+          "zoneId": "rz1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "S"
+          ]
+        },
+        {
+          "id": "rz1-tb2",
+          "name": "psi 0.15",
+          "psiValue": 0.15,
+          "length": 5.13,
+          "zoneId": "rz1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "S"
+          ]
+        },
+        {
+          "id": "rz1-tb3",
+          "name": "psi 0.09",
+          "psiValue": 0.09,
+          "length": 2.76,
+          "zoneId": "rz1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "S"
+          ]
+        },
+        {
+          "id": "rz1-tb4",
+          "name": "psi 0.1",
+          "psiValue": 0.1,
+          "length": 5.13,
+          "zoneId": "rz1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "S"
+          ]
+        },
+        {
+          "id": "rz1-tb5",
+          "name": "psi 0.14",
+          "psiValue": 0.14,
+          "length": 3.08,
+          "zoneId": "rz1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "S"
+          ]
+        },
+        {
+          "id": "rz1-tb6",
+          "name": "psi 0.13",
+          "psiValue": 0.13,
+          "length": 1.3,
+          "zoneId": "rz1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "S"
+          ]
+        },
+        {
+          "id": "rz1-tb7",
+          "name": "psi 0.15",
+          "psiValue": 0.15,
+          "length": 1.98,
+          "zoneId": "rz1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "S"
+          ]
+        },
+        {
+          "id": "rz1-tb8",
+          "name": "psi 0.09",
+          "psiValue": 0.09,
+          "length": 7.56,
+          "zoneId": "rz1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "S"
+          ]
+        },
+        {
+          "id": "rz1-tb9",
+          "name": "psi 0.1",
+          "psiValue": 0.1,
+          "length": 3.96,
+          "zoneId": "rz1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "S"
+          ]
+        },
+        {
+          "id": "rz1-tb10",
+          "name": "psi 0.14",
+          "psiValue": 0.14,
+          "length": 3.08,
+          "zoneId": "rz1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "W"
+          ]
+        },
+        {
+          "id": "rz1-tb11",
+          "name": "psi 0.16",
+          "psiValue": 0.16,
+          "length": 3.29,
+          "zoneId": "rz1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "W"
+          ]
+        },
+        {
+          "id": "rz1-tb12",
+          "name": "psi 0.15",
+          "psiValue": 0.15,
+          "length": 4.7,
+          "zoneId": "rz1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "W"
+          ]
+        },
+        {
+          "id": "rz1-tb13",
+          "name": "psi 0.09",
+          "psiValue": 0.09,
+          "length": 2.76,
+          "zoneId": "rz1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "W"
+          ]
+        },
+        {
+          "id": "rz1-tb14",
+          "name": "psi 0.1",
+          "psiValue": 0.1,
+          "length": 4.7,
+          "zoneId": "rz1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "W"
+          ]
+        },
+        {
+          "id": "rz1-tb15",
+          "name": "psi 0.14",
+          "psiValue": 0.14,
+          "length": 1.67,
+          "zoneId": "rz1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "W"
+          ]
+        },
+        {
+          "id": "rz1-tb16",
+          "name": "psi 0.15",
+          "psiValue": 0.15,
+          "length": 9.2,
+          "zoneId": "rz1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "W"
+          ]
+        },
+        {
+          "id": "rz1-tb17",
+          "name": "psi 0.09",
+          "psiValue": 0.09,
+          "length": 2.76,
+          "zoneId": "rz1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "W"
+          ]
+        },
+        {
+          "id": "rz1-tb18",
+          "name": "psi 0.1",
+          "psiValue": 0.1,
+          "length": 9.2,
+          "zoneId": "rz1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "W"
+          ]
+        },
+        {
+          "id": "rz1-tb19",
+          "name": "psi 0.16",
+          "psiValue": 0.16,
+          "length": 3.29,
+          "zoneId": "rz1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "W"
+          ]
+        },
+        {
+          "id": "rz1-tb20",
+          "name": "psi 0.13",
+          "psiValue": 0.13,
+          "length": 1.3,
+          "zoneId": "rz1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "W"
+          ]
+        }
+      ],
+      "pointThermalBridges": [],
+      "pointBridgeInventoryComplete": true,
+      "airTightness": {
+        "qv10": 0.69
+      }
+    },
+    {
+      "id": "rz2",
+      "name": "RZ-2",
+      "floorArea": 626.0,
+      "volume": 3130.0,
+      "height": 5.0,
+      "surfaces": [
+        {
+          "id": "rz2-vloer",
+          "name": "Begane grond vloer",
+          "type": "floor",
+          "thermalBoundary": "ground",
+          "area": 201.22,
+          "orientation": "horizontal",
+          "constructionId": "c-vloer",
+          "zoneId": "rz2",
+          "windows": []
+        },
+        {
+          "id": "rz2-vg",
+          "name": "Voorgevel",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 95.64,
+          "orientation": "S",
+          "constructionId": "c-gevel",
+          "zoneId": "rz2",
+          "windows": [
+            {
+              "id": "rz2-D1-1",
+              "name": "Merk D1",
+              "area": 3.54,
+              "uValue": 1.7,
+              "gValue": 0.6,
+              "orientation": "S",
+              "surfaceId": "rz2-vg"
+            },
+            {
+              "id": "rz2-D1-2",
+              "name": "Merk D1",
+              "area": 3.54,
+              "uValue": 1.7,
+              "gValue": 0.6,
+              "orientation": "S",
+              "surfaceId": "rz2-vg"
+            }
+          ]
+        },
+        {
+          "id": "rz2-lz",
+          "name": "Linker zijgevel",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 47.41,
+          "orientation": "W",
+          "constructionId": "c-gevel",
+          "zoneId": "rz2",
+          "windows": [
+            {
+              "id": "rz2-E1",
+              "name": "Merk E1",
+              "area": 6.49,
+              "uValue": 1.7,
+              "gValue": 0.6,
+              "orientation": "W",
+              "surfaceId": "rz2-lz"
+            }
+          ]
+        },
+        {
+          "id": "rz2-lzt",
+          "name": "Linker zijgevel terugliggend",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 35.77,
+          "orientation": "W",
+          "constructionId": "c-gevel",
+          "zoneId": "rz2",
+          "windows": [
+            {
+              "id": "rz2-B1-l",
+              "name": "Merk B1 links",
+              "area": 5.2,
+              "uValue": 1.7,
+              "gValue": 0.6,
+              "orientation": "W",
+              "surfaceId": "rz2-lzt"
+            },
+            {
+              "id": "rz2-C1",
+              "name": "Merk C1 paneel",
+              "area": 2.26,
+              "uValue": 1.7,
+              "gValue": 0.0,
+              "orientation": "W",
+              "surfaceId": "rz2-lzt"
+            },
+            {
+              "id": "rz2-B1-r",
+              "name": "Merk B1 rechts",
+              "area": 5.2,
+              "uValue": 1.7,
+              "gValue": 0.6,
+              "orientation": "W",
+              "surfaceId": "rz2-lzt"
+            }
+          ]
+        },
+        {
+          "id": "rz2-rz",
+          "name": "Rechter zijgevel",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 149.08,
+          "orientation": "E",
+          "constructionId": "c-gevel",
+          "zoneId": "rz2",
+          "windows": []
+        },
+        {
+          "id": "rz2-ag",
+          "name": "Achtergevel",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 73.97,
+          "orientation": "N",
+          "constructionId": "c-gevel",
+          "zoneId": "rz2",
+          "windows": [
+            {
+              "id": "rz2-F1",
+              "name": "Merk F1 paneel",
+              "area": 7.28,
+              "uValue": 1.7,
+              "gValue": 0.0,
+              "orientation": "N",
+              "surfaceId": "rz2-ag"
+            }
+          ]
+        },
+        {
+          "id": "rz2-vv-avr",
+          "name": "Verdiepingsvloer AVR",
+          "type": "floor",
+          "thermalBoundary": "adjacent_conditioned",
+          "area": 183.15,
+          "orientation": "horizontal",
+          "constructionId": "c-tussen",
+          "zoneId": "rz2",
+          "windows": []
+        },
+        {
+          "id": "rz2-tw-avr",
+          "name": "Tussenwand AVR",
+          "type": "wall",
+          "thermalBoundary": "adjacent_conditioned",
+          "area": 64.66,
+          "orientation": "N",
+          "constructionId": "c-tussen",
+          "zoneId": "rz2",
+          "windows": [
+            {
+              "id": "rz2-binnendeur",
+              "name": "dubbele binnendeur",
+              "area": 4.58,
+              "uValue": 2.7,
+              "gValue": 0.0,
+              "orientation": "N",
+              "surfaceId": "rz2-tw-avr"
+            }
+          ]
+        },
+        {
+          "id": "rz2-dak-w",
+          "name": "Hellend dak linker zijgevel",
+          "type": "roof",
+          "thermalBoundary": "outdoor",
+          "area": 184.68,
+          "orientation": "W",
+          "constructionId": "c-dak",
+          "zoneId": "rz2",
+          "windows": []
+        },
+        {
+          "id": "rz2-dak-o",
+          "name": "Hellend dak rechter zijgevel",
+          "type": "roof",
+          "thermalBoundary": "outdoor",
+          "area": 266.84,
+          "orientation": "E",
+          "constructionId": "c-dak",
+          "zoneId": "rz2",
+          "windows": []
+        }
+      ],
+      "thermalBridges": [
+        {
+          "id": "rz2-tb1",
+          "name": "psi 0.14",
+          "psiValue": 0.14,
+          "length": 4.93,
+          "zoneId": "rz2",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "S"
+          ]
+        },
+        {
+          "id": "rz2-tb2",
+          "name": "psi 0.13",
+          "psiValue": 0.13,
+          "length": 7.72,
+          "zoneId": "rz2",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "S"
+          ]
+        },
+        {
+          "id": "rz2-tb3",
+          "name": "psi 0.15",
+          "psiValue": 0.15,
+          "length": 5.13,
+          "zoneId": "rz2",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "S"
+          ]
+        },
+        {
+          "id": "rz2-tb4",
+          "name": "psi 0.09",
+          "psiValue": 0.09,
+          "length": 2.76,
+          "zoneId": "rz2",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "S"
+          ]
+        },
+        {
+          "id": "rz2-tb5",
+          "name": "psi 0.1",
+          "psiValue": 0.1,
+          "length": 5.13,
+          "zoneId": "rz2",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "S"
+          ]
+        },
+        {
+          "id": "rz2-tb6",
+          "name": "psi 0.14",
+          "psiValue": 0.14,
+          "length": 1.4,
+          "zoneId": "rz2",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "W"
+          ]
+        },
+        {
+          "id": "rz2-tb7",
+          "name": "psi 0.16",
+          "psiValue": 0.16,
+          "length": 6.65,
+          "zoneId": "rz2",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "W"
+          ]
+        },
+        {
+          "id": "rz2-tb8",
+          "name": "psi 0.15",
+          "psiValue": 0.15,
+          "length": 4.7,
+          "zoneId": "rz2",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "W"
+          ]
+        },
+        {
+          "id": "rz2-tb9",
+          "name": "psi 0.09",
+          "psiValue": 0.09,
+          "length": 2.76,
+          "zoneId": "rz2",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "W"
+          ]
+        },
+        {
+          "id": "rz2-tb10",
+          "name": "psi 0.1",
+          "psiValue": 0.1,
+          "length": 4.7,
+          "zoneId": "rz2",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "W"
+          ]
+        },
+        {
+          "id": "rz2-tb11",
+          "name": "psi 0.14",
+          "psiValue": 0.14,
+          "length": 1.86,
+          "zoneId": "rz2",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "W"
+          ]
+        },
+        {
+          "id": "rz2-tb12",
+          "name": "psi 0.16",
+          "psiValue": 0.16,
+          "length": 4.82,
+          "zoneId": "rz2",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "W"
+          ]
+        },
+        {
+          "id": "rz2-tb13",
+          "name": "psi 0.15",
+          "psiValue": 0.15,
+          "length": 9.2,
+          "zoneId": "rz2",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "W"
+          ]
+        },
+        {
+          "id": "rz2-tb14",
+          "name": "psi 0.09",
+          "psiValue": 0.09,
+          "length": 2.76,
+          "zoneId": "rz2",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "W"
+          ]
+        },
+        {
+          "id": "rz2-tb15",
+          "name": "psi 0.1",
+          "psiValue": 0.1,
+          "length": 9.2,
+          "zoneId": "rz2",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "W"
+          ]
+        },
+        {
+          "id": "rz2-tb16",
+          "name": "psi 0.14",
+          "psiValue": 0.14,
+          "length": 4.48,
+          "zoneId": "rz2",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "E"
+          ]
+        },
+        {
+          "id": "rz2-tb17",
+          "name": "psi 0.16",
+          "psiValue": 0.16,
+          "length": 14.75,
+          "zoneId": "rz2",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "E"
+          ]
+        },
+        {
+          "id": "rz2-tb18",
+          "name": "psi 0.14",
+          "psiValue": 0.14,
+          "length": 2.8,
+          "zoneId": "rz2",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "N"
+          ]
+        },
+        {
+          "id": "rz2-tb19",
+          "name": "psi 0.13",
+          "psiValue": 0.13,
+          "length": 9.05,
+          "zoneId": "rz2",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "N"
+          ]
+        },
+        {
+          "id": "rz2-tb20",
+          "name": "psi 0.15",
+          "psiValue": 0.15,
+          "length": 2.6,
+          "zoneId": "rz2",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "N"
+          ]
+        },
+        {
+          "id": "rz2-tb21",
+          "name": "psi 0.09",
+          "psiValue": 0.09,
+          "length": 5.6,
+          "zoneId": "rz2",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "N"
+          ]
+        },
+        {
+          "id": "rz2-tb22",
+          "name": "psi 0.1",
+          "psiValue": 0.1,
+          "length": 2.6,
+          "zoneId": "rz2",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "N"
+          ]
+        },
+        {
+          "id": "rz2-tb23",
+          "name": "psi 0.16",
+          "psiValue": 0.16,
+          "length": 11.47,
+          "zoneId": "rz2",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "W"
+          ]
+        },
+        {
+          "id": "rz2-tb24",
+          "name": "psi 0.13",
+          "psiValue": 0.13,
+          "length": 7.72,
+          "zoneId": "rz2",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "W"
+          ]
+        },
+        {
+          "id": "rz2-tb25",
+          "name": "psi 0.05",
+          "psiValue": 0.05,
+          "length": 14.75,
+          "zoneId": "rz2",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "W"
+          ]
+        },
+        {
+          "id": "rz2-tb26",
+          "name": "psi 0.16",
+          "psiValue": 0.16,
+          "length": 14.75,
+          "zoneId": "rz2",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "E"
+          ]
+        },
+        {
+          "id": "rz2-tb27",
+          "name": "psi 0.13",
+          "psiValue": 0.13,
+          "length": 9.05,
+          "zoneId": "rz2",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "E"
+          ]
+        },
+        {
+          "id": "rz2-tb28",
+          "name": "psi 0.05",
+          "psiValue": 0.05,
+          "length": 14.75,
+          "zoneId": "rz2",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "E"
+          ]
+        }
+      ],
+      "pointThermalBridges": [],
+      "pointBridgeInventoryComplete": true,
+      "airTightness": {
+        "qv10": 0.69
+      }
+    }
+  ],
+  "heatingSystems": [],
+  "ventilationSystems": [],
+  "coolingSystems": [],
+  "hotWaterSystems": [],
+  "solarPV": [],
+  "solarThermal": [],
+  "unheatedSpaces": [],
+  "constructions": [
+    {
+      "id": "c-gevel",
+      "name": "Gevel Rc 4,70",
+      "layers": [],
+      "rcValue": 4.7,
+      "uValue": 0.2053
+    },
+    {
+      "id": "c-dak",
+      "name": "Hellend dak Rc 6,30",
+      "layers": [],
+      "rcValue": 6.3,
+      "uValue": 0.1553
+    },
+    {
+      "id": "c-vloer",
+      "name": "Begane grond Rc 3,70",
+      "layers": [],
+      "rcValue": 3.7,
+      "uValue": 0.2558
+    },
+    {
+      "id": "c-tussen",
+      "name": "Tussenwand/vloer AVR Rc 1,47",
+      "layers": [],
+      "rcValue": 1.47,
+      "uValue": 0.578
+    }
+  ],
+  "ntaCalculation": {
+    "normVersion": "2023",
+    "calculationScope": "utility",
+    "constructionYear": 2024,
+    "areaSourceReference": "openbare bron Uniec 3.2.9.2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024): Ag 743,80 m2: kantoor 14,70, bijeenkomst overig 26,30, gezondheidszorg overig 27,60, sport 626,00 en gemeenschappelijke ruimte 49,20 (naar rato over de vier functies)",
+    "usageFunction": "sport",
+    "setpoints": {
+      "heatingC": 16.0,
+      "coolingC": 24.0,
+      "sourceReference": "table 7.13"
+    },
+    "thermalMass": {
+      "floor": "heavy",
+      "wall": "light",
+      "ceiling": "open_or_none",
+      "sourceReference": "openbare bron Uniec 3.2.9.2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024)"
+    },
+    "internalGains": {
+      "method": "utility",
+      "lighting": {
+        "method": "chapter14"
+      },
+      "sourceReference": "tabellen 7.2/7.3"
+    },
+    "zoneData": [
+      {
+        "zoneId": "rz1",
+        "functionAreas": [
+          {
+            "function": "office",
+            "areaM2": 15.74
+          },
+          {
+            "function": "other_assembly",
+            "areaM2": 28.16
+          },
+          {
+            "function": "other_healthcare",
+            "areaM2": 29.55
+          },
+          {
+            "function": "sport",
+            "areaM2": 44.35
+          }
+        ],
+        "usageFunction": "sport",
+        "setpoints": {
+          "heatingC": 19.117572156196946,
+          "coolingC": 24.0,
+          "sourceReference": "6.5.3: tabel 7.13 naar rato van de functies van de zone"
+        },
+        "verticalPipes": [
+          {
+            "id": "rz1-leiding",
+            "storeys": 2,
+            "insulated": true,
+            "sourceReference": "openbare bron Uniec 3.2.9.2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024): 1 verticale leiding, geisoleerd, 2 aangrenzende rekenzones"
+          }
+        ],
+        "ventilationFlows": [],
+        "ventilation": {
+          "zoneId": "rz1",
+          "usableFloorAreaM2": 117.8,
+          "category": "utility",
+          "functions": [
+            {
+              "function": "office",
+              "areaM2": 15.74,
+              "swimmingPool": false
+            },
+            {
+              "function": "other_assembly",
+              "areaM2": 28.16,
+              "swimmingPool": false
+            },
+            {
+              "function": "other_healthcare",
+              "areaM2": 29.55,
+              "swimmingPool": false
+            },
+            {
+              "function": "sport",
+              "areaM2": 44.35,
+              "swimmingPool": false
+            }
+          ],
+          "dwellingCount": 0,
+          "apartmentBuilding": false,
+          "buildingHeightM": 9.54,
+          "constructionYear": 2024,
+          "floorAboveCrawlspace": false,
+          "heatingSetpointC": 19.117572156196946,
+          "coolingSetpointC": 24.0,
+          "system": {
+            "kind": "single",
+            "unit": {
+              "variant": "d2",
+              "ducts": "unknown",
+              "heatRecovery": {
+                "efficiency": {
+                  "method": "table",
+                  "exchanger": "counter_flow_aluminium"
+                },
+                "bypass": {
+                  "kind": "none"
+                },
+                "layout": "central",
+                "constantVolumeControl": false,
+                "supplyDuctInsulation": {
+                  "kind": "insulated"
+                },
+                "equipmentReference": "openbare bron Uniec 3.2.9.2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024): tegenstroom aluminium 0,750, bypass onbekend met aandeel 0,00"
+              },
+              "equipmentReference": "openbare bron Uniec 3.2.9.2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024): D.2 centrale WTW zonder zonering, forfaitair"
+            }
+          },
+          "maximumCapacityForCooling": "openbare bron Uniec 3.2.9.2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024): automatische passieve koelregeling",
+          "flowReduction": {
+            "collective": false
+          },
+          "infiltration": {
+            "method": "measured",
+            "qv10DmPerSM2": 0.69,
+            "sourceReference": "openbare bron Uniec 3.2.9.2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024): geen meetwaarde; q_v10;lea;ref 0,69 uit de uitdraai overgenomen"
+          },
+          "combustionAppliances": [],
+          "fans": {
+            "method": "forfait",
+            "current": "dc",
+            "manufactureYear": 2024
+          },
+          "sourceReference": "openbare bron Uniec 3.2.9.2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024)"
+        },
+        "internalGains": {
+          "method": "utility",
+          "lighting": {
+            "method": "chapter14"
+          },
+          "sourceReference": "tabellen 7.2/7.3 per functie; verlichting uit hoofdstuk 14"
+        },
+        "thermalMass": {
+          "floor": "heavy",
+          "wall": "light",
+          "ceiling": "closed_or_suspended",
+          "sourceReference": "openbare bron Uniec 3.2.9.2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024): massief beton, staalskelet, plafond gesloten of verlaagd"
+        }
+      },
+      {
+        "zoneId": "rz2",
+        "functionAreas": [
+          {
+            "function": "sport",
+            "areaM2": 626.0
+          }
+        ],
+        "usageFunction": "sport",
+        "setpoints": {
+          "heatingC": 16.0,
+          "coolingC": 24.0,
+          "sourceReference": "6.5.3: tabel 7.13 naar rato van de functies van de zone"
+        },
+        "verticalPipes": [
+          {
+            "id": "rz2-leiding",
+            "storeys": 2,
+            "insulated": true,
+            "sourceReference": "openbare bron Uniec 3.2.9.2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024): 1 verticale leiding, geisoleerd, 2 aangrenzende rekenzones"
+          }
+        ],
+        "ventilationFlows": [],
+        "ventilation": {
+          "zoneId": "rz2",
+          "usableFloorAreaM2": 626.0,
+          "category": "utility",
+          "functions": [
+            {
+              "function": "sport",
+              "areaM2": 626.0,
+              "swimmingPool": false
+            }
+          ],
+          "dwellingCount": 0,
+          "apartmentBuilding": false,
+          "buildingHeightM": 9.54,
+          "constructionYear": 2024,
+          "floorAboveCrawlspace": false,
+          "heatingSetpointC": 16.0,
+          "coolingSetpointC": 24.0,
+          "system": {
+            "kind": "single",
+            "unit": {
+              "variant": "d2",
+              "ducts": "unknown",
+              "heatRecovery": {
+                "efficiency": {
+                  "method": "table",
+                  "exchanger": "counter_flow_aluminium"
+                },
+                "bypass": {
+                  "kind": "none"
+                },
+                "layout": "central",
+                "constantVolumeControl": false,
+                "supplyDuctInsulation": {
+                  "kind": "insulated"
+                },
+                "equipmentReference": "openbare bron Uniec 3.2.9.2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024): tegenstroom aluminium 0,750, bypass onbekend met aandeel 0,00"
+              },
+              "equipmentReference": "openbare bron Uniec 3.2.9.2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024): D.2 centrale WTW zonder zonering, forfaitair"
+            }
+          },
+          "maximumCapacityForCooling": "openbare bron Uniec 3.2.9.2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024): automatische passieve koelregeling",
+          "flowReduction": {
+            "collective": false
+          },
+          "infiltration": {
+            "method": "measured",
+            "qv10DmPerSM2": 0.69,
+            "sourceReference": "openbare bron Uniec 3.2.9.2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024): geen meetwaarde; q_v10;lea;ref 0,69 uit de uitdraai overgenomen"
+          },
+          "combustionAppliances": [],
+          "fans": {
+            "method": "forfait",
+            "current": "dc",
+            "manufactureYear": 2024
+          },
+          "sourceReference": "openbare bron Uniec 3.2.9.2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024)"
+        },
+        "internalGains": {
+          "method": "utility",
+          "lighting": {
+            "method": "chapter14"
+          },
+          "sourceReference": "tabellen 7.2/7.3 per functie; verlichting uit hoofdstuk 14"
+        },
+        "thermalMass": {
+          "floor": "heavy",
+          "wall": "light",
+          "ceiling": "open_or_none",
+          "sourceReference": "openbare bron Uniec 3.2.9.2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024): massief beton, staalskelet, plafond geen of open"
+        }
+      }
+    ],
+    "windowSolar": {
+      "frameFraction": 0.25,
+      "obstruction": {
+        "method": "minimal"
+      },
+      "sourceReference": "default F_F; openbare bron Uniec 3.2.9.2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024): minimale belemmering tenzij per raam anders (windowObstructions)"
+    },
+    "windowObstructions": [
+      {
+        "windowId": "rz1-A-deur",
+        "obstruction": {
+          "method": "side_obstruction",
+          "side": "left",
+          "relativeWidth": 0.117,
+          "coolingHeightCondition": true
+        },
+        "sourceReference": "openbare bron Uniec 3,2,9,2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024), rz1-A-deur: zijbelemmering links, hoogte >= 2,5 m, afstand 1,14 m, breedte 9,73 m, hoek 7 graden; b_b = afstand / breedte"
+      },
+      {
+        "windowId": "rz1-A-zl",
+        "obstruction": {
+          "method": "side_obstruction",
+          "side": "left",
+          "relativeWidth": 0.042,
+          "coolingHeightCondition": true
+        },
+        "sourceReference": "openbare bron Uniec 3,2,9,2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024), rz1-A-zl: zijbelemmering links, hoogte >= 2,5 m, afstand 0,41 m, breedte 9,73 m, hoek 2 graden; b_b = afstand / breedte"
+      },
+      {
+        "windowId": "rz1-A-zr",
+        "obstruction": {
+          "method": "side_obstruction",
+          "side": "left",
+          "relativeWidth": 0.192,
+          "coolingHeightCondition": true
+        },
+        "sourceReference": "openbare bron Uniec 3,2,9,2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024), rz1-A-zr: zijbelemmering links, hoogte >= 2,5 m, afstand 1,87 m, breedte 9,73 m, hoek 11 graden; b_b = afstand / breedte"
+      },
+      {
+        "windowId": "rz1-A1",
+        "obstruction": {
+          "method": "side_obstruction",
+          "side": "left",
+          "relativeWidth": 0.117,
+          "coolingHeightCondition": false
+        },
+        "sourceReference": "openbare bron Uniec 3,2,9,2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024), rz1-A1: zijbelemmering links, hoogte < 2,5 m, afstand 1,14 m, breedte 9,73 m, hoek 7 graden; b_b = afstand / breedte"
+      },
+      {
+        "windowId": "rz1-B-l",
+        "obstruction": {
+          "method": "side_obstruction",
+          "side": "right",
+          "relativeWidth": 2.789,
+          "coolingHeightCondition": true
+        },
+        "sourceReference": "openbare bron Uniec 3,2,9,2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024), rz1-B-l: zijbelemmering rechts, hoogte >= 2,5 m, afstand 7,39 m, breedte 2,65 m, hoek 70 graden; b_b = afstand / breedte"
+      },
+      {
+        "windowId": "rz1-B-r",
+        "obstruction": {
+          "method": "side_obstruction",
+          "side": "right",
+          "relativeWidth": 0.743,
+          "coolingHeightCondition": true
+        },
+        "sourceReference": "openbare bron Uniec 3,2,9,2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024), rz1-B-r: zijbelemmering rechts, hoogte >= 2,5 m, afstand 1,97 m, breedte 2,65 m, hoek 37 graden; b_b = afstand / breedte"
+      },
+      {
+        "windowId": "rz2-B1-l",
+        "obstruction": {
+          "method": "side_obstruction",
+          "side": "right",
+          "relativeWidth": 2.789,
+          "coolingHeightCondition": false
+        },
+        "sourceReference": "openbare bron Uniec 3,2,9,2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024), rz2-B1-l: zijbelemmering rechts, hoogte < 2,5 m, afstand 7,39 m, breedte 2,65 m, hoek 70 graden; b_b = afstand / breedte"
+      },
+      {
+        "windowId": "rz2-B1-r",
+        "obstruction": {
+          "method": "side_obstruction",
+          "side": "right",
+          "relativeWidth": 0.743,
+          "coolingHeightCondition": false
+        },
+        "sourceReference": "openbare bron Uniec 3,2,9,2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024), rz2-B1-r: zijbelemmering rechts, hoogte < 2,5 m, afstand 1,97 m, breedte 2,65 m, hoek 37 graden; b_b = afstand / breedte"
+      }
+    ],
+    "surfaceTilts": [
+      {
+        "surfaceId": "rz1-dak",
+        "tiltDeg": 20.0,
+        "sourceReference": "openbare bron Uniec 3.2.9.2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024)"
+      },
+      {
+        "surfaceId": "rz2-dak-w",
+        "tiltDeg": 20.0,
+        "sourceReference": "openbare bron Uniec 3.2.9.2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024)"
+      },
+      {
+        "surfaceId": "rz2-dak-o",
+        "tiltDeg": 20.0,
+        "sourceReference": "openbare bron Uniec 3.2.9.2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024)"
+      }
+    ],
+    "groundFloors": [
+      {
+        "surfaceId": "rz1-vloer",
+        "exposedPerimeterM": 22.57,
+        "constructionResistanceM2kPerW": 3.7,
+        "edgeThermalBridges": {
+          "method": "detailed",
+          "bridges": [
+            {
+              "lengthM": 20.59,
+              "psiWPerMk": 0.27,
+              "sourceReference": "I.1 nr 01"
+            },
+            {
+              "lengthM": 1.98,
+              "psiWPerMk": 0.45,
+              "sourceReference": "I.1 nr 02"
+            }
+          ]
+        },
+        "sourceReference": "openbare bron Uniec 3.2.9.2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024): op/boven mv, z <= 0,3; omtrek niet in de uitdraai, aangenomen gelijk aan de lengte van de funderingsaansluitingen (20,59 + 1,98 m)"
+      },
+      {
+        "surfaceId": "rz2-vloer",
+        "exposedPerimeterM": 31.77,
+        "constructionResistanceM2kPerW": 3.7,
+        "edgeThermalBridges": {
+          "method": "detailed",
+          "bridges": [
+            {
+              "lengthM": 31.77,
+              "psiWPerMk": 0.27,
+              "sourceReference": "I.1 nr 01"
+            }
+          ]
+        },
+        "sourceReference": "openbare bron Uniec 3.2.9.2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024): op/boven mv, z <= 0,3; omtrek niet in de uitdraai, aangenomen gelijk aan de lengte van de funderingsaansluitingen (31,77 m)"
+      }
+    ],
+    "ventilationFlows": [],
+    "emission": {
+      "system": "floor_heating",
+      "balancing": "none_or_unknown",
+      "control": "individual_room_thermostats",
+      "sourceReference": "openbare bron Uniec 3.2.9.2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024): vloerverwarming, vertrekhoogte 4 < h <= 6 m, isolatie onbekend, autom. regeling per ruimte met handmatig overrulen",
+      "edition2023": {
+        "kind": {
+          "type": "high_room",
+          "heightM": 5.0,
+          "emitter": "floor_minimal_insulation_up_to10_cm",
+          "control": "controlled"
+        },
+        "pipeSystem": "two_pipe",
+        "balancing": "none_or_unknown"
+      }
+    },
+    "distribution": {
+      "method": "calculated",
+      "sourceReference": "openbare bron Uniec 3.2.9.2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024)"
+    },
+    "distributionSystem": {
+      "designTemperatureClass": "45_40",
+      "installation": "individual",
+      "usageFunction": "sport",
+      "connectedStoreys": 2,
+      "pipeTransmittance": {
+        "method": "forfait",
+        "insulation": {
+          "state": "insulated",
+          "period": "from1995"
+        }
+      },
+      "valvesInsulated": false,
+      "pump": {
+        "method": "included_in_generator_auxiliary"
+      },
+      "sourceReference": "openbare bron Uniec 3.2.9.2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024): tweepijps 45 C, inregeling onbekend, leidinggegevens onbekend (476,03 m, geisoleerd), geen leidingen buiten de verwarmde zone, geen aanvullende pomp",
+      "unheatedPipeLengthM": 0.0
+    },
+    "generator": {
+      "kind": "heat_pump_forfait",
+      "forfait": {
+        "generatorId": "hp",
+        "classificationSourceReference": "openbare bron Uniec 3.2.9.2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024): WP elektrisch forfaitair, buitenlucht, afgifte water, COP 3,05",
+        "scope": "utility_collective_or_over25_kw",
+        "source": "outdoor_air",
+        "sink": "hydronic",
+        "designSupplyTemperatureC": 45
+      },
+      "sourceSystem": "individual",
+      "sourceSystemReference": "buitenlucht"
+    },
+    "heatPumpRenewable": {
+      "sourceBelow20C": true,
+      "exhaustAirSource": false,
+      "sourceReference": "outdoor air"
+    },
+    "bacsFactor": 1.0,
+    "bacsSourceReference": "openbare bron Uniec 3.2.9.2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024): geen GBS in de uitdraai",
+    "useInventoryComplete": true,
+    "declaredUses": [],
+    "productionInventoryComplete": true,
+    "pvSystems": [
+      {
+        "id": "pv",
+        "peakPower": {
+          "method": "declared_specific",
+          "peakPowerWPerM2": 200.0,
+          "panelAreaM2": 66.0
+        },
+        "azimuthDeg": 270.0,
+        "tiltDeg": 20.0,
+        "mounting": "moderately_ventilated",
+        "obstructionFactors": [
+          1.0
+        ],
+        "sourceReference": "openbare bron Uniec 3.2.9.2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024): 66 m2, 200 Wp/m2, west 20 graden, matig geventileerd, minimale belemmering"
+      }
+    ],
+    "lighting": [
+      {
+        "zoneId": "rz1",
+        "functions": [
+          {
+            "function": "office",
+            "areaM2": 15.74
+          },
+          {
+            "function": "assembly_without_day_care",
+            "areaM2": 28.16
+          },
+          {
+            "function": "healthcare_without_beds",
+            "areaM2": 29.55
+          },
+          {
+            "function": "sport",
+            "areaM2": 44.35
+          }
+        ],
+        "lightingZones": [
+          {
+            "id": "rz1-vz1",
+            "areaM2": 68.6,
+            "power": {
+              "method": "forfait",
+              "ledFrom2017": false
+            },
+            "parasitic": {
+              "method": "forfait"
+            },
+            "occupancy": {
+              "control": "manual_or_unknown",
+              "centralOnControl": false,
+              "largeOfficeGroup": false
+            },
+            "daylight": {
+              "method": "none"
+            },
+            "extractedLuminaires": false
+          },
+          {
+            "id": "rz1-gemeenschappelijk",
+            "areaM2": 49.2,
+            "power": {
+              "method": "forfait",
+              "ledFrom2017": false
+            },
+            "parasitic": {
+              "method": "forfait"
+            },
+            "occupancy": {
+              "control": "manual_or_unknown",
+              "centralOnControl": false,
+              "largeOfficeGroup": false
+            },
+            "daylight": {
+              "method": "none"
+            },
+            "extractedLuminaires": false
+          }
+        ],
+        "sourceReference": "openbare bron Uniec 3.2.9.2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024): verlichtingsvermogen en parasitair vermogen forfaitair, vertrekschakeling hand aan/uit"
+      },
+      {
+        "zoneId": "rz2",
+        "functions": [
+          {
+            "function": "sport",
+            "areaM2": 626.0
+          }
+        ],
+        "lightingZones": [
+          {
+            "id": "rz2-vz2",
+            "areaM2": 626.0,
+            "power": {
+              "method": "forfait",
+              "ledFrom2017": false
+            },
+            "parasitic": {
+              "method": "forfait"
+            },
+            "occupancy": {
+              "control": "manual_or_unknown",
+              "centralOnControl": false,
+              "largeOfficeGroup": false
+            },
+            "daylight": {
+              "method": "none"
+            },
+            "extractedLuminaires": false
+          }
+        ],
+        "sourceReference": "openbare bron Uniec 3.2.9.2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024): verlichtingsvermogen en parasitair vermogen forfaitair, vertrekschakeling hand aan/uit"
+      }
+    ],
+    "labelFunction": "sport",
+    "demandUsesFixedC1Ventilation": false,
+    "batteryStoragePresent": false,
+    "bblFunction": "sport",
+    "bblFunctions": [
+      {
+        "function": "office",
+        "areaM2": 15.74
+      },
+      {
+        "function": "other_assembly",
+        "areaM2": 28.16
+      },
+      {
+        "function": "other_healthcare",
+        "areaM2": 29.55
+      },
+      {
+        "function": "sport",
+        "areaM2": 670.35
+      }
+    ],
+    "cooling": {
+      "emission": {
+        "emitter": "floor_cooling",
+        "balancing": "none_or_unknown",
+        "control": "standalone_per_room",
+        "sourceReference": "openbare bron Uniec 3.2.9.2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024): vloerkoeling, autom. regeling per ruimte met handmatig overrulen"
+      },
+      "distribution": {
+        "designTemperature": "t17_to21",
+        "pipe": {
+          "kind": "insulated_from1995"
+        },
+        "fittingsInsulated": false,
+        "pump": {
+          "hydraulicallyBalanced": false,
+          "floorCount": 2,
+          "heatMeter": false,
+          "individualDwellingInstallation": false,
+          "labelPowerKw": 0.033,
+          "energyEfficiencyIndex": 0.23,
+          "sourceReference": "openbare bron Uniec 3.2.9.2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024): pomp 33 W, EEI 0,23"
+        },
+        "sourceReference": "openbare bron Uniec 3.2.9.2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024): watergedragen 17/21, inregeling onbekend, leidinggegevens onbekend, geisoleerd, geen leidingen buiten de gekoelde zone",
+        "unconditionedPipeLengthM": 0.0
+      },
+      "generators": [
+        {
+          "id": "koel",
+          "generator": {
+            "kind": "compression"
+          },
+          "equipmentReference": "openbare bron Uniec 3.2.9.2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024): compressiekoeling forfaitair, EER 3,00"
+        }
+      ]
+    },
+    "hotWater": {
+      "need": {
+        "method": "utility",
+        "areas": [
+          {
+            "function": "office",
+            "areaM2": 15.74
+          },
+          {
+            "function": "assembly_without_day_care",
+            "areaM2": 28.16
+          },
+          {
+            "function": "healthcare_without_beds",
+            "areaM2": 29.55
+          },
+          {
+            "function": "sport",
+            "areaM2": 670.35
+          }
+        ],
+        "sourceReference": "openbare bron Uniec 3.2.9.2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024): tabel 13.1 per functie"
+      },
+      "emission": {
+        "method": "utility",
+        "meanLengthM": 2.0,
+        "sourceReference": "openbare bron Uniec 3.2.9.2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024): uittapleidingen <= 3 m"
+      },
+      "storage": [
+        {
+          "id": "vat",
+          "volumeL": 200.0,
+          "loss": {
+            "method": "unknown_label",
+            "producedFrom2018": true
+          },
+          "connectionFactor": 4,
+          "inHeatedZone": true,
+          "sourceReference": "openbare bron Uniec 3.2.9.2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024): 200 l, vanaf 2018, label onbekend, rechte delen geisoleerd, 5 of meer aansluitingen (f_sto;dis;ls 4)"
+        }
+      ],
+      "generator": {
+        "kind": "indirect_heat_pump",
+        "alsoSpaceHeating": false
+      },
+      "equipmentReference": "openbare bron Uniec 3.2.9.2 printout (bedrijfsgebouw met sportschool 743,80 m2, 29-05-2024): luchtwarmtepomp met los voorraadvat, COP 1,40"
+    }
+  }
+}

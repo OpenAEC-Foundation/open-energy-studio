@@ -16,7 +16,10 @@ use crate::annex_m::{
 use crate::annex_n::{
     heater_month, resolve_heater, validate_local_heater, HeaterMonth, LocalHeater,
 };
-use crate::annex_o::{auxiliary_constants, monthly_auxiliary_kwh, AppliancePowerMeasurements};
+use crate::annex_o::{
+    auxiliary_constants, declared_auxiliary_constants, monthly_auxiliary_kwh,
+    AppliancePowerMeasurements, DeclaredAuxiliaryConstants,
+};
 use crate::annex_q::{
     calculate_annex_q, validate_annex_q, AnnexQContext, AnnexQHeatPump, AnnexQResult, AnnexQSource,
     DemandClass,
@@ -251,6 +254,11 @@ pub struct DistributionSystem {
     /// Collective buffer vessel (9.2.3.3/9.2.3.5); only with calculated Ψ.
     #[serde(default)]
     pub buffer_vessel: Option<BufferVessel>,
+    /// NTA 8800:2023 9.4.3 (p. 299): uninsulated pipes run in an uninsulated
+    /// outer wall or floor of the heated zone, f_H;dis;rbl = 0,5. From 2024
+    /// those pipes count as pipes in an unheated space (p. 285).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub uninsulated_pipes_in_uninsulated_shell: bool,
     pub pump: DistributionPump,
     pub source_reference: String,
 }
@@ -435,10 +443,42 @@ pub struct ChpGenerator {
     /// Method 1 (9.6.6.2): NEN-EN 50465 test values of a micro-CHP.
     #[serde(default)]
     pub method1: Option<crate::micro_chp::MicroChp>,
+    /// Method 2 with ε_chp;th and ε_chp;el from a quality declaration
+    /// instead of table 9.31 (§9.1, 2025+C1 p. 285; table 9.31 p. 343).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub declared_efficiencies: Option<DeclaredChpEfficiencies>,
     /// 9.6.8.2 (9.91) inputs.
     #[serde(default)]
     pub auxiliary: Option<OtherGeneratorAuxiliary>,
     pub equipment_reference: String,
+}
+
+/// Annual mean conversion factors of a CHP on gross calorific value from
+/// a quality declaration (§9.1), replacing the table 9.31 row.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DeclaredChpEfficiencies {
+    /// ε_chp;th.
+    pub thermal: f64,
+    /// ε_chp;el.
+    pub electric: f64,
+    pub declaration_reference: String,
+}
+
+impl DeclaredChpEfficiencies {
+    /// §9.1 (p. 285): rounded down to the two decimals of table 9.31;
+    /// `None` when either factor is outside (0, 1] or together above 1.
+    pub fn factors(&self) -> Option<(f64, f64)> {
+        let round = |value: f64| (value * 100.0 + 1e-9).floor() / 100.0;
+        let (thermal, electric) = (round(self.thermal), round(self.electric));
+        (self.thermal.is_finite()
+            && self.electric.is_finite()
+            && thermal > 0.0
+            && self.thermal <= 1.0
+            && self.electric >= 0.0
+            && self.thermal + self.electric <= 1.0)
+            .then_some((thermal, electric))
+    }
 }
 
 /// 9.6.1: generators with their preference and nominal power.
@@ -827,6 +867,10 @@ pub struct GasBoilerGenerator {
     /// constants A, B and C of 9.85 (9.86–9.90); absent means the forfait.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auxiliary_measurements: Option<AppliancePowerMeasurements>,
+    /// Individual appliances: A, B, C and B_nom of 9.85 from a quality
+    /// declaration (§9.1); exclusive with `auxiliaryMeasurements`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub declared_auxiliary_constants: Option<DeclaredAuxiliaryConstants>,
     /// Collective boilers: 9.91 inputs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auxiliary: Option<OtherGeneratorAuxiliary>,
@@ -1209,6 +1253,12 @@ impl SystemHeatPump {
             crate::norm_versions::HeatPumpSourceRoute::AnySourceFrom15C2024 => {
                 self.source_from_15_c
             }
+            // NTA 8800:2023 p. 326: only a source of at least 20 °C.
+            crate::norm_versions::HeatPumpSourceRoute::From20C2023 => {
+                self.source_from_15_c && !self.source_15_to_20_c
+            }
+            // NTA 8800:2022 p. 94–96: 5.20 has no Q_HD;hp;in;bron.
+            crate::norm_versions::HeatPumpSourceRoute::None2022 => false,
         }
     }
 }
@@ -1461,6 +1511,20 @@ fn zone_terms(
             format!("{prefix}emission.balancing"),
         ));
     }
+    // NTA 8800:2023 tables 9.2–9.10 (p. 273–285) exist in that edition only.
+    if let Some(edition) = &emission.edition2023 {
+        if !crate::norm_versions::profile().emission_tables_2023 {
+            issues.push(issue(
+                "route_not_in_edition",
+                format!("{prefix}emission.edition2023"),
+            ));
+        } else if !edition.valid() {
+            issues.push(issue(
+                "emission_2023_input_invalid",
+                format!("{prefix}emission.edition2023"),
+            ));
+        }
+    }
     // 9.23: air heater auxiliary energy (tables 9.12/9.13).
     if let Some(heaters) = &emission.air_heaters {
         if heaters
@@ -1492,6 +1556,16 @@ fn zone_terms(
                 issues.push(issue(
                     "emission_fan_count_invalid",
                     format!("{prefix}emission.fans.count"),
+                ));
+            }
+            // The NEN-EN 16430 assembly power is new in NTA 8800:2023
+            // (p. 286; 2022 p. 282).
+            if fans.tested_power_w.is_some()
+                && !crate::norm_versions::profile().tested_emission_fan_power
+            {
+                issues.push(issue(
+                    "route_not_in_edition",
+                    format!("{prefix}emission.fans.testedPowerW"),
                 ));
             }
             if fans
@@ -1661,8 +1735,32 @@ struct DistributionResult {
     summary: Option<DistributionSummary>,
 }
 
-fn validate_distribution_system(system: &DistributionSystem, issues: &mut Vec<ChainIssue>) {
+fn validate_distribution_system(
+    system: &DistributionSystem,
+    residential: bool,
+    issues: &mut Vec<ChainIssue>,
+) {
     let path = "distributionSystem";
+    // 9.4.2.3: NTA 8800:2020+A1 (p. 292) allows the actual pipe length only
+    // for utility buildings; from 2022 (p. 294) also for dwellings.
+    if residential
+        && system.actual_pipe_length_m.is_some()
+        && !crate::norm_versions::profile().residential_actual_pipe_length
+    {
+        issues.push(issue(
+            "route_not_in_edition",
+            format!("{path}.actualPipeLengthM"),
+        ));
+    }
+    if system
+        .design_temperature_class
+        .is_some_and(|class| !class.in_edition())
+    {
+        issues.push(issue(
+            "route_not_in_edition",
+            format!("{path}.designTemperatureClass"),
+        ));
+    }
     if system.source_reference.trim().is_empty() {
         issues.push(issue(
             "source_reference_required",
@@ -1673,6 +1771,14 @@ fn validate_distribution_system(system: &DistributionSystem, issues: &mut Vec<Ch
         issues.push(issue(
             "connected_storeys_invalid",
             format!("{path}.connectedStoreys"),
+        ));
+    }
+    if system.uninsulated_pipes_in_uninsulated_shell
+        && !crate::norm_versions::profile().distribution_half_recoverable_route
+    {
+        issues.push(issue(
+            "route_not_in_edition",
+            format!("{path}.uninsulatedPipesInUninsulatedShell"),
         ));
     }
     for (value, field) in [
@@ -1805,7 +1911,12 @@ fn calculate_distribution(
         .design_temperature_class
         .unwrap_or(DesignTemperatureClass::C90);
     let (design_supply, design_spread) = class.design();
-    let full_month = system.pipes_also_for_hot_water || system.collective_hot_water_delivery_set;
+    // 2024 p. 285–286 and 289–290: full-month t_H;op for combined pipes and
+    // delivery sets, ϑ_H;mean ≥ 65 °C (9.30) and L_zi = 0 for heating-only
+    // pipes. NTA 8800:2023 (p. 290–294) has none of these rules.
+    let rules_2024 = crate::norm_versions::profile().distribution_2024_rules;
+    let full_month =
+        rules_2024 && (system.pipes_also_for_hot_water || system.collective_hot_water_delivery_set);
     // Table 9.X: pump fraction 0,10 for dwellings with an individual installation.
     let pump_fraction = if system.usage_function == ReductionFunction::Residential
         && system.installation == Installation::Individual
@@ -1856,7 +1967,7 @@ fn calculate_distribution(
     let mean = |zone: usize, month: usize| {
         let (supply, ret) = supply_return[zone][month];
         let value = (supply + ret) / 2.0;
-        if system.collective_hot_water_delivery_set {
+        if rules_2024 && system.collective_hot_water_delivery_set {
             value.max(DELIVERY_SET_MIN_MEAN_C)
         } else {
             value
@@ -1877,7 +1988,11 @@ fn calculate_distribution(
         ));
         return result;
     }
-    let shared = system.pipes_also_for_hot_water && system.installation == Installation::Collective;
+    // Table 9.16 rows for combined collective pipes: 2024 p. 292; absent
+    // in NTA 8800:2023 (p. 296).
+    let shared = system.pipes_also_for_hot_water
+        && system.installation == Installation::Collective
+        && crate::norm_versions::profile().table_9_16_combined_rows;
     let psi_zone = system.pipe_transmittance.value(connected_area_m2, shared);
     let psi_unheated = system
         .unheated_pipe_transmittance
@@ -1905,8 +2020,9 @@ fn calculate_distribution(
             continue;
         }
         let share = zone.area_m2 / zone_area;
-        // 9.4.1: L_zi = 0 when the pipes serve space heating only.
-        let zone_length = if system.pipes_also_for_hot_water {
+        // 9.4.1: L_zi = 0 when the pipes serve space heating only (2024
+        // p. 284–285; not in NTA 8800:2023 p. 290–291).
+        let zone_length = if system.pipes_also_for_hot_water || !rules_2024 {
             in_zone_with_fittings * share
         } else {
             0.0
@@ -1920,8 +2036,16 @@ fn calculate_distribution(
                     / 1000.0
                     * share;
             result.zone_loss[index][month] = (in_zone + unheated) * building_fraction;
-            // 9.38 with f_H;dis;rbl = 1; losses in unheated spaces are not recoverable.
-            result.zone_recoverable[index][month] = in_zone * building_fraction;
+            // 9.38 with f_H;dis;rbl = 1 (0,5 for NTA 8800:2023 p. 299 pipes
+            // in an uninsulated shell); losses in unheated spaces are not
+            // recoverable.
+            let recoverable_fraction = if system.uninsulated_pipes_in_uninsulated_shell {
+                0.5
+            } else {
+                1.0
+            };
+            result.zone_recoverable[index][month] =
+                recoverable_fraction * in_zone * building_fraction;
         }
     }
 
@@ -1965,7 +2089,9 @@ fn calculate_distribution(
                 let peak = (0..12)
                     .max_by(|a, b| totals[*a].total_cmp(&totals[*b]))
                     .unwrap_or(0);
-                let spread = if system.collective_hot_water_delivery_set {
+                // 2024 p. 300: Δϑ_H;min = Δϑ_H,ontw with delivery sets; not
+                // in NTA 8800:2023 (p. 304).
+                let spread = if rules_2024 && system.collective_hot_water_delivery_set {
                     design_spread
                 } else {
                     hydronic
@@ -2125,7 +2251,23 @@ pub fn other_generator_auxiliary_kwh(
 }
 
 /// 9.85 with the forfait constants for an individual electric heat pump.
-pub fn heat_pump_forfait_auxiliary_kwh(electricity_kwh: f64) -> f64 {
+/// `installation_year` only matters under NTA 8800:2020+A1.
+pub fn heat_pump_forfait_auxiliary_kwh(
+    electricity_kwh: f64,
+    installation_year: Option<u16>,
+) -> f64 {
+    let profile = crate::norm_versions::profile();
+    if !profile.heat_pump_aux_constants {
+        // NTA 8800:2020+A1 9.6.8.1.1.2.1 (p. 334–336): heat pumps take the
+        // device forfait A 87,6 kWh for a build year before 2015 or unknown,
+        // 13,0 kWh from 2015, B 0,132 kW, C 1,44/3,6 and B_nom 24 kW.
+        let annual_fixed = if installation_year.is_some_and(|year| year >= 2015) {
+            profile.device_aux_a_from_2015_kwh
+        } else {
+            87.6
+        };
+        return annual_fixed / 12.0 + 0.132 * electricity_kwh / (1.44 / 3.6 * 24.0);
+    }
     HEAT_PUMP_AUX_A_KWH / 12.0
         + HEAT_PUMP_AUX_B_KW * electricity_kwh / (HEAT_PUMP_AUX_C * HEAT_PUMP_AUX_B_NOM_KW)
 }
@@ -2334,7 +2476,10 @@ fn assess_chain_pass(
         });
     match &input.distribution_system {
         Some(system) => {
-            validate_distribution_system(system, &mut issues);
+            let residential = std::iter::once(&input.demand)
+                .chain(input.additional_zones.iter().map(|zone| &zone.demand))
+                .all(|zone| zone.usage_function.is_residential());
+            validate_distribution_system(system, residential, &mut issues);
             if matches!(system.pump, DistributionPump::IncludedInGeneratorAuxiliary)
                 && !input.generator.auxiliary_includes_pump()
             {
@@ -2990,7 +3135,11 @@ enum BiomassClass {
 /// Tables 5.2/5.4 (p. 94–95): bmA is biomass above 500 kW thermal power per
 /// installation, so the powers of all solid-biomass generators of one
 /// heating system (a multiple set, identical appliances) are added.
-const BIOMASS_CLASS_LIMIT_KW: f64 = 500.0;
+/// 500 kW from 2024 (p. 92–95), 100 kW in 2023 (p. 90–93); the
+/// `biomassAbove500Kw` input flag means "above the edition's threshold".
+fn biomass_class_limit_kw() -> f64 {
+    crate::norm_versions::profile().biomass_threshold_kw
+}
 
 fn validate_biomass_evidence(
     compliant: Option<bool>,
@@ -3064,7 +3213,7 @@ fn local_heater_above_500_kw(generator: &LocalHeaterGenerator) -> bool {
         .heater
         .product
         .output_full_kw
-        .is_some_and(|power| power.is_finite() && power > BIOMASS_CLASS_LIMIT_KW)
+        .is_some_and(|power| power.is_finite() && power > biomass_class_limit_kw())
 }
 
 /// Marks a biomass generator as part of an installation above 500 kW.
@@ -3085,13 +3234,13 @@ fn mark_biomass_installation(generator: &mut Generator) {
 /// declaration is reported, not refused.
 fn biomass_class_warnings(input: &SpaceHeatingChainInput) -> Vec<ChainIssue> {
     let installation_kw = biomass_installation_kw(input);
-    let above = |flagged: bool| flagged || installation_kw > BIOMASS_CLASS_LIMIT_KW;
+    let above = |flagged: bool| flagged || installation_kw > biomass_class_limit_kw();
     let declared = |generator: &Generator| -> Option<(bool, bool)> {
         match generator {
             Generator::ProductBoiler(item) if item.boiler.fuel == BoilerFuel::Wood => Some((
                 item.annex_r_compliant_at_most_500_kw == Some(true),
                 item.biomass_above_500_kw
-                    || item.boiler.product.nominal_power_kw > BIOMASS_CLASS_LIMIT_KW,
+                    || item.boiler.product.nominal_power_kw > biomass_class_limit_kw(),
             )),
             Generator::LocalHeater(item) if item.fuel == LocalHeaterFuel::Biomass => Some((
                 item.annex_r_compliant_at_most_500_kw == Some(true),
@@ -3629,7 +3778,7 @@ fn generate_multiple_with_annex_q(
     let mut rest_rows = rows_for(&rest_outputs);
     let mut rest_issues = Vec::new();
     let mut annex_q_unused = None;
-    let installation_above_500 = biomass_installation_kw(input) > BIOMASS_CLASS_LIMIT_KW;
+    let installation_above_500 = biomass_installation_kw(input) > biomass_class_limit_kw();
     if let [only] = rest_indices.as_slice() {
         let mut sub_input = input.clone();
         sub_input.generator = set.generators[*only].generator.clone();
@@ -3913,7 +4062,11 @@ fn generate_multiple(
     } else {
         total_power
     };
-    let scale = if set.added_preferred_generator {
+    // (9.58) has f_gebouw;si;H from NTA 8800:2023 (p. 309); 2022 p. 305
+    // relates the installed power alone to Φ_H;tot.
+    let scale = if set.added_preferred_generator
+        && crate::norm_versions::profile().preference_beta_building_share
+    {
         building_fraction
     } else {
         1.0
@@ -3946,7 +4099,7 @@ fn generate_multiple(
     let mut total_input = 0.0;
     let mut auxiliary_known = true;
     // Tables 5.2/5.4: the biomass class follows the whole installation.
-    let installation_above_500 = biomass_installation_kw(input) > BIOMASS_CLASS_LIMIT_KW;
+    let installation_above_500 = biomass_installation_kw(input) > biomass_class_limit_kw();
     for row in monthly.iter_mut() {
         row.auxiliary_electricity_kwh = Some(0.0);
     }
@@ -4065,7 +4218,7 @@ fn generate_identical(
     // §9.1 identical appliances form one installation (tables 5.2/5.4).
     let marked;
     let input = if is_biomass(&input.generator)
-        && biomass_installation_kw(input) > BIOMASS_CLASS_LIMIT_KW
+        && biomass_installation_kw(input) > biomass_class_limit_kw()
     {
         let mut copy = input.clone();
         mark_biomass_installation(&mut copy.generator);
@@ -4217,9 +4370,31 @@ fn generate(
             match (&generator.chp, &generator.method1) {
                 (Some(class), None) => {
                     validate_other_auxiliary(generator.auxiliary.as_ref(), true, issues);
-                    let Some((thermal, electric)) = class.factors() else {
+                    let Some(table) = class.factors() else {
                         issues.push(issue("chp_class_invalid", "generator.chp"));
                         return None;
+                    };
+                    // §9.1: a quality declaration replaces the table row.
+                    let (thermal, electric) = match &generator.declared_efficiencies {
+                        None => table,
+                        Some(declared) => {
+                            if declared.declaration_reference.trim().is_empty() {
+                                issues.push(issue(
+                                    "source_reference_required",
+                                    "generator.declaredEfficiencies.declarationReference",
+                                ));
+                            }
+                            match declared.factors() {
+                                Some(factors) => factors,
+                                None => {
+                                    issues.push(issue(
+                                        "chp_declared_efficiency_invalid",
+                                        "generator.declaredEfficiencies",
+                                    ));
+                                    return None;
+                                }
+                            }
+                        }
                     };
                     if !issues.is_empty() {
                         return None;
@@ -4241,6 +4416,12 @@ fn generate(
                     }
                 }
                 (None, Some(product)) => {
+                    if generator.declared_efficiencies.is_some() {
+                        issues.push(issue(
+                            "chp_declared_efficiency_method1",
+                            "generator.declaredEfficiencies",
+                        ));
+                    }
                     issues.extend(
                         crate::micro_chp::validate_micro_chp(product, "generator.method1")
                             .into_iter()
@@ -4369,6 +4550,35 @@ fn generate(
                 } else {
                     // Annex O and 9.86–9.88 instead of the 9.85 forfait.
                     match auxiliary_constants(measurements, "generator.auxiliaryMeasurements") {
+                        Ok(constants) => {
+                            for row in monthly.iter_mut() {
+                                row.auxiliary_electricity_kwh =
+                                    Some(monthly_auxiliary_kwh(&constants, row.natural_gas_kwh));
+                            }
+                        }
+                        Err(found) => {
+                            issues.extend(found.into_iter().map(|item| issue(item.code, item.path)))
+                        }
+                    }
+                }
+            }
+            if let Some(declared) = &generator.declared_auxiliary_constants {
+                if collective {
+                    issues.push(issue(
+                        "boiler_auxiliary_measurements_individual_only",
+                        "generator.declaredAuxiliaryConstants",
+                    ));
+                } else if generator.auxiliary_measurements.is_some() {
+                    issues.push(issue(
+                        "boiler_auxiliary_declared_and_measured",
+                        "generator.declaredAuxiliaryConstants",
+                    ));
+                } else {
+                    // §9.1 quality declaration instead of the 9.85 forfait.
+                    match declared_auxiliary_constants(
+                        declared,
+                        "generator.declaredAuxiliaryConstants",
+                    ) {
                         Ok(constants) => {
                             for row in monthly.iter_mut() {
                                 row.auxiliary_electricity_kwh =
@@ -4573,7 +4783,12 @@ fn generate(
                 Some(
                     electricity
                         .iter()
-                        .map(|(_, kwh)| heat_pump_forfait_auxiliary_kwh(*kwh))
+                        .map(|(_, kwh)| {
+                            heat_pump_forfait_auxiliary_kwh(
+                                *kwh,
+                                generator.forfait.installation_year,
+                            )
+                        })
                         .collect(),
                 )
             };
@@ -4630,6 +4845,7 @@ fn generate(
                             .map_or(0.0, |item| item.electricity_kwh),
                         None => heat_pump_forfait_auxiliary_kwh(
                             pump_month.generator_input_electricity_kwh,
+                            generator.forfait.installation_year,
                         ),
                     };
                     row.auxiliary_electricity_kwh = boiler_month
@@ -4788,7 +5004,7 @@ fn generate(
                 validate_biomass_evidence(
                     generator.annex_r_compliant_at_most_500_kw,
                     generator.biomass_above_500_kw
-                        || generator.boiler.product.nominal_power_kw > BIOMASS_CLASS_LIMIT_KW,
+                        || generator.boiler.product.nominal_power_kw > biomass_class_limit_kw(),
                     generator.annex_r_reference.as_ref(),
                     issues,
                 )
@@ -4804,6 +5020,15 @@ fn generate(
                 ));
                 return None;
             };
+            if generator
+                .design_temperature_class
+                .is_some_and(|class| !class.in_edition())
+            {
+                issues.push(issue(
+                    "route_not_in_edition",
+                    "generator.designTemperatureClass",
+                ));
+            }
             if !issues.is_empty() {
                 return None;
             }
@@ -5141,6 +5366,8 @@ mod tests {
 
     fn heat_pump() -> ForfaitHeatPumpDraftInput {
         ForfaitHeatPumpDraftInput {
+            installation_year: None,
+            installation_year_reference: None,
             generator_id: "hp".into(),
             classification_source_reference: "system design".into(),
             scope: TableScope::ResidentialAtMost25Kw,
@@ -5323,6 +5550,7 @@ mod tests {
         };
         let mut input = boiler_chain();
         input.generator = Generator::Chp(ChpGenerator {
+            declared_efficiencies: None,
             chp: None,
             method1: Some(product.clone()),
             auxiliary: None,
@@ -5448,6 +5676,7 @@ mod tests {
     fn chp_generator_follows_9_65_and_16_12() {
         let mut input = boiler_chain();
         input.generator = Generator::Chp(ChpGenerator {
+            declared_efficiencies: None,
             chp: Some(crate::space_cooling::ChpClass {
                 power_kw: 50.0,
                 built_after_2006: true,
@@ -5691,6 +5920,72 @@ mod tests {
         let jan = &result.monthly[0];
         assert!((jan.generator_electricity_kwh - jan.generator_output_kwh / cop).abs() < 1e-9);
         assert_eq!(result.annual_natural_gas_kwh, Some(0.0));
+    }
+
+    #[test]
+    fn heat_pump_build_year_sets_the_2020a1_device_forfait() {
+        use crate::norm_versions::{with_version, NormVersion};
+        let run = |year: Option<u16>, version: NormVersion| {
+            let mut input = boiler_chain();
+            let mut forfait = heat_pump();
+            forfait.installation_year = year;
+            forfait.installation_year_reference = year.map(|_| "type plate".into());
+            input.generator = Generator::HeatPumpForfait(HeatPumpGenerator {
+                regeneration: None,
+                forfait,
+                source_system: SourceSystem::Individual,
+                source_system_reference: "own outdoor unit".into(),
+                auxiliary_measurements: None,
+                auxiliary: None,
+            });
+            let result = with_version(version, || assess_space_heating_chain(&input));
+            assert!(result.issues.is_empty(), "{:?}", result.issues);
+            result.monthly[0].auxiliary_electricity_kwh.unwrap()
+                - result.monthly[0].distribution_auxiliary_electricity_kwh
+        };
+        // 2020 p. 336: A 13,0 kWh from 2015 instead of 87,6 kWh per year.
+        let unknown = run(None, NormVersion::V2020A1);
+        let recent = run(Some(2016), NormVersion::V2020A1);
+        assert!((unknown - recent - (87.6 - 13.0) / 12.0).abs() < 1e-9);
+        assert!((run(Some(2014), NormVersion::V2020A1) - unknown).abs() < 1e-12);
+        // The heat-pump constants of 2022 and later have no build year.
+        assert!(
+            (run(Some(2016), NormVersion::V2022) - run(None, NormVersion::V2022)).abs() < 1e-12
+        );
+    }
+
+    #[test]
+    fn heat_pump_build_year_needs_a_reference() {
+        use crate::norm_versions::{with_version, NormVersion};
+        let mut forfait = heat_pump();
+        forfait.installation_year = Some(2016);
+        let codes_in = |version: NormVersion, input: &ForfaitHeatPumpDraftInput| {
+            with_version(version, || {
+                crate::forfait_heat_pump_draft::assess_forfait_heat_pump_draft(input)
+                    .issues
+                    .into_iter()
+                    .map(|item| item.code)
+                    .collect::<Vec<_>>()
+            })
+        };
+        let codes = |input: &ForfaitHeatPumpDraftInput| codes_in(NormVersion::V2020A1, input);
+        assert!(codes(&forfait).contains(&"installation_year_reference_required"));
+        // Under 2022 and later the year changes nothing (own constants of
+        // 9.85), so a value left behind does not invalidate the generator.
+        for version in [NormVersion::V2022, NormVersion::V2025C1] {
+            assert!(codes_in(version, &forfait).is_empty());
+        }
+        forfait.installation_year = Some(1800);
+        forfait.installation_year_reference = Some("type plate".into());
+        assert!(codes(&forfait).contains(&"installation_year_invalid"));
+        // No fixed "current year": a device installed after the kernel was
+        // built is still a valid year (the bound only catches typing errors).
+        forfait.installation_year = Some(2027);
+        assert!(codes(&forfait).is_empty(), "{:?}", codes(&forfait));
+        forfait.installation_year = Some(crate::LATEST_PLAUSIBLE_YEAR + 1);
+        assert!(codes(&forfait).contains(&"installation_year_invalid"));
+        forfait.installation_year = None;
+        assert!(codes(&forfait).contains(&"installation_year_reference_without_year"));
     }
 
     fn annex_q_chain() -> SpaceHeatingChainInput {
@@ -6845,6 +7140,164 @@ mod tests {
         assert!((jan.auxiliary_electricity_kwh.unwrap() - expected).abs() < 1e-9);
     }
 
+    /// §9.1 (2025+C1 p. 285) with 9.85 (p. 359–360): the ISSO 54 EP-W203j
+    /// declaration A 10 kWh, B 0,12 kW, C 0,3 and B_nom 20 kW replaces the
+    /// forfait constants: W = A/12 + B·E/(C·B_nom).
+    #[test]
+    fn individual_boiler_auxiliary_from_declared_constants() {
+        let declared = json!({
+            "aKwh": 10.0, "bKw": 0.12, "c": 0.3, "nominalLoadKw": 20.0,
+            "declarationReference": "HR107 kwaliteitsverklaring"
+        });
+        let mut input = boiler_chain();
+        let Generator::GasBoiler(boiler) = &mut input.generator else {
+            unreachable!()
+        };
+        boiler.declared_auxiliary_constants = Some(serde_json::from_value(declared).unwrap());
+        let result = assess_space_heating_chain(&input);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        for row in &result.monthly {
+            let expected = 10.0 / 12.0 + 0.12 * row.natural_gas_kwh / (0.3 * 20.0);
+            assert!((row.auxiliary_electricity_kwh.unwrap() - expected).abs() < 1e-9);
+        }
+
+        // Rounded down to the decimals of the forfait values (§9.1):
+        // A 10,07 → 10,0; B 0,1209 → 0,120; C 0,39 → 0,3.
+        let constants = declared_auxiliary_constants(
+            &serde_json::from_value(json!({
+                "aKwh": 10.07, "bKw": 0.1209, "c": 0.39, "nominalLoadKw": 20.5,
+                "declarationReference": "x"
+            }))
+            .unwrap(),
+            "a",
+        )
+        .unwrap();
+        assert_eq!(
+            (
+                constants.a_kwh,
+                constants.b_kw,
+                constants.c,
+                constants.nominal_load_kw
+            ),
+            (10.0, 0.12, 0.3, 20.5)
+        );
+
+        // Invalid values and the combination with annex O measurements.
+        for (field, bad) in [
+            ("c", 0.04),
+            ("c", 1.2),
+            ("bKw", -1.0),
+            ("nominalLoadKw", 0.0),
+        ] {
+            let mut item = json!({
+                "aKwh": 10.0, "bKw": 0.12, "c": 0.3, "nominalLoadKw": 20.0,
+                "declarationReference": "x"
+            });
+            item[field] = json!(bad);
+            let found = declared_auxiliary_constants(&serde_json::from_value(item).unwrap(), "a")
+                .unwrap_err();
+            assert!(
+                found.iter().any(|issue| issue.path == format!("a.{field}")),
+                "{field}: {found:?}"
+            );
+        }
+        let mut input = boiler_chain();
+        let Generator::GasBoiler(boiler) = &mut input.generator else {
+            unreachable!()
+        };
+        boiler.declared_auxiliary_constants = Some(
+            serde_json::from_value(json!({
+                "aKwh": 10.0, "bKw": 0.12, "c": 0.3, "nominalLoadKw": 20.0,
+                "declarationReference": " "
+            }))
+            .unwrap(),
+        );
+        let result = assess_space_heating_chain(&input);
+        assert!(result
+            .issues
+            .iter()
+            .any(|issue| issue.code == "source_reference_required"
+                && issue.path == "generator.declaredAuxiliaryConstants.declarationReference"));
+    }
+
+    /// §9.1 with method 2 (9.65, table 9.31, 2025+C1 p. 342–343): the
+    /// ISSO 54 EP-W204h declaration ε_th 0,8 and ε_el 0,12 replaces the
+    /// "P_el ≤ 2 kW volgens HRe" row (0,83/0,10).
+    #[test]
+    fn chp_declared_efficiencies_replace_table_9_31() {
+        let mut input = boiler_chain();
+        let chp = |declared: Option<DeclaredChpEfficiencies>| {
+            Generator::Chp(ChpGenerator {
+                declared_efficiencies: declared,
+                chp: Some(crate::space_cooling::ChpClass {
+                    power_kw: 1.0,
+                    built_after_2006: true,
+                    hre_declared: true,
+                    low_temperature: true,
+                }),
+                method1: None,
+                auxiliary: Some(OtherGeneratorAuxiliary {
+                    electrically_connected_devices: 1,
+                    nominal_power_kw: Some(5.0),
+                    source_reference: "datasheet".into(),
+                }),
+                equipment_reference: "micro-CHP".into(),
+            })
+        };
+        input.distribution_system = Some(system(calculated_pump()));
+        input.generator = chp(Some(DeclaredChpEfficiencies {
+            thermal: 0.8,
+            electric: 0.12,
+            declaration_reference: "HRe kwaliteitsverklaring".into(),
+        }));
+        let result = assess_space_heating_chain(&input);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        let jan = &result.monthly[0];
+        assert!((jan.natural_gas_kwh - jan.generator_output_kwh / 0.8).abs() < 1e-9);
+        assert!((jan.chp_electricity_kwh - jan.generator_output_kwh * 0.12 / 0.8).abs() < 1e-9);
+        assert_eq!(result.generation_efficiency, Some(0.8));
+
+        // Rounded down to two decimals; refused outside (0, 1] or above 1
+        // together.
+        let factors = |thermal: f64, electric: f64| {
+            DeclaredChpEfficiencies {
+                thermal,
+                electric,
+                declaration_reference: "x".into(),
+            }
+            .factors()
+        };
+        assert_eq!(factors(0.806, 0.129), Some((0.8, 0.12)));
+        assert_eq!(factors(0.0, 0.1), None);
+        assert_eq!(factors(0.95, 0.1), None);
+        assert_eq!(factors(0.8, -0.1), None);
+        input.generator = chp(Some(DeclaredChpEfficiencies {
+            thermal: 1.2,
+            electric: 0.1,
+            declaration_reference: " ".into(),
+        }));
+        let result = assess_space_heating_chain(&input);
+        let codes: Vec<&str> = result.issues.iter().map(|issue| issue.code).collect();
+        assert!(
+            codes.contains(&"chp_declared_efficiency_invalid"),
+            "{codes:?}"
+        );
+        assert!(codes.contains(&"source_reference_required"), "{codes:?}");
+
+        // Without a declaration the table row stays: identical results.
+        input.generator = chp(None);
+        let table = assess_space_heating_chain(&input);
+        assert_eq!(table.generation_efficiency, Some(0.83));
+    }
+
     fn other_aux(devices: u32, power: Option<f64>) -> Option<OtherGeneratorAuxiliary> {
         Some(OtherGeneratorAuxiliary {
             electrically_connected_devices: devices,
@@ -6885,6 +7338,7 @@ mod tests {
             unheated_ambient_c: None,
             unheated_reduction_factor: None,
             buffer_vessel: None,
+            uninsulated_pipes_in_uninsulated_shell: false,
             pump,
             source_reference: "installation survey".into(),
         }
@@ -7042,7 +7496,7 @@ mod tests {
         let jan = &result.monthly[0];
         let expected = 43.8 / 12.0 + 0.132 * jan.generator_electricity_kwh / (0.7 * 3.0);
         assert!((jan.auxiliary_electricity_kwh.unwrap() - expected).abs() < 1e-9);
-        assert!((heat_pump_forfait_auxiliary_kwh(0.0) - 3.65).abs() < 1e-12);
+        assert!((heat_pump_forfait_auxiliary_kwh(0.0, None) - 3.65).abs() < 1e-12);
 
         let Generator::HeatPumpForfait(generator) = &mut input.generator else {
             unreachable!()
@@ -7195,6 +7649,7 @@ mod tests {
         // §9.1: one pump per dwelling, sized on the dwelling's share.
         let mut input = boiler_chain();
         input.generator = Generator::Chp(ChpGenerator {
+            declared_efficiencies: None,
             chp: Some(crate::space_cooling::ChpClass {
                 power_kw: 50.0,
                 built_after_2006: true,
@@ -7414,6 +7869,92 @@ mod tests {
         assert!(found.contains(&"distribution_system_required"));
         assert!(found.contains(&"distribution_pump_input_required"));
     }
+    /// NTA 8800:2023 9.4 against 2024: full-month operation and
+    /// ϑ_H;mean ≥ 65 °C with delivery sets (2024 p. 286, 290; absent in 2023
+    /// p. 291, 294), table 9.16 combined rows (2024 p. 292, 2023 p. 296),
+    /// L_zi = 0 for heating-only pipes (2024 p. 284–285, 2023 p. 290–291)
+    /// and f_H;dis;rbl = 0,5 in an uninsulated shell (2023 p. 299 only).
+    #[test]
+    fn distribution_rules_switch_with_the_2023_edition() {
+        use crate::norm_versions::{with_version, NormVersion};
+        let mut input = collective_boiler_chain();
+        input.distribution = Distribution::Calculated {
+            heating_limit_extra_kwh: Some(vec![0.0; 12]),
+            source_reference: "9.26".into(),
+        };
+        let distribution = input.distribution_system.as_mut().unwrap();
+        distribution.pipes_also_for_hot_water = true;
+        distribution.collective_hot_water_delivery_set = true;
+        distribution.pipe_transmittance = PipeTransmittance::Forfait {
+            insulation: crate::heating_distribution::PipeInsulation::Unknown,
+        };
+        let run = |version, input: &SpaceHeatingChainInput| {
+            with_version(version, || assess_space_heating_chain(input))
+        };
+        let v24 = run(NormVersion::V2024, &input);
+        let v23 = run(NormVersion::V2023, &input);
+        for result in [&v24, &v23] {
+            assert_eq!(
+                result.status, "calculated_unverified",
+                "{:?}",
+                result.issues
+            );
+        }
+        let (s24, s23) = (
+            v24.distribution.as_ref().unwrap(),
+            v23.distribution.as_ref().unwrap(),
+        );
+        // Table 9.16, uninsulated or unknown, connected area ≤ 200 m²:
+        // combined row 2,0 (2024 p. 292), heating row 1,0 (2023 p. 296).
+        assert_eq!(s24.psi_zone_w_per_mk, 2.0);
+        assert_eq!(s23.psi_zone_w_per_mk, 1.0);
+        // July: whole month (744 h) and 65 °C in 2024; table 9.15 hours and
+        // the 9.31/9.32 temperature (here the setpoint) in 2023.
+        assert_eq!(s24.zones[0].operating_hours[6], 744.0);
+        assert!(s23.zones[0].operating_hours[6] < 744.0);
+        assert!(s24.zones[0]
+            .mean_medium_temperature_c
+            .iter()
+            .all(|t| *t >= 65.0));
+        assert_eq!(s23.zones[0].mean_medium_temperature_c[6], 20.0);
+
+        // Heating-only pipes: L_zi = 0 in 2024, so only the recoverable pump
+        // energy (table 9.18, 0,25) remains; 2023 keeps the zone pipes.
+        let mut heating_only = input.clone();
+        let only = heating_only.distribution_system.as_mut().unwrap();
+        only.pipes_also_for_hot_water = false;
+        only.collective_hot_water_delivery_set = false;
+        let h24 = run(NormVersion::V2024, &heating_only);
+        let h23 = run(NormVersion::V2023, &heating_only);
+        let jan24 = &h24.monthly[0];
+        let jan23 = &h23.monthly[0];
+        let pump_part = |month: &ChainMonth| 0.25 * month.distribution_auxiliary_electricity_kwh;
+        assert!((jan24.recoverable_loss_kwh - pump_part(jan24)).abs() < 1e-9);
+        assert!(jan23.recoverable_loss_kwh > pump_part(jan23) + 100.0);
+
+        // f_H;dis;rbl = 0,5 halves the recoverable pipe loss (2023 p. 299).
+        let mut half = heating_only.clone();
+        half.distribution_system
+            .as_mut()
+            .unwrap()
+            .uninsulated_pipes_in_uninsulated_shell = true;
+        let f23 = run(NormVersion::V2023, &half);
+        let jan_half = &f23.monthly[0];
+        assert!(
+            (jan_half.recoverable_loss_kwh
+                - (pump_part(jan23) + 0.5 * (jan23.recoverable_loss_kwh - pump_part(jan23))))
+            .abs()
+                < 1e-9
+        );
+        assert_eq!(jan_half.distribution_loss_kwh, jan23.distribution_loss_kwh);
+        let f24 = run(NormVersion::V2024, &half);
+        assert!(f24
+            .issues
+            .iter()
+            .any(|item| item.code == "route_not_in_edition"
+                && item.path == "distributionSystem.uninsulatedPipesInUninsulatedShell"));
+    }
+
     #[test]
     fn collective_fixture_calculates_distribution_and_pump() {
         let input: SpaceHeatingChainInput = serde_json::from_str(include_str!(

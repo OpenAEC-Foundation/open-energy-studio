@@ -4,6 +4,7 @@
 //! adapters cannot drift. This crate depends only on the kernel and serde, so
 //! it compiles for `wasm32-unknown-unknown` as well as for the servers.
 
+use nta8800_core::norm_versions::{self, NormVersion};
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::{json, Value};
 
@@ -64,8 +65,8 @@ impl StatusRule {
 /// 200 is a success. 422 is a kernel assessment that refuses or cannot complete
 /// the input; the body is then the assessment itself, with its `status`,
 /// `gaps` and `issues`. 400 is a malformed request and 500 a withheld
-/// non-finite result; both use the [`error_body`] envelope, as do the HTTP
-/// adapter's own 404, 405, 413 and 415 answers.
+/// non-finite or unserializable result; both use the [`error_body`] envelope,
+/// as do the HTTP adapter's own 404, 405, 413 and 415 answers.
 #[derive(Debug, Clone)]
 pub struct Outcome {
     pub status: u16,
@@ -109,11 +110,19 @@ pub fn error_body(
     })
 }
 
-/// Serializes a kernel result, withholding it (500, `non_finite_result`) when
-/// it holds NaN or infinity: `serde_json` would otherwise write `null`.
+/// Serializes a kernel result, withholding it if it contains a non-finite
+/// number or cannot be represented as JSON.
 pub fn finite_value<T: Serialize + ?Sized>(value: &T) -> Result<Value, Outcome> {
     match nta8800_core::finite::first_non_finite(value) {
-        None => Ok(serde_json::to_value(value).unwrap_or(Value::Null)),
+        None => serde_json::to_value(value).map_err(|_| Outcome {
+            status: 500,
+            body: error_body(
+                "serialization_failed",
+                "The kernel result could not be serialized as JSON; the result is withheld",
+                None,
+                Value::Null,
+            ),
+        }),
         Some(path) => Err(Outcome {
             status: 500,
             body: error_body(
@@ -380,6 +389,163 @@ fn run_maatwerkadvies(body: &Value) -> Outcome {
             ),
         },
     }
+}
+
+// ---------------------------------------------------------------- editions
+
+/// Request member that selects the NTA 8800 edition of any operation.
+pub const NORM_VERSION_MEMBER: &str = norm_versions::request::NORM_VERSION_MEMBER;
+
+/// How an operation takes the edition of a request.
+enum EditionRoute {
+    /// The input carries its own edition at these (member, JSON pointer)
+    /// places; the request's edition is written there when absent and must
+    /// match when present.
+    Slots(Vec<(&'static str, &'static str)>),
+    /// The kernel function runs with the edition active (constructions and
+    /// diagnostic routes).
+    Active,
+    /// The result does not depend on the edition (label-input hash).
+    Independent,
+    /// Reference cases are compared in 2025+C1:2026 only.
+    Fixed,
+}
+
+fn edition_route(op: &Operation, body: &Value) -> EditionRoute {
+    const PROJECT: &str = "/ntaCalculation/normVersion";
+    match op.name {
+        "validate_project"
+        | "calculate_beng"
+        | "calculate_project_performance"
+        | "get_energy_by_service"
+        | "get_label_data"
+        | "assess_registration" => EditionRoute::Slots(vec![("project", PROJECT)]),
+        "assess_residential_survey" | "assess_utility_survey" => {
+            EditionRoute::Slots(vec![("survey", "/normVersion")])
+        }
+        "calculate_building_performance" => EditionRoute::Slots(vec![("input", "/normVersion")]),
+        // Every variant is calculated in the base situation's edition.
+        "assess_maatwerkadvies" => EditionRoute::Slots(vec![(
+            "input",
+            match body.pointer("/input/base/kind").and_then(Value::as_str) {
+                Some("building") => "/base/input/normVersion",
+                _ => "/base/project/ntaCalculation/normVersion",
+            },
+        )]),
+        // A relabel stays in the original's edition (BRL 9500-W §4.2.4).
+        "assess_relabel" => EditionRoute::Slots(vec![("original", PROJECT), ("current", PROJECT)]),
+        "get_label_input_hash" => EditionRoute::Independent,
+        "audit_reference_case"
+        | "compare_reference_case"
+        | "compare_direct_diagnostic"
+        | "compare_gas_heat_pump_chain_diagnostic" => EditionRoute::Fixed,
+        _ => EditionRoute::Active,
+    }
+}
+
+fn edition_error(code: &str, message: String, path: String) -> Outcome {
+    let supported: Vec<&str> = NormVersion::ALL
+        .iter()
+        .map(|version| version.id())
+        .collect();
+    Outcome {
+        status: 400,
+        body: error_body(
+            code,
+            message,
+            Some(path),
+            json!({ "supportedNormVersions": supported }),
+        ),
+    }
+}
+
+/// Refusal of a request's edition, as an error envelope.
+fn edition_refusal(error: norm_versions::request::EditionError) -> Outcome {
+    edition_error(error.code, error.message, error.path)
+}
+
+/// The request's `normVersion`, if any.
+fn requested_norm_version(body: &Value) -> Result<Option<NormVersion>, Outcome> {
+    norm_versions::request::parse_requested(body.get(NORM_VERSION_MEMBER)).map_err(edition_refusal)
+}
+
+/// Writes `version` into the input's own edition slots, refusing a request
+/// that contradicts the input.
+fn place_edition(
+    slots: &[(&'static str, &'static str)],
+    body: &mut Value,
+    version: NormVersion,
+) -> Result<(), Outcome> {
+    for (member, pointer) in slots {
+        if let Some(input) = body.get_mut(*member) {
+            norm_versions::request::place_in(input, member, pointer, version)
+                .map_err(edition_refusal)?;
+        }
+    }
+    Ok(())
+}
+
+/// Records the edition a result was calculated with (see
+/// [`norm_versions::request::stamp`]).
+fn stamp_edition(outcome: &mut Outcome, version: NormVersion) {
+    norm_versions::request::stamp(&mut outcome.body, version);
+}
+
+/// Runs an operation as the HTTP and MCP adapters do: with the request's
+/// optional `normVersion` applied (written into the input's own edition, or
+/// active while the kernel runs) and the edition stamped on the result.
+pub fn execute(op: &Operation, body: &Value) -> Outcome {
+    if op.method == Method::Get {
+        return (op.run)(body);
+    }
+    let requested = match requested_norm_version(body) {
+        Ok(requested) => requested,
+        Err(outcome) => return outcome,
+    };
+    let mut version = requested.unwrap_or_default();
+    let mut body = body.clone();
+    match edition_route(op, &body) {
+        EditionRoute::Slots(slots) => {
+            if let Some(version) = requested {
+                if let Err(outcome) = place_edition(&slots, &mut body, version) {
+                    return outcome;
+                }
+            }
+            // The input's own edition (for a relabel the original's) is the
+            // one the kernel applies.
+            version = slots
+                .first()
+                .and_then(|(member, pointer)| body.get(*member)?.pointer(pointer))
+                .and_then(|value| serde_json::from_value(value.clone()).ok())
+                .unwrap_or_default();
+        }
+        EditionRoute::Active if !version.implemented() => {
+            return Outcome {
+                status: 422,
+                body: error_body(
+                    "edition_not_implemented",
+                    format!("The kernel has no profile for {}", version.label()),
+                    Some(NORM_VERSION_MEMBER.into()),
+                    Value::Null,
+                ),
+            };
+        }
+        EditionRoute::Fixed if !version.is_default() => {
+            return edition_error(
+                "norm_version_not_applicable",
+                "Reference cases are compared in NTA 8800:2025+C1:2026 only".into(),
+                NORM_VERSION_MEMBER.into(),
+            );
+        }
+        EditionRoute::Active | EditionRoute::Independent | EditionRoute::Fixed => {}
+    }
+    let mut outcome = norm_versions::with_version(version, || (op.run)(&body));
+    // The legacy status is a success under every status rule, so stamping
+    // never changes the HTTP status.
+    if outcome.status == 200 || outcome.status == 422 {
+        stamp_edition(&mut outcome, version);
+    }
+    outcome
 }
 
 /// Kernel, norm and service identity of this build.

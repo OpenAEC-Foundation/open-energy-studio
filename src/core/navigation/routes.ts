@@ -38,6 +38,8 @@ export interface Route {
   focusPath?: string;
   /** The question of the basisopname step to show (question flow). */
   question?: string;
+  /** Gereedschap › Handleiding: the chapter, optionally with "#anchor" ("03-projectberekening#koelvermogen…"). */
+  chapter?: string;
 }
 
 export const WORKFLOW_STEPS: StepDefinition[] = [
@@ -115,8 +117,12 @@ export const TOOL_STEP: StepDefinition = {
     { id: 'uvalue', labelKey: 'ribbon.uvalueCalc' },
     { id: 'thermal-bridge', labelKey: 'ribbon.thermalBridgeCalc' },
     { id: 'heat-pump-sizing', labelKey: 'ribbon.heatPumpSizing' },
+    { id: 'manual', labelKey: 'manual.title' },
   ],
 };
+
+/** Tool pages that are not calculators (the tools menu lists them under Help). */
+export const HELP_TOOL_SUBS = new Set(['manual']);
 
 export const STEP_GROUPS: Array<{ id: StepGroup; labelKey: string }> = [
   { id: 'input', labelKey: 'nav.group.input' },
@@ -150,6 +156,7 @@ export function normalizeRoute(route: Route): Route {
   return {
     step: definition.id, ...(sub ? { sub } : {}), ...(route.focusPath ? { focusPath: route.focusPath } : {}),
     ...(route.question && definition.id === 'survey' ? { question: route.question } : {}),
+    ...(route.chapter && definition.id === 'tool' && sub === 'manual' ? { chapter: route.chapter } : {}),
   };
 }
 

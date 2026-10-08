@@ -678,12 +678,18 @@ pub fn validate_obstruction(
             }
         }
         Obstruction::Declared {
-            heating, cooling, ..
+            heating,
+            cooling,
+            source_reference,
         } => {
             if [heating, cooling].iter().any(|values| {
                 values.len() != 12 || values.iter().any(|value| !(0.0..=1.0).contains(value))
             }) {
                 issues.push(("window_obstruction_factor_invalid", ""));
+            }
+            // Declared factors come from elsewhere (§17.3.8): name the source.
+            if source_reference.trim().is_empty() {
+                issues.push(("source_reference_required", ".sourceReference"));
             }
         }
     }
@@ -799,6 +805,13 @@ impl ShadingControl {
         match self {
             Self::ManualResidential | Self::ManualUtilityWithGlareProtection => &SHADING_TABLE_7_7,
             Self::ManualUtilityWithoutGlareProtection => &SHADING_TABLE_7_8,
+            // NTA 8800:2023 p. 181: automatic shading of dwellings takes
+            // table 7.7 (table 7.9 is for utility buildings only, p. 183).
+            Self::AutomaticResidentialIso52016
+                if !crate::norm_versions::profile().dwelling_shading_heating_off =>
+            {
+                &SHADING_TABLE_7_7
+            }
             Self::Automatic | Self::AutomaticResidentialIso52016 => &SHADING_TABLE_7_9,
         }
     }
@@ -809,6 +822,14 @@ impl ShadingControl {
             self,
             Self::ManualResidential | Self::AutomaticResidentialIso52016
         )
+    }
+
+    /// NTA 8800:2023 p. 181: automatic shading of a dwelling is a table 7.7
+    /// case; the generic `Automatic` (table 7.9) belongs to utility
+    /// buildings only in that edition.
+    pub fn in_edition(self, residential: bool) -> bool {
+        crate::norm_versions::profile().dwelling_shading_heating_off
+            || !(residential && self == Self::Automatic)
     }
 
     /// Whether the control variant fits a residential (`true`) or utility
@@ -829,7 +850,7 @@ impl ShadingControl {
 pub struct MovableShading {
     /// `F_c` (7.43), rounded up to two decimals; omitted when `device`
     /// gives the table 7.5/7.6 value.
-    #[serde(default = "nan")]
+    #[serde(default = "nan", skip_serializing_if = "is_nan")]
     pub reduction_factor: f64,
     /// Table 7.5/7.6 device; replaces `reductionFactor`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -840,6 +861,32 @@ pub struct MovableShading {
 
 fn nan() -> f64 {
     f64::NAN
+}
+
+/// A table 7.5/7.6 device leaves `reductionFactor` unset (NaN); writing it
+/// out would trip the finite-number guard on the derived input.
+fn is_nan(value: &f64) -> bool {
+    value.is_nan()
+}
+
+/// Checks of a movable shading that do not depend on the building function
+/// or the edition: the factor of 7.43 (0..1, or a table 7.5/7.6 device but
+/// not both) and its source. Codes with the path suffix below the shading.
+pub fn validate_movable_shading(shading: &MovableShading) -> Vec<(&'static str, &'static str)> {
+    let mut issues = Vec::new();
+    if shading.device.is_some() && shading.reduction_factor.is_finite() {
+        issues.push((
+            "window_shading_factor_declared_and_table",
+            ".reductionFactor",
+        ));
+    }
+    if shading.device.is_none() && !(0.0..=1.0).contains(&shading.reduction_factor) {
+        issues.push(("window_shading_factor_invalid", ".reductionFactor"));
+    }
+    if shading.source_reference.trim().is_empty() {
+        issues.push(("source_reference_required", ".sourceReference"));
+    }
+    issues
 }
 
 impl MovableShading {
@@ -887,6 +934,22 @@ pub enum ShadingDevice {
 }
 
 impl ShadingDevice {
+    /// Table 7.5 has the "onbekende kleur" rows from NTA 8800:2023 (p. 180);
+    /// 2022 p. 176 lacks them.
+    pub fn in_edition(self) -> bool {
+        let unknown = matches!(
+            self,
+            Self::ExternalScreen {
+                colour: ShadeColour::Unknown
+            } | Self::ExternalVenetianBlind {
+                colour: ShadeColour::Unknown
+            } | Self::ExternalRollerShutter {
+                colour: ShadeColour::Unknown
+            }
+        );
+        !unknown || crate::norm_versions::profile().unknown_shade_colour_rows
+    }
+
     /// `F_c` of tables 7.5/7.6; table 7.6 by orientation.
     pub fn reduction_factor(self, orientation: Orientation) -> f64 {
         use Orientation::*;
@@ -1079,7 +1142,11 @@ pub fn shading_fraction(
     month: u8,
     balance: Balance,
 ) -> f64 {
-    if balance == Balance::Heating && control.off_for_heating() {
+    // 2024+ p. 181 case 1; NTA 8800:2023 (p. 179–181) has no such case.
+    if balance == Balance::Heating
+        && control.off_for_heating()
+        && crate::norm_versions::profile().dwelling_shading_heating_off
+    {
         0.0
     } else {
         shading_lookup(control.table(), orientation, tilt_deg, month)

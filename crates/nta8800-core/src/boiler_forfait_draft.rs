@@ -183,8 +183,14 @@ pub fn assess_boiler_forfait_draft(
     if input.kind == BoilerKind::Unknown && input.role != BoilerRole::Collective {
         issues.push(issue("unknown_boiler_collective_only", "kind"));
     }
+    // θem;avg is the mean of the design supply and return temperature of the
+    // heating water (table 9.26, note a, 2025+C1 p. 329; examples 45/38 to
+    // 90/70). A heating circuit below the room setpoint of 20 °C heats
+    // nothing, and a water circuit stays below boiling, so only
+    // 20 °C < θem;avg ≤ 100 °C is a design temperature.
     if !input.average_design_emission_temperature_c.is_finite()
-        || !(-30.0..=120.0).contains(&input.average_design_emission_temperature_c)
+        || input.average_design_emission_temperature_c <= 20.0
+        || input.average_design_emission_temperature_c > 100.0
     {
         issues.push(issue(
             "average_emission_temperature_invalid",
@@ -202,7 +208,7 @@ pub fn assess_boiler_forfait_draft(
     }
     if input
         .installation_year
-        .is_some_and(|year| !(1900..=2026).contains(&year))
+        .is_some_and(|year| !(1900..=crate::LATEST_PLAUSIBLE_YEAR).contains(&year))
     {
         issues.push(issue("installation_year_invalid", "installationYear"));
     }
@@ -348,7 +354,8 @@ pub fn assess_boiler_forfait_monthly_draft(
         .installation_year
         .is_some_and(|year| year >= 2015)
     {
-        43.8
+        // 13,0 kWh in NTA 8800:2020+A1 (p. 336), 43,8 from 2022 (p. 338).
+        crate::norm_versions::profile().device_aux_a_from_2015_kwh
     } else {
         87.6
     };
@@ -494,6 +501,32 @@ mod tests {
     }
 
     #[test]
+    fn emission_temperature_is_a_heating_design_temperature() {
+        // Table 9.26 note a (2025+C1 p. 329): the mean of the design supply
+        // and return temperature, so above the 20 °C setpoint and below
+        // boiling.
+        let mut input = sample();
+        for valid in [20.5, 42.5, 50.0, 80.0, 100.0] {
+            input.average_design_emission_temperature_c = valid;
+            assert_eq!(
+                assess_boiler_forfait_draft(&input).status,
+                "diagnostic_valid",
+                "{valid}"
+            );
+        }
+        for invalid in [-30.0, -1.0, 0.0, 20.0, 100.5, 120.0, f64::NAN] {
+            input.average_design_emission_temperature_c = invalid;
+            assert!(
+                assess_boiler_forfait_draft(&input)
+                    .issues
+                    .iter()
+                    .any(|item| item.code == "average_emission_temperature_invalid"),
+                "{invalid}"
+            );
+        }
+    }
+
+    #[test]
     fn table_925_separates_supplementary_from_main_and_lt_from_ht() {
         let mut input = sample();
         let result = assess_boiler_forfait_draft(&input);
@@ -553,6 +586,20 @@ mod tests {
             assess_boiler_forfait_monthly_draft(&input).status,
             "invalid"
         );
+        // No fixed "current year": a boiler installed after the kernel was
+        // built is a valid year; only implausible years are refused.
+        input.boiler.installation_year_reference = Some("commissioning certificate".into());
+        input.boiler.installation_year = Some(2027);
+        assert_eq!(
+            assess_boiler_forfait_monthly_draft(&input).status,
+            "diagnostic_valid"
+        );
+        input.boiler.installation_year = Some(crate::LATEST_PLAUSIBLE_YEAR + 1);
+        assert_eq!(
+            assess_boiler_forfait_monthly_draft(&input).status,
+            "invalid"
+        );
+        input.boiler.installation_year_reference = None;
         input.boiler.installation_year = None;
         input.boiler.pilot_flame_present = true;
         // §9.6.2.1: 695 kWh per year, by month length.

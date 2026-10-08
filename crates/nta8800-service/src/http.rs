@@ -1,11 +1,18 @@
 //! HTTP adapter: one route per [`crate::operations::Operation`], plus
 //! `/health` and `/v1/openapi.json`, with a common error envelope, a body
-//! size limit, optional CORS and request logging.
+//! size limit, a limit on simultaneous calculations, a bounded queue of
+//! waiting requests, separate queue and calculation timeouts, optional CORS
+//! and request logging.
 
-use std::{sync::Arc, time::Instant};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
+
+use tokio::sync::Semaphore;
 
 use axum::{
-    extract::{rejection::JsonRejection, DefaultBodyLimit, Request, State},
+    extract::{rejection::JsonRejection, DefaultBodyLimit, FromRequest, Request, State},
     http::{header, HeaderMap, HeaderValue, Method as HttpMethod, StatusCode},
     middleware::{self, Next},
     response::{IntoResponse, Response},
@@ -14,7 +21,7 @@ use axum::{
 };
 use serde_json::{json, Value};
 
-use crate::operations::{error_body, operations, Method, Operation, Outcome};
+use crate::operations::{error_body, execute, operations, Method, Operation, Outcome};
 
 /// Runtime options of the HTTP adapter.
 #[derive(Debug, Clone)]
@@ -25,6 +32,39 @@ pub struct HttpConfig {
     pub cors_origins: Vec<String>,
     /// Write one line per request to stderr.
     pub log_requests: bool,
+    /// Calculations that may run at the same time. Further requests wait
+    /// for a slot, up to [`HttpConfig::max_waiting_requests`].
+    pub max_concurrent_calculations: usize,
+    /// Requests that may wait for a calculation slot. A waiting request
+    /// already holds its parsed body, so together with the body limit this
+    /// bounds the memory of the queue: at most
+    /// `(max_concurrent_calculations + max_waiting_requests) × body limit`
+    /// of request bodies. A request beyond it is refused at once with 503
+    /// `server_busy`, before its body is read. `0`: no queue.
+    pub max_waiting_requests: usize,
+    /// Longest wait for a free calculation slot. After it the client gets
+    /// 503 `server_busy` and no calculation is started.
+    pub queue_timeout: Duration,
+    /// Longest calculation, counted from the moment it gets its slot. After
+    /// it the client gets 503 `calculation_timeout`; the calculation
+    /// finishes in the background and keeps its slot until then.
+    pub calculation_timeout: Duration,
+}
+
+/// Default number of simultaneous calculations: the available cores,
+/// within the 1–1024 range the API accepts.
+pub fn default_max_concurrent_calculations() -> usize {
+    std::thread::available_parallelism()
+        .map_or(4, |n| n.get())
+        .clamp(1, MAX_CALCULATION_SLOTS)
+}
+
+/// Upper bound of simultaneous calculations accepted by the API.
+pub const MAX_CALCULATION_SLOTS: usize = 1024;
+
+/// Default number of waiting requests: twice the calculation slots.
+pub fn default_max_waiting_requests() -> usize {
+    default_max_concurrent_calculations() * 2
 }
 
 impl Default for HttpConfig {
@@ -33,8 +73,30 @@ impl Default for HttpConfig {
             body_limit_bytes: 16 * 1024 * 1024,
             cors_origins: Vec::new(),
             log_requests: false,
+            max_concurrent_calculations: default_max_concurrent_calculations(),
+            max_waiting_requests: default_max_waiting_requests(),
+            queue_timeout: Duration::from_secs(30),
+            calculation_timeout: Duration::from_secs(120),
         }
     }
+}
+
+/// Shared limits of the calculation routes.
+struct Limits {
+    /// Calculations that may run at once.
+    slots: Arc<Semaphore>,
+    /// Requests that may be admitted at once: running plus waiting.
+    admission: Arc<Semaphore>,
+    queue_timeout: Duration,
+    calculation_timeout: Duration,
+    /// `Retry-After` of a 503, in seconds.
+    retry_after_secs: u64,
+}
+
+/// `Retry-After` hint of a 503: a quarter of the calculation timeout,
+/// between 1 and 60 s.
+fn retry_after_secs(config: &HttpConfig) -> u64 {
+    (config.calculation_timeout.as_secs() / 4).clamp(1, 60)
 }
 
 fn respond(outcome: Outcome) -> Response {
@@ -55,8 +117,30 @@ fn rejection_outcome(rejection: JsonRejection) -> Outcome {
     }
 }
 
-async fn dispatch(op: &'static Operation, payload: Result<Json<Value>, JsonRejection>) -> Response {
-    let body = match payload {
+fn busy(code: &'static str, message: String, retry_after_secs: u64) -> Response {
+    let mut response = respond(Outcome {
+        status: 503,
+        body: error_body(code, message, None, Value::Null),
+    });
+    response.headers_mut().insert(
+        header::RETRY_AFTER,
+        HeaderValue::from_str(&retry_after_secs.to_string())
+            .unwrap_or_else(|_| HeaderValue::from_static("1")),
+    );
+    response
+}
+
+async fn dispatch(op: &'static Operation, limits: Arc<Limits>, request: Request) -> Response {
+    // Admission comes before the body is read, so the queue of waiting
+    // requests (each holding its body) stays bounded.
+    let Ok(_admitted) = limits.admission.clone().try_acquire_owned() else {
+        return busy(
+            "server_busy",
+            "Too many requests are waiting for a calculation slot; try again later".to_string(),
+            limits.retry_after_secs,
+        );
+    };
+    let body = match Json::<Value>::from_request(request, &()).await {
         Ok(Json(body)) => body,
         Err(rejection) => return respond(rejection_outcome(rejection)),
     };
@@ -71,8 +155,46 @@ async fn dispatch(op: &'static Operation, payload: Result<Json<Value>, JsonRejec
             ),
         });
     }
-    // Kernel work is CPU-bound; keep it off the async workers.
-    match tokio::task::spawn_blocking(move || (op.run)(&body)).await {
+    let slot = match tokio::time::timeout(
+        limits.queue_timeout,
+        limits.slots.clone().acquire_owned(),
+    )
+    .await
+    {
+        Ok(Ok(slot)) => slot,
+        _ => {
+            return busy(
+                "server_busy",
+                format!(
+                    "No calculation slot became free within {} s; try again later",
+                    limits.queue_timeout.as_secs_f64()
+                ),
+                limits.retry_after_secs,
+            )
+        }
+    };
+    // Kernel work is CPU-bound; keep it off the async workers. The slot (and
+    // the body, moved into the closure) is released when the calculation
+    // ends, also after a timeout. The calculation gets its full timeout,
+    // however long the request waited for the slot.
+    let work = tokio::task::spawn_blocking(move || {
+        let _slot = slot;
+        execute(op, &body)
+    });
+    let joined = match tokio::time::timeout(limits.calculation_timeout, work).await {
+        Ok(joined) => joined,
+        Err(_) => {
+            return busy(
+                "calculation_timeout",
+                format!(
+                    "The calculation took longer than {} s; the result is withheld",
+                    limits.calculation_timeout.as_secs_f64()
+                ),
+                limits.retry_after_secs,
+            )
+        }
+    };
+    match joined {
         Ok(outcome) => respond(outcome),
         Err(_) => respond(Outcome {
             status: 500,
@@ -214,6 +336,16 @@ pub fn app() -> Router {
 
 /// The HTTP application with the given options.
 pub fn app_with(config: HttpConfig) -> Router {
+    let slots = config.max_concurrent_calculations.max(1);
+    let limits = Arc::new(Limits {
+        slots: Arc::new(Semaphore::new(slots)),
+        admission: Arc::new(Semaphore::new(
+            slots.saturating_add(config.max_waiting_requests),
+        )),
+        queue_timeout: config.queue_timeout,
+        calculation_timeout: config.calculation_timeout,
+        retry_after_secs: retry_after_secs(&config),
+    });
     let config = Arc::new(config);
     let mut router = Router::new()
         .route("/health", get(health))
@@ -221,10 +353,13 @@ pub fn app_with(config: HttpConfig) -> Router {
     for op in operations() {
         router = match op.method {
             Method::Get => router.route(op.path, get(move || dispatch_get(op))),
-            Method::Post => router.route(
-                op.path,
-                post(move |payload: Result<Json<Value>, JsonRejection>| dispatch(op, payload)),
-            ),
+            Method::Post => {
+                let limits = limits.clone();
+                router.route(
+                    op.path,
+                    post(move |request: Request| dispatch(op, limits.clone(), request)),
+                )
+            }
         };
     }
     router
@@ -245,6 +380,19 @@ fn input_schema(op: &Operation) -> Value {
         json!({ "type": "object", "description": input.description }),
     );
     let mut required = vec![input.key];
+    let editions: Vec<&str> = nta8800_core::norm_versions::NormVersion::ALL
+        .iter()
+        .map(|version| version.id())
+        .collect();
+    properties.insert(
+        crate::operations::NORM_VERSION_MEMBER.to_string(),
+        json!({
+            "type": "string",
+            "enum": editions,
+            "default": nta8800_core::norm_versions::NormVersion::default().id(),
+            "description": "NTA 8800 edition to calculate with (default 2025+C1, the only registrable one). Written into the input's own edition (ntaCalculation.normVersion, survey or building normVersion, maatwerkadvies base, both relabel projects) when absent and must match it when present; diagnostic routes run with it active. Results record normVersion and targetNormVersion; an older edition gives status calculated_legacy_edition and is never registrable, except a relabel in the original's edition. Reference cases accept only 2025+C1."
+        }),
+    );
     if op.name == "assess_relabel" {
         properties.insert(
             "current".to_string(),
@@ -304,7 +452,8 @@ pub fn openapi_document() -> Value {
             responses.insert("413".into(), json!({ "description": "Request body larger than the configured limit", "content": { "application/json": { "schema": error } } }));
             responses.insert("415".into(), json!({ "description": "Content-Type is not application/json", "content": { "application/json": { "schema": error } } }));
             responses.insert("422".into(), json!({ "description": "The kernel refuses or cannot complete the input; the body is the assessment with its status, gaps and issues", "content": { "application/json": { "schema": { "type": "object" } } } }));
-            responses.insert("500".into(), json!({ "description": "Result withheld (non_finite_result) or kernel failure", "content": { "application/json": { "schema": error } } }));
+            responses.insert("500".into(), json!({ "description": "Result withheld (non_finite_result or serialization_failed) or kernel failure", "content": { "application/json": { "schema": error } } }));
+            responses.insert("503".into(), json!({ "description": "Too many requests waiting or no calculation slot free within the queue timeout (server_busy), or the calculation exceeded the calculation timeout (calculation_timeout). The Retry-After header gives the seconds to wait before retrying.", "headers": { "Retry-After": { "description": "Seconds to wait before retrying", "schema": { "type": "integer", "minimum": 1 } } }, "content": { "application/json": { "schema": error } } }));
         }
         if op.name == "calculate_beng" {
             responses.insert("501".into(), json!({ "description": "Legacy endpoint, calculation unavailable", "content": { "application/json": { "schema": error } } }));
@@ -348,7 +497,7 @@ pub fn openapi_document() -> Value {
             "required": ["error", "code", "message"],
             "properties": {
                 "error": { "type": "string", "description": "Machine code (same as code; kept for older clients)" },
-                "code": { "type": "string", "description": "Machine code, e.g. invalid_json, invalid_request_shape, missing_request_member, invalid_project_shape, payload_too_large, unsupported_media_type, not_found, method_not_allowed, non_finite_result, kernel_panic, calculation_unavailable" },
+                "code": { "type": "string", "description": "Machine code, e.g. invalid_json, invalid_request_shape, missing_request_member, invalid_project_shape, payload_too_large, unsupported_media_type, not_found, method_not_allowed, non_finite_result, serialization_failed, kernel_panic, calculation_unavailable" },
                 "message": { "type": "string" },
                 "path": { "type": ["string", "null"], "description": "JSON path of the offending input or result value" },
                 "details": { "description": "Optional extra data" }

@@ -13,8 +13,9 @@ use crate::constructions::{
     U_VENTILATION_GRILLE,
 };
 use crate::forfait_envelope::{
-    forfait_door_u, forfait_glazed_door_u, forfait_panel_u, forfait_psi, forfait_window_u,
-    ForfaitGlass, ForfaitOpaque, ForfaitOpaqueResult, PanelInsulation, PsiColumn, PSI_DEFAULT,
+    forfait_door_u, forfait_glazed_door_u, forfait_panel_u, forfait_panel_u_in_edition,
+    forfait_psi, forfait_window_u, ForfaitGlass, ForfaitOpaque, ForfaitOpaqueResult,
+    PanelInsulation, PsiColumn, PSI_DEFAULT,
 };
 use crate::materials::round_half_up;
 use crate::window_u::{round_transparent, FrameGroup, WindowInput, WindowMethod, WindowResult};
@@ -55,6 +56,10 @@ pub enum ElementKind {
         cavity: bool,
         frame: FrameGroup,
         exterior: bool,
+        /// Build year of the building (part), NTA 8800:2023 tables I.13/I.14
+        /// only (p. 819–820).
+        #[serde(default, rename = "buildYear", skip_serializing_if = "Option::is_none")]
+        build_year: Option<i32>,
     },
     /// Note 2 of 8.2.2.1 (NEN-EN 1873).
     Rooflight {
@@ -251,9 +256,22 @@ fn validate(input: &EnvelopeInput) -> Vec<EnvelopeIssue> {
                 cavity,
                 frame,
                 exterior,
+                build_year,
             } => {
                 if forfait_panel_u(*insulation, *cavity, *frame, *exterior).is_none() {
                     push("panel_thickness_outside_table", el.clone());
+                }
+                // Tables I.13/I.14 by build year exist in NTA 8800:2023 only;
+                // there a panel without a known thickness needs the year.
+                let tables = crate::norm_versions::profile().panel_build_year_tables;
+                if build_year.is_some() && !tables {
+                    push("route_not_in_edition", format!("{el}.buildYear"));
+                }
+                if tables
+                    && build_year.is_none()
+                    && !matches!(insulation, PanelInsulation::KnownThickness { .. })
+                {
+                    push("panel_build_year_required", format!("{el}.buildYear"));
                 }
                 if e.in_forfait_supplement {
                     push(
@@ -267,6 +285,11 @@ fn validate(input: &EnvelopeInput) -> Vec<EnvelopeIssue> {
                 area_with_upstand_m2,
                 source_reference,
             } => {
+                // NTA 8800:2023 8.2.2.1 (p. 207) has no rooflight category and
+                // no U_rc conversion (2024 p. 210).
+                if !crate::norm_versions::profile().rooflight_route {
+                    push("route_not_in_edition", el.clone());
+                }
                 if !positive(*u_rc) || !positive(*area_with_upstand_m2) {
                     push("rooflight_invalid", el.clone());
                 }
@@ -324,10 +347,18 @@ fn validate(input: &EnvelopeInput) -> Vec<EnvelopeIssue> {
         if b.description.trim().is_empty() {
             push("source_reference_required", format!("{path}.description"));
         }
+        let edition = crate::norm_versions::profile().psi_columns_and_default;
         if let Some(position) = b.position {
-            if forfait_psi(position, b.variant, b.column).is_none() {
+            if !edition && b.column == PsiColumn::B {
+                // NTA 8800:2020+A1 tables I.1/I.2 (p. 786–788): one column.
+                push("route_not_in_edition", format!("{path}.column"));
+            } else if forfait_psi(position, b.variant, b.column).is_none() {
                 push("bridge_position_not_in_table", format!("{path}.position"));
             }
+        } else if !edition {
+            // The 0,5 W/(m·K) of a position without a value is new in 2022
+            // (p. 793).
+            push("route_not_in_edition", format!("{path}.position"));
         }
     }
     if input.forfait_supplement && !input.forfait_bridges.is_empty() {
@@ -411,8 +442,11 @@ fn element_result(e: &EnvelopeElement) -> ElementResult {
             cavity,
             frame,
             exterior,
+            build_year,
         } => {
-            let u = forfait_panel_u(*insulation, *cavity, *frame, *exterior).unwrap_or(f64::NAN);
+            let u =
+                forfait_panel_u_in_edition(*insulation, *cavity, *frame, *exterior, *build_year)
+                    .unwrap_or(f64::NAN);
             base("I.2.2.4", u, round_transparent(u))
         }
         ElementKind::Rooflight {
@@ -509,6 +543,36 @@ pub const INTERPRETATIONS: &[&str] = &[
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Footnotes c and e of tables C.3/C.4 (2025+C1 p. 782 and 784): the
+    /// fixture's weakly ventilated 40 mm cavity made 10 mm. Unventilated it
+    /// calculates by D.2 of NEN-EN-ISO 6946 (R 0,15 instead of the table's
+    /// 0,18, so a higher U); weakly ventilated it is refused.
+    #[test]
+    fn thin_cavity_in_a_construction() {
+        let base: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-constructions-synthetic.json"
+        ))
+        .unwrap();
+        let layer = "/elements/0/element/construction/build/layers/2";
+        let with = |thickness: f64, ventilation: &str| {
+            let mut value = base.clone();
+            *value.pointer_mut(&format!("{layer}/thicknessMm")).unwrap() = thickness.into();
+            *value.pointer_mut(&format!("{layer}/ventilation")).unwrap() =
+                serde_json::json!({ "kind": ventilation });
+            assess_envelope(&serde_json::from_value(value).unwrap())
+        };
+        let thick = with(40.0, "unventilated");
+        let thin = with(10.0, "unventilated");
+        assert_eq!(thin.status, "calculated_unverified", "{:?}", thin.issues);
+        assert!(thin.elements[0].u_value >= thick.elements[0].u_value);
+        let weak = with(10.0, "weakly");
+        assert_eq!(weak.status, "invalid");
+        assert!(weak
+            .issues
+            .iter()
+            .any(|i| i.code == "air_cavity_below_20_mm_unsupported"));
+    }
 
     #[test]
     fn fixture_assesses_all_element_kinds() {
@@ -647,6 +711,7 @@ mod tests {
                 cavity: false,
                 frame: FrameGroup::WoodOrPlastic,
                 exterior: true,
+                build_year: None,
             },
         ));
         bad.elements.push(element(

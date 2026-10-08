@@ -34,8 +34,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::climate::{
-    ARGII_TEMPERATURE_C as VENTILATIVE_COOLING_TEMPERATURE_C, COLD_RECOVERY_SUPPLY_TEMPERATURE_C,
-    MONTH_HOURS, OUTDOOR_TEMPERATURE_C, WIND_SPEED_M_PER_S,
+    COLD_RECOVERY_SUPPLY_TEMPERATURE_C, MONTH_HOURS, OUTDOOR_TEMPERATURE_C, WIND_SPEED_M_PER_S,
 };
 use crate::monthly_demand::{VentilationFlow, VentilationMonth};
 
@@ -158,7 +157,10 @@ impl VentilationFunction {
     /// Table 11.8 f_τ; dwellings depend on the dwelling area.
     fn occupancy_factor(self, dwelling_area_m2: f64) -> f64 {
         match self {
-            Self::Residential => (0.38 + dwelling_area_m2 * 0.006).min(0.8),
+            // 2023 p. 460: a fixed 0,80.
+            Self::Residential => crate::norm_versions::profile()
+                .dwelling_occupancy_factor
+                .unwrap_or((0.38 + dwelling_area_m2 * 0.006).min(0.8)),
             Self::AssemblyChildCare => 0.30,
             Self::OtherAssembly => 0.15,
             Self::Cell => 0.80,
@@ -496,6 +498,33 @@ pub struct SystemUnit {
     #[serde(default)]
     pub air_handling_unit: Option<AirHandlingUnit>,
     pub equipment_reference: String,
+    /// f_ctrl from a kwaliteitsverklaring (gelijkwaardigheidsverklaring) of
+    /// the applied system, replacing the table 11.5 value (forfaitaire
+    /// waarde, 2025+C1 p. 7; table 11.5 p. 460). It enters 11.48/11.49 as
+    /// f_ctrl;tabel 11.5, and in E.1 (11.51/11.52) as f_ctrl;overig.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub declared_control_factor: Option<Box<DeclaredControlFactor>>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DeclaredControlFactor {
+    pub value: f64,
+    /// The kwaliteitsverklaring (e.g. BCRG) that gives the value.
+    pub declaration_reference: String,
+}
+
+/// Highest declared f_ctrl the kernel accepts; table 11.5 runs up to 1,32.
+pub const MAX_DECLARED_CONTROL_FACTOR: f64 = 2.0;
+
+impl SystemUnit {
+    /// f_ctrl;tabel 11.5 of the unit: the declared value, else table 11.5.
+    fn control_factor_value(&self, category: Category) -> Option<f64> {
+        match &self.declared_control_factor {
+            Some(declared) => Some(declared.value),
+            None => self.variant.control_factor(category),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -767,7 +796,20 @@ pub enum OpeningArea {
         max_net_area_m2: f64,
         #[serde(rename = "maxAngleDeg")]
         max_angle_deg: f64,
+        /// No specification of louvres, perforations or mesh: A_w;max,k is
+        /// the NEN 1087 net opening times 0,3 (2024 p. 461) or 0,5
+        /// (NTA 8800:2023 p. 466).
+        #[serde(
+            default,
+            rename = "screenUnspecified",
+            skip_serializing_if = "is_false"
+        )]
+        screen_unspecified: bool,
     },
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 impl OpeningArea {
@@ -782,7 +824,15 @@ impl OpeningArea {
             Self::OpeningAngle {
                 max_net_area_m2,
                 max_angle_deg,
-            } => (1.46 * max_angle_deg / (max_angle_deg + 41.0)).min(1.0) * max_net_area_m2,
+                screen_unspecified,
+            } => {
+                let screen = if *screen_unspecified {
+                    crate::norm_versions::profile().unspecified_screen_factor
+                } else {
+                    1.0
+                };
+                (1.46 * max_angle_deg / (max_angle_deg + 41.0)).min(1.0) * max_net_area_m2 * screen
+            }
         }
     }
 }
@@ -813,8 +863,9 @@ pub enum CoolingOperation {
 impl CoolingOperation {
     fn factor(self) -> f64 {
         match self {
-            Self::Manual => 0.35,
-            Self::Automatic => 0.50,
+            // 2025 p. 466 / 2024 p. 461: 0,35 / 0,50; 2023 p. 466: 0,5 / 0,9.
+            Self::Manual => crate::norm_versions::profile().ventilative_cooling_operation[0],
+            Self::Automatic => crate::norm_versions::profile().ventilative_cooling_operation[1],
             Self::AutomaticWithTemperature => 1.0,
         }
     }
@@ -1179,6 +1230,13 @@ pub fn validate_ventilation(input: &VentilationInput) -> Vec<VentilationIssue> {
             ));
         }
         function_area += item.area_m2;
+        // (11.57) with a swimming pool is new in NTA 8800:2023 (p. 459).
+        if item.swimming_pool && !crate::norm_versions::profile().swimming_pool_route {
+            issues.push(issue(
+                "route_not_in_edition",
+                format!("functions[{index}].swimmingPool"),
+            ));
+        }
         if item.swimming_pool && item.function != VentilationFunction::Sport {
             issues.push(issue(
                 "swimming_pool_requires_sport_function",
@@ -1459,10 +1517,17 @@ pub fn validate_ventilation(input: &VentilationInput) -> Vec<VentilationIssue> {
                 OpeningArea::OpeningAngle {
                     max_net_area_m2,
                     max_angle_deg,
+                    ..
                 } => finite_positive(*max_net_area_m2) && finite_positive(*max_angle_deg),
             };
             if !area_ok {
                 issues.push(issue("opening_area_invalid", format!("{path}.area")));
+            }
+            // (11.71a) is new in 2024 (p. 460–461); 2023 (p. 465) has none.
+            if matches!(opening.area, OpeningArea::Discharge { .. })
+                && !crate::norm_versions::profile().discharge_opening_route
+            {
+                issues.push(issue("route_not_in_edition", format!("{path}.area.method")));
             }
             if !opening.centre_height_m.is_finite()
                 || opening.centre_height_m < 0.0
@@ -1534,6 +1599,9 @@ pub fn validate_ventilation(input: &VentilationInput) -> Vec<VentilationIssue> {
             current,
             manufacture_year,
         } => {
+            if !manufacture_year_valid(*manufacture_year) {
+                issues.push(issue("manufacture_year_invalid", "fans.manufactureYear"));
+            }
             if *current == FanCurrent::Ac && manufacture_year.is_some_and(|y| y > 2006) {
                 issues.push(issue("forfait_fan_ac_after_2006_unsupported", "fans"));
             }
@@ -1565,6 +1633,17 @@ pub fn validate_ventilation(input: &VentilationInput) -> Vec<VentilationIssue> {
                         "fan_power_invalid",
                         format!("fans.fans[{index}].power"),
                     ));
+                }
+                if let FanPower::Motor {
+                    manufacture_year, ..
+                } = &fan.power
+                {
+                    if !manufacture_year_valid(*manufacture_year) {
+                        issues.push(issue(
+                            "manufacture_year_invalid",
+                            format!("fans.fans[{index}].power.manufactureYear"),
+                        ));
+                    }
                 }
             }
             if !(*building_share > 0.0 && *building_share <= 1.0) {
@@ -1600,6 +1679,24 @@ pub fn validate_ventilation(input: &VentilationInput) -> Vec<VentilationIssue> {
     issues
 }
 
+/// Earliest manufacture year of a fan or heat-recovery unit. Every year up to
+/// it falls in the oldest row of table 11.20 ("onbekend of J < 2005",
+/// 2025+C1 p. 516) and table 11.23 ("j ≤ 1980 of onbekend", p. 519), so a
+/// survey that substitutes an older construction year may clamp to it
+/// without changing the result.
+pub const EARLIEST_MANUFACTURE_YEAR: i32 = 1900;
+
+/// A manufacture year picks a row of tables 11.20 (motor efficiency), 11.23
+/// (forfait fan power) and the heat-recovery rule of 11.2.6; a year outside
+/// `EARLIEST_MANUFACTURE_YEAR` to `LATEST_PLAUSIBLE_YEAR` is no real
+/// appliance and would silently take the oldest or newest row. Absent means
+/// unknown.
+pub fn manufacture_year_valid(year: Option<i32>) -> bool {
+    year.map_or(true, |year| {
+        (EARLIEST_MANUFACTURE_YEAR..=i32::from(crate::LATEST_PLAUSIBLE_YEAR)).contains(&year)
+    })
+}
+
 fn validate_unit(
     unit: &SystemUnit,
     path: &str,
@@ -1618,6 +1715,28 @@ fn validate_unit(
             format!("{path}.variant"),
         ));
     }
+    if let Some(declared) = &unit.declared_control_factor {
+        let dpath = format!("{path}.declaredControlFactor");
+        if !(declared.value.is_finite()
+            && declared.value > 0.0
+            && declared.value <= MAX_DECLARED_CONTROL_FACTOR)
+        {
+            issues.push(issue(
+                "declared_control_factor_invalid",
+                format!("{dpath}.value"),
+            ));
+        }
+        if declared.declaration_reference.trim().is_empty() {
+            issues.push(issue(
+                "source_reference_required",
+                format!("{dpath}.declarationReference"),
+            ));
+        }
+        // E.1 fixes f_ctrl of the decentral D.5b part (11.51/11.52).
+        if path.ends_with(".decentral") {
+            issues.push(issue("declared_control_factor_not_applicable", dpath));
+        }
+    }
     let op = unit.variant.op();
     if let Some(recovery) = &unit.heat_recovery {
         let rpath = format!("{path}.heatRecovery");
@@ -1627,12 +1746,28 @@ fn validate_unit(
                 rpath.clone(),
             ));
         }
+        if !manufacture_year_valid(recovery.manufacture_year) {
+            issues.push(issue(
+                "manufacture_year_invalid",
+                format!("{rpath}.manufactureYear"),
+            ));
+        }
         match &recovery.efficiency {
             HeatRecoveryEfficiency::Declared {
                 value,
                 source_reference,
-                ..
+                standard,
             } => {
+                // The NEN-EN 13053 row is new in NTA 8800:2023 (p. 490–491;
+                // 2022 p. 482).
+                if *standard == EfficiencyStandard::En13053
+                    && !crate::norm_versions::profile().en_13053_route
+                {
+                    issues.push(issue(
+                        "route_not_in_edition",
+                        format!("{rpath}.efficiency.standard"),
+                    ));
+                }
                 if !(0.0..=1.0).contains(value) {
                     issues.push(issue(
                         "heat_recovery_efficiency_invalid",
@@ -1652,6 +1787,13 @@ fn validate_unit(
             Bypass::Partial { fraction } if !(0.0..=1.0).contains(fraction) => issues.push(issue(
                 "bypass_fraction_invalid",
                 format!("{rpath}.bypass.fraction"),
+            )),
+            // (11.106a) is new in NTA 8800:2022 (p. 479; 2020+A1 p. 476).
+            Bypass::Full {
+                cold_recovery_evidence: Some(_),
+            } if !crate::norm_versions::profile().cold_recovery_route => issues.push(issue(
+                "route_not_in_edition",
+                format!("{rpath}.bypass.coldRecoveryEvidence"),
             )),
             Bypass::Full {
                 cold_recovery_evidence: Some(evidence),
@@ -2042,7 +2184,7 @@ fn parts(system: &VentilationSystem) -> Vec<Part<'_>> {
 fn control_factor_table(input: &VentilationInput) -> f64 {
     match &input.system {
         VentilationSystem::Single { unit } => {
-            unit.variant.control_factor(input.category).unwrap_or(1.0)
+            unit.control_factor_value(input.category).unwrap_or(1.0)
         }
         VentilationSystem::Combined {
             decentral_area_m2,
@@ -2054,7 +2196,7 @@ fn control_factor_table(input: &VentilationInput) -> f64 {
                 Category::Residential => 0.52,
                 Category::Utility => 0.67,
             };
-            let other_factor = other.variant.control_factor(input.category).unwrap_or(1.0);
+            let other_factor = other.control_factor_value(input.category).unwrap_or(1.0);
             (decentral_area_m2 * hru + (total_residence_area_m2 - decentral_area_m2) * other_factor)
                 / total_residence_area_m2
         }
@@ -2342,11 +2484,13 @@ fn mechanical_supply_temperature(
     // 11.129/11.130.
     let extract_out = context.indoor_c - duct_outside;
     let mut recovery_rise = 0.0;
+    // 11.3.2.7: 0,7 / 0,4 / 0,7 K; 2023 (p. 496) 1 / 0,7 / 1,5 K.
+    let rise = crate::norm_versions::profile().fan_temperature_rise_k;
     let mut fan_rise = match context.balance {
-        Balance::Heating => 0.7,
+        Balance::Heating => rise[0],
         Balance::Cooling => match input.category {
-            Category::Residential => 0.4,
-            Category::Utility => 0.7,
+            Category::Residential => rise[1],
+            Category::Utility => rise[2],
         },
     };
     if let (VentSysOp::Balanced, Some(recovery)) = (op, &unit.heat_recovery) {
@@ -2499,8 +2643,10 @@ fn ventilative_cooling_flows(
     let Some(cooling) = &input.ventilative_cooling else {
         return (0.0, 0.0);
     };
-    let tau = TAU_VENTILATIVE_COOLING[month_index];
-    let Some(argii_c) = VENTILATIVE_COOLING_TEMPERATURE_C[month_index] else {
+    // Table 11.7 τ_argII and table 17.1 θ_e;argII differ per edition.
+    let profile = crate::norm_versions::profile();
+    let tau = profile.tau_ventilative_cooling[month_index];
+    let Some(argii_c) = profile.argii_temperature_c[month_index] else {
         return (0.0, 0.0);
     };
     if tau == 0.0 {
@@ -2576,7 +2722,12 @@ fn cross_area(openings: &[CoolingOpening], areas: &[f64], total: f64) -> f64 {
                 .iter()
                 .zip(areas)
                 .filter(|(o, _)| {
-                    o.tilt_deg < 60.0 || angular_difference(o.azimuth_deg, reference) <= 45.0
+                    // 11.77a/b (2024 p. 464): a roof opening (β < 60°) counts
+                    // in every sector; 11.77 of NTA 8800:2023 (p. 469) sorts
+                    // all openings by orientation only.
+                    (o.tilt_deg < 60.0
+                        && crate::norm_versions::profile().cross_area_roof_all_sectors)
+                        || angular_difference(o.azimuth_deg, reference) <= 45.0
                 })
                 .map(|(_, a)| a)
                 .sum();
@@ -2741,7 +2892,8 @@ fn balance_month(
     } else {
         (0.0, 0.0)
     };
-    let argii_temperature = VENTILATIVE_COOLING_TEMPERATURE_C[m].unwrap_or(outdoor);
+    let argii_temperature =
+        crate::norm_versions::profile().argii_temperature_c[m].unwrap_or(outdoor);
 
     // Supply temperatures.
     let context = SupplyContext {
@@ -3053,12 +3205,23 @@ fn fan_electricity(
             manufacture_year,
         } => {
             let sfp = specific_fan_power(*current, *manufacture_year);
-            parts(&input.system)
-                .iter()
-                .map(|part| {
-                    sfp * part.unit.variant.fan_system_factor() * required_m3_per_h * part.fraction
-                })
-                .sum::<f64>()
+            // NTA 8800:2020+A1 (11.142) (p. 495): one f_systype 1,5 for E1;
+            // from 2022 (p. 498–499) 11.139–11.141 split by area.
+            if let (VentilationSystem::Combined { .. }, Some(systype)) = (
+                &input.system,
+                crate::norm_versions::profile().fan_systype_combined,
+            ) {
+                sfp * systype * required_m3_per_h
+            } else {
+                parts(&input.system)
+                    .iter()
+                    .map(|part| {
+                        sfp * part.unit.variant.fan_system_factor()
+                            * required_m3_per_h
+                            * part.fraction
+                    })
+                    .sum::<f64>()
+            }
         }
         Fans::Declared {
             fans,
@@ -3242,6 +3405,7 @@ pub fn c1_variant(input: &VentilationInput) -> VentilationInput {
             ducts: DuctAirtightness::LukaABC,
             air_handling_unit: None,
             equipment_reference: "NTA 8800 §5.4.3 fixed C1 system".into(),
+            declared_control_factor: None,
         },
     };
     fixed.maximum_capacity_for_cooling = None;
@@ -3311,6 +3475,39 @@ pub fn assess_ventilation(input: &VentilationInput) -> VentilationAssessment {
 mod tests {
     use super::*;
 
+    /// Edition switches of 11.2.3.3 and 11.3.2.7: f_argII (2023 p. 466,
+    /// 2024 p. 461), table 11.7 τ_argII (2023 p. 454, 2024 p. 449), f_τ of
+    /// dwellings (table 11.8, 2023 p. 460, 2024 p. 455), table 17.1
+    /// θ_e;argII (2023 p. 676, 2024 p. 674) and ΔT_fan (2023 p. 496,
+    /// 2024 p. 491).
+    #[test]
+    fn ventilative_cooling_and_fan_rise_follow_the_edition() {
+        use crate::norm_versions::{profile, with_version, NormVersion};
+        let old = |body: fn() -> f64| with_version(NormVersion::V2023, body);
+        assert_eq!(CoolingOperation::Manual.factor(), 0.35);
+        assert_eq!(CoolingOperation::Automatic.factor(), 0.50);
+        assert_eq!(old(|| CoolingOperation::Manual.factor()), 0.5);
+        assert_eq!(old(|| CoolingOperation::Automatic.factor()), 0.9);
+        assert_eq!(
+            old(|| CoolingOperation::AutomaticWithTemperature.factor()),
+            1.0
+        );
+        assert_eq!(
+            VentilationFunction::Residential.occupancy_factor(40.0),
+            0.38 + 40.0 * 0.006
+        );
+        assert_eq!(
+            old(|| VentilationFunction::Residential.occupancy_factor(40.0)),
+            0.80
+        );
+        assert_eq!(old(|| profile().tau_ventilative_cooling[6]), 0.28);
+        assert_eq!(profile().tau_ventilative_cooling[6], 0.81);
+        assert_eq!(old(|| profile().argii_temperature_c[6].unwrap()), 16.17);
+        assert_eq!(profile().argii_temperature_c[6], Some(17.51));
+        assert_eq!(old(|| profile().fan_temperature_rise_k[2]), 1.5);
+        assert_eq!(profile().fan_temperature_rise_k, [0.7, 0.4, 0.7]);
+    }
+
     fn unit(variant: SystemVariant) -> SystemUnit {
         SystemUnit {
             variant,
@@ -3322,6 +3519,7 @@ mod tests {
             },
             air_handling_unit: None,
             equipment_reference: "design".into(),
+            declared_control_factor: None,
         }
     }
 
@@ -3368,6 +3566,76 @@ mod tests {
 
     fn close(a: f64, b: f64, tolerance: f64) {
         assert!((a - b).abs() <= tolerance, "{a} vs {b}");
+    }
+
+    /// A manufacture year picks the row of table 11.23 (forfait fans, p. 519),
+    /// table 11.20 (motor efficiency) and the 2010 rule of the heat-recovery
+    /// unit; a year that no appliance can have (−1, 2101) is refused instead
+    /// of silently taking the oldest or newest row. Absent stays "unknown".
+    #[test]
+    fn manufacture_year_outside_1900_to_2100_is_refused() {
+        let codes = |input: &VentilationInput| -> Vec<(String, String)> {
+            validate_ventilation(input)
+                .into_iter()
+                .map(|item| (item.code.to_string(), item.path))
+                .collect()
+        };
+        let year = |input: &VentilationInput, path: &str| {
+            codes(input).contains(&("manufacture_year_invalid".to_string(), path.to_string()))
+        };
+        let mut input = dwelling(SystemVariant::D2);
+        for (value, refused) in [
+            (-1, true),
+            (1899, true),
+            (1900, false),
+            (2100, false),
+            (2101, true),
+        ] {
+            input.fans = Fans::Forfait {
+                current: FanCurrent::Dc,
+                manufacture_year: Some(value),
+            };
+            assert_eq!(year(&input, "fans.manufactureYear"), refused, "{value}");
+        }
+        input.fans = Fans::Forfait {
+            current: FanCurrent::Dc,
+            manufacture_year: None,
+        };
+        assert!(!year(&input, "fans.manufactureYear"));
+        input.fans = Fans::Declared {
+            fans: vec![Fan {
+                id: "f1".into(),
+                power: FanPower::Motor {
+                    motor_power_w: 50.0,
+                    manufacture_year: Some(-1),
+                    electrical_input_w: None,
+                },
+            }],
+            control: FanControl::ResidentialTable,
+            building_share: 1.0,
+            source_reference: "plate".into(),
+        };
+        assert!(year(&input, "fans.fans[0].power.manufactureYear"));
+        if let VentilationSystem::Single { unit } = &mut input.system {
+            unit.heat_recovery = Some(HeatRecovery {
+                efficiency: HeatRecoveryEfficiency::Table {
+                    exchanger: HeatExchanger::CounterFlowPlastic,
+                },
+                bypass: Bypass::Full {
+                    cold_recovery_evidence: None,
+                },
+                layout: UnitLayout::Central,
+                constant_volume_control: false,
+                supply_duct_length_m: None,
+                supply_duct_insulation: DuctInsulation::Insulated,
+                manufacture_year: Some(-1),
+                equipment_reference: "unit".into(),
+            });
+        }
+        assert!(codes(&input)
+            .iter()
+            .any(|(code, path)| code == "manufacture_year_invalid"
+                && path.ends_with("heatRecovery.manufactureYear")));
     }
 
     #[test]
@@ -3771,8 +4039,37 @@ mod tests {
         let angle = OpeningArea::OpeningAngle {
             max_net_area_m2: 2.0,
             max_angle_deg: 30.0,
+            screen_unspecified: false,
         };
         close(angle.net_area(), 1.46 * 30.0 / 71.0 * 2.0, 1e-12);
+        // Unspecified screen: NEN 1087 opening times 0,3 (2024 p. 461) or
+        // 0,5 (NTA 8800:2023 p. 466).
+        let screened = OpeningArea::OpeningAngle {
+            max_net_area_m2: 2.0,
+            max_angle_deg: 30.0,
+            screen_unspecified: true,
+        };
+        close(screened.net_area(), 1.46 * 30.0 / 71.0 * 2.0 * 0.3, 1e-12);
+        crate::norm_versions::with_version(crate::norm_versions::NormVersion::V2023, || {
+            close(screened.net_area(), 1.46 * 30.0 / 71.0 * 2.0 * 0.5, 1e-12);
+        });
+        // A roof hatch (β 30°) and a façade window, both facing north:
+        // 11.77a counts the hatch in every sector (2024 p. 464), so sectors
+        // 135° and 225° pair it with the window: 2·(1/√2)/4. 11.77 of
+        // NTA 8800:2023 (p. 469) sorts both into the north sector only, and
+        // no sector has area on both sides: A_w;cros = 0.
+        let mut hatch = opening(0.0);
+        hatch.tilt_deg = 30.0;
+        let mixed = vec![opening(0.0), hatch];
+        assert!(cross_ventilation(&mixed));
+        close(
+            cross_area(&mixed, &[1.0, 1.0], 2.0),
+            2.0 / 2f64.sqrt() / 4.0,
+            1e-12,
+        );
+        crate::norm_versions::with_version(crate::norm_versions::NormVersion::V2023, || {
+            close(cross_area(&mixed, &[1.0, 1.0], 2.0), 0.0, 1e-12);
+        });
         let discharge = OpeningArea::Discharge {
             gross_area_m2: 1.0,
             discharge_coefficient: 0.6,
@@ -3817,6 +4114,67 @@ mod tests {
         let mut broken = dwelling(SystemVariant::C1);
         broken.usable_floor_area_m2 = 0.0;
         assert_eq!(assess_ventilation(&broken).status, "invalid");
+    }
+
+    #[test]
+    fn declared_control_factor_replaces_table_11_5() {
+        // Table 11.5 (2025+C1 p. 460): C.4c f_ctrl 0,59 for heating. A
+        // kwaliteitsverklaring may replace this forfaitaire waarde (p. 7);
+        // the declared value enters 11.48/11.49 as f_ctrl;tabel 11.5.
+        let table = calculate_ventilation(&dwelling(SystemVariant::C4c)).unwrap();
+        let mut declared = dwelling(SystemVariant::C4c);
+        if let VentilationSystem::Single { unit } = &mut declared.system {
+            unit.declared_control_factor = Some(Box::new(DeclaredControlFactor {
+                value: 0.51,
+                declaration_reference: "BCRG gelijkwaardigheidsverklaring".into(),
+            }));
+        }
+        assert!(validate_ventilation(&declared).is_empty());
+        let result = calculate_ventilation(&declared).unwrap();
+        close(
+            result.months[0].heating.required_outdoor_air_m3_per_h,
+            table.months[0].heating.required_outdoor_air_m3_per_h * 0.51 / 0.59,
+            1e-9,
+        );
+        // Without a declaration nothing changes, and the field is not
+        // serialised.
+        let plain = dwelling(SystemVariant::C4c);
+        let json = serde_json::to_value(&plain).unwrap();
+        assert!(json["system"]["unit"]
+            .get("declaredControlFactor")
+            .is_none());
+    }
+
+    #[test]
+    fn declared_control_factor_is_validated() {
+        let mut input = dwelling(SystemVariant::C4c);
+        if let VentilationSystem::Single { unit } = &mut input.system {
+            unit.declared_control_factor = Some(Box::new(DeclaredControlFactor {
+                value: f64::NAN,
+                declaration_reference: " ".into(),
+            }));
+        }
+        let issues = validate_ventilation(&input);
+        let found: Vec<_> = issues.iter().map(|i| (i.code, i.path.as_str())).collect();
+        assert!(found.contains(&(
+            "declared_control_factor_invalid",
+            "system.unit.declaredControlFactor.value"
+        )));
+        assert!(found.contains(&(
+            "source_reference_required",
+            "system.unit.declaredControlFactor.declarationReference"
+        )));
+        for value in [0.0, -0.1, 2.5] {
+            if let VentilationSystem::Single { unit } = &mut input.system {
+                unit.declared_control_factor = Some(Box::new(DeclaredControlFactor {
+                    value,
+                    declaration_reference: "verklaring".into(),
+                }));
+            }
+            assert!(validate_ventilation(&input)
+                .iter()
+                .any(|i| i.code == "declared_control_factor_invalid"));
+        }
     }
 
     #[test]

@@ -1,4 +1,7 @@
+import { DeclaredAuxiliaryConstantsFields, DeclaredChpEfficienciesFields } from './NtaPipeGeometry';
 import { useI18n } from '../../i18n/i18n';
+import { ElectricBoilerInsulatedPipe2022Field } from './NtaEdition2022Fields';
+import { HeatPumpInstallationYear2020Field } from './NtaEdition2020Fields';
 import type { IProject } from '../../core/energy/types';
 import {
   additionalHotWaterGeneratorTemplate, calculatedSolarMethod, collectorObstructionTemplate, coolingPerformanceTemplate,
@@ -12,6 +15,25 @@ import {
 import {
   AnnexQHeatPumpFields, BoilerForfaitFields, ForfaitHeaterFields, LocalHeaterFields, ProductBoilerFields,
 } from './NtaProductGenerators';
+
+/**
+ * Table 13.2 of NTA 8800:2023: the kitchen row by inner pipe diameter. Only the
+ * 2023 edition has this input; under another edition a value left behind is
+ * offered for removal (the kernel reports it as route_not_in_edition).
+ */
+export function KitchenPipeDiameterField({ draft, change, path }: { draft: Draft; change: (path: Path, value: unknown) => void; path: Path }) {
+  const { t } = useI18n();
+  const value = read(draft, path);
+  if (['2023', '2022', '2020+A1'].includes(read(draft, ['normVersion']) as string)) {
+    return <SelectField draft={draft} onChange={change} path={path} label={t('ntaStep.kitchenPipeDiameter')}
+      options={(['up_to_8_mm', 'up_to_10_mm', 'other'] as const).map((key) => [key, t(`ntaStep.kitchenPipeDiameter.${key}`)])} />;
+  }
+  if (value == null) return null;
+  return <p className="nta-form-note nta-form-error" role="alert">
+    {t('ntaStep.staleEdition2023', { field: t('ntaStep.kitchenPipeDiameter') })}{' '}
+    <button type="button" onClick={() => change(path, undefined)}>{t('nta.form.remove')}</button>
+  </p>;
+}
 
 // System inputs of the NTA form that share a base path: space-heating
 // generators (also nested in `multiple`), hot-water generators, solar water
@@ -72,7 +94,7 @@ export function SpaceGeneratorFields({ draft, change, base, project, allowMultip
       <p className="nta-form-note">{t('nta.form.externalNote')}</p>
     </>}
     {kind === 'electric_resistance' && <TextField {...field} path={at('equipmentReference')} label={t('nta.form.source')} />}
-    {kind === 'chp' && <ChpClassFields draft={draft} change={change} base={base} lowTemperature />}
+    {kind === 'chp' && <ChpClassFields draft={draft} change={change} base={base} lowTemperature declared />}
     {kind === 'gas_heat_pump' && <>
       <SelectField {...field} path={at('table')} label={t('nta.form.gasHp.table')} options={[
         ['residential_at_most25_kw', t('nta.form.gasHp.table.residential')],
@@ -104,7 +126,10 @@ export function SpaceGeneratorFields({ draft, change, base, project, allowMultip
       <TextField {...field} path={at('auxiliary', 'sourceReference')} label={t('nta.form.auxSource')} />
       <p className="nta-form-note">{t('nta.form.distributionSystemNote')}</p>
     </>}
-    {kind === 'gas_boiler' && <BoilerForfaitFields draft={draft} change={change} base={at('boiler')} />}
+    {kind === 'gas_boiler' && <>
+      <BoilerForfaitFields draft={draft} change={change} base={at('boiler')} />
+      <DeclaredAuxiliaryConstantsFields draft={draft} change={change} base={at('declaredAuxiliaryConstants')} />
+    </>}
     {kind === 'heat_pump_annex_q' && <>
       <AnnexQHeatPumpFields draft={draft} change={change} base={base} />
       {read(draft, at('heatPump', 'source')) === 'brine_water' &&
@@ -114,6 +139,8 @@ export function SpaceGeneratorFields({ draft, change, base, project, allowMultip
     {kind === 'local_heater' && <LocalHeaterFields draft={draft} change={change} base={base} />}
     {kind === 'forfait_heater' && <ForfaitHeaterFields draft={draft} change={change} base={base} />}
     {heatPumpNote && (kind === 'heat_pump_forfait' || kind === 'hybrid_heat_pump') && <p className="nta-form-note">{t('nta.form.heatPumpNote')}</p>}
+    {(kind === 'heat_pump_forfait' || kind === 'hybrid_heat_pump') &&
+      <HeatPumpInstallationYear2020Field draft={draft} change={change} base={at('forfait')} />}
     {kind === 'heat_pump_forfait' && <RegenerationFields draft={draft} change={change} base={at('regeneration')} />}
     {kind === 'heat_pump_forfait' && <HeatPumpDeclarationFields draft={draft} change={change} base={at('forfait', 'qualityDeclaration')} />}
     {kind === 'multiple' && <MultipleGeneratorFields draft={draft} change={change} base={base} project={project} />}
@@ -194,7 +221,8 @@ function RegenerationFields({ draft, change, base }: SectionProps & { base: Path
 }
 
 /** Building CHP: table 9.31 class (method 2) or measured micro-CHP (method 1, 9.6.6.2). */
-function ChpClassFields({ draft, change, base, lowTemperature = false }: SectionProps & { base: Path; lowTemperature?: boolean }) {
+function ChpClassFields({ draft, change, base, lowTemperature = false, declared = false }:
+  SectionProps & { base: Path; lowTemperature?: boolean; declared?: boolean }) {
   const { t } = useI18n();
   const field = { draft, onChange: change };
   const method1 = read(draft, [...base, 'method1']) != null;
@@ -202,6 +230,7 @@ function ChpClassFields({ draft, change, base, lowTemperature = false }: Section
     ...(read(draft, base) as Draft),
     chp: measured ? null : chpClassTemplate(),
     method1: measured ? microChpTemplate() : null,
+    ...(declared ? { declaredEfficiencies: null } : {}),
   });
   return <>
     <label>{t('nta.form.chp.method')}
@@ -212,7 +241,10 @@ function ChpClassFields({ draft, change, base, lowTemperature = false }: Section
     </label>
     {method1
       ? <MicroChpFields draft={draft} change={change} base={[...base, 'method1']} />
-      : <ChpTableFields draft={draft} change={change} base={base} lowTemperature={lowTemperature} />}
+      : <>
+        <ChpTableFields draft={draft} change={change} base={base} lowTemperature={lowTemperature} />
+        {declared && <DeclaredChpEfficienciesFields draft={draft} change={change} base={[...base, 'declaredEfficiencies']} />}
+      </>}
     <TextField {...field} path={[...base, 'equipmentReference']} label={t('nta.form.boilerEquipmentSource')} />
     <p className="nta-form-note">{t('nta.form.chp.note')}</p>
   </>;
@@ -436,6 +468,7 @@ export function HotWaterStorageFields({ draft, change, base = ['hotWater'] }: Se
         <SelectField {...field} path={at('connectionFactor')} label={t('nta.form.vessel.connection')}
           options={['1', '2', '3', '4', '5'].map((key) => [key, key])}
           onChange={(path, value) => change(path, value == null ? null : Number(value))} />
+        <ElectricBoilerInsulatedPipe2022Field draft={draft} change={change} path={at('electricBoilerInsulatedPipe')} />
         <CheckField {...field} path={at('inHeatedZone')} label={t('nta.form.vessel.heated')} />
         {!heated && <NumberField {...field} path={at('unheatedAmbientC')} label={t('nta.form.vessel.ambient')} />}
         <CheckField {...field} path={at('notInApplianceTest')} label={t('nta.form.vessel.notInTest')} />
@@ -603,6 +636,7 @@ export function AdditionalHotWaterSystemsFields({ draft, change, residential }: 
             ['kitchen_and_bathroom', t('nta.form.dhwTaps.both')], ['bathroom_only', t('nta.form.dhwTaps.bathroom')],
             ['kitchen_only', t('nta.form.dhwTaps.kitchen')]]} />
           <NumberField {...field} path={[...base, 'emission', 'kitchenLengthM']} label={t('nta.form.hotWaterKitchenLength')} />
+          <KitchenPipeDiameterField draft={draft} change={change} path={[...base, 'emission', 'kitchenPipeDiameter']} />
           <NumberField {...field} path={[...base, 'emission', 'bathroomLengthM']} label={t('nta.form.hotWaterBathroomLength')} />
           <NumberField {...field} path={[...base, 'connectedTaps', 'bathrooms']} label={t('nta.form.dhwSystems.bathrooms')} step="1" />
           <NumberField {...field} path={[...base, 'connectedTaps', 'kitchens']} label={t('nta.form.dhwSystems.kitchens')} step="1" />
@@ -858,11 +892,13 @@ export function CoolingPerformanceFields({ draft, change, base }: SectionProps &
   </>;
 }
 
-/** §17.3 window obstruction situations a–g (`windowSolar.obstruction`). */
-export function WindowObstructionFields({ draft, change }: SectionProps) {
+/**
+ * §17.3 window obstruction situations a–g, at `windowSolar.obstruction` or
+ * at one entry of `windowObstructions`.
+ */
+export function WindowObstructionFields({ draft, change, base = ['windowSolar', 'obstruction'] }: SectionProps & { base?: Path }) {
   const { t } = useI18n();
   const field = { draft, onChange: change };
-  const base: Path = ['windowSolar', 'obstruction'];
   const method = read(draft, [...base, 'method']);
   return <>
     <SelectField {...field} path={[...base, 'method']} label={t('nta.form.obstruction')} options={[

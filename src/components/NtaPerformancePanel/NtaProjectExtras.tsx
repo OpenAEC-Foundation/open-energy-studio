@@ -1,3 +1,5 @@
+import { PipeGeometryFields } from './NtaPipeGeometry';
+import { CoolingEmission2023Fields } from './NtaEdition2023Fields';
 import { useI18n } from '../../i18n/i18n';
 import type { IProject } from '../../core/energy/types';
 import {
@@ -178,6 +180,7 @@ export function CoolingSystemFields({ draft, change, base, allowNone }: SectionP
         ['unknown_or_other', t('nta.form.coolCtrl.unknown')], ['standalone_per_room', t('nta.form.coolCtrl.standalone')],
         ['central_with_room_control', t('nta.form.coolCtrl.central')]]} />
       <NumberField {...field} path={at('emission', 'fanCoilCount')} label={t('nta.form.coolingFanCoils')} />
+      <CoolingEmission2023Fields draft={draft} change={change} base={at('emission')} />
       <TextField {...field} path={at('emission', 'sourceReference')} label={t('nta.form.source')} />
       <label className="nta-form-check">
         <input type="checkbox" checked={read(draft, at('distribution')) != null}
@@ -191,7 +194,12 @@ export function CoolingSystemFields({ draft, change, base, allowNone }: SectionP
           ['t6_to12_or_unknown', '6/12'], ['t12_to16', '12/16'], ['t12_to18', '12/18'], ['t17_to21', '17/21']]} />
         <SelectField {...field} path={at('distribution', 'pipe', 'kind')} label={t('nta.form.coolingPipe')} options={[
           ['insulated_from1995', t('nta.form.coolPipe.from1995')], ['insulated1980_to1995', t('nta.form.coolPipe.1980')],
-          ['insulated_before1980_or_unknown_age', t('nta.form.coolPipe.before1980')], ['uninsulated', t('nta.form.coolPipe.none')]]} />
+          ['insulated_before1980_or_unknown_age', t('nta.form.coolPipe.before1980')], ['uninsulated', t('nta.form.coolPipe.none')],
+          ['calculated', t('nta.form.coolPipe.calculated')]]} />
+        {read(draft, at('distribution', 'pipe', 'kind')) === 'calculated' && <>
+          <PipeGeometryFields draft={draft} change={change} base={at('distribution', 'pipe', 'geometry')} />
+          <TextField {...field} path={at('distribution', 'pipe', 'sourceReference')} label={t('nta.form.pipeGeometry.source')} />
+        </>}
         <CheckField {...field} path={at('distribution', 'fittingsInsulated')} label={t('nta.form.coolingFittings')} />
         <TextField {...field} path={at('distribution', 'sourceReference')} label={t('nta.form.source')} />
       </>}

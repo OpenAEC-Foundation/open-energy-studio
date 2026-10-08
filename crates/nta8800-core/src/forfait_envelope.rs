@@ -92,6 +92,22 @@ const PSI_TABLE: &[(u16, u8, f64, f64)] = &[
 /// ψ_for for a detail position; `None` when the position/variant does not
 /// exist (use [`PSI_DEFAULT`] only for genuinely missing positions).
 pub fn forfait_psi(position: u16, variant: u8, column: PsiColumn) -> Option<f64> {
+    // Detail 17: 0,06 / 0,09 from 2024 (p. 803), 0,60 / 0,90 in 2023 (p. 804).
+    // NTA 8800:2020+A1 tables I.1/I.2 (p. 786–788) have one Ψ column.
+    if column == PsiColumn::B && !crate::norm_versions::profile().psi_columns_and_default {
+        return None;
+    }
+    // Detail 14: 0,70 in 2020+A1 (p. 786), 0,03 / 0,13 from 2022 (p. 793).
+    if (position, variant) == (14, 0) && column == PsiColumn::A {
+        return Some(crate::norm_versions::profile().psi_detail_14);
+    }
+    if (position, variant) == (17, 0) {
+        let psi = crate::norm_versions::profile().psi_detail_17;
+        return Some(match column {
+            PsiColumn::A => psi[0],
+            PsiColumn::B => psi[1],
+        });
+    }
     PSI_TABLE
         .iter()
         .find(|(p, v, _, _)| *p == position && *v == variant)
@@ -428,6 +444,16 @@ impl ForfaitOpaque {
                     path: format!("{path}.insulation.knownLambdaEquivalent"),
                 });
             }
+            // (I.2): a known higher λ from NTA 8800:2023 (p. 814); 2022
+            // p. 805 has only the fixed 0,06.
+            if known_lambda_equivalent.is_some()
+                && !crate::norm_versions::profile().lambda_equi_known_route
+            {
+                issues.push(ForfaitIssue {
+                    code: "route_not_in_edition",
+                    path: format!("{path}.insulation.knownLambdaEquivalent"),
+                });
+            }
             if reed_thickness_m.is_some_and(|d| !(0.1..=0.4).contains(&d)) {
                 issues.push(ForfaitIssue {
                     code: "reed_thickness_out_of_range",
@@ -546,7 +572,10 @@ impl ForfaitOpaque {
                 } else {
                     (thickness_mm / 10.0).round() * 10.0
                 };
-                let lambda = known_lambda_equivalent.unwrap_or(0.045).max(0.045);
+                // (I.2) λ_equi;ntr: 0,045 or a known higher value (2023 p. 814
+                // and later), 0,06 in 2022 (p. 805).
+                let base = crate::norm_versions::profile().lambda_equi_ntr;
+                let lambda = known_lambda_equivalent.unwrap_or(base).max(base);
                 let mut r = d_mm / 1000.0 / lambda + self.element.additional_resistance();
                 if self.cavity && d_mm <= 30.0 {
                     r += self.element.cavity_resistance();
@@ -664,6 +693,42 @@ pub enum PanelInsulation {
         #[serde(rename = "thicknessMm")]
         thickness_mm: f64,
     },
+}
+
+/// NTA 8800:2023 tables I.13/I.14 (p. 819–820): forfait U of a panel in a
+/// frame for a building (part) from 1965 whose data are missing, by
+/// build-year class; `None` before 1965 (tables I.11/I.12 apply).
+pub fn panel_u_by_build_year(build_year: i32, frame: FrameGroup, exterior: bool) -> Option<f64> {
+    let row: [f64; 3] = match (exterior, build_year) {
+        (_, ..=1964) => return None,
+        (true, 1965..=1991) => [3.7, 4.1, 4.9],
+        (true, 1992..=2012) => [3.7, 4.1, 4.2],
+        (true, _) => [1.65, 1.65, 1.65],
+        (false, 1965..=1991) => [2.8, 3.0, 3.4],
+        (false, 1992..=2012) => [2.8, 3.0, 3.0],
+        (false, _) => [1.4, 1.4, 1.4],
+    };
+    Some(row[frame_index(frame)])
+}
+
+/// Forfait panel U in the active edition: NTA 8800:2023 (I.2.2.4.1–2,
+/// p. 818–820) takes tables I.13/I.14 for a building from 1965 without a
+/// known insulation thickness; otherwise [`forfait_panel_u`].
+pub fn forfait_panel_u_in_edition(
+    insulation: PanelInsulation,
+    cavity: bool,
+    frame: FrameGroup,
+    exterior: bool,
+    build_year: Option<i32>,
+) -> Option<f64> {
+    if crate::norm_versions::profile().panel_build_year_tables
+        && !matches!(insulation, PanelInsulation::KnownThickness { .. })
+    {
+        if let Some(u) = build_year.and_then(|year| panel_u_by_build_year(year, frame, exterior)) {
+            return Some(u);
+        }
+    }
+    forfait_panel_u(insulation, cavity, frame, exterior)
 }
 
 /// Tables I.11/I.12 and I.15/I.16 (thickness rounded to 10 mm, 10–300 mm).
@@ -958,6 +1023,35 @@ mod tests {
         )
         .calculate();
         assert!((thin.r_c - (0.02 / 0.05 + 0.36 + 0.16)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn lambda_equi_ntr_is_0_06_in_2022() {
+        use crate::norm_versions::{with_version, NormVersion};
+        let known = |lambda: Option<f64>| {
+            element(
+                1970,
+                InsulationState::KnownThickness {
+                    thickness_mm: 50.0,
+                    thickness_proven: true,
+                    known_lambda_equivalent: lambda,
+                    reed_thickness_m: None,
+                    thermal_cushions: false,
+                },
+            )
+        };
+        // (I.2): 0,06 in 2022 (p. 805), 0,045 from 2023 (p. 814).
+        let r22 = with_version(NormVersion::V2022, || known(None).calculate().r_c);
+        let r23 = with_version(NormVersion::V2023, || known(None).calculate().r_c);
+        assert!((r22 - (0.05 / 0.06 + 0.36)).abs() < 1e-12);
+        assert!((r23 - (0.05 / 0.045 + 0.36)).abs() < 1e-12);
+        // A known higher λ is a 2023 route.
+        let refused = with_version(NormVersion::V2022, || known(Some(0.05)).validate("e"));
+        assert!(refused
+            .iter()
+            .any(|item| item.code == "route_not_in_edition"
+                && item.path == "e.insulation.knownLambdaEquivalent"));
+        assert!(with_version(NormVersion::V2023, || known(Some(0.05)).validate("e")).is_empty());
     }
 
     #[test]

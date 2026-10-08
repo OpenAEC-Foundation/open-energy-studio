@@ -59,7 +59,8 @@ def verify(manifest_path: Path) -> dict:
         if type(expected_bytes) is not int or expected_bytes <= 0:
             raise ValueError(f"Invalid {key} byte count")
         path = manifest_path.parent / name
-        if not path.is_file() or path.stat().st_size != expected_bytes or digest(path) != expected_sha:
+        # A basename alone does not confine a symlink to the manifest directory.
+        if path.is_symlink() or not path.is_file() or path.stat().st_size != expected_bytes or digest(path) != expected_sha:
             raise ValueError(f"Artifact differs from manifest: {path}")
 
     desktop = manifest.get("desktopPackage")
@@ -75,6 +76,13 @@ def verify(manifest_path: Path) -> dict:
 
 def verify_source(manifest: dict, repo: Path) -> None:
     commit = manifest["sourceCommit"]
+    object_type = subprocess.check_output(
+        ["git", "-C", str(repo), "cat-file", "-t", commit],
+        text=True,
+        stderr=subprocess.DEVNULL,
+    ).strip()
+    if object_type != "commit":
+        raise ValueError("Claimed source object is not a Git commit")
 
     def source_bytes(path: str) -> bytes:
         return subprocess.check_output(

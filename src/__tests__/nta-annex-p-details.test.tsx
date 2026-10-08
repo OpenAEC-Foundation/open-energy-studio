@@ -35,23 +35,23 @@ describe('annex P details without JSON editors', () => {
   it('edits pipe segments, a buffer and the calculated hot-water storage', async () => {
     const user = userEvent.setup();
     renderWithProviders(<Harness initial={{}} body={(draft, change) => <ExternalSupplyFields draft={draft} change={change} />} />);
-    await user.selectOptions(screen.getByRole('combobox', { name: 'External heat for hot water (dw)' }), 'calculated');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Distribution' }), 'pipes');
+    await user.selectOptions(screen.getByLabelText('External heat for hot water (dw)'), 'calculated');
+    await user.selectOptions(screen.getByLabelText('Distribution'), 'pipes');
     await user.click(screen.getByRole('button', { name: 'Add pipe segment' }));
-    await user.type(screen.getByRole('spinbutton', { name: 'Length, m' }), '120');
+    await user.type(screen.getByLabelText('Length, m'), '120');
     await user.click(screen.getByRole('button', { name: 'Add layer' }));
-    await user.type(screen.getByRole('spinbutton', { name: 'Layer 1 — λ W/(m·K)' }), '0.03');
-    await user.type(screen.getByRole('spinbutton', { name: 'Inner diameter, m' }), '0.06');
-    await user.type(screen.getByRole('spinbutton', { name: 'Outer diameter, m' }), '0.12');
-    await user.type(screen.getByRole('spinbutton', { name: 'Cover depth h_j, m' }), '0.8');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Surroundings' }), 'crawlspace');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Correction f_x;j (table P.1)' }), 'two_pipes_in_trench');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Network water temperature θ_XD;circ' }), 'constant');
-    await user.type(screen.getByRole('spinbutton', { name: 'Water temperature, °C' }), '70');
+    await user.type(screen.getByLabelText('Layer 1 — λ W/(m·K)'), '0.03');
+    await user.type(screen.getByLabelText('Inner diameter, m'), '0.06');
+    await user.type(screen.getByLabelText('Outer diameter, m'), '0.12');
+    await user.type(screen.getByLabelText('Cover depth h_j, m'), '0.8');
+    await user.selectOptions(screen.getByLabelText('Surroundings'), 'crawlspace');
+    await user.selectOptions(screen.getByLabelText('Correction f_x;j (table P.1)'), 'two_pipes_in_trench');
+    await user.selectOptions(screen.getByLabelText('Network water temperature θ_XD;circ'), 'constant');
+    await user.type(screen.getByLabelText('Water temperature, °C'), '70');
     await user.click(screen.getByRole('button', { name: 'Add buffer vessel' }));
-    await user.type(screen.getByRole('spinbutton', { name: 'Volume, l' }), '500');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Insulation (P.6.6.4.1)' }), 'at_least20_mm');
-    await user.type(screen.getAllByRole('textbox', { name: 'Source' })[0], 'leidingtekening');
+    await user.type(screen.getByLabelText('Volume, l'), '500');
+    await user.selectOptions(screen.getByLabelText('Insulation (P.6.6.4.1)'), 'at_least20_mm');
+    await user.type(screen.getAllByLabelText('Source')[0], 'leidingtekening');
     expect(withoutNulls(current().externalSupply.hotWater.distribution)).toEqual({
       method: 'pipes', sourceReference: 'leidingtekening',
       segments: [{
@@ -62,7 +62,7 @@ describe('annex P details without JSON editors', () => {
       buffers: [{ volumeL: 500, insulation: 'at_least20_mm' }],
     });
     // Other losses are optional: clearing drops the member (kernel default 0).
-    const other = screen.getByRole('spinbutton', { name: 'Other losses, kWh/year' });
+    const other = screen.getByLabelText('Other losses, kWh/year');
     await user.type(other, '50');
     expect(current().externalSupply.hotWater.distribution.otherLossKwh).toBe(50);
     await user.clear(other);
@@ -70,19 +70,19 @@ describe('annex P details without JSON editors', () => {
       && current().externalSupply.hotWater.distribution.otherLossKwh !== undefined).toBe(false);
 
     // Switching the placement drops the buried-only fields.
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Placement' }), 'in_air');
+    await user.selectOptions(screen.getByLabelText('Placement'), 'in_air');
     expect(current().externalSupply.hotWater.distribution.segments[0].placement)
       .toEqual({ kind: 'in_air', ambient: { kind: 'indoor', temperatureC: null } });
 
     // The calculated route starts with one vessel: without components η would be 1 (P.35).
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Hot-water storage η_WD;gen;sto (P.34/P.35)' }), 'calculated');
-    await user.type(screen.getAllByRole('spinbutton', { name: 'Volume, l' })[1], '300');
+    await user.selectOptions(screen.getByLabelText('Hot-water storage η_WD;gen;sto (P.34/P.35)'), 'calculated');
+    await user.type(screen.getAllByLabelText('Volume, l')[1], '300');
     await user.click(screen.getByRole('button', { name: 'Add charging pipe' }));
-    await user.type(screen.getAllByRole('spinbutton', { name: 'Length, m' })[1], '10');
-    await user.click(screen.getByRole('checkbox', { name: 'External plate heat exchanger (P.46)' }));
-    const powers = screen.getAllByRole('spinbutton', { name: 'Nominal power, kW' });
+    await user.type(screen.getAllByLabelText('Length, m')[1], '10');
+    await user.click(screen.getByLabelText('External plate heat exchanger (P.46)'));
+    const powers = screen.getAllByLabelText('Nominal power, kW');
     await user.type(powers[powers.length - 1], '150');
-    await user.click(screen.getByRole('checkbox', { name: 'Insulated at least 20 mm all round' }));
+    await user.click(screen.getByLabelText('Insulated at least 20 mm all round'));
     expect(withoutNulls(current().externalSupply.hotWater.hotWaterStorage)).toEqual({
       method: 'calculated', sourceReference: '', vessels: [{ volumeL: 300 }], pipes: [{ lengthM: 10 }],
       exchanger: { nominalPowerKw: 150, insulated: true },
@@ -92,23 +92,23 @@ describe('annex P details without JSON editors', () => {
   it('edits collective solar, flex and sorption generators and clears stale fields', async () => {
     const user = userEvent.setup();
     renderWithProviders(<Harness initial={{}} body={(draft, change) => <ExternalSupplyFields draft={draft} change={change} />} />);
-    await user.selectOptions(screen.getByRole('combobox', { name: 'External heat for space heating (dh)' }), 'calculated');
+    await user.selectOptions(screen.getByLabelText('External heat for space heating (dh)'), 'calculated');
     await user.click(screen.getByRole('button', { name: 'Add generator' }));
-    const kind = () => screen.getAllByRole('combobox', { name: 'Generator kind' })[1];
+    const kind = () => screen.getAllByLabelText('Generator kind')[1];
     const generator = () => current().externalSupply.heating.generators[1].kind;
 
     await user.selectOptions(kind(), 'collective_solar');
-    await user.type(screen.getByRole('spinbutton', { name: 'Annual solar contribution, kWh' }), '4000');
+    await user.type(screen.getByLabelText('Annual solar contribution, kWh'), '4000');
     expect(withoutNulls(generator())).toEqual({
       kind: 'collective_solar', contribution: { method: 'declared', annualKwh: 4000, sourceReference: '' },
     });
-    await user.click(screen.getByRole('checkbox', { name: 'Twelve monthly values' }));
-    await user.type(screen.getByRole('spinbutton', { name: 'Monthly solar contribution, kWh 1' }), '300');
+    await user.click(screen.getByLabelText('Twelve monthly values'));
+    await user.type(screen.getByLabelText('Monthly solar contribution, kWh 1'), '300');
     expect(generator().contribution.annualKwh).toBeUndefined();
     expect(generator().contribution.monthlyKwh[0]).toBe(300);
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Solar contribution Q_XD;sol;mi' }), 'calculated');
-    await user.type(screen.getByRole('spinbutton', { name: 'Collector module area, m²' }), '2.5');
-    await user.type(screen.getByRole('spinbutton', { name: 'Network design supply temperature, °C' }), '70');
+    await user.selectOptions(screen.getByLabelText('Solar contribution Q_XD;sol;mi'), 'calculated');
+    await user.type(screen.getByLabelText('Collector module area, m²'), '2.5');
+    await user.type(screen.getByLabelText('Network design supply temperature, °C'), '70');
     expect(generator().contribution).toMatchObject({
       method: 'calculated', solarType: 'preheater', networkSupplyC: 70,
       collectors: { moduleAreaM2: 2.5, orientation: 'south' }, storage: { loss: { method: 'unknown_label' } },
@@ -116,21 +116,21 @@ describe('annex P details without JSON editors', () => {
     expect(generator().contribution.monthlyKwh).toBeUndefined();
 
     await user.selectOptions(kind(), 'electric_flex');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Flex-mode generator (5.8)' }), 'heat_pump');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Source (table P.5)' }), 'electric_surface_water');
-    await user.type(screen.getByRole('spinbutton', { name: 'Connections of the heat network (at least 500)' }), '600');
-    await user.click(screen.getByRole('checkbox', { name: 'Heat buffer decouples production from demand' }));
+    await user.selectOptions(screen.getByLabelText('Flex-mode generator (5.8)'), 'heat_pump');
+    await user.selectOptions(screen.getByLabelText('Source (table P.5)'), 'electric_surface_water');
+    await user.type(screen.getByLabelText('Connections of the heat network (at least 500)'), '600');
+    await user.click(screen.getByLabelText('Heat buffer decouples production from demand'));
     expect(withoutNulls(generator())).toEqual({
       kind: 'electric_flex', connections: 600, heatBuffer: true, registrationReference: '',
       generator: { kind: 'heat_pump', efficiency: { method: 'table_p5', source: 'electric_surface_water' } },
     });
 
     await user.selectOptions(kind(), 'sorption_chiller');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Heat source (table P.10)' }), 'chp');
+    await user.selectOptions(screen.getByLabelText('Heat source (table P.10)'), 'chp');
     expect(withoutNulls(generator())).toEqual({
       kind: 'sorption_chiller', heat: { source: 'chp', carrier: { kind: 'natural_gas' }, tableP6: { installedAfter2006: true } },
     });
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Heat source (table P.10)' }), 'collective_heat');
+    await user.selectOptions(screen.getByLabelText('Heat source (table P.10)'), 'collective_heat');
     expect(withoutNulls(generator())).toEqual({ kind: 'sorption_chiller', heat: { source: 'collective_heat', sourceReference: '' } });
   }, 60000);
 
@@ -138,20 +138,20 @@ describe('annex P details without JSON editors', () => {
     const user = userEvent.setup();
     renderWithProviders(<Harness initial={{}} body={(draft, change) => <ExternalSupplyFields draft={draft} change={change} />} />);
     await user.click(screen.getByRole('button', { name: 'Add area PV system' }));
-    await user.type(screen.getByRole('spinbutton', { name: 'panel peak power W' }), '400');
-    await user.type(screen.getByRole('spinbutton', { name: 'number of panels' }), '10');
-    await user.type(screen.getByRole('spinbutton', { name: 'azimuth ° (0 = north)' }), '180');
+    await user.type(screen.getByLabelText('panel peak power W'), '400');
+    await user.type(screen.getByLabelText('number of panels'), '10');
+    await user.type(screen.getByLabelText('azimuth ° (0 = north)'), '180');
     expect(withoutNulls(current().externalSupply.areaElectricity[0])).toEqual({
       kind: 'pv', id: 'gebied-pv-1', peakPower: { method: 'panels', panelPeakPowerW: 400, panelCount: 10 }, azimuthDeg: 180,
       mounting: 'unknown', obstructionFactors: [], sourceReference: '',
     });
     // The obstruction factor is optional: clearing it leaves no blank.
-    const obstruction = screen.getByRole('spinbutton', { name: /obstruction/i });
+    const obstruction = screen.getByLabelText(/obstruction/i);
     await user.type(obstruction, '0.9');
     expect(current().externalSupply.areaElectricity[0].obstructionFactors).toEqual([0.9]);
     await user.clear(obstruction);
     expect(current().externalSupply.areaElectricity[0].obstructionFactors).toEqual([]);
-    await user.selectOptions(screen.getByRole('combobox', { name: 'gebied-pv-1 — peak power P_pk' }), 'table16_1');
+    await user.selectOptions(screen.getByLabelText('gebied-pv-1 — peak power P_pk'), 'table16_1');
     expect(current().externalSupply.areaElectricity[0].peakPower).toEqual({ method: 'table16_1', moduleType: null, panelAreaM2: null });
   }, 60000);
 });
@@ -161,23 +161,23 @@ describe('lighting, floor edges and measure patches without JSON', () => {
     const user = userEvent.setup();
     renderWithProviders(<Harness initial={{ labelFunction: 'office' }}
       body={(draft, change) => <NtaLightingSection draft={draft} change={change} project={project} />} />);
-    await user.click(screen.getByRole('checkbox', { name: 'Calculate lighting' }));
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Power' }), 'installed');
-    await user.type(screen.getByRole('spinbutton', { name: 'Luminaire group 1 — Number of luminaires' }), '20');
-    await user.type(screen.getByRole('spinbutton', { name: 'System power per luminaire, W' }), '36');
+    await user.click(screen.getByLabelText('Calculate lighting'));
+    await user.selectOptions(screen.getByLabelText('Power'), 'installed');
+    await user.type(screen.getByLabelText('Luminaire group 1 — Number of luminaires'), '20');
+    await user.type(screen.getByLabelText('System power per luminaire, W'), '36');
     await user.click(screen.getByRole('button', { name: 'Add luminaire group' }));
-    await user.type(screen.getByRole('spinbutton', { name: 'Luminaire group 2 — Number of luminaires' }), '4');
-    await user.selectOptions(screen.getAllByRole('combobox', { name: 'Power per luminaire' })[1], 'lamps');
-    await user.type(screen.getByRole('spinbutton', { name: 'Lamp power, W' }), '28');
-    await user.type(screen.getByRole('spinbutton', { name: 'Lamps per luminaire' }), '2');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Lamp technology (table 14.2)' }), 'fluorescent_t5');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Parasitic power' }), 'installed');
-    await user.type(screen.getByRole('spinbutton', { name: 'Σ emergency charging power P_ei, W' }), '12');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Daylight' }), 'sectors');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Kind' }), 'tilted_window');
-    await user.type(screen.getByRole('spinbutton', { name: 'Tilt γ from the horizontal, °' }), '45');
-    await user.click(screen.getByRole('checkbox', { name: 'Data for the rooflight projection (below 75°)' }));
-    await user.type(screen.getAllByRole('spinbutton', { name: 'Distance to wall, m — side 1' })[0], '2');
+    await user.type(screen.getByLabelText('Luminaire group 2 — Number of luminaires'), '4');
+    await user.selectOptions(screen.getAllByLabelText('Power per luminaire')[1], 'lamps');
+    await user.type(screen.getByLabelText('Lamp power, W'), '28');
+    await user.type(screen.getByLabelText('Lamps per luminaire'), '2');
+    await user.selectOptions(screen.getByLabelText('Lamp technology (table 14.2)'), 'fluorescent_t5');
+    await user.selectOptions(screen.getByLabelText('Parasitic power'), 'installed');
+    await user.type(screen.getByLabelText('Σ emergency charging power P_ei, W'), '12');
+    await user.selectOptions(screen.getByLabelText('Daylight'), 'sectors');
+    await user.selectOptions(screen.getByLabelText('Kind'), 'tilted_window');
+    await user.type(screen.getByLabelText('Tilt γ from the horizontal, °'), '45');
+    await user.click(screen.getByLabelText('Data for the rooflight projection (below 75°)'));
+    await user.type(screen.getAllByLabelText('Distance to wall, m — side 1')[0], '2');
     const zone = withoutNulls(current().lighting[0].lightingZones[0]);
     expect(zone.power).toEqual({
       method: 'installed', sourceReference: '', luminaires: [
@@ -202,8 +202,8 @@ describe('lighting, floor edges and measure patches without JSON', () => {
       body={(draft, change) => <GroundEdgeBridgesFields draft={draft} change={change}
         base={['groundFloors', 0, 'edgeThermalBridges', 'bridges']} />} />);
     await user.click(screen.getByRole('button', { name: 'Add edge part' }));
-    await user.type(screen.getByRole('spinbutton', { name: 'Edge part length ℓ_j, m 1' }), '12.5');
-    await user.type(screen.getByRole('spinbutton', { name: 'ψ_gr;j, W/(m·K)' }), '0.08');
+    await user.type(screen.getByLabelText('Edge part length ℓ_j, m 1'), '12.5');
+    await user.type(screen.getByLabelText('ψ_gr;j, W/(m·K)'), '0.08');
     expect(current().groundFloors[0].edgeThermalBridges.bridges).toEqual([{ lengthM: 12.5, psiWPerMk: 0.08, sourceReference: '' }]);
   }, 60000);
 
@@ -222,23 +222,23 @@ describe('lighting, floor edges and measure patches without JSON', () => {
     }
     renderWithProviders(<PatchHarness />);
     await user.click(screen.getByRole('button', { name: 'Add change' }));
-    await user.type(screen.getByRole('textbox', { name: 'Path (JSON pointer)' }), '/constructions/0/uValue');
-    await user.type(screen.getByRole('textbox', { name: 'New value' }), '0.15');
+    await user.type(screen.getByLabelText('Path (JSON pointer)'), '/constructions/0/uValue');
+    await user.type(screen.getByLabelText('New value'), '0.15');
     expect(current().patch).toEqual([{ op: 'replace', path: '/constructions/0/uValue', value: 0.15 }]);
     // The type is explicit: text "2" stays a string, true a boolean.
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Value type' }), 'text');
-    await user.clear(screen.getByRole('textbox', { name: 'New value' }));
-    await user.type(screen.getByRole('textbox', { name: 'New value' }), '2');
+    await user.selectOptions(screen.getByLabelText('Value type'), 'text');
+    await user.clear(screen.getByLabelText('New value'));
+    await user.type(screen.getByLabelText('New value'), '2');
     expect(current().patch[0].value).toBe('2');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Value type' }), 'boolean');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'New value' }), 'true');
+    await user.selectOptions(screen.getByLabelText('Value type'), 'boolean');
+    await user.selectOptions(screen.getByLabelText('New value'), 'true');
     expect(current().patch[0].value).toBe(true);
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Value type' }), 'json');
+    await user.selectOptions(screen.getByLabelText('Value type'), 'json');
     expect(current().patch[0].value).toEqual({});
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Value type' }), 'number');
-    await user.type(screen.getByRole('textbox', { name: 'New value' }), '7');
+    await user.selectOptions(screen.getByLabelText('Value type'), 'number');
+    await user.type(screen.getByLabelText('New value'), '7');
     expect(current().patch[0].value).toBe(7);
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Operation' }), 'remove');
+    await user.selectOptions(screen.getByLabelText('Operation'), 'remove');
     expect(current().patch).toEqual([{ op: 'remove', path: '/constructions/0/uValue' }]);
   }, 60000);
 
@@ -257,12 +257,12 @@ describe('lighting, floor edges and measure patches without JSON', () => {
     }
     renderWithProviders(<PatchHarness />);
     // The saved null row shows the null type, not "number".
-    const types = () => screen.getAllByRole('combobox', { name: 'Value type' }) as HTMLSelectElement[];
+    const types = () => screen.getAllByLabelText('Value type') as HTMLSelectElement[];
     expect(types().map((select) => select.value)).toEqual(['text', 'text', 'null']);
     await user.click(screen.getAllByRole('button', { name: 'Remove' })[0]);
     expect(current().patch.map((row: MwaPatchOperation) => row.path)).toEqual(['/b', '/c']);
     // The remaining rows keep their own values and types.
-    expect((screen.getByRole('textbox', { name: 'New value' }) as HTMLInputElement).value).toBe('second');
+    expect((screen.getByLabelText('New value') as HTMLInputElement).value).toBe('second');
     expect(types().map((select) => select.value)).toEqual(['text', 'null']);
   }, 60000);
 });

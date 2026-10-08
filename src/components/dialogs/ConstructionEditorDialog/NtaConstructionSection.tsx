@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useProjectEdition } from '../../../context/EnergyContext';
 import { useI18n } from '../../../i18n/i18n';
 import type { IConstructionLayer } from '../../../core/energy/types';
 import { calculateConstructionsWithRust, type EnvelopeAssessment } from '../../../core/nta/KernelClient';
@@ -36,6 +37,7 @@ export function NtaConstructionSection({ layers, onApply }: {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const requestId = useRef(0);
+  const edition = useProjectEdition();
   useEffect(() => () => { requestId.current += 1; }, []);
 
   const invalidate = () => {
@@ -57,7 +59,7 @@ export function NtaConstructionSection({ layers, onApply }: {
     setResult(null);
     try {
       const input = mode === 'layers' ? envelopeFromLayers('construction', draft) : envelopeFromForfait('construction', forfait);
-      const assessment = await calculateConstructionsWithRust(input);
+      const assessment = await calculateConstructionsWithRust(input, edition);
       if (requestId.current === current) setResult(assessment);
     } catch (reason) {
       if (requestId.current === current) setError(reason instanceof Error ? reason.message : String(reason));

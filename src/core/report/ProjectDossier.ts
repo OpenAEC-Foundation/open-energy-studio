@@ -4,6 +4,7 @@ import type {
   NtaEvidenceItem, NtaEvidenceKind, NtaRegistration, OpnameAssessment, ProjectPerformanceAssessment, RelabelAssessment,
 } from '../nta/KernelClient';
 import { evidenceArchiveName, loadEvidenceBytes, sha256Hex } from '../nta/Evidence';
+import { evidenceUsage } from '../nta/EvidenceLinks';
 import { serializeProject, type KernelStamp } from '../io/ProjectSerializer';
 import { labelInputSha256, relabelDeadline } from '../nta/Registration';
 import { isProductionPath } from '../nta/RelabelText';
@@ -280,8 +281,23 @@ export interface DossierManifest {
   kernel: KernelStamp | null;
   attestStatus: string | null;
   files: DossierManifestEntry[];
+  /** Table of contents of the evidence (Bijlage 3 "bewijsmateriaal met inhoudsopgave"): file, hash and what it supports. */
+  evidence: DossierEvidenceEntry[];
   missingEvidence: Array<{ id: string; fileName: string; reason: string }>;
   checklist: DossierItem[];
+}
+
+export interface DossierEvidenceEntry {
+  id: string;
+  kind: NtaEvidenceKind;
+  fileName: string;
+  sha256: string;
+  date: string | null;
+  /** Path in the ZIP; null when the file was not available. */
+  archivePath: string | null;
+  checkedBy: string | null;
+  /** Inputs it supports: JSON pointers into the project (linked paths and `evidence:<id>` references). */
+  supports: string[];
 }
 
 export interface DossierBundle {
@@ -324,10 +340,17 @@ export async function buildProjectDossier(
     if (originalProjectText) files['herlabel-origineel.oes.json'] = strToU8(originalProjectText);
   }
   const missingEvidence: DossierManifest['missingEvidence'] = [];
+  const evidenceEntries: DossierEvidenceEntry[] = [];
+  const usage = evidenceUsage(project);
   for (const item of project.registration?.evidence ?? []) {
     const bytes = await loadEvidenceBytes(item);
     if (bytes) files[evidenceArchiveName(item)] = bytes;
     else missingEvidence.push({ id: item.id, fileName: item.fileName, reason: 'bestand niet beschikbaar of hash wijkt af' });
+    evidenceEntries.push({
+      id: item.id, kind: item.kind, fileName: item.fileName, sha256: item.sha256, date: item.date ?? null,
+      archivePath: bytes ? evidenceArchiveName(item) : null, checkedBy: item.checkedBy ?? null,
+      supports: usage.get(item.id) ?? [],
+    });
   }
   const checklist = checkDossierCompleteness({ ...context, pending: false, labelInputSha256: labelSha });
   files['dossier-checklist.json'] = strToU8(JSON.stringify(checklist, null, 2));
@@ -341,6 +364,7 @@ export async function buildProjectDossier(
     kernel,
     attestStatus: assessment?.attestStatus ?? null,
     files: entries,
+    evidence: evidenceEntries,
     missingEvidence,
     checklist,
   };

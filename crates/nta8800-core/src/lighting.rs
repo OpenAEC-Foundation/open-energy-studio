@@ -468,6 +468,33 @@ pub struct LightingZone {
     /// 7.28: at least 70 % of the power is in extracted luminaires.
     #[serde(default)]
     pub extracted_luminaires: bool,
+    /// NTA 8800:2022 (14.15) with table 14.4 (p. 639): a system with
+    /// constant-illuminance compensation; F_C = 1 − ½·(1 − MF). From 2023
+    /// MF = 1 (p. 649) and the input is refused.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub constant_illuminance: Option<ConstantIlluminance>,
+}
+
+/// NTA 8800:2022 table 14.4 (p. 639): systems with constant-illuminance
+/// (nieuwwaarde-)compensation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ConstantIlluminance {
+    /// Linear fluorescent lamps, MF 0,8.
+    LinearFluorescent,
+    /// LED light source (L80), MF 0,7.
+    LedL80,
+}
+
+impl ConstantIlluminance {
+    /// (14.15) with F_CC = 1: F_C = 1 − ½·(1 − MF).
+    pub fn compensation_factor(self) -> f64 {
+        let maintenance = match self {
+            Self::LinearFluorescent => 0.8,
+            Self::LedL80 => 0.7,
+        };
+        1.0 - 0.5 * (1.0 - maintenance)
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -603,6 +630,34 @@ pub fn validate_lighting(zone: &ZoneLighting, zone_area_m2: f64, path: &str) -> 
         .iter()
         .filter(|item| matches!(item.power, InstalledPower::Forfait { .. }))
         .count();
+    // Table 14.3: the LED-from-2017 column exists from 2024 (p. 646), not in
+    // 2023 (p. 648).
+    if !crate::norm_versions::profile().led_2017_column {
+        for (index, item) in zone.lighting_zones.iter().enumerate() {
+            if matches!(
+                item.power,
+                InstalledPower::Forfait {
+                    led_from_2017: true
+                }
+            ) {
+                push(
+                    "route_not_in_edition",
+                    format!("lightingZones[{index}].power.ledFrom2017"),
+                );
+            }
+        }
+    }
+    // Table 14.4 MF exists in NTA 8800:2022 only (p. 639; 2023 p. 649).
+    if !crate::norm_versions::profile().lighting_maintenance_factor {
+        for (index, item) in zone.lighting_zones.iter().enumerate() {
+            if item.constant_illuminance.is_some() {
+                push(
+                    "route_not_in_edition",
+                    format!("lightingZones[{index}].constantIlluminance"),
+                );
+            }
+        }
+    }
     if forfait_power != 0 && forfait_power != zone.lighting_zones.len() {
         // §14.3.4: the forfait applies to all lighting zones of the zone.
         push("lighting_forfait_mixed", "lightingZones".into());
@@ -973,9 +1028,16 @@ fn calculate_zone_lighting(zone: &ZoneLighting, context: LightingContext) -> Zon
                 }
             }
         };
-        // 14.7 with F_C = 1 (14.15).
-        let lighting =
-            power * (t_day * occupancy_day * daylight_factor + t_night * occupancy_night) / 1000.0;
+        // 14.7 with F_C of (14.15): 1 from NTA 8800:2023 (p. 649), table
+        // 14.4 in 2022 (p. 639).
+        let compensation = item
+            .constant_illuminance
+            .filter(|_| crate::norm_versions::profile().lighting_maintenance_factor)
+            .map_or(1.0, ConstantIlluminance::compensation_factor);
+        let lighting = power
+            * compensation
+            * (t_day * occupancy_day * daylight_factor + t_night * occupancy_night)
+            / 1000.0;
         let parasitic = match &item.parasitic {
             ParasiticPower::Forfait => PARASITIC_FORFAIT_KWH_PER_M2 * item.area_m2,
             ParasiticPower::Installed {
@@ -1060,7 +1122,46 @@ mod tests {
                 daylight_control: true,
             },
             extracted_luminaires: false,
+            constant_illuminance: None,
         }
+    }
+
+    /// Table 14.3: the LED-from-2017 column exists from 2024 (p. 646), not
+    /// in 2023 (p. 648).
+    #[test]
+    fn led_from_2017_is_not_in_2023() {
+        use crate::norm_versions::{with_version, NormVersion};
+        let zone = office(vec![forfait_zone(200.0)]);
+        assert!(matches!(
+            zone.lighting_zones[0].power,
+            InstalledPower::Forfait {
+                led_from_2017: true
+            }
+        ));
+        assert!(
+            with_version(NormVersion::V2024, || validate_lighting(&zone, 200.0, "l")).is_empty()
+        );
+        let issues = with_version(NormVersion::V2023, || validate_lighting(&zone, 200.0, "l"));
+        assert!(issues.iter().any(|item| item.code == "route_not_in_edition"
+            && item.path == "l.lightingZones[0].power.ledFrom2017"));
+    }
+
+    /// Table 14.4 (NTA 8800:2022 p. 639) is a 2022 route; 2023 sets MF = 1
+    /// (p. 649).
+    #[test]
+    fn constant_illuminance_is_a_2022_route() {
+        use crate::norm_versions::{with_version, NormVersion};
+        let mut zone = office(vec![forfait_zone(200.0)]);
+        if let InstalledPower::Forfait { led_from_2017 } = &mut zone.lighting_zones[0].power {
+            *led_from_2017 = false;
+        }
+        zone.lighting_zones[0].constant_illuminance = Some(ConstantIlluminance::LedL80);
+        assert!(
+            with_version(NormVersion::V2022, || validate_lighting(&zone, 200.0, "l")).is_empty()
+        );
+        let issues = with_version(NormVersion::V2023, || validate_lighting(&zone, 200.0, "l"));
+        assert!(issues.iter().any(|item| item.code == "route_not_in_edition"
+            && item.path == "l.lightingZones[0].constantIlluminance"));
     }
 
     /// §14.5.1 (p. 664): the large-group rule outside an office function

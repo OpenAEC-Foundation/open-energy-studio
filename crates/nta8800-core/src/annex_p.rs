@@ -96,6 +96,9 @@ pub const K_CO2_EL: f64 = 0.268;
 pub const F_PREN_ELEC: f64 = 1.45;
 /// P.6.5.4.7: specific auxiliary energy to make residual heat available.
 pub const RESIDUAL_HEAT_AUX: f64 = 0.07;
+/// NTA 8800:2020+A1 tables 5.5/5.6 (p. 109–110): residual heat (rw).
+pub const RESIDUAL_HEAT_PRIMARY_2020: f64 = 0.1;
+pub const RESIDUAL_HEAT_CO2_2020: f64 = 0.034;
 /// P.29: `Δε_chp;el / ε_chp;th` for CHP with power loss.
 pub const CHP_LOSS_RATIO: f64 = 0.18;
 /// P.6.5.4.8: geothermal efficiency at 40 K cooling.
@@ -1902,6 +1905,10 @@ fn biomass_efficiency(net_efficiency: f64) -> f64 {
 }
 
 fn geothermal_efficiency(source_c: f64, return_c: f64) -> f64 {
+    // 2023 (P.6.5.4.8, p. 960): the forfait 20 without correction.
+    if crate::norm_versions::profile().geothermal_efficiency_fixed {
+        return GEOTHERMAL_EFFICIENCY_40K;
+    }
     GEOTHERMAL_EFFICIENCY_40K * (source_c - return_c - 3.0) / 40.0
 }
 
@@ -2116,7 +2123,31 @@ fn factors(
                     format!("{kpath}.efficiency.sourceReference"),
                     issues,
                 ),
-                HeatPumpEfficiency::TableP5 { source, .. } => {
+                HeatPumpEfficiency::TableP5 {
+                    source,
+                    supply_temperature_c,
+                } => {
+                    // NTA 8800:2022 table P.5 (p. 941): up to 55 °C and
+                    // without the source-temperature rows.
+                    if crate::norm_versions::profile().heat_pump_tables_2022 {
+                        if matches!(
+                            source,
+                            TableP5Source::ElectricSource15To20C
+                                | TableP5Source::ElectricSource20To40C
+                                | TableP5Source::ElectricSourceAtLeast40C
+                        ) {
+                            issues.push(issue(
+                                "route_not_in_edition",
+                                format!("{kpath}.efficiency.source"),
+                            ));
+                        }
+                        if *supply_temperature_c > 55.0 {
+                            issues.push(issue(
+                                "route_not_in_edition",
+                                format!("{kpath}.efficiency.supplyTemperatureC"),
+                            ));
+                        }
+                    }
                     let electric_drive = matches!(drive, SystemCarrier::Electricity { .. });
                     if source.electric() != electric_drive {
                         issues.push(issue(
@@ -2214,6 +2245,28 @@ fn factors(
         GeneratorKind::ResidualHeat {
             auxiliary_specific,
             auxiliary_reference,
+        } if crate::norm_versions::profile().residual_heat_fixed_factors => {
+            // NTA 8800:2020+A1 P.6.5.4.7 (p. 933) with tables 5.5/5.6 and
+            // (5.47) (p. 109–113): η = 1, f_P;del;rw 0,1, K_CO2 0,034 and
+            // f_Pren 0,9; a different efficiency includes the auxiliary
+            // energy, so there is no f_rw;aux;spec.
+            if auxiliary_specific.is_some() || auxiliary_reference.is_some() {
+                issues.push(issue(
+                    "route_not_in_edition",
+                    format!("{kpath}.auxiliarySpecific"),
+                ));
+                return None;
+            }
+            Some(GenFactors {
+                f: RESIDUAL_HEAT_PRIMARY_2020,
+                k: RESIDUAL_HEAT_CO2_2020,
+                pren: 1.0 - RESIDUAL_HEAT_PRIMARY_2020,
+                ..GenFactors::default()
+            })
+        }
+        GeneratorKind::ResidualHeat {
+            auxiliary_specific,
+            auxiliary_reference,
         } => {
             let aux = match auxiliary_specific {
                 Some(value) => {
@@ -2233,11 +2286,18 @@ fn factors(
                 ));
                 return None;
             }
-            // P.6.5.4.7 and 5.47/5.55.
+            // P.6.5.4.7 and 5.47/5.55: 1 − f_rw;aux;spec (2024 p. 119, 124);
+            // 1 − f_P;del;rw with f_P;del;rw = f_rw;aux;spec·f_P;del;el in
+            // NTA 8800:2023 (p. 116, 121 and 959).
+            let pren = if crate::norm_versions::profile().residual_heat_pren_primary {
+                1.0 - aux * F_P_EL
+            } else {
+                1.0 - aux
+            };
             Some(GenFactors {
                 f: aux * F_P_EL,
                 k: aux * k_co2_el(),
-                pren: 1.0 - aux,
+                pren,
                 ..GenFactors::default()
             })
         }
@@ -2390,6 +2450,10 @@ fn factors(
                 format!("{kpath}.registrationReference"),
                 issues,
             );
+            // The flex mode is new in NTA 8800:2023 (p. 111, 963).
+            if !crate::norm_versions::profile().flex_mode_route {
+                issues.push(issue("route_not_in_edition", kpath.clone()));
+            }
             // 5.8: at least 500 connections and a heat buffer.
             if *connections < 500 || !*heat_buffer {
                 issues.push(issue("flex_mode_conditions_not_met", kpath.clone()));
@@ -3255,6 +3319,10 @@ fn distribution(
             if system.function == SystemFunction::Cooling || *connections == 0 {
                 issues.push(issue("small_system_forfait_invalid", dpath.clone()));
             }
+            // Table P.0 is new in NTA 8800:2022 (p. 930; 2020+A1 p. 920).
+            if !crate::norm_versions::profile().small_system_forfait_route {
+                issues.push(issue("route_not_in_edition", dpath.clone()));
+            }
             if !other_loss_kwh.is_finite() || *other_loss_kwh < 0.0 {
                 issues.push(issue("value_invalid", format!("{dpath}.otherLossKwh")));
             }
@@ -3894,9 +3962,9 @@ fn energy_fractions(
                 // cascade of P.6.5.3.2 and P.23 for the remainder.
                 // P.25 literally uses Q_HD;in;tot, the whole heat delivered
                 // by all generators, collective solar included (p. 968).
-                let reference_power = input
-                    .reference_power_kw
-                    .unwrap_or(input.input_kwh * 3.6 / REFERENCE_POWER_DIVISOR);
+                let reference_power = input.reference_power_kw.unwrap_or(
+                    input.input_kwh * 3.6 / crate::norm_versions::profile().reference_power_divisor,
+                );
                 fractions.reference_power_kw = Some(reference_power);
                 let last = groups.len() - 1;
                 let mut cumulative = 0.0;
@@ -3924,6 +3992,11 @@ fn energy_fractions(
                         }
                         None => {
                             known = false;
+                            // β 0,5 for an unknown ratio is new in NTA 8800:2022
+                            // (p. 936); 2020+A1 (p. 925) needs the powers.
+                            if !crate::norm_versions::profile().unknown_beta_route {
+                                ok &= require_powers(input, group, path, issues);
+                            }
                             UNKNOWN_BETA
                         }
                     };
@@ -4110,9 +4183,22 @@ fn auxiliary_energy(
             network,
             farthest_distance_km,
         } => {
+            let edition = crate::norm_versions::profile().small_system_forfait_route;
             let specific = match ctx.function {
                 SystemFunction::HotWater => Some(SECONDARY_AUX_SPECIFIC),
+                // The 0,009 0 cold forfait is new in NTA 8800:2022 (p. 981;
+                // 2020+A1 p. 969).
+                SystemFunction::Cooling if !edition => {
+                    issues.push(issue("route_not_in_edition", apath.clone()));
+                    None
+                }
                 SystemFunction::Cooling => Some(COLD_AUX_SPECIFIC),
+                SystemFunction::Heating
+                    if !edition && *network == Some(AuxiliaryNetwork::SmallSystem) =>
+                {
+                    issues.push(issue("route_not_in_edition", format!("{apath}.network")));
+                    None
+                }
                 SystemFunction::Heating => match network {
                     None => {
                         issues.push(issue(
@@ -4848,8 +4934,11 @@ pub fn source_factors(
     if !issues.is_empty() {
         return Err(issues);
     }
-    let route_2024 = crate::norm_versions::profile().heat_pump_source_route
-        == crate::norm_versions::HeatPumpSourceRoute::AnySourceFrom15C2024;
+    // NTA 8800:2023 (p. 343) books ≥ 20 °C source heat with table 5.2 or
+    // annex P as well.
+    let route_2024 = crate::norm_versions::profile()
+        .heat_pump_source_route
+        .books_table_sources();
     let forfait = match source.temperature_class {
         // NTA 8800:2024 9.6.3.1.3 (p. 323, INT-V1 p. 5): the source heat
         // takes f_P;del of table 5.2 (p. 93: 0,9) or annex P, whatever its
@@ -4878,6 +4967,23 @@ pub fn source_factors(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// P.6.5.4.8: forfait 20 without correction in 2023 (p. 960); (P.25)
+    /// divisor 8 800 in 2023 (p. 950) and 5 400 in 2024 (p. 948).
+    #[test]
+    fn geothermal_efficiency_and_reference_power_follow_the_edition() {
+        use crate::norm_versions::{profile, with_version, NormVersion};
+        assert_eq!(geothermal_efficiency(70.0, 40.0), 20.0 * 27.0 / 40.0);
+        assert_eq!(
+            with_version(NormVersion::V2023, || geothermal_efficiency(70.0, 40.0)),
+            20.0
+        );
+        assert_eq!(profile().reference_power_divisor, 5400.0);
+        assert_eq!(
+            with_version(NormVersion::V2023, || profile().reference_power_divisor),
+            8800.0
+        );
+    }
 
     fn close(a: f64, b: f64) {
         assert!((a - b).abs() < 1e-9, "{a} vs {b}");
@@ -4999,6 +5105,54 @@ mod tests {
         .unwrap();
         close(residual.0, 0.07 * 1.45);
         close(residual.2, 0.93);
+        // NTA 8800:2023 (5.47) p. 116 with P.6.5.4.7 p. 959: f_Pren =
+        // 1 − f_P;del;rw = 1 − 0,07·1,45 = 0,8985; 2024 p. 119: 1 − 0,07.
+        let residual_2023 =
+            crate::norm_versions::with_version(crate::norm_versions::NormVersion::V2023, || {
+                generator_factors(
+                    &GeneratorKind::ResidualHeat {
+                        auxiliary_specific: None,
+                        auxiliary_reference: None,
+                    },
+                    SystemFunction::HotWater,
+                    "g",
+                    &mut issues,
+                )
+                .unwrap()
+            });
+        close(residual_2023.0, 0.07 * 1.45);
+        close(residual_2023.2, 0.8985);
+        // NTA 8800:2020+A1 tables 5.5/5.6 and (5.47) (p. 109–113, 933):
+        // f_P;del;rw 0,1, K_CO2 0,034, f_Pren 0,9; no f_rw;aux;spec.
+        let residual_2020 =
+            crate::norm_versions::with_version(crate::norm_versions::NormVersion::V2020A1, || {
+                let fixed = generator_factors(
+                    &GeneratorKind::ResidualHeat {
+                        auxiliary_specific: None,
+                        auxiliary_reference: None,
+                    },
+                    SystemFunction::Heating,
+                    "g",
+                    &mut issues,
+                )
+                .unwrap();
+                let mut refused = Vec::new();
+                let declared = generator_factors(
+                    &GeneratorKind::ResidualHeat {
+                        auxiliary_specific: Some(0.05),
+                        auxiliary_reference: Some("verklaring".into()),
+                    },
+                    SystemFunction::Heating,
+                    "g",
+                    &mut refused,
+                );
+                assert!(declared.is_none());
+                assert_eq!(refused[0].code, "route_not_in_edition");
+                fixed
+            });
+        close(residual_2020.0, 0.1);
+        close(residual_2020.1, 0.034);
+        close(residual_2020.2, 0.9);
         // Geothermal 83/40 °C: Δθ = 40 K → η = 20, f_Pren 0,95 (5.48).
         let geo = generator_factors(
             &GeneratorKind::Geothermal {
@@ -6268,6 +6422,53 @@ mod tests {
             codes(calculated(&input, "s")),
             vec!["flex_mode_conditions_not_met"]
         );
+        // The flex mode is new in NTA 8800:2023 (p. 111, 963).
+        if let GeneratorKind::ElectricFlex { connections, .. } = &mut input.generators[1].kind {
+            *connections = 600;
+        }
+        assert_eq!(
+            crate::norm_versions::with_version(crate::norm_versions::NormVersion::V2022, || {
+                codes(calculated(&input, "s"))
+            }),
+            vec!["route_not_in_edition"]
+        );
+    }
+
+    #[test]
+    fn table_p5_of_2022_ends_at_55_c_without_source_rows() {
+        use crate::norm_versions::{with_version, NormVersion};
+        let pump = |source, supply| {
+            let mut item = generator(
+                "hp",
+                None,
+                GeneratorKind::HeatPump {
+                    efficiency: HeatPumpEfficiency::TableP5 {
+                        source,
+                        supply_temperature_c: supply,
+                    },
+                    drive: SystemCarrier::Electricity {
+                        direct_renewable_share: 0.0,
+                    },
+                },
+            );
+            item.energy_fraction = Some(1.0);
+            system(vec![item])
+        };
+        let run = |edition, input: &CalculatedSystem| {
+            with_version(edition, || codes(calculated(input, "s")))
+        };
+        let valid = |edition, input: &CalculatedSystem| {
+            with_version(edition, || calculated(input, "s").is_ok())
+        };
+        // 2022 p. 941: columns up to 55 °C, no 15–20/20–40/≥ 40 °C rows.
+        let plain = pump(TableP5Source::ElectricGround, 50.0);
+        assert!(valid(NormVersion::V2022, &plain));
+        let hot = pump(TableP5Source::ElectricGround, 70.0);
+        assert!(valid(NormVersion::V2023, &hot));
+        assert_eq!(run(NormVersion::V2022, &hot), vec!["route_not_in_edition"]);
+        let warm = pump(TableP5Source::ElectricSource20To40C, 45.0);
+        assert!(valid(NormVersion::V2023, &warm));
+        assert_eq!(run(NormVersion::V2022, &warm), vec!["route_not_in_edition"]);
     }
 
     fn buried_segment() -> PipeSegment {

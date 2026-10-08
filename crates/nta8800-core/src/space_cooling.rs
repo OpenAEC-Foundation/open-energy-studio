@@ -253,12 +253,135 @@ pub struct CoolingEmission {
     #[serde(default)]
     pub fan_coil_count: u32,
     pub source_reference: String,
+    /// NTA 8800:2023 tables 10.2–10.5 (p. 360–364); accepted under 2023
+    /// only. Without it a 2023 run derives the forfait from the fields
+    /// above.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub edition2023: Option<CoolingEmission2023>,
 }
 
 impl CoolingEmission {
-    /// 10.11: Δϑ_int;inc.
+    /// 10.11: Δϑ_int;inc; under NTA 8800:2023 the 10.11 sum of that
+    /// edition ([`CoolingEmission2023::delta_internal`]).
     pub fn delta_internal(&self) -> f64 {
+        if crate::norm_versions::profile().cooling_emission_tables_2023 {
+            return self
+                .edition2023
+                .unwrap_or_else(|| CoolingEmission2023::forfait_from(self))
+                .delta_internal(self.emitter);
+        }
         self.emitter.delta() + self.balancing.delta() + self.control.delta()
+    }
+}
+
+/// Room temperature control of table 10.2 (NTA 8800:2023 p. 362).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CoolingRoomControl2023 {
+    /// Central supply temperature control without room control.
+    Central,
+    /// P control from before 1988.
+    PBefore1988,
+    /// Main-room or one-pipe control, room temperature control (P, PI, PI
+    /// with optimisation).
+    Room,
+}
+
+/// Rows of table 10.4 (NTA 8800:2023 p. 363) from top to bottom.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CoolingBalancingRow2023 {
+    /// None or unknown, a one-pipe system, or no NEN-EN 14336 G1 report.
+    #[default]
+    NoneOrUnknown,
+    StaticPerEmitter,
+    StaticWithGroupBalancing,
+    StaticWithDynamicGroups,
+    /// Dynamic per emitter with dynamic groups, or direct expansion.
+    DynamicOrDirectExpansion,
+}
+
+/// Table 10.5 (NTA 8800:2023 p. 364): Δϑ_roomaut.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CoolingRoomAutomation2023 {
+    #[default]
+    Unknown,
+    Standalone,
+    StandaloneWithManualOverride,
+    NetworkWithOverrideAndAdaptive,
+}
+
+/// NTA 8800:2023 10.3.3 description of a cooling emission system (tables
+/// 10.2–10.5, p. 360–364).
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CoolingEmission2023 {
+    pub control: CoolingRoomControl2023,
+    /// Controls certified to NEN-EN 15500-1/NEN-EN 215: Δϑ_ctr,2.
+    #[serde(default)]
+    pub certified_control: bool,
+    #[serde(default)]
+    pub balancing: CoolingBalancingRow2023,
+    #[serde(default)]
+    pub room_automation: CoolingRoomAutomation2023,
+}
+
+impl CoolingEmission2023 {
+    /// 10.11 of NTA 8800:2023 (p. 360) for `emitter`: Δϑ_str + Δϑ_ctr +
+    /// Δϑ_emb + Δϑ_rad + Δϑ_im,emt + Δϑ_hydr + Δϑ_roomaut, with Δϑ_rad and
+    /// Δϑ_im,emt 0 K (table 10.3), K.
+    pub fn delta_internal(&self, emitter: CoolingEmitter) -> f64 {
+        // Table 10.2: (Δϑ_str, Δϑ_emb).
+        let (stratification, embedded) = match emitter {
+            CoolingEmitter::FloorCooling => (-0.7, -0.7),
+            CoolingEmitter::WallCooling => (-0.4, -0.7),
+            CoolingEmitter::CeilingCooling => (0.0, -0.2),
+            CoolingEmitter::FanCoilOrRacOnCeiling => (0.0, 0.0),
+            CoolingEmitter::FanCoilOrRacOnOuterWall | CoolingEmitter::OtherOrUnknown => (-0.4, 0.0),
+        };
+        let control = match (self.certified_control, self.control) {
+            (true, CoolingRoomControl2023::PBefore1988 | CoolingRoomControl2023::Room) => -1.5,
+            _ => -2.5,
+        };
+        let hydronic = match self.balancing {
+            CoolingBalancingRow2023::NoneOrUnknown => -0.6,
+            CoolingBalancingRow2023::StaticPerEmitter => -0.4,
+            CoolingBalancingRow2023::StaticWithGroupBalancing => -0.3,
+            CoolingBalancingRow2023::StaticWithDynamicGroups => -0.2,
+            CoolingBalancingRow2023::DynamicOrDirectExpansion => 0.0,
+        };
+        let room = match self.room_automation {
+            CoolingRoomAutomation2023::Unknown => 0.0,
+            CoolingRoomAutomation2023::Standalone => 0.5,
+            CoolingRoomAutomation2023::StandaloneWithManualOverride => 1.0,
+            CoolingRoomAutomation2023::NetworkWithOverrideAndAdaptive => 1.2,
+        };
+        stratification + control + embedded + hydronic + room
+    }
+
+    /// The 2023 forfait for an input described in 2024 terms: an
+    /// uncertified control (Δϑ_ctr,1), the table 10.4 row of the 2024
+    /// balancing and Δϑ_roomaut "standalone" for any room control; see
+    /// docs/nta8800-normversies.md.
+    pub fn forfait_from(emission: &CoolingEmission) -> Self {
+        Self {
+            control: CoolingRoomControl2023::Room,
+            certified_control: false,
+            balancing: match emission.balancing {
+                CoolingBalancing::NoneOrUnknown => CoolingBalancingRow2023::NoneOrUnknown,
+                CoolingBalancing::Static => CoolingBalancingRow2023::StaticPerEmitter,
+                CoolingBalancing::Dynamic | CoolingBalancing::NotApplicable => {
+                    CoolingBalancingRow2023::DynamicOrDirectExpansion
+                }
+            },
+            room_automation: match emission.control {
+                CoolingControl::UnknownOrOther => CoolingRoomAutomation2023::Unknown,
+                CoolingControl::StandalonePerRoom | CoolingControl::CentralWithRoomControl => {
+                    CoolingRoomAutomation2023::Standalone
+                }
+            },
+        }
     }
 }
 
@@ -298,6 +421,13 @@ pub enum CoolingPipe {
         #[serde(rename = "sourceReference")]
         source_reference: String,
     },
+    /// 10.24–10.26 (2025+C1 p. 384–385): Ψ from the pipe geometry, e.g. a
+    /// pipe embedded in the construction (10.25).
+    Calculated {
+        geometry: crate::heating_distribution::PipeGeometry,
+        #[serde(rename = "sourceReference")]
+        source_reference: String,
+    },
 }
 
 impl CoolingPipe {
@@ -310,6 +440,8 @@ impl CoolingPipe {
             Self::Uninsulated if building_area_m2 <= 500.0 => 2.0,
             Self::Uninsulated => 3.0,
             Self::Declared { psi_w_per_mk, .. } => *psi_w_per_mk,
+            // Validation refuses geometry without a Ψ.
+            Self::Calculated { geometry, .. } => geometry.psi().unwrap_or(f64::NAN),
         }
     }
 }
@@ -975,6 +1107,12 @@ pub fn validate_cooling(system: &CoolingSystem, path: &str) -> Vec<CoolingIssue>
             "emission.sourceReference".into(),
         );
     }
+    // NTA 8800:2023 tables 10.2–10.5 (p. 360–364) exist in that edition only.
+    if system.emission.edition2023.is_some()
+        && !crate::norm_versions::profile().cooling_emission_tables_2023
+    {
+        push("route_not_in_edition", "emission.edition2023".into());
+    }
     if system.emission.fan_coil_count > 0 && !system.emission.emitter.fan_coil() {
         push(
             "cooling_fan_coil_count_inconsistent",
@@ -1006,6 +1144,24 @@ pub fn validate_cooling(system: &CoolingSystem, path: &str) -> Vec<CoolingIssue>
                 push(
                     "cooling_pipe_psi_invalid",
                     "distribution.pipe.psiWPerMK".into(),
+                );
+            }
+            if source_missing(source_reference) {
+                push(
+                    "source_reference_required",
+                    "distribution.pipe.sourceReference".into(),
+                );
+            }
+        }
+        if let CoolingPipe::Calculated {
+            geometry,
+            source_reference,
+        } = &distribution.pipe
+        {
+            if geometry.psi().is_none() {
+                push(
+                    "cooling_pipe_geometry_invalid",
+                    "distribution.pipe.geometry".into(),
                 );
             }
             if source_missing(source_reference) {
@@ -2574,6 +2730,7 @@ mod tests {
                 control: CoolingControl::StandalonePerRoom,
                 fan_coil_count: 0,
                 source_reference: "design".into(),
+                edition2023: None,
             },
             distribution: None,
             generators,
@@ -2825,6 +2982,76 @@ mod tests {
         assert!((july.pump_recovered_kwh - 0.9 * pump).abs() < 1e-12);
         // Months without load have no pump energy.
         assert_eq!(result.months[0].pump_recovered_kwh, 0.0);
+    }
+
+    /// 10.25 (2025+C1 p. 385) for the ISSO 54 EP-W302e pipe embedded in
+    /// the construction: the calculated Ψ replaces table 10.9 and gives the
+    /// same result as declaring that Ψ.
+    #[test]
+    fn calculated_psi_of_an_embedded_cooling_pipe() {
+        let geometry = crate::heating_distribution::PipeGeometry::InsulatedEmbedded {
+            pipe_outer_diameter_m: 0.02,
+            insulated_diameter_m: 0.04,
+            insulation_lambda: 0.04,
+            embedding_lambda: 2.0,
+            depth_m: 0.03,
+        };
+        let psi = geometry.psi().unwrap();
+        let expected =
+            std::f64::consts::PI / (0.5 * ((2.0_f64).ln() / 0.04 + (3.0_f64).ln() / 2.0));
+        assert!((psi - expected).abs() < 1e-12);
+        let run = |pipe: CoolingPipe| {
+            let mut input = system(vec![generator(compression(), None)]);
+            input.distribution = Some(CoolingDistribution {
+                design_temperature: CoolingDesignTemperature::T6To12OrUnknown,
+                pipe,
+                fittings_insulated: true,
+                pipe_length_m: None,
+                unconditioned_pipe_length_m: None,
+                unconditioned_ambient_c: None,
+                pump: None,
+                source_reference: "design".into(),
+            });
+            let issues = validate_cooling(&input, "cooling");
+            let zones = [CoolingZoneNeed {
+                usable_floor_area_m2: 100.0,
+                need_kwh: summer_need(),
+                ahu_load_kwh: [0.0; 12],
+                limit_need_kwh: None,
+            }];
+            let losses: Vec<f64> = assess_cooling(&input, context(&zones))
+                .months
+                .iter()
+                .map(|month| month.distribution_loss_kwh)
+                .collect();
+            (issues, losses)
+        };
+        let (issues, calculated) = run(CoolingPipe::Calculated {
+            geometry,
+            source_reference: "ISSO 54 EP-W302e".into(),
+        });
+        assert!(issues.is_empty(), "{issues:?}");
+        let (_, declared) = run(CoolingPipe::Declared {
+            psi_w_per_mk: psi,
+            source_reference: "same Ψ".into(),
+        });
+        assert_eq!(calculated, declared);
+        let (issues, _) = run(CoolingPipe::Calculated {
+            geometry: crate::heating_distribution::PipeGeometry::InsulatedEmbedded {
+                pipe_outer_diameter_m: 0.02,
+                insulated_diameter_m: 0.04,
+                insulation_lambda: 0.04,
+                embedding_lambda: 2.0,
+                depth_m: 0.005,
+            },
+            source_reference: " ".into(),
+        });
+        let codes: Vec<&str> = issues.iter().map(|issue| issue.code).collect();
+        assert!(
+            codes.contains(&"cooling_pipe_geometry_invalid"),
+            "{codes:?}"
+        );
+        assert!(codes.contains(&"source_reference_required"), "{codes:?}");
     }
 
     #[test]

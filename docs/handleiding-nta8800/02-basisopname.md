@@ -1,10 +1,12 @@
 # 2. Basisopname
 
-De basisopname staat in het paneel **Basisopname**, onder Project. Er zijn twee soorten:
+De basisopname is werkstap 6 **Basisopname** (groep *Bestaande bouw*). Er zijn twee soorten:
 - **Woning-opname starten:** voor bestaande woningen, volgens ISSO 82.1, 7e druk met erratum van 6 januari 2026.
 - **Utiliteit-opname starten:** voor bestaande utiliteitsgebouwen, volgens ISSO 75.1, 7e druk.
 
-De opname wordt bij het project bewaard (blok `basisopname`). De kern zet de opname om in NTA 8800-invoer en rekent die door met **Opname doorrekenen**. Het resultaat staat los van de projectberekening: het paneel toont het als een aparte, op de opname gebaseerde uitkomst.
+Na het starten loop je de opname door met de voortgangslijst links: Algemeen, (alleen utiliteit) Rekenzones, Thermische schil, Verwarming, Warm tapwater, Ventilatie, Koeling, Zonnestroom (PV) en **Uitkomst & forfaitair**. **Vorige** en **Volgende** gaan een onderdeel terug of verder. **Opname verwijderen** haalt de opname uit het project.
+
+De opname wordt bij het project bewaard (blok `basisopname`). De kern zet de opname om in NTA 8800-invoer en rekent die door met **Opname doorrekenen**, in de uitgave van NTA 8800 die het project gebruikt (zie [hoofdstuk 8](08-versies-en-verwijzingen.md)). Na het doorrekenen toont de voortgangslijst per onderdeel het aantal fouten. Bovenaan het onderdeel waar je staat verschijnt meteen de uitkomst: de status, het indicatieve label en EP₂, de fouten van dat onderdeel met **Ga naar het veld**, en hoeveel fouten er in andere onderdelen staan. **Volledige uitkomst** opent **Uitkomst & forfaitair**. De kaart *Uitkomst opname* rechts toont hetzelfde in het kort, met **Overnemen in projectmodel**. De volledige uitkomst (status, uitgave, label en BENG 1–3, de toegepaste standaardwaarden en alle meldingen) staat onder **Uitkomst & forfaitair**. Die uitkomst staat los van de projectberekening: het is een aparte, op de opname gebaseerde uitkomst.
 
 **Volgorde van bronnen.** Volgens het wijzigingsdocument v1.1 (p. 6) zitten de wijzigingen daarvan in de 7e druk. Waar de bronnen verschillen, geldt daarom de 7e druk met het erratum. De keuzes per tabel staan in [`docs/nta8800-basisopname.md`](../nta8800-basisopname.md).
 
@@ -22,7 +24,7 @@ De opname heeft deze onderdelen:
 | Ruimtekoeling | opwekker en afgifte | hoofdstuk 10 |
 | Zonnestroom (PV) | panelen, oriëntatie, helling | ISSO-hoofdstuk over zonne-energie; NTA hoofdstuk 16 |
 
-**Standaardwaarden.** Een vraag zonder antwoord krijgt de standaardwaarde uit de ISSO-tabel. Elke toegepaste standaardwaarde verschijnt in de lijst "Toegepaste standaardwaarden". Leg per regel de reden vast in het veld **Reden**. Het projectdossier toetst die redenen; zie [hoofdstuk 7](07-herlabelen-registratie-dossier.md).
+**Standaardwaarden.** Een vraag zonder antwoord krijgt de standaardwaarde uit de ISSO-tabel. Elke toegepaste standaardwaarde verschijnt onder Uitkomst & forfaitair in de lijst "Toegepaste standaardwaarden". Leg per regel de reden vast in het veld **Reden inklappen**. Het projectdossier toetst die redenen; zie [hoofdstuk 7](07-herlabelen-registratie-dossier.md).
 
 **Meldingen die vaak voorkomen**
 - **Warmtepomp boven 70 °C** (`heat_pump_above_70_requires_declaration`, erratum §4): geef een gecontroleerde verklaring op.
@@ -73,6 +75,31 @@ Elke zone moet zelf weer aan afb. 6.6 voldoen (`calculation_zone_criteria_not_me
 - **Ontbrekend bewijs voor inregeling van koeling** (NTA 8800 tabel 10.11, voetnoot a, p. 388): geef een verklaring op, anders telt de inregeling als niet uitgevoerd.
 - **Oppervlak zwemzaal zonder zone** (`swimming_pool_zone_required`): bij meerdere sportzones moet de zone worden gekozen.
 - **Kleine oude gasmotor** (`gas_engine_small_old_no_table_row`): tabel 9.31 heeft hiervoor geen rij.
+
+## Foto's bij de opname
+
+Elk opname-onderdeel heeft een blok **Foto's**:
+- vlakken, ramen, lichtkoepels en PV-velden;
+- de opwekker van verwarming en tapwater, en extra opwekkers;
+- zonneboilers, ventilatie en koeling.
+
+**Foto toevoegen** opent de bestandskiezer; op een tablet of telefoon ook de camera. Elke foto gaat met zijn SHA-256 in het bewijsregister (soort *Detailfoto*). Hij wordt gekoppeld aan het onderdeel, bijvoorbeeld `/basisopname/survey/pv/@pv-1` (het PV-veld met id `pv-1`). Met **Bestaand bewijsstuk koppelen** koppel je een foto die al in het register staat; met het kruisje ontkoppel je hem weer.
+
+De foto's gaan mee in de dossier-ZIP (BRL 9500 bijlage 3: leesbare foto's van typeaanduiding en maatvoering). In de browser blijven de bestanden alleen in deze sessie bewaard. Exporteer daarom het dossier voordat je het venster sluit. De desktopapp bewaart ze in de app-map.
+
+Een koppeling verwijst naar het id van het onderdeel, zoals de id van een vlak, raam, lichtkoepel, PV-veld, zonneboiler, extra opwekker of extra tapwatersysteem. Verwijder of verplaats je een ander onderdeel, dan blijft de foto bij zijn eigen onderdeel. Een extra opwekker of extra tapwatersysteem krijgt bij het toevoegen een id (`opwekker-1`, `tapwateropwekker-1`, `tapwatersysteem-1`); een opname uit een eerdere versie krijgt die ids bij het openen, en de koppelingen gaan dan mee. De rekenkern gebruikt de ids niet in de berekening; twee gelijke ids in één lijst of een lege id geeft een melding. Verwijder je een onderdeel, dan vervallen de koppelingen naar dat onderdeel; de foto's blijven in het register als "niet gekoppeld".
+
+## Overnemen in projectmodel
+
+Na **Opname doorrekenen** staat de knop **Overnemen in projectmodel** onder Uitkomst & forfaitair en in de kaart *Uitkomst opname* naast elk onderdeel. Hij werkt alleen bij een berekende opname met afgeleide NTA-invoer; anders vraagt de knop eerst de opname door te rekenen. Die zet de NTA-invoer die de kern uit de opname afleidde in het concept van de NTA-invoer. Eerst toont een venster per invoer de huidige waarde en de waarde uit de opname.
+
+| Overgenomen | Niet overgenomen |
+|---|---|
+| verwarming (opwekker, distributie, afgifte, collectieve aansluiting), tapwater, koeling, ventilatie, PV, verlichting, BACS, gebruiksfunctie, setpoints, thermische massa en interne warmte | geometrie en oppervlakten: zones, vlakken en ramen blijven die van het projectmodel |
+| | bij een opname met meer rekenzones: de zonegegevens (setpoints, massa, interne warmte, ventilatie) |
+| | aanvullende verwarmingssystemen |
+
+**Overnemen in concept** past nog niets toe. De toepasbalk onderaan toont de wijzigingen, met **Ongedaan maken** en **Toepassen**. De normversie van het concept blijft staan.
 
 ## Invoergrenzen
 

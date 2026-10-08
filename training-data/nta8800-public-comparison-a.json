@@ -380,8 +380,7 @@
         }
       ],
       "pointThermalBridges": [],
-      "pointBridgeInventoryComplete": true,
-      "airTightness": {}
+      "pointBridgeInventoryComplete": true
     }
   ],
   "heatingSystems": [],
@@ -592,7 +591,11 @@
         "unit": {
           "variant": "c4c",
           "ducts": "unknown",
-          "equipmentReference": "Itho CVE/CVD ECO Optima Plus GG + zr-roosters (product f_ctrl 0,50 in report)"
+          "equipmentReference": "Itho CVE/CVD ECO Optima Plus GG + zr-roosters",
+          "declaredControlFactor": {
+            "value": 0.5,
+            "declarationReference": "product-f_ctrl 0,50 uit de BCRG-gelijkwaardigheidsverklaring van de Itho CVE/CVD ECO Optima Plus GG (C.4c), zoals in het openbare rapport van geval A"
+          }
         }
       },
       "flowReduction": {

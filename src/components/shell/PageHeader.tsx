@@ -1,6 +1,10 @@
 import type { ReactNode } from 'react';
+import { BookOpen } from 'lucide-react';
 import { useI18n } from '../../i18n/i18n';
 import { STEP_GROUPS, stepDefinition, type Route } from '../../core/navigation/routes';
+import { chapterForRoute } from '../../core/manual/manual-routes';
+import { useShellActions } from './ShellActions';
+import { Button } from '../ui';
 
 /** "Gebouw › 3D-model" for a route; used by the header, issue locations and the palette. */
 export function routeLabel(t: (key: string) => string, route: Route): string {
@@ -15,6 +19,12 @@ export function PageHeader({ route, title, lead, actions }: { route: Route; titl
   const definition = stepDefinition(route.step);
   const group = STEP_GROUPS.find((candidate) => candidate.id === definition.group);
   const sub = definition.subs.find((candidate) => candidate.id === route.sub);
+  const shell = useShellActions();
+  // Every workflow page links to the chapter of the manual that explains it (BRL 9501 §4.4).
+  const manualLink = shell && route.step !== 'tool' && (
+    <Button variant="ghost" icon={<BookOpen aria-hidden="true" />} title={t('manual.openChapter')}
+      onClick={() => shell.navigate({ step: 'tool', sub: 'manual', chapter: chapterForRoute(route) })}>{t('manual.title')}</Button>
+  );
   return (
     <div className="page-head">
       <div className="page-head-text">
@@ -26,7 +36,7 @@ export function PageHeader({ route, title, lead, actions }: { route: Route; titl
         <h1 className="page-title" id="page-title" tabIndex={-1}>{title ?? t(sub && (route.step === 'tool' || sub.id !== definition.subs[0]?.id) ? sub.labelKey : definition.labelKey)}</h1>
         {lead && <p className="page-lead">{lead}</p>}
       </div>
-      {actions && <div className="page-actions">{actions}</div>}
+      {(actions || manualLink) && <div className="page-actions">{actions}{manualLink}</div>}
     </div>
   );
 }

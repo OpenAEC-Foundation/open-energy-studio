@@ -127,6 +127,13 @@ pub struct ForfaitHeatPumpDraftInput {
     /// efficiency replaces the table 9.27/9.28/9.29 value (§9.1, p. 285).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub quality_declaration: Option<HeatPumpQualityDeclaration>,
+    /// Build year of the device. Only NTA 8800:2020+A1 uses it: the 9.85
+    /// forfait A is 13,0 kWh from 2015 and 87,6 kWh before or unknown
+    /// (2020 p. 336); later editions give heat pumps one A of 43,8 kWh.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub installation_year: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub installation_year_reference: Option<String>,
 }
 
 /// Declared values of a heat pump for space heating (§9.1, p. 285): the
@@ -189,6 +196,53 @@ pub struct ForfaitHeatPumpDraftAssessment {
 pub struct TableIssue {
     pub code: &'static str,
     pub path: &'static str,
+}
+
+/// The checks of a quality declaration (§9.1, p. 285), shared by the
+/// hydronic table route and the air-to-air route: a reference is required,
+/// the value is rounded down to a multiple of 0,05 (a value under one step
+/// would become 0) and the optional fraction and auxiliary energy must be
+/// physical.
+fn validate_quality_declaration(
+    declaration: Option<&HeatPumpQualityDeclaration>,
+    issues: &mut Vec<TableIssue>,
+) {
+    let Some(declaration) = declaration else {
+        return;
+    };
+    if declaration.declaration_reference.trim().is_empty() {
+        issues.push(issue(
+            "source_required",
+            "qualityDeclaration.declarationReference",
+        ));
+    }
+    if !declaration.generation_efficiency.is_finite()
+        || declaration.generation_efficiency < 0.05
+        || declaration.generation_efficiency > 15.0
+    {
+        issues.push(issue(
+            "heat_pump_declared_efficiency_invalid",
+            "qualityDeclaration.generationEfficiency",
+        ));
+    }
+    if declaration
+        .energy_fraction
+        .is_some_and(|value| !value.is_finite() || value <= 0.0 || value > 1.0)
+    {
+        issues.push(issue(
+            "heat_pump_declared_fraction_invalid",
+            "qualityDeclaration.energyFraction",
+        ));
+    }
+    if declaration
+        .auxiliary_kwh_per_year
+        .is_some_and(|value| !value.is_finite() || value < 0.0)
+    {
+        issues.push(issue(
+            "heat_pump_declared_auxiliary_invalid",
+            "qualityDeclaration.auxiliaryKwhPerYear",
+        ));
+    }
 }
 
 fn issue(code: &'static str, path: &'static str) -> TableIssue {
@@ -305,7 +359,9 @@ fn high_evidence_issues(input: &ForfaitHeatPumpDraftInput) -> Vec<TableIssue> {
             "highEfficiencyEvidence.testReportReference",
         ));
     }
-    if evidence.test_standard_edition != "NEN-EN 14511-2:2022" {
+    if evidence.test_standard_edition
+        != crate::norm_versions::profile().heat_pump_high_test_standard
+    {
         issues.push(issue(
             "high_test_standard_invalid",
             "highEfficiencyEvidence.testStandardEdition",
@@ -361,6 +417,15 @@ fn source_classification_issues(input: &ForfaitHeatPumpDraftInput) -> Vec<TableI
     let Some((lower, upper)) = bounds else {
         return Vec::new();
     };
+    // NTA 8800:2022 tables 9.27/9.29 (p. 314–317): "grondwater" without a
+    // source temperature; the warmer source rows do not exist.
+    if crate::norm_versions::profile().heat_pump_tables_2022 {
+        return if input.source == GroundwaterBelow15C {
+            Vec::new()
+        } else {
+            vec![issue("route_not_in_edition", "source")]
+        };
+    }
     let mut issues = Vec::new();
     if input.source_temperature_c.map_or(true, |value| {
         !value.is_finite() || value < lower || value >= upper
@@ -405,6 +470,35 @@ pub fn assess_forfait_heat_pump_draft(
         issues.push(issue("source_required", "classificationSourceReference"));
     }
     issues.extend(source_classification_issues(input));
+    // The installation year only enters 9.85 under NTA 8800:2020+A1 (A 87,6
+    // or 13,0 kWh, 2020 p. 334–336); from 2022 heat pumps have their own
+    // constants without a year. Where it changes nothing, a value left
+    // behind does not invalidate the generator.
+    if !crate::norm_versions::profile().heat_pump_aux_constants {
+        if input
+            .installation_year
+            .is_some_and(|year| !(1900..=crate::LATEST_PLAUSIBLE_YEAR).contains(&year))
+        {
+            issues.push(issue("installation_year_invalid", "installationYear"));
+        }
+        if input.installation_year.is_some()
+            && input
+                .installation_year_reference
+                .as_deref()
+                .map_or(true, |reference| reference.trim().is_empty())
+        {
+            issues.push(issue(
+                "installation_year_reference_required",
+                "installationYearReference",
+            ));
+        }
+        if input.installation_year.is_none() && input.installation_year_reference.is_some() {
+            issues.push(issue(
+                "installation_year_reference_without_year",
+                "installationYearReference",
+            ));
+        }
+    }
     let source_fallback_applied = source_fallback_applies(input);
     let source_fallback_reason = if input.source == TableSource::GroundOrGroundwaterUnknown {
         Some("ground_or_groundwater_unknown")
@@ -455,7 +549,10 @@ pub fn assess_forfait_heat_pump_draft(
                 "collectiveBuildingInstallation",
             ));
         }
+        // NTA 8800:2022 (p. 314, 317): table 9.27 for dwellings, 9.29 for
+        // utility buildings, without the 25 kW or collective boundary.
         if input.scope == TableScope::ResidentialAtMost25Kw
+            && !crate::norm_versions::profile().heat_pump_tables_2022
             && (input.thermal_capacity_kw.is_some_and(|value| value > 25.0)
                 || input.collective_building_installation == Some(true))
         {
@@ -469,6 +566,7 @@ pub fn assess_forfait_heat_pump_draft(
     let mut selected_band = None;
     let mut table_cop = None;
     let mut corrected_cop = None;
+    validate_quality_declaration(input.quality_declaration.as_ref(), &mut issues);
     if input.sink == TableSink::IndoorAir {
         if input.source != TableSource::OutdoorAir {
             issues.push(issue("air_to_air_source_unsupported", "source"));
@@ -486,13 +584,13 @@ pub fn assess_forfait_heat_pump_draft(
             ));
         }
         if issues.is_empty() {
+            // A valid declaration replaces the forfait 2,8, rounded down to a
+            // multiple of 0,05 (§9.1, p. 285); an invalid one is an issue
+            // above, never a silent fallback to the forfait.
             table_cop = Some(
                 input
                     .quality_declaration
                     .as_ref()
-                    .filter(|item| {
-                        item.generation_efficiency.is_finite() && item.generation_efficiency > 0.0
-                    })
                     .map_or(2.8, |item| round_down_to(item.generation_efficiency, 0.05)),
             );
             corrected_cop = table_cop;
@@ -508,16 +606,29 @@ pub fn assess_forfait_heat_pump_draft(
                 "designSupplyTemperatureC",
             ));
         }
+        // NTA 8800:2022 p. 313–317: the tables end at 55 °C; above it annex Q
+        // applies.
+        let index = if crate::norm_versions::profile().heat_pump_tables_2022
+            && index.is_some_and(|value| value > 5)
+        {
+            issues.push(issue("route_not_in_edition", "designSupplyTemperatureC"));
+            None
+        } else {
+            index
+        };
         let correction_required = input.scope == TableScope::ResidentialAtMost25Kw
             && matches!(
                 selected_source,
                 TableSource::Ground | TableSource::GroundwaterBelow15C
             );
         if correction_required {
-            if input
-                .source_correction_factor
-                .map_or(true, |value| !value.is_finite() || value <= 0.0)
-            {
+            // Bijlage V (tables V.1/V.3, 2025+C1 p. 1114): c_source is 1,00,
+            // 1,02 or 1,04; any other value is no annex V outcome.
+            if input.source_correction_factor.map_or(true, |value| {
+                ![1.00, 1.02, 1.04]
+                    .iter()
+                    .any(|allowed| (value - allowed).abs() < 1e-9)
+            }) {
                 issues.push(issue("source_correction_invalid", "sourceCorrectionFactor"));
             }
             if input
@@ -545,41 +656,6 @@ pub fn assess_forfait_heat_pump_draft(
                     high_row_values(input.source).and_then(|row| row.get(index).copied())
                 }
             };
-            if let Some(declaration) = &input.quality_declaration {
-                if declaration.declaration_reference.trim().is_empty() {
-                    issues.push(issue(
-                        "source_required",
-                        "qualityDeclaration.declarationReference",
-                    ));
-                }
-                if !declaration.generation_efficiency.is_finite()
-                    || declaration.generation_efficiency <= 0.0
-                    || declaration.generation_efficiency > 15.0
-                {
-                    issues.push(issue(
-                        "heat_pump_declared_efficiency_invalid",
-                        "qualityDeclaration.generationEfficiency",
-                    ));
-                }
-                if declaration
-                    .energy_fraction
-                    .is_some_and(|value| !value.is_finite() || value <= 0.0 || value > 1.0)
-                {
-                    issues.push(issue(
-                        "heat_pump_declared_fraction_invalid",
-                        "qualityDeclaration.energyFraction",
-                    ));
-                }
-                if declaration
-                    .auxiliary_kwh_per_year
-                    .is_some_and(|value| !value.is_finite() || value < 0.0)
-                {
-                    issues.push(issue(
-                        "heat_pump_declared_auxiliary_invalid",
-                        "qualityDeclaration.auxiliaryKwhPerYear",
-                    ));
-                }
-            }
             // §9.1 (p. 285): a declared value replaces the table cell and is
             // rounded down to a multiple of 0,05 for electric generators.
             let selected_value = match &input.quality_declaration {
@@ -636,6 +712,8 @@ mod tests {
 
     fn example(scope: TableScope, source: TableSource, temp: f64) -> ForfaitHeatPumpDraftInput {
         ForfaitHeatPumpDraftInput {
+            installation_year: None,
+            installation_year_reference: None,
             generator_id: "hp".into(),
             classification_source_reference: "system design".into(),
             scope,
@@ -654,6 +732,73 @@ mod tests {
             source_quality_declaration_reference: None,
             quality_declaration: None,
         }
+    }
+
+    #[test]
+    fn tables_9_27_and_9_29_of_2022() {
+        use crate::norm_versions::{with_version, NormVersion};
+        let codes = |edition, input: &ForfaitHeatPumpDraftInput| {
+            with_version(edition, || {
+                assess_forfait_heat_pump_draft(input)
+                    .issues
+                    .iter()
+                    .map(|item| (item.code, item.path))
+                    .collect::<Vec<_>>()
+            })
+        };
+        let cop = |edition, input: &ForfaitHeatPumpDraftInput| {
+            with_version(edition, || assess_forfait_heat_pump_draft(input).table_cop)
+        };
+        // 2022 p. 314: the outdoor-air row is the same up to 55 °C.
+        let air = example(
+            TableScope::UtilityCollectiveOrOver25Kw,
+            TableSource::OutdoorAir,
+            55.0,
+        );
+        assert_eq!(cop(NormVersion::V2022, &air), Some(2.8));
+        assert_eq!(cop(NormVersion::V2022, &air), cop(NormVersion::V2023, &air));
+        // Above 55 °C annex Q (2022 p. 313); 2023 p. 323 has 2,2 at 60 °C.
+        let hot = example(
+            TableScope::UtilityCollectiveOrOver25Kw,
+            TableSource::OutdoorAir,
+            60.0,
+        );
+        assert_eq!(cop(NormVersion::V2023, &hot), Some(2.2));
+        assert_eq!(
+            codes(NormVersion::V2022, &hot),
+            vec![("route_not_in_edition", "designSupplyTemperatureC")]
+        );
+        // No source-temperature rows in 2022 (2023 p. 319–324).
+        let mut warm = example(
+            TableScope::UtilityCollectiveOrOver25Kw,
+            TableSource::Collective20To40C,
+            45.0,
+        );
+        warm.source_temperature_c = Some(25.0);
+        warm.source_temperature_evidence_reference = Some("design".into());
+        warm.source_quality_declaration_reference = Some("declaration".into());
+        assert!(codes(NormVersion::V2023, &warm).is_empty());
+        assert_eq!(
+            codes(NormVersion::V2022, &warm),
+            vec![("route_not_in_edition", "source")]
+        );
+        // "Grondwater" without a temperature, and table 9.27 for every
+        // dwelling: no 25 kW or collective boundary in 2022 (p. 314).
+        let mut ground = example(
+            TableScope::ResidentialAtMost25Kw,
+            TableSource::GroundwaterBelow15C,
+            35.0,
+        );
+        ground.source_correction_factor = Some(1.0);
+        ground.source_correction_reference = Some("annex V".into());
+        ground.thermal_capacity_kw = Some(40.0);
+        ground.capacity_source_reference = Some("type plate".into());
+        ground.collective_building_installation = Some(true);
+        assert!(codes(NormVersion::V2022, &ground).is_empty());
+        assert_eq!(cop(NormVersion::V2022, &ground), Some(4.5));
+        assert!(codes(NormVersion::V2023, &ground)
+            .iter()
+            .any(|(code, _)| *code == "table_scope_capacity_mismatch"));
     }
 
     #[test]
@@ -946,6 +1091,114 @@ mod tests {
         assert!(assess_forfait_heat_pump_draft(&input)
             .corrected_cop
             .is_none());
+        // Bijlage V (p. 1114): only 1,00, 1,02 and 1,04 are annex V outcomes.
+        let codes = |input: &ForfaitHeatPumpDraftInput| -> Vec<String> {
+            assess_forfait_heat_pump_draft(input)
+                .issues
+                .into_iter()
+                .map(|item| item.code.to_string())
+                .collect()
+        };
+        for invalid in [1.1, 1.03, 0.5, 1e12] {
+            input.source_correction_factor = Some(invalid);
+            assert!(
+                codes(&input).contains(&"source_correction_invalid".to_string()),
+                "{invalid}"
+            );
+        }
+        input.source_correction_factor = Some(1.02);
+        assert!(
+            (assess_forfait_heat_pump_draft(&input)
+                .corrected_cop
+                .unwrap()
+                - 4.08)
+                .abs()
+                < 1e-9
+        );
+    }
+
+    /// §9.1 (p. 285) rounds a declared value down to 0,05: a value under one
+    /// step would become 0 and is refused.
+    #[test]
+    fn declared_efficiency_below_one_rounding_step_is_refused() {
+        let mut input = example(
+            TableScope::UtilityCollectiveOrOver25Kw,
+            TableSource::OutdoorAir,
+            35.0,
+        );
+        let declare = |input: &mut ForfaitHeatPumpDraftInput, value: f64| {
+            input.quality_declaration = Some(HeatPumpQualityDeclaration {
+                declaration_reference: "BCRG 0000/03".into(),
+                generation_efficiency: value,
+                energy_fraction: None,
+                auxiliary_kwh_per_year: None,
+            });
+        };
+        declare(&mut input, 0.04);
+        let result = assess_forfait_heat_pump_draft(&input);
+        assert!(result
+            .issues
+            .iter()
+            .any(|item| item.code == "heat_pump_declared_efficiency_invalid"));
+        assert!(result.corrected_cop.is_none());
+        declare(&mut input, 0.05);
+        assert_eq!(
+            assess_forfait_heat_pump_draft(&input).corrected_cop,
+            Some(0.05)
+        );
+    }
+
+    /// Review 3: the air-to-air route used a quality declaration without any
+    /// of the §9.1 checks (p. 285). A blank reference, a value under one
+    /// rounding step, an absurd value and a negative value are now issues,
+    /// and an invalid declaration never falls back silently to the forfait.
+    #[test]
+    fn air_to_air_declaration_gets_the_same_checks() {
+        let mut input = example(
+            TableScope::ResidentialAtMost25Kw,
+            TableSource::OutdoorAir,
+            45.0,
+        );
+        input.sink = TableSink::IndoorAir;
+        input.design_supply_temperature_c = None;
+        let declare = |input: &mut ForfaitHeatPumpDraftInput, reference: &str, value: f64| {
+            input.quality_declaration = Some(HeatPumpQualityDeclaration {
+                declaration_reference: reference.into(),
+                generation_efficiency: value,
+                energy_fraction: None,
+                auxiliary_kwh_per_year: None,
+            });
+        };
+        let codes = |input: &ForfaitHeatPumpDraftInput| {
+            let result = assess_forfait_heat_pump_draft(input);
+            (
+                result
+                    .issues
+                    .iter()
+                    .map(|item| item.code)
+                    .collect::<Vec<_>>(),
+                result.corrected_cop,
+            )
+        };
+        declare(&mut input, "", 4.0);
+        let (issues, cop) = codes(&input);
+        assert!(issues.contains(&"source_required"), "{issues:?}");
+        assert!(cop.is_none());
+        for value in [0.03, 1e6, -1.0] {
+            declare(&mut input, "BCRG 0000/04", value);
+            let (issues, cop) = codes(&input);
+            assert!(
+                issues.contains(&"heat_pump_declared_efficiency_invalid"),
+                "{value}: {issues:?}"
+            );
+            assert!(cop.is_none(), "{value}");
+        }
+        declare(&mut input, "BCRG 0000/04", 4.12);
+        let (issues, cop) = codes(&input);
+        assert!(issues.is_empty(), "{issues:?}");
+        assert!((cop.unwrap() - 4.10).abs() < 1e-9);
+        input.quality_declaration = None;
+        assert_eq!(codes(&input), (Vec::new(), Some(2.8)));
     }
 
     #[test]

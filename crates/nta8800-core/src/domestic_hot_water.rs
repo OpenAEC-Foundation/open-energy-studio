@@ -46,7 +46,8 @@
 //! test reports are evaluated in [`crate::hot_water_tests`].
 
 use crate::annex_w::{
-    calculate_booster, validate_booster, BoosterHeatPump, BoosterHeatSource, BoosterSourceCarrier,
+    calculate_booster, calculate_booster_forfait, validate_booster, validate_booster_forfait,
+    BoosterForfait, BoosterHeatPump, BoosterHeatSource, BoosterMonth, BoosterSourceCarrier,
 };
 use crate::building_performance::Carrier;
 use crate::climate::{MONTH_HOURS, OUTDOOR_TEMPERATURE_C};
@@ -121,6 +122,39 @@ pub fn kitchen_emission(length_m: f64) -> f64 {
     [1.00, 0.69, 0.53, 0.43, 0.36, 0.31, 0.27, 0.24][length_band(length_m)]
 }
 
+/// Table 13.2 of NTA 8800:2023 (p. 533): kitchen row by the inner diameter
+/// over at least two thirds of the pipe length. From 2024 (p. 527) only the
+/// "overig" row exists.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum KitchenPipeDiameter {
+    #[serde(rename = "up_to_8_mm")]
+    UpTo8Mm,
+    #[serde(rename = "up_to_10_mm")]
+    UpTo10Mm,
+    /// "Overig", or unknown.
+    Other,
+}
+
+/// Table 13.2 `η_W;em;k` with the 2023 diameter rows where the active
+/// edition has them.
+pub fn kitchen_emission_for(length_m: f64, diameter: Option<KitchenPipeDiameter>) -> f64 {
+    let band = length_band(length_m);
+    match diameter {
+        Some(KitchenPipeDiameter::UpTo8Mm)
+            if crate::norm_versions::profile().kitchen_diameter_rows =>
+        {
+            [1.00, 0.86, 0.75, 0.67, 0.60, 0.55, 0.50, 0.46][band]
+        }
+        Some(KitchenPipeDiameter::UpTo10Mm)
+            if crate::norm_versions::profile().kitchen_diameter_rows =>
+        {
+            [1.00, 0.79, 0.65, 0.55, 0.48, 0.43, 0.38, 0.35][band]
+        }
+        _ => kitchen_emission(length_m),
+    }
+}
+
 /// Table 13.2 `η_W;em;b`.
 pub fn bathroom_emission(length_m: f64) -> f64 {
     [1.00, 0.95, 0.90, 0.86, 0.82, 0.78, 0.75, 0.72][length_band(length_m)]
@@ -168,6 +202,14 @@ pub enum HotWaterEmission {
         served: ServedTaps,
         #[serde(default, rename = "kitchenLengthM")]
         kitchen_length_m: Option<f64>,
+        /// Table 13.2 of NTA 8800:2023 only: inner diameter of the kitchen
+        /// draw-off pipe over at least two thirds of its length.
+        #[serde(
+            default,
+            rename = "kitchenPipeDiameter",
+            skip_serializing_if = "Option::is_none"
+        )]
+        kitchen_pipe_diameter: Option<KitchenPipeDiameter>,
         #[serde(default, rename = "bathroomLengthM")]
         bathroom_length_m: Option<f64>,
         #[serde(rename = "sourceReference")]
@@ -229,6 +271,26 @@ pub fn table_13_4_psi(outer_diameter_mm: f64, insulation: PipeInsulation) -> f64
     ROWS[best][column]
 }
 
+/// NTA 8800:2023 table 13.4 (p. 542) rows for an unknown diameter by type
+/// of system, "klein" or "overig".
+pub fn table_13_4_system_psi(small: bool, insulation: PipeInsulation) -> f64 {
+    const SMALL: [f64; 6] = [1.0, 0.4, 0.4, 0.3, 0.25, 0.2];
+    const OTHER: [f64; 6] = [2.0, 0.74, 0.74, 0.56, 0.46, 0.4];
+    let column = match insulation {
+        PipeInsulation::None => 0,
+        PipeInsulation::Unknown => 1,
+        PipeInsulation::Mm10 => 2,
+        PipeInsulation::Mm15 => 3,
+        PipeInsulation::Mm20 => 4,
+        PipeInsulation::Mm25 => 5,
+    };
+    if small {
+        SMALL[column]
+    } else {
+        OTHER[column]
+    }
+}
+
 /// Table 13.6 pump control.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -259,6 +321,11 @@ pub struct Circulation {
     /// Declared Ψ (13.27–13.29) instead of table 13.4.
     #[serde(default)]
     pub declared_psi_w_per_mk: Option<f64>,
+    /// Ψ calculated from the pipe geometry with 13.27–13.29 (2025+C1
+    /// p. 551), e.g. a pipe embedded in the construction (13.28); exclusive
+    /// with `declaredPsiWPerMK`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub calculated_psi: Option<crate::heating_distribution::PipeGeometry>,
     pub fittings_insulated: bool,
     /// Actual length; omitted means 13.31.
     #[serde(default)]
@@ -378,6 +445,11 @@ pub struct StorageVessel {
     pub loss: StorageLoss,
     /// `f_sto;dis;ls` 1–5 (§13.6.3); ignored for a measured `H_sto;ls`.
     pub connection_factor: u8,
+    /// NTA 8800:2022 §13.6.3 (p. 550): an electric boiler with insulated
+    /// hot-water pipes, `f_sto;dis;ls` = 1,5 instead of `connectionFactor`.
+    /// Not in 2023 (p. 557–558) and later.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub electric_boiler_insulated_pipe: bool,
     /// Placed in a heated zone; otherwise 13 °C or the given ambient.
     pub in_heated_zone: bool,
     #[serde(default)]
@@ -716,6 +788,9 @@ pub enum HotWaterGenerator {
     /// Annex W booster heat pump on a collective heating system: source
     /// heat from that system plus electricity.
     BoosterHeatPump(Box<BoosterHeatPump>),
+    /// §13.8.4.4 booster heat pump with the forfait values of 13.162/13.163
+    /// instead of annex W measurements.
+    BoosterHeatPumpForfait(Box<BoosterForfait>),
     /// §13.8.4.2: tested with 24-hour measurements at two tapping
     /// profiles (NEN-EN 13203-2 or NEN-EN 16147), 13.153a–13.160a.
     MeasuredTwoProfiles(Box<TwoProfileTest>),
@@ -1330,6 +1405,10 @@ impl TwoProfileTest {
             ));
         }
         if let Some(mixed) = &self.mixed_air {
+            // 13.153b is new in NTA 8800:2023 (p. 609–611).
+            if !crate::norm_versions::profile().mixed_air_route {
+                issues.push(("route_not_in_edition", format!("{prefix}.mixedAir")));
+            }
             // 13.153b: combi heat pumps on outdoor and return air only.
             if !(self.electric() && self.combi && self.exhaust_air_source) {
                 issues.push((
@@ -1641,17 +1720,20 @@ impl HotWaterGenerator {
                 HotWaterCarrier::Fuel(if *oil { Carrier::Oil } else { Carrier::Gas })
             }
             HotWaterGenerator::ExternalHeat => HotWaterCarrier::DistrictHeat,
-            HotWaterGenerator::BoosterHeatPump(pump) => match &pump.heat_source {
-                BoosterHeatSource::ExternalHeat => HotWaterCarrier::DistrictHeat,
-                BoosterHeatSource::HeatingSystem => HotWaterGenerator::HeatingSystem.carrier(),
-                BoosterHeatSource::CollectiveGenerator { carrier, .. } => {
-                    HotWaterCarrier::Fuel(match carrier {
-                        BoosterSourceCarrier::Gas => Carrier::Gas,
-                        BoosterSourceCarrier::Oil => Carrier::Oil,
-                        BoosterSourceCarrier::Electricity => Carrier::El,
-                    })
+            HotWaterGenerator::BoosterHeatPump(_)
+            | HotWaterGenerator::BoosterHeatPumpForfait(_) => {
+                match booster_heat_source(self).unwrap() {
+                    BoosterHeatSource::ExternalHeat => HotWaterCarrier::DistrictHeat,
+                    BoosterHeatSource::HeatingSystem => HotWaterGenerator::HeatingSystem.carrier(),
+                    BoosterHeatSource::CollectiveGenerator { carrier, .. } => {
+                        HotWaterCarrier::Fuel(match carrier {
+                            BoosterSourceCarrier::Gas => Carrier::Gas,
+                            BoosterSourceCarrier::Oil => Carrier::Oil,
+                            BoosterSourceCarrier::Electricity => Carrier::El,
+                        })
+                    }
                 }
-            },
+            }
             HotWaterGenerator::MeasuredTwoProfiles(test) if !test.electric() => {
                 HotWaterCarrier::Fuel(Carrier::Gas)
             }
@@ -1941,6 +2023,7 @@ pub fn validate_hot_water(
         HotWaterEmission::Residential {
             served,
             kitchen_length_m,
+            kitchen_pipe_diameter,
             bathroom_length_m,
             source_reference,
         } => {
@@ -1951,6 +2034,14 @@ pub fn validate_hot_water(
             let needs_bathroom = *served != ServedTaps::KitchenOnly;
             if needs_kitchen && !kitchen_length_m.is_some_and(|v| v.is_finite() && v >= 0.0) {
                 push("hot_water_length_invalid", "emission.kitchenLengthM");
+            }
+            // Table 13.2 diameter rows exist in NTA 8800:2023 only.
+            if matches!(
+                kitchen_pipe_diameter,
+                Some(KitchenPipeDiameter::UpTo8Mm | KitchenPipeDiameter::UpTo10Mm)
+            ) && !crate::norm_versions::profile().kitchen_diameter_rows
+            {
+                push("route_not_in_edition", "emission.kitchenPipeDiameter");
             }
             if needs_bathroom && !bathroom_length_m.is_some_and(|v| v.is_finite() && v >= 0.0) {
                 push("hot_water_length_invalid", "emission.bathroomLengthM");
@@ -2037,6 +2128,20 @@ pub fn validate_hot_water(
                 );
             }
         }
+        if let Some(geometry) = &circulation.calculated_psi {
+            if geometry.psi().is_none() {
+                push(
+                    "hot_water_pipe_geometry_invalid",
+                    "circulation.calculatedPsi",
+                );
+            }
+            if circulation.declared_psi_w_per_mk.is_some() {
+                push(
+                    "hot_water_psi_declared_and_calculated",
+                    "circulation.calculatedPsi",
+                );
+            }
+        }
         if circulation
             .unheated_length_m
             .is_some_and(|value| !value.is_finite() || value < 0.0)
@@ -2076,6 +2181,14 @@ pub fn validate_hot_water(
             push(
                 "hot_water_storage_connection_invalid",
                 &format!("{base}.connectionFactor"),
+            );
+        }
+        if vessel.electric_boiler_insulated_pipe
+            && !crate::norm_versions::profile().electric_boiler_insulated_pipe_factor
+        {
+            push(
+                "route_not_in_edition",
+                &format!("{base}.electricBoilerInsulatedPipe"),
             );
         }
         if let StorageLoss::Measured {
@@ -2119,14 +2232,23 @@ pub fn validate_hot_water(
                 .map(|unit| &unit.generator),
         )
         .collect();
-    let needs_storage = generators.iter().any(|generator| {
-        matches!(
-            generator,
-            HotWaterGenerator::ElectricBoiler
-                | HotWaterGenerator::IndirectBoiler { .. }
-                | HotWaterGenerator::IndirectHeatPump { .. }
-        )
+    // §13.6.2 (2025+C1 p. 566, 2022 p. 547): for a solar system the loss of
+    // the vessel and of its backup part follows 13.7 (13.95/13.113), so a
+    // boiler that heats the backup part of an integrated-backup solar vessel
+    // needs no separate vessel of its own.
+    let solar_vessel_with_backup = system.solar.iter().any(|heater| {
+        heater.solar_use != crate::solar_thermal::SolarUse::SpaceHeating
+            && heater.method.solar_type() == crate::solar_thermal::SolarType::IntegratedBackup
     });
+    let needs_storage = !solar_vessel_with_backup
+        && generators.iter().any(|generator| {
+            matches!(
+                generator,
+                HotWaterGenerator::ElectricBoiler
+                    | HotWaterGenerator::IndirectBoiler { .. }
+                    | HotWaterGenerator::IndirectHeatPump { .. }
+            )
+        });
     // Note 1 of §13.6.2: a vessel outside the 24-hour test of a
     // 13.8.4.2/13.8.4.3 appliance is calculated like any other.
     let tested = generators.iter().any(|generator| {
@@ -2210,9 +2332,18 @@ pub fn validate_hot_water(
                     &format!("{exhaust_field}.declaredFlowM3PerH"),
                 );
             }
+            // (13.148a) is new in NTA 8800:2022 (p. 594; 2020+A1 p. 590).
+            let declared_route = crate::norm_versions::profile().declared_exhaust_air_flow_route;
+            if !declared_route && exhaust.declared_flow_m3_per_h.is_some() {
+                push(
+                    "route_not_in_edition",
+                    &format!("{exhaust_field}.declaredFlowM3PerH"),
+                );
+            }
             // 13.148 note 3: with measured efficiencies the flow comes from
             // the declaration with the measurements.
-            if exhaust.declared_flow_m3_per_h.is_none()
+            if declared_route
+                && exhaust.declared_flow_m3_per_h.is_none()
                 && matches!(
                     generator,
                     HotWaterGenerator::HeatPumpEn16147 { .. }
@@ -2294,6 +2425,11 @@ pub fn validate_hot_water(
         }
     }
     if let Some(series) = &system.series {
+        // 13.141a–d exist from 2024 (p. 595); NTA 8800:2023 has no series
+        // arrangements.
+        if !crate::norm_versions::profile().hot_water_series_routes {
+            push("route_not_in_edition", "series");
+        }
         if system.additional_generators.len() != 1 {
             push("hot_water_series_requires_two_generators", "series");
         }
@@ -2363,6 +2499,13 @@ pub fn validate_hot_water(
 /// Issues of one generator (main or additional), as (code, path).
 fn generator_issues(generator: &HotWaterGenerator, prefix: &str) -> Vec<(&'static str, String)> {
     let mut issues = Vec::new();
+    // §13.8.4.10 exists from 2024 (p. 638); NTA 8800:2023 has no stepped
+    // temperature rise.
+    if matches!(generator, HotWaterGenerator::HeatPumpSeries { .. })
+        && !crate::norm_versions::profile().hot_water_series_routes
+    {
+        issues.push(("route_not_in_edition", format!("{prefix}.kind")));
+    }
     if let HotWaterGenerator::Chp(chp) = generator {
         if chp.equipment_reference.trim().is_empty() {
             issues.push((
@@ -2476,7 +2619,9 @@ fn generator_issues(generator: &HotWaterGenerator, prefix: &str) -> Vec<(&'stati
         HotWaterGenerator::GasAppliance { declared, .. }
         | HotWaterGenerator::IndirectBoiler { declared, .. } => {
             if let Some(item) = declared {
-                if !positive(item.value) || item.value > 1.2 {
+                // Rounded down to a multiple of 0,025 (§13.8.4.7.2): below one
+                // step the value would become 0.
+                if !positive(item.value) || item.value < 0.025 || item.value > 1.2 {
                     issues.push((
                         "hot_water_efficiency_invalid",
                         format!("{prefix}.declared.value"),
@@ -2499,7 +2644,9 @@ fn generator_issues(generator: &HotWaterGenerator, prefix: &str) -> Vec<(&'stati
             ..
         } => {
             if let Some(item) = declared {
-                if !positive(item.value) || item.value > 10.0 {
+                // Rounded down to a multiple of 0,05 (§13.8.4.7.2): below one
+                // step the value would become 0.
+                if !positive(item.value) || item.value < 0.05 || item.value > 10.0 {
                     issues.push((
                         "hot_water_efficiency_invalid",
                         format!("{prefix}.declared.value"),
@@ -2584,6 +2731,11 @@ fn generator_issues(generator: &HotWaterGenerator, prefix: &str) -> Vec<(&'stati
         }
         HotWaterGenerator::BoosterHeatPump(pump) => {
             for found in validate_booster(pump, "generator") {
+                issues.push((found.code, found.path.replacen("generator", prefix, 1)));
+            }
+        }
+        HotWaterGenerator::BoosterHeatPumpForfait(pump) => {
+            for found in validate_booster_forfait(pump, "generator") {
                 issues.push((found.code, found.path.replacen("generator", prefix, 1)));
             }
         }
@@ -2694,10 +2846,12 @@ fn emission_efficiency(system: &HotWaterSystem) -> f64 {
         HotWaterEmission::Residential {
             served,
             kitchen_length_m,
+            kitchen_pipe_diameter,
             bathroom_length_m,
             ..
         } => {
-            let kitchen = kitchen_emission(kitchen_length_m.unwrap_or(0.0));
+            let kitchen =
+                kitchen_emission_for(kitchen_length_m.unwrap_or(0.0), *kitchen_pipe_diameter);
             let bathroom = bathroom_emission(bathroom_length_m.unwrap_or(0.0));
             match served {
                 ServedTaps::BathroomOnly => bathroom,
@@ -2720,7 +2874,24 @@ fn emission_efficiency(system: &HotWaterSystem) -> f64 {
 
 /// Generation efficiency (before `f_prac`), `f_prac`, and an issue code when
 /// the generator cannot serve the annual demand.
+///
+/// The measured and declared routes round their value down (to 0,025 for gas,
+/// 0,05 for electric, §13.8.4.7.2); a value below one step rounds to 0, which
+/// no generator can have and which would divide the carrier input by zero.
+/// Such an efficiency is refused with `hot_water_efficiency_invalid`.
 fn generation(
+    generator: &HotWaterGenerator,
+    annual_output_kwh: f64,
+) -> Result<(f64, f64), &'static str> {
+    let (efficiency, practical) = generation_values(generator, annual_output_kwh)?;
+    if efficiency > 0.0 && efficiency.is_finite() && practical > 0.0 {
+        Ok((efficiency, practical))
+    } else {
+        Err("hot_water_efficiency_invalid")
+    }
+}
+
+fn generation_values(
     generator: &HotWaterGenerator,
     annual_output_kwh: f64,
 ) -> Result<(f64, f64), &'static str> {
@@ -2872,7 +3043,9 @@ fn generation(
         }
         HotWaterGenerator::ExternalHeat => Ok((1.0, 1.0)),
         // Annex W per month; see the month loop.
-        HotWaterGenerator::BoosterHeatPump(_) => Ok((1.0, 1.0)),
+        HotWaterGenerator::BoosterHeatPump(_) | HotWaterGenerator::BoosterHeatPumpForfait(_) => {
+            Ok((1.0, 1.0))
+        }
         // 13.157 needs the appliance's own output (see the booking); here
         // the system total serves the ordering and single-unit reporting.
         HotWaterGenerator::MeasuredTwoProfiles(test) => Ok((
@@ -3001,6 +3174,7 @@ fn category(generator: &HotWaterGenerator) -> u8 {
         | HotWaterGenerator::IndirectHeatPump { .. }
         | HotWaterGenerator::HeatPumpSeries { .. }
         | HotWaterGenerator::BoosterHeatPump(_)
+        | HotWaterGenerator::BoosterHeatPumpForfait(_)
         | HotWaterGenerator::Chp(_) => 1,
         _ => 2,
     }
@@ -3027,6 +3201,32 @@ struct Booking {
     biomass_output: [f64; 12],
     /// §13.8.4.8: the heating share of a combi micro-CHP.
     combi_heating: Option<[CombiChpHeatingMonth; 12]>,
+}
+
+/// The heat source of an annex W or forfait booster heat pump.
+fn booster_heat_source(generator: &HotWaterGenerator) -> Option<&BoosterHeatSource> {
+    match generator {
+        HotWaterGenerator::BoosterHeatPump(pump) => Some(&pump.heat_source),
+        HotWaterGenerator::BoosterHeatPumpForfait(pump) => Some(&pump.heat_source),
+        _ => None,
+    }
+}
+
+/// Booster heat pump per month: annex W, or the forfait of 13.162/13.163
+/// with `c_W;gen` of class 4 (table 13.27) on the annual gross demand.
+fn booster_months(
+    generator: &HotWaterGenerator,
+    outputs: &[f64; 12],
+    annual_total: f64,
+) -> Option<[BoosterMonth; 12]> {
+    match generator {
+        HotWaterGenerator::BoosterHeatPump(pump) => Some(calculate_booster(pump, outputs)),
+        HotWaterGenerator::BoosterHeatPumpForfait(pump) => {
+            let class = heat_pump_class_correction(ApplicationClass::Class4, annual_total)?;
+            Some(calculate_booster_forfait(pump, outputs, class))
+        }
+        _ => None,
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -3224,10 +3424,12 @@ fn book_generator(
     // Annex W: the carrier input is the heat drawn from the collective
     // heating system (W.2) divided by its generation efficiency; the BWP
     // electricity (W.1) is auxiliary energy.
-    if let HotWaterGenerator::BoosterHeatPump(pump) = generator {
-        let booster = calculate_booster(pump, outputs);
-        let from_heating_system = matches!(pump.heat_source, BoosterHeatSource::HeatingSystem);
-        let source_efficiency = match &pump.heat_source {
+    if let (Some(booster), Some(heat_source)) = (
+        booster_months(generator, outputs, annual_total),
+        booster_heat_source(generator),
+    ) {
+        let from_heating_system = matches!(heat_source, BoosterHeatSource::HeatingSystem);
+        let source_efficiency = match heat_source {
             BoosterHeatSource::ExternalHeat | BoosterHeatSource::HeatingSystem => 1.0,
             BoosterHeatSource::CollectiveGenerator {
                 generation_efficiency,
@@ -3406,9 +3608,11 @@ struct SolarTotals {
 /// room is `ϑ_int;set;H;stc` with an exhaust-air heat pump for hot water,
 /// otherwise the levelled `ϑ_int;set;H;zi,mi` of 7.9.4.
 fn solar_storage_ambient(system: &HotWaterSystem, context: HotWaterContext) -> [f64; 12] {
-    let exhaust_air = units(system)
-        .iter()
-        .any(|unit| exhaust_air_heat_pump(unit.generator));
+    // (13.69a)/(13.137a) are new in NTA 8800:2023 (p. 565, 592).
+    let exhaust_air = crate::norm_versions::profile().storage_ambient_exhaust_air
+        && units(system)
+            .iter()
+            .any(|unit| exhaust_air_heat_pump(unit.generator));
     solar_ambient(exhaust_air, context)
 }
 
@@ -3678,8 +3882,8 @@ struct Dispatch {
 fn ordering_efficiency(unit: &Unit<'_>, outputs: &[f64; 12], annual_total: f64) -> f64 {
     match unit.generator {
         // Annex W: COP_W;BWP of the booster on the system output.
-        HotWaterGenerator::BoosterHeatPump(pump) => {
-            let months = calculate_booster(pump, outputs);
+        HotWaterGenerator::BoosterHeatPump(_) | HotWaterGenerator::BoosterHeatPumpForfait(_) => {
+            let months = booster_months(unit.generator, outputs, annual_total).unwrap_or_default();
             let weight: f64 = outputs.iter().sum();
             if weight > 0.0 {
                 months
@@ -3947,9 +4151,26 @@ pub fn assess_hot_water_with(
                 80.0
             }
         });
+        let calculated = circulation
+            .calculated_psi
+            .as_ref()
+            .and_then(crate::heating_distribution::PipeGeometry::psi);
         let psi = circulation
             .declared_psi_w_per_mk
-            .unwrap_or_else(|| table_13_4_psi(diameter, circulation.insulation));
+            .or(calculated)
+            .unwrap_or_else(|| {
+                match circulation.outer_diameter_mm {
+                    // NTA 8800:2023 (p. 542) has no table 13.29 nor the 35/80 mm
+                    // rule (2024 p. 537–538) but rows "klein"/"overig" for an
+                    // unknown diameter; "klein" is read as at most 500 m²
+                    // connected (the 2024 utility split), see
+                    // docs/nta8800-normversies.md.
+                    None if crate::norm_versions::profile().table_13_4_system_rows => {
+                        table_13_4_system_psi(building_area <= 500.0, circulation.insulation)
+                    }
+                    _ => table_13_4_psi(diameter, circulation.insulation),
+                }
+            });
         let length = circulation.length_m.unwrap_or(0.3 * reduced + 10.0);
         let unheated = circulation.unheated_length_m.unwrap_or(0.15 * length);
         let heated = length - unheated;
@@ -4027,7 +4248,13 @@ pub fn assess_hot_water_with(
                 )
             }
         };
-        let factor = f64::from(vessel.connection_factor);
+        let factor = if vessel.electric_boiler_insulated_pipe
+            && crate::norm_versions::profile().electric_boiler_insulated_pipe_factor
+        {
+            1.5
+        } else {
+            f64::from(vessel.connection_factor)
+        };
         let label_c = StorageLabel::C.standing_loss_w(vessel.volume_l);
         let measured = vessel.loss.measured_transmission_w_per_k();
         let watts = |index: usize| match vessel.loss {
@@ -4334,6 +4561,7 @@ mod tests {
             emission: HotWaterEmission::Residential {
                 served: ServedTaps::KitchenAndBathroom,
                 kitchen_length_m: Some(3.0),
+                kitchen_pipe_diameter: None,
                 bathroom_length_m: Some(5.0),
                 source_reference: "drawing".into(),
             },
@@ -4533,6 +4761,44 @@ mod tests {
         assert_eq!(jan.carrier_input_kwh, 0.0);
         assert!((jan.heating_system_load_kwh - booster[0].heating_system_heat_kwh).abs() < 1e-9);
         assert!(jan.auxiliary_electricity_kwh >= booster[0].electricity_kwh);
+    }
+
+    #[test]
+    fn forfait_booster_heat_pump_books_13_162_and_13_163() {
+        // §13.8.4.4 without annex W data (2025+C1 p. 631–633, 2022
+        // p. 607–609): heat from the heating system Q/(η_gen;hj·c_W;gen) and
+        // electricity Q/(COP·c_W;gen) with class 4 of table 13.27; unknown
+        // supply temperature: η 1,15 and COP 3.
+        let pump = BoosterForfait {
+            design_supply_temperature_c: None,
+            heat_source: BoosterHeatSource::HeatingSystem,
+            source_reference: "collectieve ketel".into(),
+        };
+        let input = system(HotWaterGenerator::BoosterHeatPumpForfait(Box::new(
+            pump.clone(),
+        )));
+        assert!(validate_hot_water(&input, context(), "hotWater").is_empty());
+        let result = assess_hot_water(&input, context()).unwrap();
+        let jan = &result.months[0];
+        assert_eq!(jan.carrier_input_kwh, 0.0);
+        assert!(jan.heating_system_load_kwh > 0.0);
+        let class = jan.generator_output_kwh / (1.15 * jan.heating_system_load_kwh);
+        assert!((0.45..=1.0).contains(&class), "{class}");
+        assert!(jan.auxiliary_electricity_kwh >= jan.generator_output_kwh / (3.0 * class) - 1e-9);
+        // From a collective gas boiler the heat becomes gas input.
+        let mut gas = pump;
+        gas.heat_source = BoosterHeatSource::CollectiveGenerator {
+            generation_efficiency: 0.9,
+            carrier: BoosterSourceCarrier::Gas,
+            source_reference: "collectieve HR107".into(),
+        };
+        let input = system(HotWaterGenerator::BoosterHeatPumpForfait(Box::new(gas)));
+        assert_eq!(input.carrier(), HotWaterCarrier::Fuel(Carrier::Gas));
+        let result = assess_hot_water(&input, context()).unwrap();
+        let jan = &result.months[0];
+        assert!(
+            (jan.carrier_input_kwh * 0.9 * 1.15 * class - jan.generator_output_kwh).abs() < 1e-6
+        );
     }
 
     #[test]
@@ -5105,6 +5371,83 @@ mod tests {
         assert!((shower_recovery_efficiency(&at_80, false) - 0.32).abs() < 1e-12);
     }
 
+    /// 13.28 (2025+C1 p. 551) for the ISSO 54 EP-W402f pipe embedded in
+    /// the construction: d_i 0,02, d_a 0,04, z 0,03, λ_D 0,04, λ_em 2.
+    #[test]
+    fn calculated_psi_of_an_embedded_circulation_pipe() {
+        let geometry = crate::heating_distribution::PipeGeometry::InsulatedEmbedded {
+            pipe_outer_diameter_m: 0.02,
+            insulated_diameter_m: 0.04,
+            insulation_lambda: 0.04,
+            embedding_lambda: 2.0,
+            depth_m: 0.03,
+        };
+        let psi = geometry.psi().unwrap();
+        let expected =
+            std::f64::consts::PI / (0.5 * ((2.0_f64).ln() / 0.04 + (3.0_f64).ln() / 2.0));
+        assert!((psi - expected).abs() < 1e-12);
+        let mut input = system(HotWaterGenerator::IndirectBoiler {
+            boiler: IndirectBoiler::Hr107,
+            oil: false,
+            inside_boundary: true,
+            also_space_heating: true,
+            declared: None,
+            pilot_flame: false,
+        });
+        let circulation = |declared: Option<f64>, calculated| Circulation {
+            outer_diameter_mm: Some(15.0),
+            insulation: PipeInsulation::Mm15,
+            declared_psi_w_per_mk: declared,
+            calculated_psi: calculated,
+            fittings_insulated: true,
+            length_m: None,
+            unheated_length_m: Some(0.0),
+            unheated_ambient_c: None,
+            floor_count: 2,
+            sport_hall_area_m2: 0.0,
+            connected_dwellings: None,
+            pump: CirculationPump {
+                control: PumpControl::UncontrolledOrUnknown,
+                label_power_kw: None,
+                energy_efficiency_index: None,
+            },
+            source_reference: "design".into(),
+        };
+        input.circulation = Some(circulation(None, Some(geometry)));
+        let calculated = assess_hot_water(&input, context()).unwrap();
+        input.circulation = Some(circulation(Some(psi), None));
+        let declared = assess_hot_water(&input, context()).unwrap();
+        for (a, b) in calculated.months.iter().zip(&declared.months) {
+            assert!((a.circulation_loss_kwh - b.circulation_loss_kwh).abs() < 1e-12);
+        }
+        // Not both, and no Ψ for impossible geometry (4·z ≤ d_a).
+        input.circulation = Some(circulation(Some(psi), Some(geometry)));
+        let codes: Vec<&str> = validate_hot_water(&input, context(), "w")
+            .iter()
+            .map(|issue| issue.code)
+            .collect();
+        assert!(
+            codes.contains(&"hot_water_psi_declared_and_calculated"),
+            "{codes:?}"
+        );
+        let shallow = crate::heating_distribution::PipeGeometry::InsulatedEmbedded {
+            pipe_outer_diameter_m: 0.02,
+            insulated_diameter_m: 0.04,
+            insulation_lambda: 0.04,
+            embedding_lambda: 2.0,
+            depth_m: 0.005,
+        };
+        input.circulation = Some(circulation(None, Some(shallow)));
+        let codes: Vec<&str> = validate_hot_water(&input, context(), "w")
+            .iter()
+            .map(|issue| issue.code)
+            .collect();
+        assert!(
+            codes.contains(&"hot_water_pipe_geometry_invalid"),
+            "{codes:?}"
+        );
+    }
+
     #[test]
     fn unheated_pipes_use_theta_ztu_from_b_u() {
         let mut input = system(HotWaterGenerator::IndirectBoiler {
@@ -5119,6 +5462,7 @@ mod tests {
             outer_diameter_mm: Some(15.0),
             insulation: PipeInsulation::Mm15,
             declared_psi_w_per_mk: None,
+            calculated_psi: None,
             fittings_insulated: true,
             length_m: None,
             unheated_length_m: None,
@@ -5205,6 +5549,7 @@ mod tests {
             outer_diameter_mm: Some(28.0),
             insulation: PipeInsulation::Mm15,
             declared_psi_w_per_mk: None,
+            calculated_psi: None,
             fittings_insulated: true,
             length_m: None,
             unheated_length_m: Some(0.0),
@@ -5269,6 +5614,7 @@ mod tests {
             outer_diameter_mm: Some(15.0),
             insulation: PipeInsulation::Mm15,
             declared_psi_w_per_mk: None,
+            calculated_psi: None,
             fittings_insulated: true,
             length_m: None,
             unheated_length_m: None,
@@ -5290,6 +5636,7 @@ mod tests {
                 produced_from_2018: true,
             },
             connection_factor: 3,
+            electric_boiler_insulated_pipe: false,
             in_heated_zone: true,
             unheated_ambient_c: None,
             not_in_appliance_test: false,
@@ -5684,6 +6031,7 @@ mod tests {
                 label: StorageLabel::B,
             },
             connection_factor: 1,
+            electric_boiler_insulated_pipe: false,
             in_heated_zone: true,
             unheated_ambient_c: None,
             not_in_appliance_test: false,
@@ -5705,12 +6053,76 @@ mod tests {
         assert!((jan.recoverable_loss_kwh - expected).abs() < 1e-9);
     }
 
+    /// §13.6.2 (2025+C1 p. 566): for a solar system the vessel and its
+    /// backup part are calculated in 13.7, so a boiler heating the backup
+    /// part of an integrated-backup solar vessel needs no vessel of its own
+    /// (ISSO 54 v2.0 EP-W405d/e). A solar preheater does not lift the
+    /// requirement: the boiler's own vessel stays.
+    #[test]
+    fn integrated_backup_solar_vessel_replaces_the_boiler_vessel() {
+        use crate::solar_thermal::{
+            CollectorEfficiency, CollectorField, CollectorType, LoopPipes, SolarMethod,
+            SolarStorage, SolarType, SolarUse, SolarWaterHeater,
+        };
+        let solar = |solar_type| SolarWaterHeater {
+            id: "zb".into(),
+            solar_use: SolarUse::WaterHeating,
+            count: 1,
+            method: SolarMethod::Calculated {
+                solar_type,
+                collectors: CollectorField {
+                    module_area_m2: 5.0,
+                    module_count: 1,
+                    orientation: crate::climate::Orientation::South,
+                    tilt_deg: 30.0,
+                    obstruction: crate::solar_shading::CollectorObstruction::Minimal,
+                    efficiency: CollectorEfficiency::Forfait {
+                        collector: CollectorType::Glazed,
+                    },
+                    heat_exchanger_w_per_k: None,
+                    loop_pipes: LoopPipes::Forfait,
+                    pump_power_w: None,
+                },
+                storage: SolarStorage {
+                    total_volume_l: 220.0,
+                    backup_volume_l: Some(100.0),
+                    loss: StorageLoss::Label {
+                        label: StorageLabel::B,
+                    },
+                    backup_loss_in_generator_efficiency: false,
+                },
+            },
+            pvt: None,
+            source_reference: "ISSO 54 v2.0 EP-W405e".into(),
+        };
+        let mut input = system(HotWaterGenerator::IndirectBoiler {
+            boiler: IndirectBoiler::Hr107,
+            oil: false,
+            inside_boundary: true,
+            also_space_heating: true,
+            declared: None,
+            pilot_flame: false,
+        });
+        let codes = |input: &HotWaterSystem| -> Vec<&str> {
+            validate_hot_water(input, context(), "dhw")
+                .iter()
+                .map(|item| item.code)
+                .collect()
+        };
+        assert!(codes(&input).contains(&"hot_water_storage_required"));
+        input.solar = vec![solar(SolarType::IntegratedBackup)];
+        assert!(!codes(&input).contains(&"hot_water_storage_required"));
+        input.solar = vec![solar(SolarType::Preheater)];
+        assert!(codes(&input).contains(&"hot_water_storage_required"));
+    }
+
     #[test]
     fn validation_rejects_inconsistent_input() {
         let mut bad = system(HotWaterGenerator::ElectricBoiler);
         bad.emission = HotWaterEmission::Residential {
             served: ServedTaps::KitchenAndBathroom,
             kitchen_length_m: None,
+            kitchen_pipe_diameter: None,
             bathroom_length_m: Some(-1.0),
             source_reference: String::new(),
         };
@@ -5733,6 +6145,7 @@ mod tests {
                 label: StorageLabel::A,
             },
             connection_factor: 2,
+            electric_boiler_insulated_pipe: false,
             in_heated_zone: true,
             unheated_ambient_c: None,
             not_in_appliance_test: false,
@@ -5790,6 +6203,7 @@ mod tests {
             volume_l: 120.0,
             loss: standby,
             connection_factor: 3,
+            electric_boiler_insulated_pipe: false,
             in_heated_zone: true,
             unheated_ambient_c: None,
             not_in_appliance_test: false,
@@ -6054,6 +6468,7 @@ mod tests {
                 label: StorageLabel::C,
             },
             connection_factor: 1,
+            electric_boiler_insulated_pipe: false,
             in_heated_zone: true,
             unheated_ambient_c: None,
             not_in_appliance_test: false,
@@ -6095,6 +6510,7 @@ mod tests {
                 label: StorageLabel::B,
             },
             connection_factor: 1,
+            electric_boiler_insulated_pipe: false,
             in_heated_zone: true,
             unheated_ambient_c: None,
             not_in_appliance_test: false,
@@ -6189,6 +6605,7 @@ mod tests {
                 label: StorageLabel::C,
             },
             connection_factor: 1,
+            electric_boiler_insulated_pipe: false,
             in_heated_zone: true,
             unheated_ambient_c: None,
             not_in_appliance_test: false,
@@ -6229,5 +6646,52 @@ mod tests {
         assert!((practical - 0.95).abs() < 1e-12);
         let (classed, _) = generation(&declared(Some(ApplicationClass::Class4)), 2067.0).unwrap();
         assert!(classed < plain);
+    }
+
+    /// §13.8.4.7.2 (p. 640) rounds a declared value down to 0,05 (electric)
+    /// or 0,025 (gas). A value below one step would become 0 and divide the
+    /// carrier input by zero; it is refused, and `generation` never hands
+    /// out a zero efficiency.
+    #[test]
+    fn declared_value_below_one_rounding_step_is_refused() {
+        let heat_pump = |value: f64| HotWaterGenerator::HeatPump {
+            exhaust_air_source: false,
+            source_correction: None,
+            measured_class: None,
+            outdoor_air_fraction: None,
+            same_ground_source: false,
+            declared: Some(DeclaredEfficiency {
+                value,
+                source_reference: "BCRG 0000/01".into(),
+            }),
+        };
+        let codes = |generator: &HotWaterGenerator| -> Vec<&'static str> {
+            generator_issues(generator, "hotWater.generator")
+                .into_iter()
+                .map(|(code, _)| code)
+                .collect()
+        };
+        assert!(codes(&heat_pump(0.04)).contains(&"hot_water_efficiency_invalid"));
+        assert!(!codes(&heat_pump(0.05)).contains(&"hot_water_efficiency_invalid"));
+        assert_eq!(
+            generation(&heat_pump(1e-12), 2067.0),
+            Err("hot_water_efficiency_invalid")
+        );
+        let indirect = |value: f64| HotWaterGenerator::IndirectBoiler {
+            boiler: IndirectBoiler::Hr107,
+            oil: false,
+            inside_boundary: true,
+            also_space_heating: true,
+            declared: Some(DeclaredEfficiency {
+                value,
+                source_reference: "BCRG 0000/02".into(),
+            }),
+            pilot_flame: false,
+        };
+        assert!(codes(&indirect(0.02)).contains(&"hot_water_efficiency_invalid"));
+        assert_eq!(
+            generation(&indirect(0.02), 2067.0),
+            Err("hot_water_efficiency_invalid")
+        );
     }
 }

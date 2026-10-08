@@ -87,6 +87,10 @@ pub enum HotWaterGeneratorAnswer {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct AdditionalHotWaterAnswer {
+    /// Stable id of this survey item, for evidence and photo links
+    /// (`/…/@id`); not used in the calculation. Unique within its list.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
     pub generator: HotWaterGeneratorAnswer,
     #[serde(default)]
     pub nominal_power_kw: Option<f64>,
@@ -201,6 +205,10 @@ pub struct SurveyBoilerVessel {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SurveyHotWater {
+    /// Stable id of this survey item, for evidence and photo links
+    /// (`/…/@id`); not used in the calculation. Unique within its list.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
     pub generator: HotWaterGeneratorAnswer,
     pub served: TapsServed,
     #[serde(default)]
@@ -782,6 +790,7 @@ mod tests {
 
     fn survey(generator: HotWaterGeneratorAnswer) -> SurveyHotWater {
         SurveyHotWater {
+            id: None,
             generator,
             served: TapsServed::KitchenAndBathroom,
             kitchen_length_m: Some(3.0),

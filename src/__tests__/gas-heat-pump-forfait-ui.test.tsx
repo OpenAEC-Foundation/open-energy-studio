@@ -89,7 +89,7 @@ describe('gas heat pump draft COP UI', () => {
     };
     const onSave = vi.fn();
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({
-      status: 'diagnostic_valid', table: '9.27', forfaitCop: 1.3, correctedCop: 1.43,
+      status: 'diagnostic_valid', table: '9.27', forfaitCop: 1.3, correctedCop: 1.352,
       temperatureBandUpperC: 35, issues: [],
     }) });
     vi.stubGlobal('fetch', fetchMock);
@@ -108,9 +108,13 @@ describe('gas heat pump draft COP UI', () => {
     fireEvent.change(screen.getByLabelText('Supplied source correction csource'), { target: { value: '1.1' } });
     fireEvent.change(screen.getByLabelText('Source correction evidence'), { target: { value: 'appendix V calculation' } });
     await user.click(screen.getByRole('button', { name: 'Save gas table input' }));
+    expect(onSave).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('Supplied source correction csource'), { target: { value: '1.04' } });
+    fireEvent.change(screen.getByLabelText('Source correction evidence'), { target: { value: 'appendix V calculation' } });
+    await user.click(screen.getByRole('button', { name: 'Save gas table input' }));
     await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
-      application: 'residential_collective_at_most25_kw', sourceCorrectionFactor: 1.1,
+      application: 'residential_collective_at_most25_kw', sourceCorrectionFactor: 1.04,
     })));
-    expect(await screen.findByText(/COP with supplied source correction: 1.43/)).toBeInTheDocument();
+    expect(await screen.findByText(/COP with supplied source correction: 1.35/)).toBeInTheDocument();
   });
 });

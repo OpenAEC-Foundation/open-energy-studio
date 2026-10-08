@@ -7,7 +7,7 @@
 
 use std::sync::Arc;
 
-use nta8800_service::operations::{error_body, operation, operations, Method};
+use nta8800_service::operations::{error_body, execute, operation, operations, Method};
 use rmcp::{
     model::{
         CallToolRequestParams, CallToolResponse, CallToolResult, Implementation,
@@ -92,7 +92,7 @@ pub fn call(name: &str, arguments: Option<Map<String, Value>>) -> CallToolResult
         ));
     };
     let body = Value::Object(arguments.unwrap_or_default());
-    let outcome = (op.run)(&body);
+    let outcome = execute(op, &body);
     if outcome.is_error() {
         CallToolResult::structured_error(outcome.body)
     } else {

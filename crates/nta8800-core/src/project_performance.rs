@@ -21,7 +21,9 @@ use crate::monthly_demand::{
 };
 use crate::norm_versions::NormVersion;
 use crate::pv::PvSystem;
-use crate::solar_shading::{MovableShading, Obstruction};
+use crate::solar_shading::{
+    validate_movable_shading, validate_obstruction, MovableShading, Obstruction,
+};
 use crate::space_cooling::CoolingSystem;
 use crate::space_heating_chain::{
     ChainZone, CollectiveConnection, Distribution, DistributionSystem, Generator,
@@ -60,6 +62,23 @@ pub struct NtaCalculationInput {
     /// weighting and optional step-2 correction factors.
     #[serde(default)]
     pub dynamic_windows: Vec<ProjectDynamicWindow>,
+    /// External obstruction per project window (7.13: `F_sh;obst;wi,k;mi`
+    /// per window, p. 183–184; 17.3.2: one situation per window). A window
+    /// not listed keeps `windowSolar.obstruction`.
+    #[serde(default)]
+    pub window_obstructions: Vec<ProjectWindowObstruction>,
+    /// Movable sun shading per project window (7.6.6.1.4: g_gl;wi;mi of
+    /// 7.42 and F_c of 7.43 per window wi, 2025+C1 p. 196–198). A listed
+    /// window takes its own `movableShading` (absent: none); a window not
+    /// listed keeps `windowSolar.movableShading`.
+    #[serde(default)]
+    pub window_shadings: Vec<ProjectWindowShading>,
+    /// Glazing details per project window (7.6.6.1.2/7.6.6.1.3: table 7.4
+    /// type, fixed louvres of 7.41a/7.41b or the ISO 15099 values of 7.41
+    /// for raam wi, 2025+C1 p. 189–193). A window not listed uses its
+    /// `gValue` as g_gl;n.
+    #[serde(default)]
+    pub window_glazings: Vec<ProjectWindowGlazing>,
     /// Humidifiers per zone (chapter 12).
     #[serde(default)]
     pub humidifiers: Vec<crate::space_heating_chain::ZoneHumidifier>,
@@ -214,6 +233,37 @@ pub struct SurfaceTilt {
 pub struct ProjectDynamicWindow {
     pub window_id: String,
     pub dynamic: crate::annex_a::DynamicTransparent,
+}
+
+/// Obstruction of one project window, replacing the project-wide
+/// `windowSolar.obstruction` for that window.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ProjectWindowObstruction {
+    pub window_id: String,
+    pub obstruction: Obstruction,
+    pub source_reference: String,
+}
+
+/// Movable shading of one project window, replacing the project-wide
+/// `windowSolar.movableShading` for that window.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ProjectWindowShading {
+    pub window_id: String,
+    /// `None`: this window has no movable shading, whatever the default.
+    #[serde(default)]
+    pub movable_shading: Option<MovableShading>,
+    pub source_reference: String,
+}
+
+/// Glazing details of one project window (§7.6.6.1.2/7.6.6.1.3).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ProjectWindowGlazing {
+    pub window_id: String,
+    pub glazing: crate::solar_shading::GlazingSolar,
+    pub source_reference: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -1427,6 +1477,324 @@ fn tojuli_evidence_gaps(tojuli: &[crate::tojuli::TojuliAssessment]) -> Vec<Input
     gaps
 }
 
+/// A refusal of the building calculation (a route the edition lacks, a
+/// combination the chapters refuse) names its cause in `performance.issues`
+/// with a path in the derived input. Each such issue becomes a project gap
+/// at the project input that feeds it, so the refusal is actionable; the
+/// derived path stays in `detail`.
+fn building_issue_gaps(
+    issues: &[crate::building_performance::PerformanceIssue],
+    derived: &BuildingPerformanceInput,
+    project_value: &Value,
+    existing: &[InputGap],
+) -> Vec<InputGap> {
+    let mut gaps: Vec<InputGap> = Vec::new();
+    for issue in issues {
+        let path = project_path_for_derived(&issue.path, derived, project_value);
+        let known = existing
+            .iter()
+            .chain(gaps.iter())
+            .any(|gap| gap.code == issue.code && gap.path == path);
+        if !known {
+            gaps.push(InputGap {
+                detail: Some(format!("derivedInput.{}", issue.path)),
+                ..gap(issue.code, path)
+            });
+        }
+    }
+    gaps
+}
+
+/// Splits `a.b[2].c` into its first member, the index directly after it and
+/// the rest (`.c`, with its leading separator).
+fn split_member(path: &str) -> (&str, Option<usize>, &str) {
+    let end = path.find(['.', '[']).unwrap_or(path.len());
+    let (member, rest) = path.split_at(end);
+    if let Some(after) = rest.strip_prefix('[') {
+        if let Some(close) = after.find(']') {
+            if let Ok(index) = after[..close].parse() {
+                return (member, Some(index), &after[close + 1..]);
+            }
+        }
+    }
+    (member, None, rest)
+}
+
+/// The project input path behind a path in the derived building input.
+/// Members the derived input shares with `ntaCalculation` keep their path;
+/// the space-heating chain is taken apart into the NTA blocks and zones it
+/// was built from. Anything else lands on the NTA input as a whole.
+fn project_path_for_derived(
+    path: &str,
+    derived: &BuildingPerformanceInput,
+    project_value: &Value,
+) -> String {
+    let nta = project_value.get("ntaCalculation");
+    let has_member = |member: &str| nta.and_then(|nta| nta.get(member)).is_some();
+    let (member, index, rest) = split_member(path);
+    match member {
+        "spaceHeating" => chain_path(
+            rest.strip_prefix('.').unwrap_or(rest),
+            &derived.space_heating,
+            None,
+            project_value,
+        ),
+        "additionalHeatingSystems" => {
+            let system = index.and_then(|index| derived.additional_heating_systems.get(index));
+            let base = match index {
+                Some(index) => format!("ntaCalculation.additionalHeatingSystems[{index}]"),
+                None => "ntaCalculation.additionalHeatingSystems".to_string(),
+            };
+            match system {
+                Some(system) => chain_path(
+                    rest.strip_prefix('.').unwrap_or(rest),
+                    system,
+                    Some(&base),
+                    project_value,
+                ),
+                None => base,
+            }
+        }
+        // Built from the zones (6.6, the usable area and loss area).
+        "totalUsableFloorAreaM2" | "lossAreaM2" => "zones".to_string(),
+        member if has_member(member) => format!("ntaCalculation.{path}"),
+        _ => "ntaCalculation".to_string(),
+    }
+}
+
+/// Path inside one space-heating chain (`spaceHeating` or an entry of
+/// `additionalHeatingSystems`, whose own blocks sit under `system`).
+fn chain_path(
+    path: &str,
+    chain: &crate::space_heating_chain::SpaceHeatingChainInput,
+    system: Option<&str>,
+    project_value: &Value,
+) -> String {
+    let (member, index, rest) = split_member(path);
+    let own = |block: &str| match system {
+        Some(system) => format!("{system}.{block}{rest}"),
+        None => format!("ntaCalculation.{block}{rest}"),
+    };
+    match member {
+        // An additional heating system has its own generator, distribution,
+        // humidifiers, collective connection and number of identical systems.
+        "generator"
+        | "distributionSystem"
+        | "humidifiers"
+        | "collectiveConnection"
+        | "identicalSystems" => own(member),
+        "demand" | "emission" | "distribution" => {
+            zone_path(member, rest, &chain.demand, project_value)
+        }
+        "additionalZones" => match index.and_then(|index| chain.additional_zones.get(index)) {
+            Some(zone) => {
+                let (part, _, rest) = split_member(rest.strip_prefix('.').unwrap_or(rest));
+                zone_path(part, rest, &zone.demand, project_value)
+            }
+            None => "zones".to_string(),
+        },
+        _ => system
+            .map(str::to_string)
+            .unwrap_or_else(|| "ntaCalculation".to_string()),
+    }
+}
+
+/// Path of a zone part of the chain (`demand`, `emission`, `distribution`)
+/// of the zone `demand` was derived for. A part the zone takes from its
+/// `zoneData` entry maps there, the rest to the project block, mirroring
+/// `derive_input`; ground floors and windows map by id to their source.
+fn zone_path(
+    part: &str,
+    rest: &str,
+    demand: &crate::monthly_demand::MonthlyDemandInput,
+    project_value: &Value,
+) -> String {
+    let zone_id = demand.zone_id.as_str();
+    let zone_index = project_value
+        .get("zones")
+        .and_then(Value::as_array)
+        .and_then(|items| {
+            items
+                .iter()
+                .position(|item| item.get("id").and_then(Value::as_str) == Some(zone_id))
+        });
+    let zone = zone_index
+        .map(|index| format!("zones[{index}]"))
+        .unwrap_or_else(|| "zones".to_string());
+    let zone_data = project_value
+        .pointer("/ntaCalculation/zoneData")
+        .and_then(Value::as_array)
+        .and_then(|items| {
+            items
+                .iter()
+                .position(|item| item.get("zoneId").and_then(Value::as_str) == Some(zone_id))
+        });
+    // The entry of this zone has the member (not absent, not null).
+    let zone_has = |member: &str| {
+        zone_data
+            .and_then(|index| {
+                project_value.pointer(&format!("/ntaCalculation/zoneData/{index}/{member}"))
+            })
+            .is_some_and(|value| !value.is_null())
+    };
+    let per_zone = |member: &str, tail: &str, from_zone: bool| match (zone_data, from_zone) {
+        (Some(index), true) => format!("ntaCalculation.zoneData[{index}].{member}{tail}"),
+        _ => format!("ntaCalculation.{member}{tail}"),
+    };
+    match part {
+        "emission" | "distribution" => per_zone(part, rest, zone_has(part)),
+        "demand" => {
+            let (field, index, tail) = split_member(rest.strip_prefix('.').unwrap_or(rest));
+            let indexed = match index {
+                Some(index) => format!("[{index}]{tail}"),
+                None => tail.to_string(),
+            };
+            match field {
+                // Taken from the zone entry whenever the zone has one.
+                "ventilation" | "ventilationFlows" | "sunrooms" | "internalGains"
+                | "functionAreas" => per_zone(field, &indexed, zone_data.is_some()),
+                // Taken from the zone entry only when it gives them.
+                "thermalMass" | "setpoints" | "usageFunction" => {
+                    per_zone(field, &indexed, zone_has(field))
+                }
+                // A zone that overrides the usage function brings its own
+                // dwelling type.
+                "dwellingType" => per_zone(
+                    field,
+                    &indexed,
+                    zone_has("usageFunction") || zone_has("dwellingType"),
+                ),
+                "windows" => match index.and_then(|index| demand.windows.get(index)) {
+                    Some(window) => window_source_path(window, tail, project_value),
+                    None => "ntaCalculation.windowSolar".to_string(),
+                },
+                "transmission" => {
+                    transmission_path(tail, demand, &zone, &per_zone, &zone_has, project_value)
+                }
+                _ => zone,
+            }
+        }
+        _ => zone,
+    }
+}
+
+/// Path of a transmission issue: a ground floor maps by its surface id to
+/// `ntaCalculation.groundFloors`, vertical pipes to where the zone takes
+/// them from, the rest to the surfaces of the zone.
+fn transmission_path(
+    tail: &str,
+    demand: &crate::monthly_demand::MonthlyDemandInput,
+    zone: &str,
+    per_zone: &dyn Fn(&str, &str, bool) -> String,
+    zone_has: &dyn Fn(&str) -> bool,
+    project_value: &Value,
+) -> String {
+    let (member, index, rest) = split_member(tail.strip_prefix('.').unwrap_or(tail));
+    match member {
+        "groundFloors" => {
+            let floor = match (&demand.transmission, index) {
+                (crate::monthly_demand::Transmission::Components(components), Some(index)) => {
+                    components.ground_floors.get(index)
+                }
+                _ => None,
+            };
+            let project_index = floor.and_then(|floor| {
+                project_value
+                    .pointer("/ntaCalculation/groundFloors")
+                    .and_then(Value::as_array)
+                    .and_then(|items| {
+                        items.iter().position(|item| {
+                            item.get("surfaceId").and_then(Value::as_str) == Some(floor.id.as_str())
+                        })
+                    })
+            });
+            match project_index {
+                Some(index) => format!("ntaCalculation.groundFloors[{index}]{rest}"),
+                None => "ntaCalculation.groundFloors".to_string(),
+            }
+        }
+        "verticalPipes" => {
+            let indexed = match index {
+                Some(index) => format!("[{index}]{rest}"),
+                None => rest.to_string(),
+            };
+            per_zone(member, &indexed, zone_has(member))
+        }
+        _ => format!("{zone}.surfaces"),
+    }
+}
+
+/// Path of an issue on a derived window (`window:<id>`): the obstruction of
+/// that window or the project default, its annex A data, the solar block,
+/// or the window itself in the zone surfaces.
+fn window_source_path(
+    window: &crate::monthly_demand::Window,
+    tail: &str,
+    project_value: &Value,
+) -> String {
+    let window_id = window.id.strip_prefix("window:").unwrap_or(&window.id);
+    let (field, _, rest) = split_member(tail.strip_prefix('.').unwrap_or(tail));
+    let listed = |list: &str| {
+        project_value
+            .pointer(&format!("/ntaCalculation/{list}"))
+            .and_then(Value::as_array)
+            .and_then(|items| {
+                items.iter().position(|item| {
+                    item.get("windowId").and_then(Value::as_str) == Some(window_id)
+                })
+            })
+    };
+    let project_window = || {
+        let zones = project_value.get("zones").and_then(Value::as_array)?;
+        for (zone_index, zone) in zones.iter().enumerate() {
+            let surfaces = zone.get("surfaces").and_then(Value::as_array);
+            for (surface_index, surface) in surfaces.into_iter().flatten().enumerate() {
+                let windows = surface.get("windows").and_then(Value::as_array);
+                for (index, item) in windows.into_iter().flatten().enumerate() {
+                    if item.get("id").and_then(Value::as_str) == Some(window_id) {
+                        return Some(format!(
+                            "zones[{zone_index}].surfaces[{surface_index}].windows[{index}]"
+                        ));
+                    }
+                }
+            }
+        }
+        None
+    };
+    match field {
+        "obstruction" => match listed("windowObstructions") {
+            Some(index) => format!("ntaCalculation.windowObstructions[{index}].obstruction{rest}"),
+            None => format!("ntaCalculation.windowSolar.obstruction{rest}"),
+        },
+        "dynamic" => match listed("dynamicWindows") {
+            Some(index) => format!("ntaCalculation.dynamicWindows[{index}].dynamic{rest}"),
+            None => "ntaCalculation.dynamicWindows".to_string(),
+        },
+        "movableShading" => match listed("windowShadings") {
+            Some(index) => format!("ntaCalculation.windowShadings[{index}].movableShading{rest}"),
+            None => format!("ntaCalculation.windowSolar.movableShading{rest}"),
+        },
+        "glazing" => match listed("windowGlazings") {
+            Some(index) => format!("ntaCalculation.windowGlazings[{index}].glazing{rest}"),
+            None => "ntaCalculation.windowGlazings".to_string(),
+        },
+        "frameFraction" => format!("ntaCalculation.windowSolar.{field}{rest}"),
+        // The window's own data in the project model.
+        "areaM2" | "uValueWPerM2k" | "gPerpendicular" | "" => {
+            let member = match field {
+                "areaM2" => ".area",
+                "uValueWPerM2k" => ".uValue",
+                "gPerpendicular" => ".gValue",
+                _ => "",
+            };
+            project_window()
+                .map(|path| format!("{path}{member}"))
+                .unwrap_or_else(|| "ntaCalculation.windowSolar".to_string())
+        }
+        _ => "ntaCalculation.windowSolar".to_string(),
+    }
+}
+
 pub fn assess_project_performance(project_value: &Value) -> ProjectPerformanceAssessment {
     // The whole project route (derived constructions, materials, annexes)
     // runs in the chosen edition, not only the building calculation.
@@ -1459,6 +1827,12 @@ fn assess_project_in_edition(project_value: &Value) -> ProjectPerformanceAssessm
     if let Some(result) = &performance {
         gaps.extend(tojuli_evidence_gaps(&result.tojuli));
     }
+    if let (Some(input), Some(result)) = (&derived, &performance) {
+        if !result.status.starts_with("calculated") {
+            let found = building_issue_gaps(&result.issues, input, project_value, &gaps);
+            gaps.extend(found);
+        }
+    }
     let version = project_norm_version(project_value);
     let status = match (&derived, &performance) {
         (None, _) => "incomplete",
@@ -1483,6 +1857,13 @@ fn assess_project_in_edition(project_value: &Value) -> ProjectPerformanceAssessm
             indicators.elements.wlc_gwp_kg_co2_eq_per_m2 = project_value
                 .pointer("/registration/wlcGwp/valueKgCo2EqPerM2Year")
                 .and_then(Value::as_f64);
+            // Onder k en l: the adviser's statements from the registration.
+            indicators.elements.responds_to_external_signals = project_value
+                .pointer("/registration/labelStatements/respondsToExternalSignals")
+                .and_then(Value::as_bool);
+            indicators.elements.low_temperature_heating = project_value
+                .pointer("/registration/labelStatements/lowTemperatureHeating")
+                .and_then(Value::as_bool);
         }
         data
     });
@@ -2882,6 +3263,40 @@ fn derive_input(
         .collect();
     let delta_u_forfait = forfait_bridge_route(&project, &nta, &constructions, gaps);
     let mut used_ground = HashSet::new();
+    let mut window_shadings: HashMap<&str, (usize, &ProjectWindowShading)> = HashMap::new();
+    for (index, item) in nta.window_shadings.iter().enumerate() {
+        let path = format!("ntaCalculation.windowShadings[{index}]");
+        if window_shadings
+            .insert(item.window_id.as_str(), (index, item))
+            .is_some()
+        {
+            gaps.push(gap("window_shading_duplicate", format!("{path}.windowId")));
+        }
+        if item.source_reference.trim().is_empty() {
+            gaps.push(gap(
+                "window_shading_reference_required",
+                format!("{path}.sourceReference"),
+            ));
+        }
+    }
+    let mut used_shading = HashSet::new();
+    let mut window_glazings: HashMap<&str, (usize, &ProjectWindowGlazing)> = HashMap::new();
+    for (index, item) in nta.window_glazings.iter().enumerate() {
+        let path = format!("ntaCalculation.windowGlazings[{index}]");
+        if window_glazings
+            .insert(item.window_id.as_str(), (index, item))
+            .is_some()
+        {
+            gaps.push(gap("window_glazing_duplicate", format!("{path}.windowId")));
+        }
+        if item.source_reference.trim().is_empty() {
+            gaps.push(gap(
+                "window_glazing_reference_required",
+                format!("{path}.sourceReference"),
+            ));
+        }
+    }
+    let mut used_glazing = HashSet::new();
     let mut dynamic_windows: HashMap<&str, &crate::annex_a::DynamicTransparent> = HashMap::new();
     for (index, item) in nta.dynamic_windows.iter().enumerate() {
         let path = format!("ntaCalculation.dynamicWindows[{index}]");
@@ -2893,7 +3308,11 @@ fn derive_input(
         }
         // §A.2 (p. 767): movable shading of a dynamic window belongs in its
         // states; the project-wide 7.42 shading would count it twice.
-        if nta.window_solar.movable_shading.is_some() {
+        let shaded = match window_shadings.get(item.window_id.as_str()) {
+            Some((_, own)) => own.movable_shading.is_some(),
+            None => nta.window_solar.movable_shading.is_some(),
+        };
+        if shaded {
             gaps.push(gap("window_dynamic_and_shading_exclusive", path.clone()));
         }
         for issue in item.dynamic.validate(&format!("{path}.dynamic")) {
@@ -2901,6 +3320,58 @@ fn derive_input(
         }
     }
     let mut used_dynamic = HashSet::new();
+    let mut window_obstructions: HashMap<&str, (usize, &ProjectWindowObstruction)> = HashMap::new();
+    for (index, item) in nta.window_obstructions.iter().enumerate() {
+        let path = format!("ntaCalculation.windowObstructions[{index}]");
+        if window_obstructions
+            .insert(item.window_id.as_str(), (index, item))
+            .is_some()
+        {
+            gaps.push(gap(
+                "window_obstruction_duplicate",
+                format!("{path}.windowId"),
+            ));
+        }
+        if item.source_reference.trim().is_empty() {
+            gaps.push(gap(
+                "window_obstruction_reference_required",
+                format!("{path}.sourceReference"),
+            ));
+        }
+    }
+    let mut used_obstruction = HashSet::new();
+    // Every window id of the project and whether it sits in an outdoor
+    // surface, so a per-window obstruction is only "without window" when the
+    // id names no window at all.
+    let mut project_windows: HashMap<&str, bool> = HashMap::new();
+    for surface in project.zones.iter().flat_map(|zone| &zone.surfaces) {
+        let outdoor = matches!(
+            surface
+                .get("thermalBoundary")
+                .and_then(|value| serde_json::from_value::<ThermalBoundary>(value.clone()).ok()),
+            Some(ThermalBoundary::Outdoor)
+        );
+        for window in surface
+            .get("windows")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            if let Some(id) = window.get("id").and_then(Value::as_str) {
+                *project_windows.entry(id).or_insert(false) |= outdoor;
+            }
+        }
+    }
+    // The project-wide obstruction: errors that do not depend on the tilt at
+    // its own path, once; a situation that needs a vertical window at the
+    // first non-vertical window that takes the default.
+    for (code, suffix) in validate_obstruction(&nta.window_solar.obstruction, 90.0) {
+        gaps.push(gap(
+            code,
+            format!("ntaCalculation.windowSolar.obstruction{suffix}"),
+        ));
+    }
+    let mut default_tilt_reported = false;
     let mut loss_area = 0.0;
     let mut total_area = 0.0;
     let mut zones = Vec::new();
@@ -3048,6 +3519,91 @@ fn derive_input(
                 if dynamic.is_some() {
                     used_dynamic.insert(window_id.to_owned());
                 }
+                // A per-window obstruction replaces the project default; an
+                // invalid one is a gap at its own path and the window keeps
+                // the default, so the demand reports no second error.
+                let obstruction = match window_obstructions.get(window_id) {
+                    Some((index, item)) => {
+                        used_obstruction.insert(window_id.to_owned());
+                        let issues = validate_obstruction(&item.obstruction, tilt);
+                        for (code, suffix) in &issues {
+                            gaps.push(gap(
+                                code,
+                                format!(
+                                    "ntaCalculation.windowObstructions[{index}].obstruction{suffix}"
+                                ),
+                            ));
+                        }
+                        if issues.is_empty() {
+                            item.obstruction.clone()
+                        } else {
+                            nta.window_solar.obstruction.clone()
+                        }
+                    }
+                    None => {
+                        if !default_tilt_reported
+                            && validate_obstruction(&nta.window_solar.obstruction, tilt)
+                                .iter()
+                                .any(|(code, _)| *code == "obstruction_situation_requires_vertical")
+                        {
+                            default_tilt_reported = true;
+                            gaps.push(InputGap {
+                                code: "obstruction_situation_requires_vertical",
+                                path: "ntaCalculation.windowSolar.obstruction.method".into(),
+                                detail: Some(format!("window {window_id} (tilt {tilt}°)")),
+                            });
+                        }
+                        nta.window_solar.obstruction.clone()
+                    }
+                };
+                // A per-window entry replaces the project-wide shading.
+                // An invalid one is a gap at its own path and the window
+                // keeps the default, as for obstructions.
+                let shading = match window_shadings.get(window_id) {
+                    Some((index, item)) => {
+                        used_shading.insert(window_id.to_owned());
+                        let issues = item
+                            .movable_shading
+                            .as_ref()
+                            .map(validate_movable_shading)
+                            .unwrap_or_default();
+                        for (code, suffix) in &issues {
+                            gaps.push(gap(
+                                code,
+                                format!(
+                                    "ntaCalculation.windowShadings[{index}].movableShading{suffix}"
+                                ),
+                            ));
+                        }
+                        if issues.is_empty() {
+                            item.movable_shading.clone()
+                        } else {
+                            nta.window_solar.movable_shading.clone()
+                        }
+                    }
+                    None => nta.window_solar.movable_shading.clone(),
+                };
+                let mut source_reference = match window_obstructions.get(window_id) {
+                    Some((_, item)) => format!(
+                        "project:window:{window_id}; {}; obstruction: {}",
+                        nta.window_solar.source_reference, item.source_reference
+                    ),
+                    None => format!(
+                        "project:window:{window_id}; {}",
+                        nta.window_solar.source_reference
+                    ),
+                };
+                if let Some((_, item)) = window_shadings.get(window_id) {
+                    source_reference.push_str(&format!("; shading: {}", item.source_reference));
+                }
+                // Glazing details replace the window's gValue route; the
+                // demand validates them (7.41 values, louvres) and its
+                // issues map back to this entry.
+                let glazing = window_glazings.get(window_id).map(|(_, item)| {
+                    used_glazing.insert(window_id.to_owned());
+                    source_reference.push_str(&format!("; glazing: {}", item.source_reference));
+                    item.glazing.clone()
+                });
                 windows.push(Window {
                     id: format!("window:{window_id}"),
                     area_m2: area,
@@ -3057,14 +3613,11 @@ fn derive_input(
                     frame_fraction: nta.window_solar.frame_fraction,
                     u_value_w_per_m2k: u_value,
                     forfait_delta_u_w_per_m2k: delta_u_forfait,
-                    obstruction: nta.window_solar.obstruction.clone(),
-                    movable_shading: nta.window_solar.movable_shading.clone(),
+                    obstruction,
+                    movable_shading: shading,
                     dynamic,
-                    glazing: None,
-                    source_reference: format!(
-                        "project:window:{window_id}; {}",
-                        nta.window_solar.source_reference
-                    ),
+                    glazing,
+                    source_reference,
                 });
             }
             let gross = surface.get("area").and_then(Value::as_f64).unwrap_or(0.0);
@@ -3233,6 +3786,50 @@ fn derive_input(
                 .and_then(|item| item.distribution.clone())
                 .unwrap_or_else(|| nta.distribution.clone()),
         });
+    }
+    for (index, item) in nta.window_obstructions.iter().enumerate() {
+        if used_obstruction.contains(&item.window_id) {
+            continue;
+        }
+        // A window with incomplete data already has its own gap.
+        let code = match project_windows.get(item.window_id.as_str()) {
+            None => "window_obstruction_without_window",
+            Some(false) => "window_obstruction_not_outdoor",
+            Some(true) => continue,
+        };
+        gaps.push(gap(
+            code,
+            format!("ntaCalculation.windowObstructions[{index}].windowId"),
+        ));
+    }
+    for (index, item) in nta.window_shadings.iter().enumerate() {
+        if used_shading.contains(&item.window_id) {
+            continue;
+        }
+        // A window with incomplete data already has its own gap.
+        let code = match project_windows.get(item.window_id.as_str()) {
+            None => "window_shading_without_window",
+            Some(false) => "window_shading_not_outdoor",
+            Some(true) => continue,
+        };
+        gaps.push(gap(
+            code,
+            format!("ntaCalculation.windowShadings[{index}].windowId"),
+        ));
+    }
+    for (index, item) in nta.window_glazings.iter().enumerate() {
+        if used_glazing.contains(&item.window_id) {
+            continue;
+        }
+        let code = match project_windows.get(item.window_id.as_str()) {
+            None => "window_glazing_without_window",
+            Some(false) => "window_glazing_not_outdoor",
+            Some(true) => continue,
+        };
+        gaps.push(gap(
+            code,
+            format!("ntaCalculation.windowGlazings[{index}].windowId"),
+        ));
     }
     for (index, item) in nta.dynamic_windows.iter().enumerate() {
         if !used_dynamic.contains(&item.window_id) {
@@ -3638,6 +4235,452 @@ mod tests {
         assert!(transmission(&result, 0) < transmission(&base, 0));
     }
 
+    /// 7.13 (p. 183–184) takes `F_sh;obst;wi,k;mi` per window and 17.3.2
+    /// one situation per window: an overhang on win-S lowers its factor and
+    /// the heating gains, while win-N keeps the project default.
+    #[test]
+    fn window_obstruction_replaces_the_default_for_that_window_only() {
+        let base = assess_project_performance(&project());
+        let mut value = project();
+        value["ntaCalculation"]["windowObstructions"] = serde_json::json!([{
+            "windowId": "win-S",
+            "obstruction": {"method": "overhang", "relativeHeight": 0.5},
+            "sourceReference": "balcony above the south window"
+        }]);
+        let result = assess_project_performance(&value);
+        assert_eq!(result.status, "calculated_unverified", "{:?}", result.gaps);
+        let demand = &result.derived_input.as_ref().unwrap().space_heating.demand;
+        let find = |id: &str| demand.windows.iter().find(|item| item.id == id).unwrap();
+        let south = find("window:win-S");
+        assert!(matches!(
+            south.obstruction,
+            Obstruction::Overhang { relative_height } if relative_height == 0.5
+        ));
+        assert!(south
+            .source_reference
+            .contains("balcony above the south window"));
+        assert!(matches!(
+            find("window:win-N").obstruction,
+            Obstruction::Minimal
+        ));
+        let factor = |window: &crate::monthly_demand::Window| {
+            crate::monthly_demand::window_obstruction(
+                window,
+                1,
+                crate::solar_shading::Balance::Heating,
+            )
+            .unwrap()
+        };
+        let base_demand = &base.derived_input.as_ref().unwrap().space_heating.demand;
+        let base_south = base_demand
+            .windows
+            .iter()
+            .find(|item| item.id == "window:win-S")
+            .unwrap();
+        assert!(factor(south) < factor(base_south));
+        let solar = |window: &crate::monthly_demand::Window| {
+            crate::monthly_demand::window_solar_kwh(
+                window,
+                1,
+                crate::solar_shading::Balance::Heating,
+            )
+        };
+        assert!(solar(south) < solar(base_south));
+    }
+
+    /// Listing a window with the same situation as the project default
+    /// changes nothing: projects without `windowObstructions` and projects
+    /// that repeat the default give identical results.
+    #[test]
+    fn window_obstruction_equal_to_the_default_changes_nothing() {
+        let base = assess_project_performance(&project());
+        let mut value = project();
+        value["ntaCalculation"]["windowObstructions"] = serde_json::json!([
+            {"windowId": "win-S", "obstruction": {"method": "minimal"}, "sourceReference": "survey"},
+            {"windowId": "win-N", "obstruction": {"method": "minimal"}, "sourceReference": "survey"}
+        ]);
+        let result = assess_project_performance(&value);
+        assert_eq!(result.status, base.status);
+        // Every number is equal; only the source references name the list.
+        fn numbers(value: Value) -> Value {
+            match value {
+                Value::String(_) => Value::Null,
+                Value::Array(items) => Value::Array(items.into_iter().map(numbers).collect()),
+                Value::Object(map) => Value::Object(
+                    map.into_iter()
+                        .map(|(key, item)| (key, numbers(item)))
+                        .collect(),
+                ),
+                other => other,
+            }
+        }
+        let json = |item: &ProjectPerformanceAssessment| {
+            numbers(serde_json::to_value(item.performance.as_ref().unwrap()).unwrap())
+        };
+        assert_eq!(json(&result), json(&base));
+    }
+
+    /// 7.42/7.43 (2025+C1 p. 196–198) give g_gl and F_c per window wi:
+    /// screens on win-S only lower its cooling gains, win-N keeps the project
+    /// default (none), and an entry without `movableShading` removes the
+    /// project-wide shading from that window.
+    #[test]
+    fn window_shading_replaces_the_default_for_that_window_only() {
+        let shading = serde_json::json!({
+            "reductionFactor": 0.2, "control": "manual_residential", "sourceReference": "screen"
+        });
+        let base = assess_project_performance(&project());
+        let mut value = project();
+        value["ntaCalculation"]["windowShadings"] = serde_json::json!([{
+            "windowId": "win-S", "movableShading": shading, "sourceReference": "screens on the south window"
+        }]);
+        let result = assess_project_performance(&value);
+        assert_eq!(result.status, "calculated_unverified", "{:?}", result.gaps);
+        let demand = &result.derived_input.as_ref().unwrap().space_heating.demand;
+        let find = |id: &str| demand.windows.iter().find(|item| item.id == id).unwrap();
+        assert!(find("window:win-S").movable_shading.is_some());
+        assert!(find("window:win-S")
+            .source_reference
+            .contains("screens on the south window"));
+        assert!(find("window:win-N").movable_shading.is_none());
+        let cooling = |item: &ProjectPerformanceAssessment| {
+            item.performance
+                .as_ref()
+                .unwrap()
+                .space_heating
+                .demand
+                .monthly
+                .iter()
+                .map(|month| month.cooling.gains_kwh)
+                .sum::<f64>()
+        };
+        assert!(cooling(&result) < cooling(&base));
+
+        // Project-wide shading, removed again for win-N.
+        let mut value = project();
+        value["ntaCalculation"]["windowSolar"]["movableShading"] = shading.clone();
+        value["ntaCalculation"]["windowShadings"] = serde_json::json!([{
+            "windowId": "win-N", "sourceReference": "no screen on the north window"
+        }]);
+        let result = assess_project_performance(&value);
+        assert_eq!(result.status, "calculated_unverified", "{:?}", result.gaps);
+        let demand = &result.derived_input.as_ref().unwrap().space_heating.demand;
+        let find = |id: &str| demand.windows.iter().find(|item| item.id == id).unwrap();
+        assert!(find("window:win-S").movable_shading.is_some());
+        assert!(find("window:win-N").movable_shading.is_none());
+    }
+
+    /// Projects without `windowShadings`, and projects that repeat the
+    /// project default per window, give identical numbers.
+    #[test]
+    fn window_shading_equal_to_the_default_changes_nothing() {
+        let base = assess_project_performance(&project());
+        let mut value = project();
+        value["ntaCalculation"]["windowShadings"] = serde_json::json!([
+            {"windowId": "win-S", "sourceReference": "survey"},
+            {"windowId": "win-N", "sourceReference": "survey"}
+        ]);
+        let result = assess_project_performance(&value);
+        assert_eq!(result.status, base.status);
+        fn numbers(value: Value) -> Value {
+            match value {
+                Value::String(_) => Value::Null,
+                Value::Array(items) => Value::Array(items.into_iter().map(numbers).collect()),
+                Value::Object(map) => Value::Object(
+                    map.into_iter()
+                        .map(|(key, item)| (key, numbers(item)))
+                        .collect(),
+                ),
+                other => other,
+            }
+        }
+        let json = |item: &ProjectPerformanceAssessment| {
+            numbers(serde_json::to_value(item.performance.as_ref().unwrap()).unwrap())
+        };
+        assert_eq!(json(&result), json(&base));
+    }
+
+    #[test]
+    fn window_shading_input_errors_are_gaps() {
+        let mut value = project();
+        value["ntaCalculation"]["windowShadings"] = serde_json::json!([
+            {"windowId": "win-S", "sourceReference": "a"},
+            {"windowId": "win-S", "sourceReference": "b"},
+            {"windowId": "missing", "sourceReference": "c"},
+            {"windowId": "win-N", "movableShading": {
+                "reductionFactor": 1.5, "control": "manual_residential", "sourceReference": "x"
+            }, "sourceReference": " "}
+        ]);
+        let result = assess_project_performance(&value);
+        let codes: Vec<(&str, &str)> = result
+            .gaps
+            .iter()
+            .map(|gap| (gap.code, gap.path.as_str()))
+            .collect();
+        for expected in [
+            (
+                "window_shading_duplicate",
+                "ntaCalculation.windowShadings[1].windowId",
+            ),
+            (
+                "window_shading_without_window",
+                "ntaCalculation.windowShadings[2].windowId",
+            ),
+            (
+                "window_shading_reference_required",
+                "ntaCalculation.windowShadings[3].sourceReference",
+            ),
+            (
+                "window_shading_factor_invalid",
+                "ntaCalculation.windowShadings[3].movableShading.reductionFactor",
+            ),
+        ] {
+            assert!(codes.contains(&expected), "{expected:?} in {codes:?}");
+        }
+        assert_ne!(result.status, "calculated_unverified");
+    }
+
+    /// 7.41 (2025+C1 p. 191) per window: the ISSO 54 EP-W011a values
+    /// g_gl,alt 0,045 and g_gl,dif 0,2 give 0,75·0,045 + 0,25·0,2 = 0,08375
+    /// for that window only.
+    #[test]
+    fn window_glazing_replaces_the_g_value_route_for_that_window_only() {
+        let base = assess_project_performance(&project());
+        let mut value = project();
+        value["ntaCalculation"]["windowGlazings"] = serde_json::json!([{
+            "windowId": "win-S",
+            "glazing": {"diffusing": {
+                "gAltitude45": 0.045, "gDiffuse": 0.2, "sourceReference": "ISO 15099 calculation"
+            }},
+            "sourceReference": "closed horizontal louvres"
+        }]);
+        let result = assess_project_performance(&value);
+        assert_eq!(result.status, "calculated_unverified", "{:?}", result.gaps);
+        let demand = &result.derived_input.as_ref().unwrap().space_heating.demand;
+        let find = |id: &str| demand.windows.iter().find(|item| item.id == id).unwrap();
+        let south = find("window:win-S");
+        assert!((south.g_gl(0, 0.0) - 0.08375).abs() < 1e-12);
+        assert!(south.source_reference.contains("closed horizontal louvres"));
+        assert!(find("window:win-N").glazing.is_none());
+        let gains = |item: &ProjectPerformanceAssessment| {
+            item.performance
+                .as_ref()
+                .unwrap()
+                .space_heating
+                .demand
+                .monthly
+                .iter()
+                .map(|month| month.cooling.gains_kwh)
+                .sum::<f64>()
+        };
+        assert!(gains(&result) < gains(&base));
+    }
+
+    /// Projects without `windowGlazings`, and entries without glazing
+    /// details, give identical numbers.
+    #[test]
+    fn window_glazing_without_details_changes_nothing() {
+        let base = assess_project_performance(&project());
+        let mut value = project();
+        value["ntaCalculation"]["windowGlazings"] = serde_json::json!([
+            {"windowId": "win-S", "glazing": {}, "sourceReference": "survey"},
+            {"windowId": "win-N", "glazing": {}, "sourceReference": "survey"}
+        ]);
+        let result = assess_project_performance(&value);
+        assert_eq!(result.status, base.status);
+        let numbers = |item: &ProjectPerformanceAssessment| {
+            let mut json = serde_json::to_value(item.performance.as_ref().unwrap()).unwrap();
+            fn strip(value: &mut Value) {
+                match value {
+                    Value::String(_) => *value = Value::Null,
+                    Value::Array(items) => items.iter_mut().for_each(strip),
+                    Value::Object(map) => map.values_mut().for_each(strip),
+                    _ => {}
+                }
+            }
+            strip(&mut json);
+            json
+        };
+        assert_eq!(numbers(&result), numbers(&base));
+    }
+
+    #[test]
+    fn window_glazing_input_errors_are_gaps() {
+        let mut value = project();
+        value["ntaCalculation"]["windowGlazings"] = serde_json::json!([
+            {"windowId": "win-S", "glazing": {}, "sourceReference": "a"},
+            {"windowId": "win-S", "glazing": {}, "sourceReference": "b"},
+            {"windowId": "missing", "glazing": {}, "sourceReference": "c"},
+            {"windowId": "win-N", "glazing": {"diffusing": {
+                "gAltitude45": 1.5, "gDiffuse": 0.2, "sourceReference": "x"
+            }}, "sourceReference": " "}
+        ]);
+        let result = assess_project_performance(&value);
+        let codes: Vec<(&str, &str)> = result
+            .gaps
+            .iter()
+            .map(|gap| (gap.code, gap.path.as_str()))
+            .collect();
+        for expected in [
+            (
+                "window_glazing_duplicate",
+                "ntaCalculation.windowGlazings[1].windowId",
+            ),
+            (
+                "window_glazing_without_window",
+                "ntaCalculation.windowGlazings[2].windowId",
+            ),
+            (
+                "window_glazing_reference_required",
+                "ntaCalculation.windowGlazings[3].sourceReference",
+            ),
+        ] {
+            assert!(codes.contains(&expected), "{expected:?} in {codes:?}");
+        }
+        assert_ne!(result.status, "calculated_unverified");
+        // The demand's own check of the 7.41 values points at the entry.
+        let mut value = project();
+        value["ntaCalculation"]["windowGlazings"] = serde_json::json!([
+            {"windowId": "win-N", "glazing": {"diffusing": {
+                "gAltitude45": 1.5, "gDiffuse": 0.2, "sourceReference": "x"
+            }}, "sourceReference": "y"}
+        ]);
+        let result = assess_project_performance(&value);
+        assert!(
+            result.gaps.iter().any(|gap| gap.code == "window_g_invalid"
+                && gap.path == "ntaCalculation.windowGlazings[0].glazing.diffusing"),
+            "{:?}",
+            result.gaps
+        );
+    }
+
+    #[test]
+    fn window_obstruction_input_errors_are_gaps() {
+        let mut value = project();
+        value["ntaCalculation"]["windowObstructions"] = serde_json::json!([
+            {"windowId": "win-S", "obstruction": {"method": "overhang", "relativeHeight": 0.5}, "sourceReference": "a"},
+            {"windowId": "win-S", "obstruction": {"method": "minimal"}, "sourceReference": "b"},
+            {"windowId": "missing", "obstruction": {"method": "minimal"}, "sourceReference": "c"},
+            {"windowId": "win-N", "obstruction": {"method": "overhang", "relativeHeight": -1.0}, "sourceReference": " "}
+        ]);
+        let result = assess_project_performance(&value);
+        let codes: Vec<(&str, &str)> = result
+            .gaps
+            .iter()
+            .map(|gap| (gap.code, gap.path.as_str()))
+            .collect();
+        for expected in [
+            (
+                "window_obstruction_duplicate",
+                "ntaCalculation.windowObstructions[1].windowId",
+            ),
+            (
+                "window_obstruction_without_window",
+                "ntaCalculation.windowObstructions[2].windowId",
+            ),
+            (
+                "obstruction_geometry_invalid",
+                "ntaCalculation.windowObstructions[3].obstruction.relativeHeight",
+            ),
+            (
+                "window_obstruction_reference_required",
+                "ntaCalculation.windowObstructions[3].sourceReference",
+            ),
+        ] {
+            assert!(codes.contains(&expected), "{expected:?} in {codes:?}");
+        }
+        assert_eq!(result.status, "incomplete");
+    }
+
+    /// Declared obstruction factors need a source; a blank one is a gap at
+    /// the input path (per window, with the default kept for that window, and
+    /// for the project-wide obstruction), not only an issue deep in the demand.
+    #[test]
+    fn declared_obstruction_without_source_is_a_gap() {
+        let declared = serde_json::json!({
+            "method": "declared", "heating": vec![0.9; 12], "cooling": vec![0.8; 12], "sourceReference": " "
+        });
+        let mut value = project();
+        value["ntaCalculation"]["windowObstructions"] = serde_json::json!([
+            {"windowId": "win-S", "obstruction": declared, "sourceReference": "survey"}
+        ]);
+        let result = assess_project_performance(&value);
+        assert!(
+            result
+                .gaps
+                .iter()
+                .any(|gap| gap.code == "source_reference_required"
+                    && gap.path
+                        == "ntaCalculation.windowObstructions[0].obstruction.sourceReference"),
+            "{:?}",
+            result.gaps
+        );
+        assert_eq!(result.status, "incomplete");
+        // One gap: the window keeps the project default, so the demand
+        // reports no second error elsewhere.
+        assert_eq!(
+            result
+                .gaps
+                .iter()
+                .filter(|gap| gap.code == "source_reference_required")
+                .count(),
+            1
+        );
+
+        let mut value = project();
+        value["ntaCalculation"]["windowSolar"]["obstruction"] = declared;
+        let result = assess_project_performance(&value);
+        assert!(
+            result
+                .gaps
+                .iter()
+                .any(|gap| gap.code == "source_reference_required"
+                    && gap.path == "ntaCalculation.windowSolar.obstruction.sourceReference"),
+            "{:?}",
+            result.gaps
+        );
+        assert_ne!(result.status, "calculated_unverified");
+    }
+
+    /// "Without window" only for an id that names no window: a window with
+    /// incomplete data has its own gap, and a window that no longer borders
+    /// outdoor air gets `window_obstruction_not_outdoor`.
+    #[test]
+    fn obstruction_for_an_existing_window_is_not_without_window() {
+        let entry = |id: &str| serde_json::json!({"windowId": id, "obstruction": {"method": "minimal"}, "sourceReference": "s"});
+        let mut value = project();
+        value["ntaCalculation"]["windowObstructions"] = serde_json::json!([entry("win-N")]);
+        value["zones"][0]["surfaces"][0]["windows"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("gValue");
+        let result = assess_project_performance(&value);
+        let codes: Vec<&str> = result.gaps.iter().map(|gap| gap.code).collect();
+        assert!(codes.contains(&"window_data_missing"), "{codes:?}");
+        assert!(
+            !codes.contains(&"window_obstruction_without_window"),
+            "{codes:?}"
+        );
+
+        let mut value = project();
+        value["ntaCalculation"]["windowObstructions"] = serde_json::json!([entry("win-N")]);
+        value["zones"][0]["surfaces"][0]["thermalBoundary"] = Value::from("unheated_space");
+        let result = assess_project_performance(&value);
+        assert!(
+            result
+                .gaps
+                .iter()
+                .any(|gap| gap.code == "window_obstruction_not_outdoor"
+                    && gap.path == "ntaCalculation.windowObstructions[0].windowId"),
+            "{:?}",
+            result.gaps
+        );
+        assert!(result
+            .gaps
+            .iter()
+            .all(|gap| gap.code != "window_obstruction_without_window"));
+    }
+
     #[test]
     fn dynamic_window_input_errors_are_gaps() {
         let mut value = project();
@@ -3758,6 +4801,46 @@ mod tests {
         assert!(elements.renewable_production_kwh.unwrap() > 0.0);
         assert!(elements.main_renewable_source.is_some());
         assert_eq!(elements.responds_to_external_signals, None);
+        assert_eq!(elements.low_temperature_heating, None);
+    }
+
+    /// Art. 5.13a lid 1 onder k en l: the adviser's statements in the
+    /// registration reach the label elements; an unanswered one stays `None`.
+    #[test]
+    fn label_elements_k_and_l_come_from_the_registration() {
+        let mut value: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-example-terraced-dwelling.json"
+        ))
+        .unwrap();
+        value["registration"] = serde_json::json!({
+            "labelStatements": {
+                "respondsToExternalSignals": false,
+                "lowTemperatureHeating": true
+            }
+        });
+        let result = assess_project_performance(&value);
+        let elements = &result
+            .label_data
+            .as_ref()
+            .unwrap()
+            .indicators
+            .as_ref()
+            .unwrap()
+            .elements;
+        assert_eq!(elements.responds_to_external_signals, Some(false));
+        assert_eq!(elements.low_temperature_heating, Some(true));
+        value["registration"]["labelStatements"] =
+            serde_json::json!({ "respondsToExternalSignals": true });
+        let result = assess_project_performance(&value);
+        let elements = &result
+            .label_data
+            .as_ref()
+            .unwrap()
+            .indicators
+            .as_ref()
+            .unwrap()
+            .elements;
+        assert_eq!(elements.responds_to_external_signals, Some(true));
         assert_eq!(elements.low_temperature_heating, None);
     }
 
@@ -4818,6 +5901,186 @@ mod tests {
         assert!(plausibility_warnings(&dwelling).is_empty());
     }
 
+    /// Review 9 October 2026: a refused route in the second zone, or in an
+    /// additional heating system, has to land on the project input that
+    /// feeds it, not on the first zone's or the project's.
+    #[test]
+    fn refusal_paths_follow_zones_floors_and_systems() {
+        let mut value = project();
+        let mut second = value["zones"][0].clone();
+        second["id"] = Value::from("z2");
+        second["floorArea"] = Value::from(50.0);
+        for surface in second["surfaces"].as_array_mut().unwrap() {
+            let id = surface["id"].as_str().unwrap().to_owned();
+            surface["id"] = Value::from(format!("{id}-2"));
+            surface["zoneId"] = Value::from("z2");
+            for window in surface["windows"].as_array_mut().unwrap() {
+                let window_id = window["id"].as_str().unwrap().to_owned();
+                window["id"] = Value::from(format!("{window_id}-2"));
+            }
+        }
+        for bridge in second["thermalBridges"].as_array_mut().unwrap() {
+            bridge["id"] = Value::from("tb1-2");
+            bridge["zoneId"] = Value::from("z2");
+        }
+        value["zones"].as_array_mut().unwrap().push(second);
+        let block = &mut value["ntaCalculation"];
+        // z1 takes emission and thermal mass from the project block, z2 from
+        // its own entry; both have their own internal gains.
+        let mut z1 = serde_json::json!({
+            "zoneId": "z1",
+            "verticalPipes": [],
+            "ventilationFlows": block["ventilationFlows"].clone(),
+            "internalGains": block["internalGains"].clone()
+        });
+        let mut z2 = z1.clone();
+        z2["zoneId"] = Value::from("z2");
+        z2["emission"] = block["emission"].clone();
+        z2["thermalMass"] = block["thermalMass"].clone();
+        z1["zoneId"] = Value::from("z1");
+        block["zoneData"] = serde_json::json!([z1, z2]);
+        block["surfaceTilts"].as_array_mut().unwrap().push(
+            serde_json::json!({"surfaceId": "roof-2", "tiltDeg": 45.0, "sourceReference": "copy"}),
+        );
+        // The floor of z2 is listed first, so its derived index (0 in z2)
+        // differs from its project index (0 here, z1's floor at 1).
+        let mut floor = block["groundFloors"][0].clone();
+        floor["surfaceId"] = Value::from("floor-2");
+        block["groundFloors"]
+            .as_array_mut()
+            .unwrap()
+            .insert(0, floor);
+        let window_two = value["zones"][1]["surfaces"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .enumerate()
+            .find_map(|(surface, item)| {
+                item["windows"]
+                    .as_array()
+                    .filter(|windows| !windows.is_empty())
+                    .map(|windows| (surface, windows[0]["id"].as_str().unwrap().to_owned()))
+            })
+            .unwrap();
+        value["ntaCalculation"]["windowObstructions"] = serde_json::json!([{
+            "windowId": window_two.1,
+            "obstruction": {"method": "minimal"},
+            "sourceReference": "test"
+        }]);
+        let mut gaps = Vec::new();
+        let derived = derive_input(&value, &mut gaps).unwrap_or_else(|| panic!("{gaps:?}"));
+        assert_eq!(
+            derived.space_heating.additional_zones[0].demand.zone_id,
+            "z2"
+        );
+        let floor_z1 = value["ntaCalculation"]["groundFloors"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .position(|item| item["surfaceId"] != "floor-2")
+            .unwrap();
+        let window_in_z2 = derived.space_heating.additional_zones[0]
+            .demand
+            .windows
+            .iter()
+            .position(|item| item.id == format!("window:{}", window_two.1))
+            .unwrap();
+        for (path, expected) in [
+            (
+                "spaceHeating.additionalZones[0].demand.transmission.groundFloors[0].heatedBasement"
+                    .to_string(),
+                "ntaCalculation.groundFloors[0].heatedBasement".to_string(),
+            ),
+            (
+                "spaceHeating.demand.transmission.groundFloors[0].heatedBasement".to_string(),
+                format!("ntaCalculation.groundFloors[{floor_z1}].heatedBasement"),
+            ),
+            (
+                "spaceHeating.additionalZones[0].emission.fans".to_string(),
+                "ntaCalculation.zoneData[1].emission.fans".to_string(),
+            ),
+            (
+                "spaceHeating.emission.fans".to_string(),
+                "ntaCalculation.emission.fans".to_string(),
+            ),
+            (
+                "spaceHeating.additionalZones[0].demand.internalGains.lighting".to_string(),
+                "ntaCalculation.zoneData[1].internalGains.lighting".to_string(),
+            ),
+            (
+                "spaceHeating.demand.internalGains.lighting".to_string(),
+                "ntaCalculation.zoneData[0].internalGains.lighting".to_string(),
+            ),
+            (
+                "spaceHeating.additionalZones[0].demand.thermalMass".to_string(),
+                "ntaCalculation.zoneData[1].thermalMass".to_string(),
+            ),
+            (
+                "spaceHeating.demand.thermalMass".to_string(),
+                "ntaCalculation.thermalMass".to_string(),
+            ),
+            (
+                "spaceHeating.demand.transmission.verticalPipes[0]".to_string(),
+                "ntaCalculation.zoneData[0].verticalPipes[0]".to_string(),
+            ),
+            (
+                format!("spaceHeating.additionalZones[0].demand.windows[{window_in_z2}].obstruction.method"),
+                "ntaCalculation.windowObstructions[0].obstruction.method".to_string(),
+            ),
+            (
+                format!("spaceHeating.additionalZones[0].demand.windows[{window_in_z2}].gPerpendicular"),
+                format!("zones[1].surfaces[{}].windows[0].gValue", window_two.0),
+            ),
+            (
+                "spaceHeating.demand.windows[0].obstruction".to_string(),
+                "ntaCalculation.windowSolar.obstruction".to_string(),
+            ),
+            (
+                "spaceHeating.demand.windows[0].frameFraction".to_string(),
+                "ntaCalculation.windowSolar.frameFraction".to_string(),
+            ),
+        ] {
+            assert_eq!(project_path_for_derived(&path, &derived, &value), expected, "{path}");
+        }
+        // An additional heating system serving z2 has its own collective
+        // connection and number of identical systems.
+        value["ntaCalculation"]["additionalHeatingSystems"] = serde_json::json!([{
+            "zoneIds": ["z2"],
+            "generator": value["ntaCalculation"]["generator"].clone(),
+            "identicalSystems": 2
+        }]);
+        let mut gaps = Vec::new();
+        let derived = derive_input(&value, &mut gaps).unwrap_or_else(|| panic!("{gaps:?}"));
+        for (path, expected) in [
+            (
+                "additionalHeatingSystems[0].identicalSystems",
+                "ntaCalculation.additionalHeatingSystems[0].identicalSystems",
+            ),
+            (
+                "additionalHeatingSystems[0].collectiveConnection.x",
+                "ntaCalculation.additionalHeatingSystems[0].collectiveConnection.x",
+            ),
+            (
+                "additionalHeatingSystems[0].demand.transmission.groundFloors[0]",
+                "ntaCalculation.groundFloors[0]",
+            ),
+            (
+                "additionalHeatingSystems[0].emission.fans",
+                "ntaCalculation.zoneData[1].emission.fans",
+            ),
+            (
+                "spaceHeating.identicalSystems",
+                "ntaCalculation.identicalSystems",
+            ),
+        ] {
+            assert_eq!(
+                project_path_for_derived(path, &derived, &value),
+                expected,
+                "{path}"
+            );
+        }
+    }
+
     #[test]
     fn two_zones_need_zone_data_and_sum_areas() {
         let mut value = project();
@@ -5329,5 +6592,119 @@ mod blank_fuzz {
             0x2545_F491_4F6C_DD1D,
             300,
         );
+    }
+}
+
+#[cfg(test)]
+mod refusal_gaps {
+    use super::*;
+
+    fn office() -> Value {
+        serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-example-office.json"
+        ))
+        .unwrap()
+    }
+
+    fn office_in(edition: &str) -> ProjectPerformanceAssessment {
+        let mut office = office();
+        office["ntaCalculation"]["normVersion"] = Value::from(edition);
+        assess_project_performance(&office)
+    }
+
+    /// A route the edition lacks refuses the building calculation; the
+    /// project names it as a gap at the project input, not only in
+    /// `performance.issues`.
+    #[test]
+    fn refused_routes_are_project_gaps() {
+        let result = office_in("2020+A1");
+        assert_eq!(result.status, "invalid");
+        let found: Vec<(&str, &str, Option<&str>)> = result
+            .gaps
+            .iter()
+            .map(|gap| (gap.code, gap.path.as_str(), gap.detail.as_deref()))
+            .collect();
+        for expected in [
+            (
+                "route_not_in_edition",
+                "ntaCalculation.lighting[0].lightingZones[0].power.ledFrom2017",
+            ),
+            (
+                "route_not_in_edition",
+                "ntaCalculation.pvSystems[0].peakPower.panelPeakPowerW",
+            ),
+            (
+                "lighting_gain_requires_chapter_14",
+                "ntaCalculation.internalGains.lighting",
+            ),
+        ] {
+            assert!(
+                found
+                    .iter()
+                    .any(|(code, path, _)| (*code, *path) == expected),
+                "{expected:?} in {found:?}"
+            );
+        }
+        // The derived path stays in the detail.
+        assert!(found.iter().any(|(_, _, detail)| *detail
+            == Some("derivedInput.spaceHeating.demand.internalGains.lighting")));
+        // A calculated result gets no gaps from the building issues.
+        assert!(office_in("2025+C1").status.starts_with("calculated"));
+    }
+
+    #[test]
+    fn derived_paths_map_to_their_project_input() {
+        let project = office();
+        let mut gaps = Vec::new();
+        let derived = derive_input(&project, &mut gaps).unwrap();
+        let zone = &derived.space_heating.demand.zone_id;
+        let zone_index = project["zones"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .position(|item| item["id"].as_str() == Some(zone))
+            .unwrap();
+        for (path, expected) in [
+            (
+                "spaceHeating.generator.boiler.x",
+                "ntaCalculation.generator.boiler.x".to_string(),
+            ),
+            (
+                "spaceHeating.emission.fans",
+                "ntaCalculation.emission.fans".to_string(),
+            ),
+            (
+                "spaceHeating.distributionSystem.pump",
+                "ntaCalculation.distributionSystem.pump".to_string(),
+            ),
+            (
+                "spaceHeating.demand.thermalMass",
+                "ntaCalculation.thermalMass".to_string(),
+            ),
+            (
+                "spaceHeating.demand.transmission.groundFloors[0].heatedBasement",
+                "ntaCalculation.groundFloors[0].heatedBasement".to_string(),
+            ),
+            (
+                "spaceHeating.demand.transmission.elements[3]",
+                format!("zones[{zone_index}].surfaces"),
+            ),
+            (
+                "spaceHeating.demand.windows[1].movableShading",
+                "ntaCalculation.windowSolar.movableShading".to_string(),
+            ),
+            (
+                "hotWater.generator",
+                "ntaCalculation.hotWater.generator".to_string(),
+            ),
+            ("totalUsableFloorAreaM2", "zones".to_string()),
+            ("notAProjectMember", "ntaCalculation".to_string()),
+        ] {
+            assert_eq!(
+                project_path_for_derived(path, &derived, &project),
+                expected,
+                "{path}"
+            );
+        }
     }
 }

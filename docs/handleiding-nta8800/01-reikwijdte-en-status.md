@@ -2,7 +2,7 @@
 
 ## Wat het programma berekent
 
-De rekenkern (`crates/nta8800-core`, Rust) rekent de energieprestatie volgens **NTA 8800:2025+C1:2026**. Dat gaat van invoer tot indicatoren:
+De rekenkern (`crates/nta8800-core`, Rust) rekent de energieprestatie volgens **NTA 8800:2025+C1:2026**, de aangewezen uitgave. Ter vergelijking kan een project ook in NTA 8800:2024, 2023, 2022 of 2020+A1 rekenen; zo'n uitkomst is niet registreerbaar (zie [hoofdstuk 10](10-normversies.md)). Dat gaat van invoer tot indicatoren:
 
 | Onderdeel | Normbasis |
 |---|---|
@@ -39,7 +39,7 @@ Daarnaast bevat het programma:
 
 **Afhankelijk van externe gegevens die niet beschikbaar zijn**
 - Uurwaarden van het klimaat voor §17.3.8. Belemmeringsfactoren worden daarom als opgegeven waarden aanvaard.
-- NEN-EN-ISO 6946 tabel 8, voor luchtspouwen dunner dan 20 mm. Geef zo'n laag op als R-waarde.
+- Luchtspouwen dunner dan 20 mm die zwak geventileerd zijn of een werkzame reflecterende laag hebben. Geef zo'n laag op als R-waarde met bron. Een niet-geventileerde dunne spouw zonder reflecterende laag rekent het programma zelf (bijlage D.2 van NEN-EN-ISO 6946, zie de [constructies](../nta8800-constructies.md)).
 - De kostenmodelbeschrijving van ISSO (rapport 110293) en een locatieklimaat voor het maatwerkadvies.
 - Het uitwisselformaat (XSD) van EP-Online voor registratie. Het programma registreert niet zelf.
 - Officiële referentiegevallen: de EDR-testen van ISSO-publicatie 54 versie 5.0:2026, de testset waar BRL 9501 naar verwijst, met hun verwachte uitkomsten.
@@ -47,7 +47,7 @@ Daarnaast bevat het programma:
 ## Attesteringsstatus
 
 - Het programma heeft **geen BRL 9501-attest**. De uitvoer draagt `attestStatus: "unattested"`.
-- Elke berekening krijgt de status `calculated_unverified`. Er is nog geen toets tegen officiële referentiegevallen.
+- Elke berekening krijgt de status `calculated_unverified`, of `calculated_legacy_edition` in een oudere uitgave. Er is nog geen toets tegen officiële referentiegevallen; wel is de kern per uitgave vergeleken met openbare BENG-rapporten ([`docs/nta8800-vergelijking-openbare-rapporten.md`](../nta8800-vergelijking-openbare-rapporten.md)).
 - `readyForRegistration` blijft onwaar tot er een attestnummer is ingevuld (`SOFTWARE_ATTEST_NUMBER` in `src/core/nta/Registration.ts`). De uitvoer toont los daarvan of het dossier compleet is (`dossierComplete`).
 - De kern is wel onafhankelijk nagerekend: met eigen implementaties vanuit de normpagina's en per maand vergeleken. De stand staat in [`docs/nta8800-verificatiestatus.md`](../nta8800-verificatiestatus.md).
 - Waar de norm onduidelijk of strijdig is, legt de kern de gekozen lezing vast. Die lezingen staan in de bijlage "Interpretaties" van het rekenrapport (zie [hoofdstuk 4](04-uitvoer.md)).

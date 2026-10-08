@@ -110,6 +110,14 @@ pub enum CoolingCapacityEvidence {
     AnnexAa {
         #[serde(default)]
         calculation: Option<AnnexAaInput>,
+        /// One calculation per cooled rekenzone (annex AA is determined per
+        /// rekenzone, 2025+C1 p. 1135), each naming its `zoneId`.
+        #[serde(
+            default,
+            rename = "zoneCalculations",
+            skip_serializing_if = "Vec::is_empty"
+        )]
+        zone_calculations: Vec<AnnexAaInput>,
         #[serde(rename = "sourceReference")]
         source_reference: String,
     },
@@ -153,6 +161,9 @@ pub struct TojuliOptions<'a> {
     pub heating_recoverable_july_kwh: f64,
     /// Step B: July `Q_C;ls;rbl` (10.2) of the zone, kWh.
     pub cooling_recoverable_july_kwh: f64,
+    /// Number of zones the active-cooling evidence covers; with more than
+    /// one, an annex AA calculation is selected by its `zoneId`.
+    pub cooled_zone_count: usize,
 }
 
 impl Default for TojuliOptions<'_> {
@@ -163,6 +174,7 @@ impl Default for TojuliOptions<'_> {
             booster_heat_pump_july_kwh: 0.0,
             heating_recoverable_july_kwh: 0.0,
             cooling_recoverable_july_kwh: 0.0,
+            cooled_zone_count: 1,
         }
     }
 }
@@ -379,6 +391,43 @@ fn assign_bridge(
     }
 }
 
+/// The annex AA calculation of one rekenzone (2025+C1 p. 1135) and its
+/// input path. With one cooled zone a single calculation applies; with more,
+/// each zone takes the calculation that names it. Ids that name no cooled
+/// zone, duplicates and missing ids are refused for the whole project in
+/// `building_performance`.
+fn select_annex_aa<'a>(
+    calculation: Option<&'a AnnexAaInput>,
+    zone_calculations: &'a [AnnexAaInput],
+    zone_id: &str,
+    cooled_zone_count: usize,
+) -> Result<(&'a AnnexAaInput, String), &'static str> {
+    let all: Vec<(&AnnexAaInput, String)> = calculation
+        .map(|aa| (aa, "activeCooling.capacity.calculation".to_string()))
+        .into_iter()
+        .chain(zone_calculations.iter().enumerate().map(|(index, aa)| {
+            (
+                aa,
+                format!("activeCooling.capacity.zoneCalculations[{index}]"),
+            )
+        }))
+        .collect();
+    if let Some(found) = all
+        .iter()
+        .find(|(aa, _)| aa.zone_id.as_deref() == Some(zone_id))
+    {
+        return Ok(found.clone());
+    }
+    if cooled_zone_count <= 1 && all.len() == 1 && all[0].0.zone_id.is_none() {
+        return Ok(all[0].clone());
+    }
+    Err(if cooled_zone_count > 1 {
+        "annex_aa_zone_calculation_required"
+    } else {
+        "annex_aa_calculation_required"
+    })
+}
+
 pub fn assess_tojuli(input: &MonthlyDemandInput, options: TojuliOptions<'_>) -> TojuliAssessment {
     let has_active = options.active_cooling.is_some();
     let demand = assess_monthly_demand(input);
@@ -398,15 +447,35 @@ pub fn assess_tojuli(input: &MonthlyDemandInput, options: TojuliOptions<'_>) -> 
         let mut issues =
             validate_active_cooling(evidence, input, options.residential, "activeCooling");
         let mut annex_aa = None;
-        if let CoolingCapacityEvidence::AnnexAa { calculation, .. } = &evidence.capacity {
-            match calculation {
-                None => issues.push(issue(
-                    "annex_aa_calculation_required",
-                    "activeCooling.capacity.calculation",
-                )),
-                Some(aa) => {
-                    match assess_annex_aa(aa, input, &demand, "activeCooling.capacity.calculation")
-                    {
+        if let CoolingCapacityEvidence::AnnexAa {
+            calculation,
+            zone_calculations,
+            ..
+        } = &evidence.capacity
+        {
+            // 5.7.1 of NTA 8800:2023 (p. 103–104) has no annex AA.
+            if !crate::norm_versions::profile().annex_aa_route {
+                issues.push(issue(
+                    "route_not_in_edition",
+                    "activeCooling.capacity.method",
+                ));
+            }
+            match select_annex_aa(
+                calculation.as_ref(),
+                zone_calculations,
+                &input.zone_id,
+                options.cooled_zone_count,
+            ) {
+                Err(code) => issues.push(TojuliIssue {
+                    code,
+                    path: if options.cooled_zone_count > 1 {
+                        "activeCooling.capacity.zoneCalculations".into()
+                    } else {
+                        "activeCooling.capacity.calculation".into()
+                    },
+                }),
+                Ok((aa, path)) => {
+                    match assess_annex_aa(aa, input, &demand, &path) {
                         Err(found) => issues.extend(found.into_iter().map(|item| TojuliIssue {
                             code: item.code,
                             path: item.path,
@@ -655,6 +724,37 @@ pub fn assess_tojuli(input: &MonthlyDemandInput, options: TojuliOptions<'_>) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 5.7.1 of NTA 8800:2023 (p. 103–104) has no annex AA; 2024 p. 106
+    /// and annex AA (p. 1115–1127) do.
+    #[test]
+    fn annex_aa_capacity_proof_is_not_in_2023() {
+        use crate::norm_versions::{with_version, NormVersion};
+        let input = demand();
+        let aa = evidence(CoolingCapacityEvidence::AnnexAa {
+            calculation: None,
+            zone_calculations: Vec::new(),
+            source_reference: "annex AA".into(),
+        });
+        let run = |version| {
+            with_version(version, || {
+                assess_tojuli(
+                    &input,
+                    TojuliOptions {
+                        active_cooling: Some(&aa),
+                        ..TojuliOptions::default()
+                    },
+                )
+            })
+        };
+        let refused = |result: &TojuliAssessment| {
+            result.issues.iter().any(|item| {
+                item.code == "route_not_in_edition" && item.path == "activeCooling.capacity.method"
+            })
+        };
+        assert!(refused(&run(NormVersion::V2023)));
+        assert!(!refused(&run(NormVersion::V2024)));
+    }
     use crate::direct_transmission::LinearBridge;
     use crate::project_performance::assess_project_performance;
     use serde_json::Value;
@@ -835,6 +935,7 @@ mod tests {
         let input = demand();
         let mut aa = evidence(CoolingCapacityEvidence::AnnexAa {
             calculation: None,
+            zone_calculations: Vec::new(),
             source_reference: "annex AA".into(),
         });
         let options = |aa: &ActiveCoolingEvidence| -> TojuliAssessment {
@@ -850,6 +951,7 @@ mod tests {
         assert_eq!(missing.issues[0].code, "annex_aa_calculation_required");
         let window = input.windows[0].id.clone();
         let calculation = |capacity: f64| crate::annex_aa::AnnexAaInput {
+            zone_id: None,
             construction_year: 2020,
             post_insulated: false,
             generator_capacity_kw: Some(capacity),
@@ -869,6 +971,7 @@ mod tests {
         };
         aa.capacity = CoolingCapacityEvidence::AnnexAa {
             calculation: Some(calculation(100.0)),
+            zone_calculations: Vec::new(),
             source_reference: "annex AA".into(),
         };
         let passed = options(&aa);
@@ -884,6 +987,7 @@ mod tests {
         small.rooms[0].area_m2 = 2.0;
         aa.capacity = CoolingCapacityEvidence::AnnexAa {
             calculation: Some(small),
+            zone_calculations: Vec::new(),
             source_reference: "annex AA".into(),
         };
         // §5.7.1 (p. 115): insufficient capacity is one of "alle andere
@@ -909,6 +1013,7 @@ mod tests {
         derived.windows[0].id = format!("window:{window}");
         aa.capacity = CoolingCapacityEvidence::AnnexAa {
             calculation: Some(calculation(100.0)),
+            zone_calculations: Vec::new(),
             source_reference: "annex AA".into(),
         };
         let resolved = assess_tojuli(

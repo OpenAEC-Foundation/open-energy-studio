@@ -50,4 +50,79 @@ pub(super) const PROFILE: NormProfile = NormProfile {
     wide_collective_low_temperature_sources: true,
     // Tables 5.2/5.4 (p. 94–100).
     biomass_threshold_kw: 500.0,
+    // Below: unchanged since 2024; pages of the 2024 edition.
+    // Table 13.2 (2024 p. 527): only the "overig" kitchen row.
+    kitchen_diameter_rows: false,
+    // Table 11.7 (2024 p. 449).
+    tau_ventilative_cooling: crate::ventilation::TAU_VENTILATIVE_COOLING,
+    // 11.2.3.3.1 (2024 p. 461).
+    ventilative_cooling_operation: [0.35, 0.50],
+    // (11.71a) (2024 p. 460–461).
+    discharge_opening_route: true,
+    // Table 11.8 (2024 p. 455).
+    dwelling_occupancy_factor: None,
+    // Table 17.1 (2024 p. 674).
+    argii_temperature_c: crate::climate::ARGII_TEMPERATURE_C,
+    // 11.3.2.7 (2024 p. 491).
+    fan_temperature_rise_k: [0.7, 0.4, 0.7],
+    // Table I.1 detail 17 (2024 p. 803).
+    psi_detail_17: [0.06, 0.09],
+    // Table E.10 (2024 p. 790).
+    wood_fibre_cellulose_lambda: 0.045,
+    // (P.25) (2024 p. 948).
+    reference_power_divisor: crate::annex_p::REFERENCE_POWER_DIVISOR,
+    // P.6.5.4.8 (2024 p. 958) with the temperature-difference correction.
+    geothermal_efficiency_fixed: false,
+    // Annex AA (2024 p. 1115–1127).
+    annex_aa_route: true,
+    // Table 5.7 (2024 p. 74).
+    renovation_standard: true,
+    // Table 14.3 (2024 p. 646).
+    led_2017_column: true,
+    // (8.17)/(8.18) with glazing bars (2024 p. 219–222).
+    glazing_bar_term: true,
+    dwelling_shading_heating_off: true,
+    residual_heat_pren_primary: false,
+    rooflight_route: true,
+    panel_build_year_tables: false,
+    unspecified_screen_factor: 0.3,
+    cross_area_roof_all_sectors: true,
+    distribution_2024_rules: true,
+    table_9_16_combined_rows: true,
+    distribution_half_recoverable_route: false,
+    table_13_4_system_rows: false,
+    hot_water_series_routes: true,
+    emission_tables_2023: false,
+    cooling_emission_tables_2023: false,
+    // From 2023 on; the 2022 values and both pages are in v2022.rs.
+    heat_pump_tables_2022: false,
+    flex_mode_route: true,
+    preference_beta_building_share: true,
+    design_classes_60_and_70: true,
+    tested_emission_fan_power: true,
+    unknown_shade_colour_rows: true,
+    thermal_mass_by_kg_per_m2: false,
+    crawl_wall_height_fixed: true,
+    mineral_wool_flakes_ageing: 1.00,
+    lambda_equi_ntr: 0.045,
+    lambda_equi_known_route: true,
+    swimming_pool_route: true,
+    en_13053_route: true,
+    electric_boiler_insulated_pipe_factor: false,
+    storage_ambient_exhaust_air: true,
+    mixed_air_route: true,
+    lighting_maintenance_factor: false,
+    pv_kpk_per_m2_floor: false,
+    residual_heat_fixed_factors: false,
+    small_system_forfait_route: true,
+    unknown_beta_route: true,
+    device_aux_a_from_2015_kwh: 43.8,
+    heat_pump_aux_constants: true,
+    fan_systype_combined: None,
+    psi_columns_and_default: true,
+    psi_detail_14: 0.03,
+    residential_actual_pipe_length: true,
+    declared_exhaust_air_flow_route: true,
+    cold_recovery_route: true,
+    heat_pump_high_test_standard: "NEN-EN 14511-2:2022",
 };

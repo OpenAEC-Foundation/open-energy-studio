@@ -45,6 +45,7 @@ function UnitFields({ draft, change, path }: SectionProps & { path: Path }) {
   const op = ventilationOp(unit.variant);
   const recovery = read(draft, [...path, 'heatRecovery']) as Draft | undefined;
   const ahu = read(draft, [...path, 'airHandlingUnit']) as Draft | undefined;
+  const declared = read(draft, [...path, 'declaredControlFactor']) as Draft | undefined;
   const efficiencyMethod = read(draft, [...path, 'heatRecovery', 'efficiency', 'method']);
   const bypass = read(draft, [...path, 'heatRecovery', 'bypass', 'kind']);
   const insulation = read(draft, [...path, 'heatRecovery', 'supplyDuctInsulation', 'kind']);
@@ -56,6 +57,19 @@ function UnitFields({ draft, change, path }: SectionProps & { path: Path }) {
       ['unknown', t('nta.vent.ducts.unknown')], ['luka_a_b_c', t('nta.vent.ducts.abc')], ['luka_d', t('nta.vent.ducts.d')],
       ['no_ducts', t('nta.vent.ducts.none')]]} />}
     <TextField {...field} path={[...path, 'equipmentReference']} label={t('nta.form.boilerEquipmentSource')} />
+    {/* E.1 fixes f_ctrl of the decentral D.5b part (11.51/11.52). */}
+    {unit.variant != null && path[path.length - 1] !== 'decentral' && <label className="nta-form-check">
+      <input type="checkbox" checked={declared != null}
+        onChange={(event) => change([...path, 'declaredControlFactor'],
+          event.target.checked ? { value: null, declarationReference: '' } : undefined)} />
+      {t('nta.form.ventilation.declaredControlFactor')}
+    </label>}
+    {declared != null && <>
+      <p className="nta-form-note">{t('nta.form.ventilation.declaredControlFactorHelp')}</p>
+      <NumberField {...field} path={[...path, 'declaredControlFactor', 'value']} label="f_ctrl" />
+      <TextField {...field} path={[...path, 'declaredControlFactor', 'declarationReference']}
+        label={t('nta.form.ventilation.declarationReference')} />
+    </>}
     {op === 'balanced' && <label className="nta-form-check">
       <input type="checkbox" checked={recovery != null}
         onChange={(event) => change([...path, 'heatRecovery'], event.target.checked ? heatRecoveryTemplate() : undefined)} />

@@ -26,6 +26,8 @@ pub mod ventilation;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
+use crate::norm_versions::{self, NormVersion};
+
 use crate::building_performance::{
     assess_building_performance, BuildingPerformanceAssessment, BuildingPerformanceInput,
 };
@@ -253,6 +255,11 @@ pub(crate) fn vertical_pipes(
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ResidentialSurvey {
     pub id: String,
+    /// NTA 8800 edition to calculate with; default 2025+C1:2026. The ISSO
+    /// survey protocol is always the 2025 edition, so an older edition gives
+    /// a comparison only (`survey_protocol_edition_differs`).
+    #[serde(default, skip_serializing_if = "NormVersion::is_default")]
+    pub norm_version: NormVersion,
     /// Year of the permit application, else of granting, else of
     /// completion (p. 52).
     pub construction_year: i32,
@@ -311,6 +318,12 @@ pub struct OpnameAssessment {
     pub status: &'static str,
     pub scope: &'static str,
     pub source: &'static str,
+    /// Label of the NTA 8800 edition the survey was calculated with.
+    pub target_norm_version: &'static str,
+    /// Edition the survey was calculated with.
+    pub norm_version: NormVersion,
+    /// Only a 2025+C1:2026 calculation may be registered.
+    pub registration_eligible: bool,
     pub applied_defaults: Vec<AppliedDefault>,
     pub warnings: Vec<OpnameWarning>,
     pub issues: Vec<OpnameIssue>,
@@ -447,7 +460,70 @@ pub(crate) fn validate_vertical_pipe_counts(
     }
 }
 
+/// The optional ids of one survey list (`list` is its path): a given id is
+/// not blank and names one item only, so an evidence or photo link by id
+/// (`/…/@id`) finds exactly that item. Ids are not used in the calculation.
+pub(crate) fn validate_item_ids<'a>(
+    ids: impl IntoIterator<Item = Option<&'a str>>,
+    list: &str,
+    recorder: &mut Recorder,
+) {
+    let mut seen: Vec<&str> = Vec::new();
+    for (index, id) in ids.into_iter().enumerate() {
+        let Some(id) = id else { continue };
+        if id.trim().is_empty() {
+            recorder.issue("survey_item_id_blank", format!("{list}[{index}].id"));
+        } else if seen.contains(&id) {
+            recorder.issue("survey_item_id_duplicate", format!("{list}[{index}].id"));
+        } else {
+            seen.push(id);
+        }
+    }
+}
+
+/// The ids of the survey lists without a natural key: further heating and
+/// hot-water generators and further hot-water systems.
+fn validate_residential_item_ids(survey: &ResidentialSurvey, recorder: &mut Recorder) {
+    validate_item_ids(
+        survey
+            .heating
+            .additional_generators
+            .iter()
+            .map(|item| item.id.as_deref()),
+        "heating.additionalGenerators",
+        recorder,
+    );
+    validate_item_ids(
+        survey
+            .hot_water
+            .additional_generators
+            .iter()
+            .map(|item| item.id.as_deref()),
+        "hotWater.additionalGenerators",
+        recorder,
+    );
+    validate_item_ids(
+        survey
+            .additional_hot_water_systems
+            .iter()
+            .map(|item| item.id.as_deref()),
+        "additionalHotWaterSystems",
+        recorder,
+    );
+    for (index, system) in survey.additional_hot_water_systems.iter().enumerate() {
+        validate_item_ids(
+            system
+                .additional_generators
+                .iter()
+                .map(|item| item.id.as_deref()),
+            &format!("additionalHotWaterSystems[{index}].additionalGenerators"),
+            recorder,
+        );
+    }
+}
+
 fn validate(survey: &ResidentialSurvey, recorder: &mut Recorder) {
+    validate_residential_item_ids(survey, recorder);
     if survey.id.trim().is_empty() {
         recorder.issue("survey_id_required", "id");
     }
@@ -866,23 +942,17 @@ pub fn derive_residential_input(
     Some(input)
 }
 
-/// Survey → kernel input → building performance.
+/// Survey → kernel input → building performance, in the survey's edition.
 pub fn assess_residential_survey(survey: &ResidentialSurvey) -> OpnameAssessment {
+    norm_versions::with_version(survey.norm_version, || {
+        assess_residential_in_edition(survey)
+    })
+}
+
+fn assess_residential_in_edition(survey: &ResidentialSurvey) -> OpnameAssessment {
     let mut recorder = Recorder::default();
     let derived = derive_residential_input(survey, &mut recorder);
-    let derived_input =
-        derived.and_then(
-            |value| match serde_json::from_value::<BuildingPerformanceInput>(value) {
-                Ok(input) => Some(input),
-                Err(error) => {
-                    recorder.issues.push(OpnameIssue {
-                        code: "derived_input_shape_invalid",
-                        path: error.to_string(),
-                    });
-                    None
-                }
-            },
-        );
+    let derived_input = parse_derived_input(derived, survey.norm_version, &mut recorder);
     let performance = derived_input.as_ref().map(assess_building_performance);
     let status = match &performance {
         Some(result) if result.status == "calculated_unverified" => "calculated_unverified",
@@ -891,10 +961,14 @@ pub fn assess_residential_survey(survey: &ResidentialSurvey) -> OpnameAssessment
     };
     surface_rejection(status, performance.as_ref(), &mut recorder.issues);
     apply_collapse_reasons(&mut recorder, &survey.collapse_reasons);
+    let status = edition_status(status, survey.norm_version, &mut recorder);
     refuse_non_finite(OpnameAssessment {
         status,
         scope: "isso_82_1_basisopname_residential_unverified",
         source: ISSO_SOURCE,
+        target_norm_version: survey.norm_version.label(),
+        norm_version: survey.norm_version,
+        registration_eligible: survey.norm_version.registration_eligible(),
         applied_defaults: recorder.applied,
         warnings: recorder.warnings,
         issues: recorder.issues,
@@ -902,6 +976,53 @@ pub fn assess_residential_survey(survey: &ResidentialSurvey) -> OpnameAssessment
         performance,
         reference_verified: false,
     })
+}
+
+/// Parses the derived kernel input, carrying the survey's edition into it
+/// (the building route applies the edition of its own input).
+pub(crate) fn parse_derived_input(
+    derived: Option<Value>,
+    version: NormVersion,
+    recorder: &mut Recorder,
+) -> Option<BuildingPerformanceInput> {
+    derived.and_then(|mut value| {
+        if !version.is_default() {
+            value["normVersion"] = json!(version);
+        }
+        match serde_json::from_value::<BuildingPerformanceInput>(value) {
+            Ok(input) => Some(input),
+            Err(error) => {
+                recorder.issues.push(OpnameIssue {
+                    code: "derived_input_shape_invalid",
+                    path: error.to_string(),
+                });
+                None
+            }
+        }
+    })
+}
+
+/// A survey in an older edition: the ISSO 82.1/75.1 protocol (7e druk,
+/// 2025) belongs to 2025+C1, so the result is a comparison only. A
+/// calculation keeps the legacy status and is never registrable.
+pub(crate) fn edition_status(
+    status: &'static str,
+    version: NormVersion,
+    recorder: &mut Recorder,
+) -> &'static str {
+    if version.is_default() {
+        return status;
+    }
+    recorder.warning(
+        "survey_protocol_edition_differs",
+        "normVersion",
+        "the ISSO survey protocol (7e druk, 2025) belongs to NTA 8800:2025+C1; a survey calculated in an older edition is for comparison only and cannot be registered",
+    );
+    if status == "calculated_unverified" {
+        "calculated_legacy_edition"
+    } else {
+        status
+    }
 }
 
 /// A survey whose derived input the kernel refuses must say why: when the
@@ -1254,6 +1375,8 @@ mod tests {
             source_temperature_c: None,
             source_temperature_reference: None,
             source_quality_declaration_reference: None,
+            manufacture_year: None,
+            installation_year: None,
         }
     }
 
@@ -1273,6 +1396,7 @@ mod tests {
         survey.heating.generator = boiler();
         survey.heating.nominal_power_kw = Some(24.0);
         survey.heating.additional_generators = vec![heating::AdditionalHeatingGenerator {
+            id: None,
             generator: heat_pump(heating::HeatPumpSource::OutdoorAir),
             nominal_power_kw: Some(4.0),
         }];
@@ -1314,6 +1438,46 @@ mod tests {
             .any(|item| item.code == "generator_power_required"));
     }
 
+    /// Ids of further generators are links only: they leave the derived input
+    /// unchanged, a blank or repeated id within one list is an issue.
+    #[test]
+    fn survey_item_ids_are_unique_and_do_not_change_the_calculation() {
+        let mut survey = fixture("1975");
+        survey.heating.generator = boiler();
+        survey.heating.nominal_power_kw = Some(24.0);
+        let extra = |id: Option<&str>| heating::AdditionalHeatingGenerator {
+            id: id.map(str::to_string),
+            generator: heat_pump(heating::HeatPumpSource::OutdoorAir),
+            nominal_power_kw: Some(4.0),
+        };
+        survey.heating.additional_generators = vec![extra(None)];
+        let plain = assess_residential_survey(&survey);
+        survey.heating.additional_generators = vec![extra(Some("wp-1"))];
+        let with_id = assess_residential_survey(&survey);
+        assert_eq!(with_id.status, plain.status);
+        assert_eq!(
+            serde_json::to_value(with_id.derived_input.as_ref().unwrap()).unwrap(),
+            serde_json::to_value(plain.derived_input.as_ref().unwrap()).unwrap()
+        );
+        // The id round-trips through the survey JSON.
+        let json = serde_json::to_value(&survey).unwrap();
+        assert_eq!(json["heating"]["additionalGenerators"][0]["id"], "wp-1");
+        survey.heating.additional_generators = vec![extra(Some("wp-1")), extra(Some("wp-1"))];
+        let repeated = assess_residential_survey(&survey);
+        assert!(repeated
+            .issues
+            .iter()
+            .any(|item| item.code == "survey_item_id_duplicate"
+                && item.path == "heating.additionalGenerators[1].id"));
+        survey.heating.additional_generators = vec![extra(Some(" "))];
+        let blank = assess_residential_survey(&survey);
+        assert!(blank
+            .issues
+            .iter()
+            .any(|item| item.code == "survey_item_id_blank"
+                && item.path == "heating.additionalGenerators[0].id"));
+    }
+
     #[test]
     fn exhaust_air_heat_pump_is_accepted_with_a_second_generator() {
         let mut survey = fixture("2015");
@@ -1325,6 +1489,7 @@ mod tests {
             .any(|item| item.code == "exhaust_air_heat_pump_second_generator_required"));
         survey.heating.nominal_power_kw = Some(1.5);
         survey.heating.additional_generators = vec![heating::AdditionalHeatingGenerator {
+            id: None,
             generator: heating::HeatingGenerator::Electric {
                 connected_devices: 1,
             },
@@ -1526,6 +1691,7 @@ mod tests {
         };
         survey.hot_water.nominal_power_kw = Some(1.5);
         survey.hot_water.additional_generators = vec![hot_water::AdditionalHotWaterAnswer {
+            id: None,
             generator: hot_water::HotWaterGeneratorAnswer::ElectricInstantaneous,
             nominal_power_kw: Some(6.0),
         }];
@@ -1728,6 +1894,8 @@ mod tests {
             source_temperature_c: temperature,
             source_temperature_reference: Some("design data".into()),
             source_quality_declaration_reference: Some("declaration".into()),
+            manufacture_year: None,
+            installation_year: None,
         };
         survey.heating.generator = collective(
             heating::HeatPumpSource::Groundwater,
@@ -1872,6 +2040,8 @@ mod tests {
             source_temperature_c: None,
             source_temperature_reference: None,
             source_quality_declaration_reference: None,
+            manufacture_year: None,
+            installation_year: None,
         };
         // NTA p. 334: the table 9.27 GWP rows cover a collective building
         // installation only; an individual dwelling unit up to 25 kW has no
@@ -2157,5 +2327,76 @@ mod tests {
         }];
         surface_rejection("derived_input_rejected", Some(&performance), &mut own);
         assert_eq!(own.len(), 1);
+    }
+
+    /// The survey follows its edition: 2024 gives the legacy status, the
+    /// protocol warning and a 2024 building run; 2025+C1 is unchanged.
+    #[test]
+    fn survey_is_calculated_in_its_edition() {
+        let current = assess_residential_survey(&fixture("1975"));
+        let mut survey = fixture("1975");
+        survey.norm_version = NormVersion::V2024;
+        let legacy = assess_residential_survey(&survey);
+        assert_eq!(current.status, "calculated_unverified");
+        assert_eq!(current.norm_version, NormVersion::V2025C1);
+        assert!(current.registration_eligible);
+        assert!(!current
+            .warnings
+            .iter()
+            .any(|item| item.code == "survey_protocol_edition_differs"));
+        assert_eq!(
+            legacy.status, "calculated_legacy_edition",
+            "{:?}",
+            legacy.issues
+        );
+        assert_eq!(legacy.norm_version, NormVersion::V2024);
+        assert_eq!(legacy.target_norm_version, "NTA 8800:2024 met INT-V1:2024");
+        assert!(!legacy.registration_eligible);
+        assert!(legacy
+            .warnings
+            .iter()
+            .any(|item| item.code == "survey_protocol_edition_differs"));
+        let input = legacy.derived_input.as_ref().unwrap();
+        assert_eq!(input.norm_version, NormVersion::V2024);
+        let (now, then) = (
+            current.performance.as_ref().unwrap(),
+            legacy.performance.as_ref().unwrap(),
+        );
+        assert_eq!(then.norm_version, NormVersion::V2024);
+        assert!(!then.registration_eligible);
+        // 2025+C1 adds the chapter 5 indicators (EP, final energy).
+        assert!(now.chapter5.is_some());
+        assert!(then.chapter5.is_none());
+        // The serialized survey carries the edition only when it is older.
+        let value = serde_json::to_value(&survey).unwrap();
+        assert_eq!(value["normVersion"], "2024");
+        assert!(serde_json::to_value(fixture("1975"))
+            .unwrap()
+            .get("normVersion")
+            .is_none());
+        // The thread's edition is restored after the run.
+        assert_eq!(norm_versions::current(), NormVersion::V2025C1);
+    }
+
+    /// An edition without a kernel profile is refused with the building
+    /// route's reason.
+    #[test]
+    fn survey_in_unimplemented_edition_is_refused() {
+        let mut survey = fixture("1930");
+        survey.norm_version = NormVersion::V2020A1;
+        let result = assess_residential_survey(&survey);
+        if NormVersion::V2020A1.implemented() {
+            return;
+        }
+        assert_eq!(result.status, "derived_input_rejected");
+        assert!(
+            result
+                .issues
+                .iter()
+                .any(|item| item.code == "edition_not_implemented"),
+            "{:?}",
+            result.issues
+        );
+        assert!(!result.registration_eligible);
     }
 }

@@ -39,6 +39,7 @@ const REGISTRATION_FIELDS: Array<[string, string]> = [
   ['reg.purpose', 'registration.purpose'], ['reg.constructionYear', 'registration.constructionYear'],
   ['reg.messageType', 'registration.messageType'], ['reg.surveyType', 'registration.surveyType'],
   ['reg.advisorName', 'registration.surveyingAdvisor'], ['reg.wlcGwp', 'registration.wlcGwp.valueKgCo2EqPerM2Year'],
+  ['reg.labelStatements', 'registration.labelStatements.respondsToExternalSignals'],
   ['reg.bagObjectId', 'registration.bagObjectId'], ['evidence.title', 'registration.evidence'],
 ];
 

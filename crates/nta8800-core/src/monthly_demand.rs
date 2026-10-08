@@ -428,12 +428,21 @@ pub struct ThermalMass {
     /// Annex B elements; when given they replace table 7.10.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub annex_b_elements: Vec<crate::annex_b::MassElement>,
+    /// NTA 8800:2022 table 7.10 (p. 181–182): the mass of the zone per m²
+    /// usable floor area, kg/m²; replaces the floor/wall classes there.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mass_kg_per_m2: Option<f64>,
 }
 
 impl ThermalMass {
     /// `D_m` in kJ/(m²·K): table 7.10, or annex B over the zone area.
     pub fn specific_capacity_kj_per_m2k(&self, usable_floor_area_m2: f64) -> f64 {
-        if self.annex_b_elements.is_empty() {
+        if let Some(mass) = self.mass_kg_per_m2.filter(|_| {
+            self.annex_b_elements.is_empty()
+                && crate::norm_versions::profile().thermal_mass_by_kg_per_m2
+        }) {
+            specific_heat_capacity_by_mass(mass, self.ceiling)
+        } else if self.annex_b_elements.is_empty() {
             specific_heat_capacity(self.floor, self.wall, self.ceiling)
         } else {
             crate::annex_b::zone_capacity_j_per_k(&self.annex_b_elements)
@@ -572,7 +581,7 @@ pub struct Window {
     pub tilt_deg: f64,
     /// Perpendicular `g_gl;n` (NEN-EN 410); may be omitted when
     /// `glazing.glazingType` gives the table 7.4 value.
-    #[serde(default = "nan_value")]
+    #[serde(default = "nan_value", skip_serializing_if = "is_nan_value")]
     pub g_perpendicular: f64,
     pub frame_fraction: f64,
     pub u_value_w_per_m2k: f64,
@@ -601,6 +610,12 @@ pub struct Window {
 
 fn nan_value() -> f64 {
     f64::NAN
+}
+
+/// An omitted `g_gl;n` (NaN, taken from `glazing.glazingType`) stays out of
+/// the serialized input, so the derived input passes the finite-number guard.
+fn is_nan_value(value: &f64) -> bool {
+    value.is_nan()
 }
 
 impl Window {
@@ -840,6 +855,25 @@ pub fn specific_heat_capacity(floor: MassClass, wall: MassClass, ceiling: Ceilin
         (Light, Heavy) | (Heavy | VeryHeavy, Light) => (110.0, 180.0),
         (Heavy, Heavy) | (Light, VeryHeavy) => (180.0, 360.0),
         (Heavy | VeryHeavy, VeryHeavy) | (VeryHeavy, Heavy) => (250.0, 450.0),
+    };
+    match ceiling {
+        CeilingColumn::ClosedOrSuspended => closed,
+        CeilingColumn::OpenOrNone => open,
+    }
+}
+
+/// NTA 8800:2022 table 7.10 (p. 181–182), `D_m;int;eff` in kJ/(m²K) by
+/// the mass of the zone per m² usable floor area: below 250, 250 to 500,
+/// 500 to 750 and above 750 kg/m².
+pub fn specific_heat_capacity_by_mass(mass_kg_per_m2: f64, ceiling: CeilingColumn) -> f64 {
+    let (closed, open) = if mass_kg_per_m2 < 250.0 {
+        (55.0, 80.0)
+    } else if mass_kg_per_m2 < 500.0 {
+        (110.0, 180.0)
+    } else if mass_kg_per_m2 <= 750.0 {
+        (180.0, 360.0)
+    } else {
+        (250.0, 450.0)
     };
     match ceiling {
         CeilingColumn::ClosedOrSuspended => closed,
@@ -1516,6 +1550,13 @@ fn validate(input: &MonthlyDemandInput, issues: &mut Vec<DemandIssue>) {
         "thermalMass.sourceReference".into(),
         issues,
     );
+    if let Some(mass) = input.thermal_mass.mass_kg_per_m2 {
+        if !crate::norm_versions::profile().thermal_mass_by_kg_per_m2 {
+            issues.push(issue("route_not_in_edition", "thermalMass.massKgPerM2"));
+        } else if !(mass.is_finite() && mass > 0.0) {
+            issues.push(issue("thermal_mass_invalid", "thermalMass.massKgPerM2"));
+        }
+    }
     issues.extend(
         crate::annex_b::validate_mass_elements(
             &input.thermal_mass.annex_b_elements,
@@ -1702,6 +1743,12 @@ fn validate(input: &MonthlyDemandInput, issues: &mut Vec<DemandIssue>) {
                         format!("{path}.glazing.fixedLouvres.control"),
                     ));
                 }
+                if !control.in_edition(function.is_residential()) {
+                    issues.push(issue(
+                        "route_not_in_edition",
+                        format!("{path}.glazing.fixedLouvres.control"),
+                    ));
+                }
             }
             if window.dynamic.is_some()
                 && (glazing.glazing_type.is_some() || glazing.diffusing.is_some())
@@ -1742,18 +1789,9 @@ fn validate(input: &MonthlyDemandInput, issues: &mut Vec<DemandIssue>) {
             ));
         }
         check_forfait_delta_u(window.forfait_delta_u_w_per_m2k, &path, issues);
+        // Includes the source of declared factors (`source_reference_required`).
         for (code, suffix) in validate_obstruction(&window.obstruction, window.tilt_deg) {
             issues.push(issue(code, format!("{path}.obstruction{suffix}")));
-        }
-        if let Obstruction::Declared {
-            source_reference, ..
-        } = &window.obstruction
-        {
-            check_reference(
-                source_reference,
-                format!("{path}.obstruction.sourceReference"),
-                issues,
-            );
         }
         if let Some(shading) = &window.movable_shading {
             if shading.device.is_some() && shading.reduction_factor.is_finite() {
@@ -1772,6 +1810,18 @@ fn validate(input: &MonthlyDemandInput, issues: &mut Vec<DemandIssue>) {
                 issues.push(issue(
                     "window_shading_control_function_mismatch",
                     format!("{path}.movableShading.control"),
+                ));
+            }
+            if !shading.control.in_edition(function.is_residential()) {
+                issues.push(issue(
+                    "route_not_in_edition",
+                    format!("{path}.movableShading.control"),
+                ));
+            }
+            if shading.device.is_some_and(|device| !device.in_edition()) {
+                issues.push(issue(
+                    "route_not_in_edition",
+                    format!("{path}.movableShading.device.colour"),
                 ));
             }
             check_reference(
@@ -3942,5 +3992,18 @@ mod tests {
         );
         let july = &shaded_result.monthly[6];
         assert!(july.window_solar_cooling_kwh < july.window_solar_gains_kwh);
+    }
+
+    /// A window without `gPerpendicular` takes `g_gl;n` from the glazing
+    /// type (table 7.4); the unset NaN must stay out of the serialized input.
+    #[test]
+    fn window_without_g_perpendicular_serialises_without_it() {
+        let mut window = sample().windows[0].clone();
+        window.g_perpendicular = f64::NAN;
+        let written = serde_json::to_value(&window).unwrap();
+        assert!(written.get("gPerpendicular").is_none(), "{written}");
+        assert!(crate::finite::first_non_finite(&window).is_none());
+        let again: Window = serde_json::from_value(written).unwrap();
+        assert!(again.g_perpendicular.is_nan());
     }
 }

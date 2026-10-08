@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useProjectEdition } from '../../context/EnergyContext';
 import type { INtaHeatPumpInput } from '../../core/energy/types';
 import {
   diagnoseHeatingAuxMeasuredDraftWithRust,
@@ -46,6 +47,7 @@ export function HeatPumpAuxDiagnosticPanel({ pump, onSave }: { pump: INtaHeatPum
   const [loading, setLoading] = useState(false);
   const requestSequence = useRef(0);
 
+  const edition = useProjectEdition();
   useEffect(() => {
     requestSequence.current += 1;
     setNumbers(pump.heatingAuxMeasuredDraft
@@ -106,7 +108,7 @@ export function HeatPumpAuxDiagnosticPanel({ pump, onSave }: { pump: INtaHeatPum
     setError(null);
     setResult(null);
     try {
-      const assessment = await diagnoseHeatingAuxMeasuredDraftWithRust(input);
+      const assessment = await diagnoseHeatingAuxMeasuredDraftWithRust(input, edition);
       if (requestSequence.current === current) {
         setResult(assessment);
         setLoading(false);

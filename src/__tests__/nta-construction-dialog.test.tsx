@@ -57,12 +57,12 @@ describe('NTA construction section', () => {
     renderWithProviders(<Harness />);
     await user.click(screen.getByRole('button', { name: 'Calculate with the kernel' }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Heat flow' }), 'upward');
+    await user.selectOptions(screen.getByLabelText('Heat flow'), 'upward');
     await act(async () => resolveFirst({ ok: true, json: async () => assessment }));
     expect(screen.queryByRole('button', { name: 'Apply to this construction' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Calculate with the kernel' }));
     expect(await screen.findByRole('button', { name: 'Apply to this construction' })).toBeInTheDocument();
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Heat flow' }), 'horizontal');
+    await user.selectOptions(screen.getByLabelText('Heat flow'), 'horizontal');
     expect(screen.queryByRole('button', { name: 'Apply to this construction' })).not.toBeInTheDocument();
   });
 });

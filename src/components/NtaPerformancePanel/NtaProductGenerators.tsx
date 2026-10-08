@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { WallHeightAboveGround2022Field } from './NtaEdition2022Fields';
 import { useI18n } from '../../i18n/i18n';
 import {
   diagnoseDeclaredHeatingTableWithRust, type DeclaredHeatingTableAssessment, type DeclaredHeatingTableInput,
@@ -336,6 +337,7 @@ export function GroundFloorDetailFields({ draft, change, base }: SectionProps & 
         ['other', t('nta.form.ground.depthClass.other')], ['on_sand', t('nta.form.ground.depthClass.onSand')]]} />
       <NumberField {...field} path={at('below', 'wallResistanceM2kPerW')} label={t('nta.form.ground.wallResistance')} />
       <NumberField {...field} path={at('below', 'wallUValueWPerM2k')} label={t('nta.form.ground.wallUValue')} />
+      <WallHeightAboveGround2022Field draft={draft} change={change} path={at('below', 'wallHeightAboveGroundM')} />
       {below === 'crawlspace'
         ? <NumberField {...field} path={at('below', 'ventilationOpeningM2PerM')} label={t('nta.form.ground.ventilationOpening')} />
         : <>

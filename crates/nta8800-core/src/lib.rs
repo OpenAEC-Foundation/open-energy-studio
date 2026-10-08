@@ -89,6 +89,11 @@ use unheated_transmission::{UnheatedSpaceInput, UnheatedTransmissionInput};
 
 pub const TARGET_NORM_VERSION: &str = "NTA 8800:2025+C1:2026";
 pub const KERNEL_VERSION: &str = env!("CARGO_PKG_VERSION");
+/// Upper bound of an installation, build or renovation year. The kernel has
+/// no clock (the same input gives the same result on any date), so the bound
+/// is a fixed year far ahead instead of "this year"; it only catches typing
+/// errors, as the renovation-year checks with 2100 do.
+pub const LATEST_PLAUSIBLE_YEAR: u16 = 2100;
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]

@@ -112,6 +112,22 @@ pub struct WlcGwp {
     pub report_reference: Option<String>,
 }
 
+/// The adviser's yes/no statements for the label elements that NTA 8800
+/// does not determine (Omgevingsregeling art. 5.13a lid 1 onder k and l,
+/// since 29 May 2026).
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LabelStatements {
+    /// k. The building can respond to external signals and adapt its
+    /// energy use.
+    #[serde(default)]
+    pub responds_to_external_signals: Option<bool>,
+    /// l. The heating distribution system is designed to work at low
+    /// temperature.
+    #[serde(default)]
+    pub low_temperature_heating: Option<bool>,
+}
+
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Advisor {
@@ -354,6 +370,10 @@ pub struct Registration {
     /// WLC-GWP result (BRL 9500-W p. 18, 21, 62).
     #[serde(default)]
     pub wlc_gwp: Option<WlcGwp>,
+    /// The adviser's statements for label elements k and l
+    /// (Omgevingsregeling art. 5.13a lid 1).
+    #[serde(default)]
+    pub label_statements: Option<LabelStatements>,
     /// Delivery: date of the toets Bbl the delivery follows, YYYY-MM-DD.
     /// The WLC-GWP duty from 1-1-2028 follows that check (BRL 9500-W p. 21,
     /// 62).
@@ -524,12 +544,24 @@ pub fn data_import_declaration(
 
 /// Only the designated edition (NTA 8800:2025+C1:2026) may be registered
 /// (Omgevingsregeling art. 5.11/5.12 lid 2); a calculation in an older
-/// edition is a comparison or control calculation.
+/// edition is a comparison or control calculation. The exception is a
+/// relabel: it keeps the method and software version of the original
+/// survey (BRL 9500-W §4.2.4 p. 23–24, U p. 19–20), so it may be in the
+/// original's older edition when the kernel's own comparison found that
+/// edition.
 pub fn refuse_legacy_edition(
     assessment: &mut RegistrationAssessment,
     version: crate::norm_versions::NormVersion,
 ) {
     if version.registration_eligible() {
+        return;
+    }
+    let original_edition = assessment
+        .relabel_assessment
+        .as_ref()
+        .and_then(|relabel| relabel.get("normVersion"))
+        .and_then(|value| serde_json::from_value(value.clone()).ok());
+    if assessment.message_type == MessageType::Relabel && original_edition == Some(version) {
         return;
     }
     assessment.issues.push(RegistrationIssue {
@@ -577,6 +609,14 @@ const WLC_GWP_FROM: Date = Date {
 
 /// Usable floor area above which the WLC-GWP result is required, m².
 const WLC_GWP_AREA_M2: f64 = 1000.0;
+
+/// First day on which a label carries the elements of Omgevingsregeling
+/// art. 5.13a lid 1, among them the statements k and l.
+const LABEL_ELEMENTS_FROM: Date = Date {
+    year: 2026,
+    month: 5,
+    day: 29,
+};
 
 /// Calendar date without time zone.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -836,6 +876,37 @@ fn check_wlc_gwp(
         ));
     }
     Some(true)
+}
+
+/// Omgevingsregeling art. 5.13a lid 1 onder k and l: a label registered
+/// from 29 May 2026 carries two yes/no statements the calculation cannot
+/// give, so the adviser answers them. The registration date decides, else
+/// the survey date; without either the statements are asked.
+fn check_label_statements(registration: &Registration, issues: &mut Vec<RegistrationIssue>) {
+    let before = registration
+        .registration_date
+        .as_deref()
+        .or(registration.survey_date.as_deref())
+        .and_then(Date::parse)
+        .is_some_and(|date| date < LABEL_ELEMENTS_FROM);
+    if before {
+        return;
+    }
+    let statements = registration.label_statements.clone().unwrap_or_default();
+    if statements.responds_to_external_signals.is_none() {
+        issues.push(issue(
+            "label_statement_external_signals_required",
+            "labelStatements.respondsToExternalSignals",
+            "missing",
+        ));
+    }
+    if statements.low_temperature_heating.is_none() {
+        issues.push(issue(
+            "label_statement_low_temperature_required",
+            "labelStatements.lowTemperatureHeating",
+            "missing",
+        ));
+    }
 }
 
 fn warning(code: &'static str, path: &str) -> RegistrationIssue {
@@ -1198,6 +1269,7 @@ pub fn assess_registration_with(
     );
     let mut plausibility = plausibility_warnings(registration, context);
     let wlc_gwp_required = check_wlc_gwp(registration, context, &mut issues, &mut plausibility);
+    check_label_statements(registration, &mut issues);
     // Only used for the class-jump warning, so an unknown class warns.
     if registration
         .previous_label_class
@@ -1712,8 +1784,59 @@ mod tests {
                 attest_number: Some("TEST-ATTEST".into()),
                 kernel_version: None,
             }),
+            label_statements: Some(LabelStatements {
+                responds_to_external_signals: Some(false),
+                low_temperature_heating: Some(true),
+            }),
             ..Registration::default()
         }
+    }
+
+    /// Omgevingsregeling art. 5.13a lid 1 onder k and l: from 29 May 2026
+    /// the adviser answers both statements before registration.
+    #[test]
+    fn label_statements_from_29_may_2026() {
+        let codes = |registration: &Registration| {
+            assess_registration_with(registration, &RegistrationContext::default())
+                .issues
+                .iter()
+                .map(|item| item.code)
+                .filter(|code| code.starts_with("label_statement"))
+                .collect::<Vec<_>>()
+        };
+        // Before the date the label has no such elements.
+        let mut early = complete();
+        early.label_statements = None;
+        assert!(codes(&early).is_empty());
+        let mut late = early.clone();
+        late.survey_date = Some("2026-09-30".into());
+        late.registration_date = Some("2026-10-08".into());
+        assert_eq!(
+            codes(&late),
+            vec![
+                "label_statement_external_signals_required",
+                "label_statement_low_temperature_required"
+            ]
+        );
+        late.label_statements = Some(LabelStatements {
+            responds_to_external_signals: Some(false),
+            low_temperature_heating: None,
+        });
+        assert_eq!(
+            codes(&late),
+            vec!["label_statement_low_temperature_required"]
+        );
+        late.label_statements = Some(LabelStatements {
+            responds_to_external_signals: Some(false),
+            low_temperature_heating: Some(true),
+        });
+        assert!(codes(&late).is_empty());
+        assert!(assess_registration_with(&late, &RegistrationContext::default()).dossier_complete);
+        // Without dates the statements are asked.
+        let mut undated = early;
+        undated.registration_date = None;
+        undated.survey_date = None;
+        assert_eq!(codes(&undated).len(), 2);
     }
 
     /// The relabel dossier items of §4.2.3: original holder and label, the
@@ -2475,5 +2598,63 @@ mod tests {
         let mut issues = Vec::new();
         data_import_declaration(&serde_json::json!({"importLog": "x"}), &mut issues);
         assert_eq!(issues[0].path, "importLog");
+    }
+
+    /// A relabel in the original's older edition may be registered (BRL
+    /// 9500-W §4.2.4 p. 23–24); a regular label in that edition may not.
+    #[test]
+    fn relabel_in_the_original_edition_is_not_refused_as_legacy() {
+        use crate::norm_versions::NormVersion;
+        let original = serde_json::json!({
+            "buildingFunction": "residential",
+            "registration": {"epOnlineNumber": "EP-123", "certificateNumber": "K12345",
+                "surveyDate": "2026-01-31"},
+            "ntaCalculation": {"normVersion": "2024"},
+            "constructions": [{"id": "c1", "rcValue": 0.4}]
+        });
+        let mut improved = original.clone();
+        improved["constructions"][0]["rcValue"] = serde_json::json!(3.5);
+        let text = serde_json::to_string_pretty(
+            &serde_json::json!({"type": "open-energy-studio", "version": "1.0", "project": original}),
+        )
+        .unwrap();
+        let mut relabel = complete();
+        relabel.message_type = Some(MessageType::Relabel);
+        relabel.original_kernel_version = Some(KERNEL_VERSION.into());
+        relabel.improvement_date = Some("2027-01-31".into());
+        relabel_dossier(&mut relabel);
+        let record = relabel.relabel_comparison.as_mut().unwrap();
+        record.original_sha256 = Some(format!("{:x}", Sha256::digest(text.as_bytes())));
+        record.original_project_text = Some(text);
+        record.assessment =
+            serde_json::to_value(crate::relabel::assess_relabel(&original, &improved)).unwrap();
+        let codes = |registration: &Registration, version: NormVersion| {
+            let mut result = assess_project_registration(
+                registration,
+                &improved,
+                &RegistrationContext::default(),
+            );
+            refuse_legacy_edition(&mut result, version);
+            result
+                .issues
+                .iter()
+                .map(|item| item.code)
+                .collect::<Vec<_>>()
+        };
+        let found = codes(&relabel, NormVersion::V2024);
+        assert!(found.is_empty(), "{found:?}");
+        // A regular registration in 2024 is refused.
+        let found = codes(&complete(), NormVersion::V2024);
+        assert!(
+            found.contains(&"legacy_edition_not_registrable"),
+            "{found:?}"
+        );
+        // A relabel calculated in another older edition than the original's
+        // is refused too.
+        let found = codes(&relabel, NormVersion::V2023);
+        assert!(
+            found.contains(&"legacy_edition_not_registrable"),
+            "{found:?}"
+        );
     }
 }

@@ -1,0 +1,4115 @@
+{
+ "attestStatus": "unattested",
+ "derivedInput": {
+  "activeCooling": null,
+  "areaSourceReference": "synthetic floor plan",
+  "bacsFactor": 1.0,
+  "bacsSourceReference": "NTA 8800:2022 kent geen f_BACS (5.5.8 is nieuw in 2025+C1)",
+  "batteryStoragePresent": false,
+  "bblFunction": "other_residential",
+  "calculationScope": "residential",
+  "constructionYear": 2020,
+  "cooling": null,
+  "declaredRenewableHeat": [],
+  "declaredUses": [],
+  "demandUsesFixedC1Ventilation": false,
+  "externalSupply": {
+   "areaElectricity": [],
+   "collectiveHeatPumpSource": null,
+   "cooling": null,
+   "heating": null,
+   "hotWater": null
+  },
+  "heatPumpRenewable": null,
+  "hotWater": {
+   "boilingWaterTap": false,
+   "circulation": null,
+   "collective": null,
+   "deliverySets": null,
+   "emission": {
+    "bathroomLengthM": 5.0,
+    "kitchenLengthM": 3.0,
+    "method": "residential",
+    "served": "kitchen_and_bathroom",
+    "sourceReference": "synthetic floor plan"
+   },
+   "equipmentReference": "synthetic: HR combi boiler with Gaskeur CW label",
+   "generator": {
+    "appliance": "combi_gaskeur_hr_cw",
+    "declared": null,
+    "kind": "gas_appliance",
+    "kitchenOnly": false,
+    "measuredClass": null
+   },
+   "need": {
+    "dwellingCount": 1,
+    "method": "residential",
+    "sourceReference": "one dwelling"
+   },
+   "showerHeatRecovery": null,
+   "storage": []
+  },
+  "labelFunction": null,
+  "lighting": [],
+  "lossAreaM2": 165.72,
+  "lossAreaSourceReference": "derived: gross project surfaces bordering outdoor air, ground or unheated space",
+  "normVersion": "2022",
+  "onSiteProduction": [],
+  "permitApplicationAfter20260529": false,
+  "productionInventoryComplete": true,
+  "pvSystems": [
+   {
+    "azimuthDeg": 180.0,
+    "collective": null,
+    "id": "pv",
+    "mounting": "moderately_ventilated",
+    "obstructionFactors": [
+     1.0
+    ],
+    "peakPower": {
+     "method": "panels",
+     "panelCount": 6,
+     "panelPeakPowerW": 300.0
+    },
+    "sourceReference": "synthetic datasheet",
+    "tiltDeg": 45.0
+   }
+  ],
+  "spaceHeating": {
+   "demand": {
+    "areaSourceReference": "synthetic floor plan",
+    "dwellingType": "other",
+    "internalGains": {
+     "dwellingCount": 1,
+     "method": "residential",
+     "sourceReference": "one dwelling"
+    },
+    "opaqueElements": [
+     {
+      "areaM2": 26.0,
+      "forfaitDeltaUWPerM2k": 0.15494609164420486,
+      "id": "surface:wall-N:opaque",
+      "orientation": "north",
+      "sourceReference": "project:construction:c-wall.uValue",
+      "tiltDeg": 90.0,
+      "uValueWPerM2k": 0.21
+     },
+     {
+      "areaM2": 22.0,
+      "forfaitDeltaUWPerM2k": 0.15494609164420486,
+      "id": "surface:wall-S:opaque",
+      "orientation": "south",
+      "sourceReference": "project:construction:c-wall.uValue",
+      "tiltDeg": 90.0,
+      "uValueWPerM2k": 0.21
+     },
+     {
+      "areaM2": 35.36,
+      "forfaitDeltaUWPerM2k": 0.15494609164420486,
+      "id": "surface:roof:opaque",
+      "orientation": "south",
+      "sourceReference": "project:construction:c-roof.uValue",
+      "tiltDeg": 45.0,
+      "uValueWPerM2k": 0.16
+     },
+     {
+      "areaM2": 35.36,
+      "forfaitDeltaUWPerM2k": 0.15494609164420486,
+      "id": "surface:roof-n:opaque",
+      "orientation": "north",
+      "sourceReference": "project:construction:c-roof.uValue",
+      "tiltDeg": 45.0,
+      "uValueWPerM2k": 0.16
+     }
+    ],
+    "opaqueInventoryComplete": true,
+    "setpoints": {
+     "coolingC": 24.0,
+     "heatingC": 20.0,
+     "sourceReference": "table 7.13 residential (transcribed)"
+    },
+    "thermalMass": {
+     "ceiling": "open_or_none",
+     "floor": "very_heavy",
+     "sourceReference": "synthetic: concrete floors, masonry",
+     "wall": "heavy"
+    },
+    "transmission": {
+     "direct": {
+      "elements": [
+       {
+        "areaM2": 4.0,
+        "id": "window:win-N",
+        "sourceReference": "project:window:win-N.uValue + ΔU_for 0.155 (NTA 8800 8.2/8.3)",
+        "uValueWPerM2k": 1.254946091644205
+       },
+       {
+        "areaM2": 26.0,
+        "id": "surface:wall-N:opaque",
+        "sourceReference": "project:construction:c-wall.uValue + ΔU_for 0.155 (NTA 8800 8.2/8.3)",
+        "uValueWPerM2k": 0.3649460916442049
+       },
+       {
+        "areaM2": 8.0,
+        "id": "window:win-S",
+        "sourceReference": "project:window:win-S.uValue + ΔU_for 0.155 (NTA 8800 8.2/8.3)",
+        "uValueWPerM2k": 1.254946091644205
+       },
+       {
+        "areaM2": 22.0,
+        "id": "surface:wall-S:opaque",
+        "sourceReference": "project:construction:c-wall.uValue + ΔU_for 0.155 (NTA 8800 8.2/8.3)",
+        "uValueWPerM2k": 0.3649460916442049
+       },
+       {
+        "areaM2": 35.36,
+        "id": "surface:roof:opaque",
+        "sourceReference": "project:construction:c-roof.uValue + ΔU_for 0.155 (NTA 8800 8.2/8.3)",
+        "uValueWPerM2k": 0.31494609164420484
+       },
+       {
+        "areaM2": 35.36,
+        "id": "surface:roof-n:opaque",
+        "sourceReference": "project:construction:c-roof.uValue + ΔU_for 0.155 (NTA 8800 8.2/8.3)",
+        "uValueWPerM2k": 0.31494609164420484
+       }
+      ],
+      "linearBridges": [],
+      "pointBridges": []
+     },
+     "groundFloors": [
+      {
+       "areaM2": 50.0,
+       "constructionResistanceM2kPerW": 3.87,
+       "edgeInsulation": [],
+       "edgeThermalBridges": {
+        "method": "forfait"
+       },
+       "exposedPerimeterM": 10.0,
+       "id": "floor",
+       "sourceReference": "synthetic: Rc 3,7 + Rsi 0,17"
+      }
+     ],
+     "groundInventoryConfirmed": true,
+     "method": "components",
+     "unheated": null,
+     "verticalPipes": [
+      {
+       "id": "standleiding",
+       "insulated": false,
+       "sharedZones": 1,
+       "sourceReference": "synthetic: one uninsulated soil stack over both storeys (7.3.3, table 7.1)",
+       "storeys": 2
+      }
+     ]
+    },
+    "usableFloorAreaM2": 100.0,
+    "usageFunction": "residential",
+    "ventilation": {
+     "apartmentBuilding": false,
+     "buildingHeightM": 9.0,
+     "category": "residential",
+     "combustionAppliances": [],
+     "constructionYear": 2020,
+     "coolingSetpointC": 24.0,
+     "dwellingCount": 1,
+     "fans": {
+      "current": "dc",
+      "manufactureYear": 2020,
+      "method": "forfait"
+     },
+     "floorAboveCrawlspace": false,
+     "flowReduction": {
+      "collective": false,
+      "evidenceReference": null,
+      "flowControlPercent": null,
+      "recirculationPercent": null
+     },
+     "functions": [
+      {
+       "areaM2": 100.0,
+       "function": "residential",
+       "swimmingPool": false
+      }
+     ],
+     "grillePreheating": null,
+     "heatingSetpointC": 20.0,
+     "infiltration": {
+      "method": "measured",
+      "qv10DmPerSM2": 0.4,
+      "sourceReference": "synthetic: C1 extract system, measured qv10 0,4 dm³/(s·m²)"
+     },
+     "installedCapacity": null,
+     "maximumCapacityForCooling": null,
+     "overventilation": null,
+     "sourceReference": "synthetic: C1 extract system, measured qv10 0,4 dm³/(s·m²)",
+     "system": {
+      "kind": "single",
+      "unit": {
+       "airHandlingUnit": null,
+       "ducts": "luka_a_b_c",
+       "equipmentReference": "synthetic: mechanical extract, DC fan",
+       "heatRecovery": null,
+       "variant": "c1"
+      }
+     },
+     "usableFloorAreaM2": 100.0,
+     "ventilativeCooling": null,
+     "wholeDwellingAreaM2": null,
+     "zoneId": "z1"
+    },
+    "ventilationFlows": [],
+    "windowInventoryComplete": true,
+    "windows": [
+     {
+      "areaM2": 4.0,
+      "forfaitDeltaUWPerM2k": 0.15494609164420486,
+      "frameFraction": 0.25,
+      "gPerpendicular": 0.6,
+      "id": "window:win-N",
+      "obstruction": {
+       "method": "minimal"
+      },
+      "orientation": "north",
+      "sourceReference": "project:window:win-N; synthetic: minimal obstruction (§17.3.2a), no movable shading",
+      "tiltDeg": 90.0,
+      "uValueWPerM2k": 1.1
+     },
+     {
+      "areaM2": 8.0,
+      "forfaitDeltaUWPerM2k": 0.15494609164420486,
+      "frameFraction": 0.25,
+      "gPerpendicular": 0.6,
+      "id": "window:win-S",
+      "obstruction": {
+       "method": "minimal"
+      },
+      "orientation": "south",
+      "sourceReference": "project:window:win-S; synthetic: minimal obstruction (§17.3.2a), no movable shading",
+      "tiltDeg": 90.0,
+      "uValueWPerM2k": 1.1
+     }
+    ],
+    "zoneId": "z1"
+   },
+   "distribution": {
+    "method": "heated_zone_only_space_heating",
+    "sourceReference": "synthetic: pipes inside envelope, space heating only"
+   },
+   "emission": {
+    "balancing": "none_or_unknown",
+    "control": "main_room_thermostat",
+    "sourceReference": "synthetic survey",
+    "system": "radiators_or_convectors"
+   },
+   "generator": {
+    "boiler": {
+     "averageDesignEmissionTemperatureC": 45.0,
+     "emissionCircuit": "direct",
+     "equipmentReference": "synthetic type plate",
+     "fuel": "natural_gas",
+     "generatorId": "boiler",
+     "installationYear": 2020,
+     "installationYearReference": "synthetic invoice",
+     "kind": "hr107",
+     "location": "inside_thermal_boundary",
+     "locationReference": "synthetic plan",
+     "pilotFlamePresent": false,
+     "role": "individual_main",
+     "temperatureAndCircuitReference": "synthetic design"
+    },
+    "kind": "gas_boiler"
+   }
+  },
+  "storage": null,
+  "totalUsableFloorAreaM2": 100.0,
+  "useInventoryComplete": true
+ },
+ "gaps": [],
+ "geometry": {
+  "envelopeAreaM2": 180.72,
+  "lossAreaM2": 165.72,
+  "lossAreaRatio": 1.6572,
+  "unclassifiedSurfaceCount": 0,
+  "usableFloorAreaM2": 100.0
+ },
+ "inputFingerprint": "sha256:dd4a9ac51c87041248b22b416dd2b7f164d11eb057470cc07804ca5033f7d5e6",
+ "kernelVersion": "0.1.0",
+ "labelData": {
+  "envelope": [
+   {
+    "areaM2": 48.0,
+    "category": "facade",
+    "maxRcM2kPerW": 4.7,
+    "meanUWPerM2k": 0.21,
+    "minRcM2kPerW": 4.7
+   },
+   {
+    "areaM2": 70.72,
+    "category": "roof",
+    "maxRcM2kPerW": 6.3,
+    "meanUWPerM2k": 0.16,
+    "minRcM2kPerW": 6.3
+   },
+   {
+    "areaM2": 50.0,
+    "category": "floor",
+    "maxRcM2kPerW": 3.7,
+    "meanUWPerM2k": 0.26,
+    "minRcM2kPerW": 3.7
+   },
+   {
+    "areaM2": 12.0,
+    "category": "glazing",
+    "maxRcM2kPerW": null,
+    "meanUWPerM2k": 1.1,
+    "minRcM2kPerW": null
+   }
+  ],
+  "general": {
+   "constructionYear": 2020,
+   "dwellingType": "other",
+   "usableFloorAreaM2": 100.0,
+   "useFunction": "residential"
+  },
+  "indicators": {
+   "elements": {
+    "annualFinalEnergyKwh": null,
+    "annualPrimaryFossilKwh": 8055.362242813071,
+    "annualRenewablePrimaryKwh": 2320.2407232,
+    "finalEnergyKwhPerM2": null,
+    "lowTemperatureHeating": null,
+    "mainEnergyCarrier": null,
+    "mainRenewableSource": null,
+    "operationalCo2KgPerM2": 13.7845338669292,
+    "renewableProductionKwh": 1600.166016,
+    "respondsToExternalSignals": null,
+    "wlcGwpKgCo2EqPerM2": null
+   },
+   "energyNeedKwhPerM2": 51.37,
+   "heatingNeedKwhPerM2": null,
+   "indicativeLabelClass": "A+",
+   "primaryFossilKwhPerM2": 80.56,
+   "renewableSharePercent": 22.3,
+   "renovationStandardKwhPerM2": null,
+   "standardInsulationKwhPerM2": null,
+   "tojuliMaxK": 0.85
+  },
+  "installations": {
+   "coolingGenerators": [],
+   "heatingGenerator": "gas_boiler",
+   "heatingGenerators": [
+    "gas_boiler"
+   ],
+   "hotWaterGenerator": "gas_appliance",
+   "lightingZoneCount": 0,
+   "pvSystemCount": 1,
+   "solarWaterHeaterCount": 0,
+   "solarWaterHeaterUses": [],
+   "ventilationSystems": [
+    "c1"
+   ]
+  },
+  "source": "Omgevingsregeling art. 5.13 en 5.13a (BWBR0045528, versie 2026-10-01; gegevens en verplichte elementen energielabel)"
+ },
+ "normVersion": "2022",
+ "performance": {
+  "a0Check": null,
+  "annualCo2Kg": 1378.45338669292,
+  "annualFinalEnergyEedKwh": null,
+  "annualFinalEnergyKwh": null,
+  "annualHeatPumpAmbientHeatKwh": 0.0,
+  "annualHeatingAndCoolingNeedKwh": 5136.290974013065,
+  "annualPrimaryFossilKwh": 8055.362242813071,
+  "annualRenewablePrimaryKwh": 2320.2407232,
+  "annualStorageCorrectionKwh": 0.0,
+  "annualZebCo2Kg": null,
+  "annualZebPrimaryTotalKwh": null,
+  "attestStatus": "unattested",
+  "bblCheck": {
+   "energyNeedMeets": true,
+   "function": "other_residential",
+   "functions": [
+    {
+     "areaM2": 100.0,
+     "function": "other_residential"
+    }
+   ],
+   "limits": {
+    "energyNeedMaxKwhPerM2": 59.716,
+    "lightConstructionAllowanceApplied": false,
+    "primaryFossilMaxKwhPerM2": 30.0,
+    "renewableShareMinPercent": 50.0
+   },
+   "lossAreaRatio": 1.6572,
+   "primaryFossilMeets": false,
+   "renewableShareMeets": false,
+   "source": "Bbl art. 4.149 met tabel 4.148A (BWBR0041297, versie 2026-01-01)"
+  },
+  "carriers": [
+   {
+    "carrier": "el",
+    "deliveredKwh": 0.0,
+    "month": 1,
+    "usedKwh": 38.92125302956532
+   },
+   {
+    "carrier": "gas",
+    "deliveredKwh": 1710.526652736726,
+    "month": 1,
+    "usedKwh": 1710.526652736726
+   },
+   {
+    "carrier": "oil",
+    "deliveredKwh": 0.0,
+    "month": 1,
+    "usedKwh": 0.0
+   },
+   {
+    "carrier": "el",
+    "deliveredKwh": 0.0,
+    "month": 2,
+    "usedKwh": 33.78937710017599
+   },
+   {
+    "carrier": "gas",
+    "deliveredKwh": 1420.0078981378679,
+    "month": 2,
+    "usedKwh": 1420.0078981378679
+   },
+   {
+    "carrier": "oil",
+    "deliveredKwh": 0.0,
+    "month": 2,
+    "usedKwh": 0.0
+   },
+   {
+    "carrier": "el",
+    "deliveredKwh": 0.0,
+    "month": 3,
+    "usedKwh": 30.5199905723616
+   },
+   {
+    "carrier": "gas",
+    "deliveredKwh": 1099.5257467582735,
+    "month": 3,
+    "usedKwh": 1099.5257467582735
+   },
+   {
+    "carrier": "oil",
+    "deliveredKwh": 0.0,
+    "month": 3,
+    "usedKwh": 0.0
+   },
+   {
+    "carrier": "el",
+    "deliveredKwh": 0.0,
+    "month": 4,
+    "usedKwh": 24.191659546689806
+   },
+   {
+    "carrier": "gas",
+    "deliveredKwh": 666.8530189192345,
+    "month": 4,
+    "usedKwh": 666.8530189192345
+   },
+   {
+    "carrier": "oil",
+    "deliveredKwh": 0.0,
+    "month": 4,
+    "usedKwh": 0.0
+   },
+   {
+    "carrier": "el",
+    "deliveredKwh": 0.0,
+    "month": 5,
+    "usedKwh": 20.461715019724075
+   },
+   {
+    "carrier": "gas",
+    "deliveredKwh": 368.0147974755444,
+    "month": 5,
+    "usedKwh": 368.0147974755444
+   },
+   {
+    "carrier": "oil",
+    "deliveredKwh": 0.0,
+    "month": 5,
+    "usedKwh": 0.0
+   },
+   {
+    "carrier": "el",
+    "deliveredKwh": 0.0,
+    "month": 6,
+    "usedKwh": 19.638495138068567
+   },
+   {
+    "carrier": "gas",
+    "deliveredKwh": 335.71378920132634,
+    "month": 6,
+    "usedKwh": 335.71378920132634
+   },
+   {
+    "carrier": "oil",
+    "deliveredKwh": 0.0,
+    "month": 6,
+    "usedKwh": 0.0
+   },
+   {
+    "carrier": "el",
+    "deliveredKwh": 0.0,
+    "month": 7,
+    "usedKwh": 20.09631578947368
+   },
+   {
+    "carrier": "gas",
+    "deliveredKwh": 341.44030800278864,
+    "month": 7,
+    "usedKwh": 341.44030800278864
+   },
+   {
+    "carrier": "oil",
+    "deliveredKwh": 0.0,
+    "month": 7,
+    "usedKwh": 0.0
+   },
+   {
+    "carrier": "el",
+    "deliveredKwh": 0.0,
+    "month": 8,
+    "usedKwh": 20.09631578947368
+   },
+   {
+    "carrier": "gas",
+    "deliveredKwh": 341.44030800278864,
+    "month": 8,
+    "usedKwh": 341.44030800278864
+   },
+   {
+    "carrier": "oil",
+    "deliveredKwh": 0.0,
+    "month": 8,
+    "usedKwh": 0.0
+   },
+   {
+    "carrier": "el",
+    "deliveredKwh": 0.0,
+    "month": 9,
+    "usedKwh": 19.695386502925523
+   },
+   {
+    "carrier": "gas",
+    "deliveredKwh": 339.8513430091049,
+    "month": 9,
+    "usedKwh": 339.8513430091049
+   },
+   {
+    "carrier": "oil",
+    "deliveredKwh": 0.0,
+    "month": 9,
+    "usedKwh": 0.0
+   },
+   {
+    "carrier": "el",
+    "deliveredKwh": 0.0,
+    "month": 10,
+    "usedKwh": 24.83826545614221
+   },
+   {
+    "carrier": "gas",
+    "deliveredKwh": 686.3093746695906,
+    "month": 10,
+    "usedKwh": 686.3093746695906
+   },
+   {
+    "carrier": "oil",
+    "deliveredKwh": 0.0,
+    "month": 10,
+    "usedKwh": 0.0
+   },
+   {
+    "carrier": "el",
+    "deliveredKwh": 0.0,
+    "month": 11,
+    "usedKwh": 29.521650790579002
+   },
+   {
+    "carrier": "gas",
+    "deliveredKwh": 1054.48874574754,
+    "month": 11,
+    "usedKwh": 1054.48874574754
+   },
+   {
+    "carrier": "oil",
+    "deliveredKwh": 0.0,
+    "month": 11,
+    "usedKwh": 0.0
+   },
+   {
+    "carrier": "el",
+    "deliveredKwh": 0.0,
+    "month": 12,
+    "usedKwh": 36.709003965803404
+   },
+   {
+    "carrier": "gas",
+    "deliveredKwh": 1549.6358117358595,
+    "month": 12,
+    "usedKwh": 1549.6358117358595
+   },
+   {
+    "carrier": "oil",
+    "deliveredKwh": 0.0,
+    "month": 12,
+    "usedKwh": 0.0
+   }
+  ],
+  "chapter5": null,
+  "chapter5Source": "NTA 8800:2025+C1:2026, §5.9, formules 5.57–5.60 (p. 133)",
+  "co2KgPerM2": 13.7845338669292,
+  "electricityBalance": [
+   {
+    "exportedKwh": 20.00890377043467,
+    "month": 1,
+    "producedKwh": 58.93015679999999,
+    "selfUsedKwh": 38.92125302956532,
+    "usedKwh": 38.92125302956532
+   },
+   {
+    "exportedKwh": 34.330456499824,
+    "month": 2,
+    "producedKwh": 68.11983359999999,
+    "selfUsedKwh": 33.78937710017599,
+    "usedKwh": 33.78937710017599
+   },
+   {
+    "exportedKwh": 98.33247662763839,
+    "month": 3,
+    "producedKwh": 128.85246719999998,
+    "selfUsedKwh": 30.5199905723616,
+    "usedKwh": 30.5199905723616
+   },
+   {
+    "exportedKwh": 162.6552524533102,
+    "month": 4,
+    "producedKwh": 186.846912,
+    "selfUsedKwh": 24.191659546689806,
+    "usedKwh": 24.191659546689806
+   },
+   {
+    "exportedKwh": 185.84472338027592,
+    "month": 5,
+    "producedKwh": 206.3064384,
+    "selfUsedKwh": 20.461715019724075,
+    "usedKwh": 20.461715019724075
+   },
+   {
+    "exportedKwh": 174.69411286193144,
+    "month": 6,
+    "producedKwh": 194.33260800000002,
+    "selfUsedKwh": 19.638495138068567,
+    "usedKwh": 19.638495138068567
+   },
+   {
+    "exportedKwh": 168.19520421052627,
+    "month": 7,
+    "producedKwh": 188.29151999999996,
+    "selfUsedKwh": 20.09631578947368,
+    "usedKwh": 20.09631578947368
+   },
+   {
+    "exportedKwh": 176.84643621052632,
+    "month": 8,
+    "producedKwh": 196.942752,
+    "selfUsedKwh": 20.09631578947368,
+    "usedKwh": 20.09631578947368
+   },
+   {
+    "exportedKwh": 135.53430949707447,
+    "month": 9,
+    "producedKwh": 155.229696,
+    "selfUsedKwh": 19.695386502925523,
+    "usedKwh": 19.695386502925523
+   },
+   {
+    "exportedKwh": 86.5081793438578,
+    "month": 10,
+    "producedKwh": 111.34644480000001,
+    "selfUsedKwh": 24.83826545614221,
+    "usedKwh": 24.83826545614221
+   },
+   {
+    "exportedKwh": 30.560909209421006,
+    "month": 11,
+    "producedKwh": 60.08256000000001,
+    "selfUsedKwh": 29.521650790579002,
+    "usedKwh": 29.521650790579002
+   },
+   {
+    "exportedKwh": 8.1756232341966,
+    "month": 12,
+    "producedKwh": 44.884627200000004,
+    "selfUsedKwh": 36.709003965803404,
+    "usedKwh": 36.709003965803404
+   }
+  ],
+  "energyByService": {
+   "adjustments": [
+    {
+     "exportedElectricityCreditKwh": 29.012910467130272,
+     "month": 1,
+     "renewableElectricityKwh": 85.44872735999999,
+     "storageCorrectionKwh": 0.0
+    },
+    {
+     "exportedElectricityCreditKwh": 49.779161924744805,
+     "month": 2,
+     "renewableElectricityKwh": 98.77375871999999,
+     "storageCorrectionKwh": 0.0
+    },
+    {
+     "exportedElectricityCreditKwh": 142.58209111007565,
+     "month": 3,
+     "renewableElectricityKwh": 186.83607743999997,
+     "storageCorrectionKwh": 0.0
+    },
+    {
+     "exportedElectricityCreditKwh": 235.85011605729977,
+     "month": 4,
+     "renewableElectricityKwh": 270.9280224,
+     "storageCorrectionKwh": 0.0
+    },
+    {
+     "exportedElectricityCreditKwh": 269.4748489014001,
+     "month": 5,
+     "renewableElectricityKwh": 299.14433568,
+     "storageCorrectionKwh": 0.0
+    },
+    {
+     "exportedElectricityCreditKwh": 253.30646364980058,
+     "month": 6,
+     "renewableElectricityKwh": 281.78228160000003,
+     "storageCorrectionKwh": 0.0
+    },
+    {
+     "exportedElectricityCreditKwh": 243.88304610526308,
+     "month": 7,
+     "renewableElectricityKwh": 273.0227039999999,
+     "storageCorrectionKwh": 0.0
+    },
+    {
+     "exportedElectricityCreditKwh": 256.42733250526317,
+     "month": 8,
+     "renewableElectricityKwh": 285.5669904,
+     "storageCorrectionKwh": 0.0
+    },
+    {
+     "exportedElectricityCreditKwh": 196.52474877075798,
+     "month": 9,
+     "renewableElectricityKwh": 225.08305919999998,
+     "storageCorrectionKwh": 0.0
+    },
+    {
+     "exportedElectricityCreditKwh": 125.43686004859381,
+     "month": 10,
+     "renewableElectricityKwh": 161.45234496,
+     "storageCorrectionKwh": 0.0
+    },
+    {
+     "exportedElectricityCreditKwh": 44.313318353660456,
+     "month": 11,
+     "renewableElectricityKwh": 87.119712,
+     "storageCorrectionKwh": 0.0
+    },
+    {
+     "exportedElectricityCreditKwh": 11.854653689585069,
+     "month": 12,
+     "renewableElectricityKwh": 65.08270944,
+     "storageCorrectionKwh": 0.0
+    }
+   ],
+   "annual": [
+    {
+     "carrier": "gas",
+     "deliveredKwh": 5893.623522750909,
+     "primaryFossilKwh": 5893.623522750909,
+     "service": "heating",
+     "usedKwh": 5893.623522750909
+    },
+    {
+     "carrier": "el",
+     "deliveredKwh": 0.0,
+     "primaryFossilKwh": 0.0,
+     "service": "ventilation",
+     "usedKwh": 193.6421052631579
+    },
+    {
+     "carrier": "gas",
+     "deliveredKwh": 4020.1842716457377,
+     "primaryFossilKwh": 4020.1842716457377,
+     "service": "hotWater",
+     "usedKwh": 4020.1842716457377
+    },
+    {
+     "carrier": "el",
+     "deliveredKwh": 0.0,
+     "primaryFossilKwh": 0.0,
+     "service": "auxiliary",
+     "usedKwh": 124.83732343782498
+    }
+   ],
+   "months": [
+    {
+     "carrier": "gas",
+     "deliveredKwh": 1369.0863447339373,
+     "month": 1,
+     "primaryFossilKwh": 1369.0863447339373,
+     "service": "heating",
+     "usedKwh": 1369.0863447339373
+    },
+    {
+     "carrier": "el",
+     "deliveredKwh": 0.0,
+     "month": 1,
+     "primaryFossilKwh": 0.0,
+     "service": "ventilation",
+     "usedKwh": 16.446315789473683
+    },
+    {
+     "carrier": "gas",
+     "deliveredKwh": 341.44030800278864,
+     "month": 1,
+     "primaryFossilKwh": 341.44030800278864,
+     "service": "hotWater",
+     "usedKwh": 341.44030800278864
+    },
+    {
+     "carrier": "el",
+     "deliveredKwh": 0.0,
+     "month": 1,
+     "primaryFossilKwh": 0.0,
+     "service": "auxiliary",
+     "usedKwh": 22.474937240091634
+    },
+    {
+     "carrier": "gas",
+     "deliveredKwh": 1111.610200586962,
+     "month": 2,
+     "primaryFossilKwh": 1111.610200586962,
+     "service": "heating",
+     "usedKwh": 1111.610200586962
+    },
+    {
+     "carrier": "el",
+     "deliveredKwh": 0.0,
+     "month": 2,
+     "primaryFossilKwh": 0.0,
+     "service": "ventilation",
+     "usedKwh": 14.854736842105263
+    },
+    {
+     "carrier": "gas",
+     "deliveredKwh": 308.39769755090583,
+     "month": 2,
+     "primaryFossilKwh": 308.39769755090583,
+     "service": "hotWater",
+     "usedKwh": 308.39769755090583
+    },
+    {
+     "carrier": "el",
+     "deliveredKwh": 0.0,
+     "month": 2,
+     "primaryFossilKwh": 0.0,
+     "service": "auxiliary",
+     "usedKwh": 18.934640258070726
+    },
+    {
+     "carrier": "gas",
+     "deliveredKwh": 758.0854387554849,
+     "month": 3,
+     "primaryFossilKwh": 758.0854387554849,
+     "service": "heating",
+     "usedKwh": 758.0854387554849
+    },
+    {
+     "carrier": "el",
+     "deliveredKwh": 0.0,
+     "month": 3,
+     "primaryFossilKwh": 0.0,
+     "service": "ventilation",
+     "usedKwh": 16.446315789473683
+    },
+    {
+     "carrier": "gas",
+     "deliveredKwh": 341.44030800278864,
+     "month": 3,
+     "primaryFossilKwh": 341.44030800278864,
+     "service": "hotWater",
+     "usedKwh": 341.44030800278864
+    },
+    {
+     "carrier": "el",
+     "deliveredKwh": 0.0,
+     "month": 3,
+     "primaryFossilKwh": 0.0,
+     "service": "auxiliary",
+     "usedKwh": 14.073674782887917
+    },
+    {
+     "carrier": "gas",
+     "deliveredKwh": 336.4269144004068,
+     "month": 4,
+     "primaryFossilKwh": 336.4269144004068,
+     "service": "heating",
+     "usedKwh": 336.4269144004068
+    },
+    {
+     "carrier": "el",
+     "deliveredKwh": 0.0,
+     "month": 4,
+     "primaryFossilKwh": 0.0,
+     "service": "ventilation",
+     "usedKwh": 15.91578947368421
+    },
+    {
+     "carrier": "gas",
+     "deliveredKwh": 330.4261045188277,
+     "month": 4,
+     "primaryFossilKwh": 330.4261045188277,
+     "service": "hotWater",
+     "usedKwh": 330.4261045188277
+    },
+    {
+     "carrier": "el",
+     "deliveredKwh": 0.0,
+     "month": 4,
+     "primaryFossilKwh": 0.0,
+     "service": "auxiliary",
+     "usedKwh": 8.275870073005594
+    },
+    {
+     "carrier": "gas",
+     "deliveredKwh": 26.574489472755783,
+     "month": 5,
+     "primaryFossilKwh": 26.574489472755783,
+     "service": "heating",
+     "usedKwh": 26.574489472755783
+    },
+    {
+     "carrier": "el",
+     "deliveredKwh": 0.0,
+     "month": 5,
+     "primaryFossilKwh": 0.0,
+     "service": "ventilation",
+     "usedKwh": 16.446315789473683
+    },
+    {
+     "carrier": "gas",
+     "deliveredKwh": 341.44030800278864,
+     "month": 5,
+     "primaryFossilKwh": 341.44030800278864,
+     "service": "hotWater",
+     "usedKwh": 341.44030800278864
+    },
+    {
+     "carrier": "el",
+     "deliveredKwh": 0.0,
+     "month": 5,
+     "primaryFossilKwh": 0.0,
+     "service": "auxiliary",
+     "usedKwh": 4.015399230250392
+    },
+    {
+     "carrier": "gas",
+     "deliveredKwh": 5.287684682498623,
+     "month": 6,
+     "primaryFossilKwh": 5.287684682498623,
+     "service": "heating",
+     "usedKwh": 5.287684682498623
+    },
+    {
+     "carrier": "el",
+     "deliveredKwh": 0.0,
+     "month": 6,
+     "primaryFossilKwh": 0.0,
+     "service": "ventilation",
+     "usedKwh": 15.91578947368421
+    },
+    {
+     "carrier": "gas",
+     "deliveredKwh": 330.4261045188277,
+     "month": 6,
+     "primaryFossilKwh": 330.4261045188277,
+     "service": "hotWater",
+     "usedKwh": 330.4261045188277
+    },
+    {
+     "carrier": "el",
+     "deliveredKwh": 0.0,
+     "month": 6,
+     "primaryFossilKwh": 0.0,
+     "service": "auxiliary",
+     "usedKwh": 3.722705664384356
+    },
+    {
+     "carrier": "el",
+     "deliveredKwh": 0.0,
+     "month": 7,
+     "primaryFossilKwh": 0.0,
+     "service": "ventilation",
+     "usedKwh": 16.446315789473683
+    },
+    {
+     "carrier": "gas",
+     "deliveredKwh": 341.44030800278864,
+     "month": 7,
+     "primaryFossilKwh": 341.44030800278864,
+     "service": "hotWater",
+     "usedKwh": 341.44030800278864
+    },
+    {
+     "carrier": "el",
+     "deliveredKwh": 0.0,
+     "month": 7,
+     "primaryFossilKwh": 0.0,
+     "service": "auxiliary",
+     "usedKwh": 3.65
+    },
+    {
+     "carrier": "el",
+     "deliveredKwh": 0.0,
+     "month": 8,
+     "primaryFossilKwh": 0.0,
+     "service": "ventilation",
+     "usedKwh": 16.446315789473683
+    },
+    {
+     "carrier": "gas",
+     "deliveredKwh": 341.44030800278864,
+     "month": 8,
+     "primaryFossilKwh": 341.44030800278864,
+     "service": "hotWater",
+     "usedKwh": 341.44030800278864
+    },
+    {
+     "carrier": "el",
+     "deliveredKwh": 0.0,
+     "month": 8,
+     "primaryFossilKwh": 0.0,
+     "service": "auxiliary",
+     "usedKwh": 3.65
+    },
+    {
+     "carrier": "gas",
+     "deliveredKwh": 9.425238490277211,
+     "month": 9,
+     "primaryFossilKwh": 9.425238490277211,
+     "service": "heating",
+     "usedKwh": 9.425238490277211
+    },
+    {
+     "carrier": "el",
+     "deliveredKwh": 0.0,
+     "month": 9,
+     "primaryFossilKwh": 0.0,
+     "service": "ventilation",
+     "usedKwh": 15.91578947368421
+    },
+    {
+     "carrier": "gas",
+     "deliveredKwh": 330.4261045188277,
+     "month": 9,
+     "primaryFossilKwh": 330.4261045188277,
+     "service": "hotWater",
+     "usedKwh": 330.4261045188277
+    },
+    {
+     "carrier": "el",
+     "deliveredKwh": 0.0,
+     "month": 9,
+     "primaryFossilKwh": 0.0,
+     "service": "auxiliary",
+     "usedKwh": 3.7795970292413115
+    },
+    {
+     "carrier": "gas",
+     "deliveredKwh": 344.86906666680204,
+     "month": 10,
+     "primaryFossilKwh": 344.86906666680204,
+     "service": "heating",
+     "usedKwh": 344.86906666680204
+    },
+    {
+     "carrier": "el",
+     "deliveredKwh": 0.0,
+     "month": 10,
+     "primaryFossilKwh": 0.0,
+     "service": "ventilation",
+     "usedKwh": 16.446315789473683
+    },
+    {
+     "carrier": "gas",
+     "deliveredKwh": 341.44030800278864,
+     "month": 10,
+     "primaryFossilKwh": 341.44030800278864,
+     "service": "hotWater",
+     "usedKwh": 341.44030800278864
+    },
+    {
+     "carrier": "el",
+     "deliveredKwh": 0.0,
+     "month": 10,
+     "primaryFossilKwh": 0.0,
+     "service": "auxiliary",
+     "usedKwh": 8.391949666668529
+    },
+    {
+     "carrier": "gas",
+     "deliveredKwh": 724.0626412287122,
+     "month": 11,
+     "primaryFossilKwh": 724.0626412287122,
+     "service": "heating",
+     "usedKwh": 724.0626412287122
+    },
+    {
+     "carrier": "el",
+     "deliveredKwh": 0.0,
+     "month": 11,
+     "primaryFossilKwh": 0.0,
+     "service": "ventilation",
+     "usedKwh": 15.91578947368421
+    },
+    {
+     "carrier": "gas",
+     "deliveredKwh": 330.4261045188277,
+     "month": 11,
+     "primaryFossilKwh": 330.4261045188277,
+     "service": "hotWater",
+     "usedKwh": 330.4261045188277
+    },
+    {
+     "carrier": "el",
+     "deliveredKwh": 0.0,
+     "month": 11,
+     "primaryFossilKwh": 0.0,
+     "service": "auxiliary",
+     "usedKwh": 13.605861316894792
+    },
+    {
+     "carrier": "gas",
+     "deliveredKwh": 1208.1955037330708,
+     "month": 12,
+     "primaryFossilKwh": 1208.1955037330708,
+     "service": "heating",
+     "usedKwh": 1208.1955037330708
+    },
+    {
+     "carrier": "el",
+     "deliveredKwh": 0.0,
+     "month": 12,
+     "primaryFossilKwh": 0.0,
+     "service": "ventilation",
+     "usedKwh": 16.446315789473683
+    },
+    {
+     "carrier": "gas",
+     "deliveredKwh": 341.44030800278864,
+     "month": 12,
+     "primaryFossilKwh": 341.44030800278864,
+     "service": "hotWater",
+     "usedKwh": 341.44030800278864
+    },
+    {
+     "carrier": "el",
+     "deliveredKwh": 0.0,
+     "month": 12,
+     "primaryFossilKwh": 0.0,
+     "service": "auxiliary",
+     "usedKwh": 20.262688176329718
+    }
+   ],
+   "renewable": []
+  },
+  "externalSupply": {
+   "areaElectricity": null,
+   "cooling": null,
+   "declared": {
+    "districtCold": {
+     "co2KgPerKwh": 0.11333333333333334,
+     "primaryFactor": 0.48333333333333334,
+     "renewableFactor": 0.0
+    },
+    "districtHeat": {
+     "co2KgPerKwh": 0.17,
+     "primaryFactor": 0.9,
+     "renewableFactor": 0.0
+    },
+    "districtHotWater": {
+     "co2KgPerKwh": 0.17,
+     "primaryFactor": 0.9,
+     "renewableFactor": 0.0
+    },
+    "heatPumpSource": null,
+    "practiceCold": 1.0,
+    "practiceHeat": 1.0,
+    "practiceHotWater": 1.0
+   },
+   "forfait": {
+    "districtCold": {
+     "co2KgPerKwh": 0.11333333333333334,
+     "primaryFactor": 0.48333333333333334,
+     "renewableFactor": 0.0
+    },
+    "districtHeat": {
+     "co2KgPerKwh": 0.17,
+     "primaryFactor": 0.9,
+     "renewableFactor": 0.0
+    },
+    "districtHotWater": {
+     "co2KgPerKwh": 0.17,
+     "primaryFactor": 0.9,
+     "renewableFactor": 0.0
+    },
+    "heatPumpSource": null,
+    "practiceCold": 1.0,
+    "practiceHeat": 1.0,
+    "practiceHotWater": 1.0
+   },
+   "forfaitCo2Kg": null,
+   "forfaitPrimaryFossilKwh": null,
+   "forfaitRenewablePrimaryKwh": null,
+   "heatPumpSource": null,
+   "heating": null,
+   "hotWater": null,
+   "qualityDeclarationUsed": false
+  },
+  "finalEditionVerified": false,
+  "finalEnergyByCarrier": [],
+  "hotWater": {
+   "annualGeneratorOutputKwh": 2300.531014492754,
+   "annualNetNeedKwh": 1951.6799999999998,
+   "annualSolarRenewableKwh": 0.0,
+   "annualSolarSpaceHeatingKwh": 0.0,
+   "emissionEfficiency": 0.8483606557377048,
+   "generators": [
+    {
+     "index": 0,
+     "monthlyOutputKwh": [
+      195.38756561445308,
+      176.4790915227318,
+      195.38756561445308,
+      189.08474091721266,
+      195.38756561445308,
+      189.08474091721266,
+      195.38756561445308,
+      195.38756561445308,
+      189.08474091721266,
+      195.38756561445308,
+      189.08474091721266,
+      195.38756561445308
+     ],
+     "monthlyShare": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ],
+     "order": 0
+    }
+   ],
+   "months": [
+    {
+     "ambientHeatKwh": 0.0,
+     "auxiliaryElectricityKwh": 0.0,
+     "biomassKwh": 0.0,
+     "biomassOutputKwh": 0.0,
+     "carrierInputKwh": 341.44030800278864,
+     "chpElectricityKwh": 0.0,
+     "chpExcessKwh": 0.0,
+     "circulationLossKwh": 0.0,
+     "conversionLossKwh": 0.0,
+     "distributionEfficiency": 1.0,
+     "districtHeatKwh": 0.0,
+     "electricityKwh": 0.0,
+     "emissionInputKwh": 195.38756561445308,
+     "extraElectricOutputKwh": 0.0,
+     "generationEfficiency": 0.5722451656553019,
+     "generatorOutputKwh": 195.38756561445308,
+     "heatingSystemLoadKwh": 0.0,
+     "month": 1,
+     "naturalGasKwh": 341.44030800278864,
+     "netNeedKwh": 165.75912328767123,
+     "oilKwh": 0.0,
+     "recoverableLossKwh": 0.0,
+     "recoveredKwh": 0.0,
+     "solarAuxiliaryKwh": 0.0,
+     "solarBackupStorageLossKwh": 0.0,
+     "solarRecoverableKwh": 0.0,
+     "solarRenewableKwh": 0.0,
+     "solarSpaceHeatingKwh": 0.0,
+     "storageLossKwh": 0.0
+    },
+    {
+     "ambientHeatKwh": 0.0,
+     "auxiliaryElectricityKwh": 0.0,
+     "biomassKwh": 0.0,
+     "biomassOutputKwh": 0.0,
+     "carrierInputKwh": 308.39769755090583,
+     "chpElectricityKwh": 0.0,
+     "chpExcessKwh": 0.0,
+     "circulationLossKwh": 0.0,
+     "conversionLossKwh": 0.0,
+     "distributionEfficiency": 1.0,
+     "districtHeatKwh": 0.0,
+     "electricityKwh": 0.0,
+     "emissionInputKwh": 176.4790915227318,
+     "extraElectricOutputKwh": 0.0,
+     "generationEfficiency": 0.5722451656553019,
+     "generatorOutputKwh": 176.4790915227318,
+     "heatingSystemLoadKwh": 0.0,
+     "month": 2,
+     "naturalGasKwh": 308.39769755090583,
+     "netNeedKwh": 149.71791780821917,
+     "oilKwh": 0.0,
+     "recoverableLossKwh": 0.0,
+     "recoveredKwh": 0.0,
+     "solarAuxiliaryKwh": 0.0,
+     "solarBackupStorageLossKwh": 0.0,
+     "solarRecoverableKwh": 0.0,
+     "solarRenewableKwh": 0.0,
+     "solarSpaceHeatingKwh": 0.0,
+     "storageLossKwh": 0.0
+    },
+    {
+     "ambientHeatKwh": 0.0,
+     "auxiliaryElectricityKwh": 0.0,
+     "biomassKwh": 0.0,
+     "biomassOutputKwh": 0.0,
+     "carrierInputKwh": 341.44030800278864,
+     "chpElectricityKwh": 0.0,
+     "chpExcessKwh": 0.0,
+     "circulationLossKwh": 0.0,
+     "conversionLossKwh": 0.0,
+     "distributionEfficiency": 1.0,
+     "districtHeatKwh": 0.0,
+     "electricityKwh": 0.0,
+     "emissionInputKwh": 195.38756561445308,
+     "extraElectricOutputKwh": 0.0,
+     "generationEfficiency": 0.5722451656553019,
+     "generatorOutputKwh": 195.38756561445308,
+     "heatingSystemLoadKwh": 0.0,
+     "month": 3,
+     "naturalGasKwh": 341.44030800278864,
+     "netNeedKwh": 165.75912328767123,
+     "oilKwh": 0.0,
+     "recoverableLossKwh": 0.0,
+     "recoveredKwh": 0.0,
+     "solarAuxiliaryKwh": 0.0,
+     "solarBackupStorageLossKwh": 0.0,
+     "solarRecoverableKwh": 0.0,
+     "solarRenewableKwh": 0.0,
+     "solarSpaceHeatingKwh": 0.0,
+     "storageLossKwh": 0.0
+    },
+    {
+     "ambientHeatKwh": 0.0,
+     "auxiliaryElectricityKwh": 0.0,
+     "biomassKwh": 0.0,
+     "biomassOutputKwh": 0.0,
+     "carrierInputKwh": 330.4261045188277,
+     "chpElectricityKwh": 0.0,
+     "chpExcessKwh": 0.0,
+     "circulationLossKwh": 0.0,
+     "conversionLossKwh": 0.0,
+     "distributionEfficiency": 1.0,
+     "districtHeatKwh": 0.0,
+     "electricityKwh": 0.0,
+     "emissionInputKwh": 189.08474091721266,
+     "extraElectricOutputKwh": 0.0,
+     "generationEfficiency": 0.5722451656553019,
+     "generatorOutputKwh": 189.08474091721266,
+     "heatingSystemLoadKwh": 0.0,
+     "month": 4,
+     "naturalGasKwh": 330.4261045188277,
+     "netNeedKwh": 160.41205479452054,
+     "oilKwh": 0.0,
+     "recoverableLossKwh": 0.0,
+     "recoveredKwh": 0.0,
+     "solarAuxiliaryKwh": 0.0,
+     "solarBackupStorageLossKwh": 0.0,
+     "solarRecoverableKwh": 0.0,
+     "solarRenewableKwh": 0.0,
+     "solarSpaceHeatingKwh": 0.0,
+     "storageLossKwh": 0.0
+    },
+    {
+     "ambientHeatKwh": 0.0,
+     "auxiliaryElectricityKwh": 0.0,
+     "biomassKwh": 0.0,
+     "biomassOutputKwh": 0.0,
+     "carrierInputKwh": 341.44030800278864,
+     "chpElectricityKwh": 0.0,
+     "chpExcessKwh": 0.0,
+     "circulationLossKwh": 0.0,
+     "conversionLossKwh": 0.0,
+     "distributionEfficiency": 1.0,
+     "districtHeatKwh": 0.0,
+     "electricityKwh": 0.0,
+     "emissionInputKwh": 195.38756561445308,
+     "extraElectricOutputKwh": 0.0,
+     "generationEfficiency": 0.5722451656553019,
+     "generatorOutputKwh": 195.38756561445308,
+     "heatingSystemLoadKwh": 0.0,
+     "month": 5,
+     "naturalGasKwh": 341.44030800278864,
+     "netNeedKwh": 165.75912328767123,
+     "oilKwh": 0.0,
+     "recoverableLossKwh": 0.0,
+     "recoveredKwh": 0.0,
+     "solarAuxiliaryKwh": 0.0,
+     "solarBackupStorageLossKwh": 0.0,
+     "solarRecoverableKwh": 0.0,
+     "solarRenewableKwh": 0.0,
+     "solarSpaceHeatingKwh": 0.0,
+     "storageLossKwh": 0.0
+    },
+    {
+     "ambientHeatKwh": 0.0,
+     "auxiliaryElectricityKwh": 0.0,
+     "biomassKwh": 0.0,
+     "biomassOutputKwh": 0.0,
+     "carrierInputKwh": 330.4261045188277,
+     "chpElectricityKwh": 0.0,
+     "chpExcessKwh": 0.0,
+     "circulationLossKwh": 0.0,
+     "conversionLossKwh": 0.0,
+     "distributionEfficiency": 1.0,
+     "districtHeatKwh": 0.0,
+     "electricityKwh": 0.0,
+     "emissionInputKwh": 189.08474091721266,
+     "extraElectricOutputKwh": 0.0,
+     "generationEfficiency": 0.5722451656553019,
+     "generatorOutputKwh": 189.08474091721266,
+     "heatingSystemLoadKwh": 0.0,
+     "month": 6,
+     "naturalGasKwh": 330.4261045188277,
+     "netNeedKwh": 160.41205479452054,
+     "oilKwh": 0.0,
+     "recoverableLossKwh": 0.0,
+     "recoveredKwh": 0.0,
+     "solarAuxiliaryKwh": 0.0,
+     "solarBackupStorageLossKwh": 0.0,
+     "solarRecoverableKwh": 0.0,
+     "solarRenewableKwh": 0.0,
+     "solarSpaceHeatingKwh": 0.0,
+     "storageLossKwh": 0.0
+    },
+    {
+     "ambientHeatKwh": 0.0,
+     "auxiliaryElectricityKwh": 0.0,
+     "biomassKwh": 0.0,
+     "biomassOutputKwh": 0.0,
+     "carrierInputKwh": 341.44030800278864,
+     "chpElectricityKwh": 0.0,
+     "chpExcessKwh": 0.0,
+     "circulationLossKwh": 0.0,
+     "conversionLossKwh": 0.0,
+     "distributionEfficiency": 1.0,
+     "districtHeatKwh": 0.0,
+     "electricityKwh": 0.0,
+     "emissionInputKwh": 195.38756561445308,
+     "extraElectricOutputKwh": 0.0,
+     "generationEfficiency": 0.5722451656553019,
+     "generatorOutputKwh": 195.38756561445308,
+     "heatingSystemLoadKwh": 0.0,
+     "month": 7,
+     "naturalGasKwh": 341.44030800278864,
+     "netNeedKwh": 165.75912328767123,
+     "oilKwh": 0.0,
+     "recoverableLossKwh": 0.0,
+     "recoveredKwh": 0.0,
+     "solarAuxiliaryKwh": 0.0,
+     "solarBackupStorageLossKwh": 0.0,
+     "solarRecoverableKwh": 0.0,
+     "solarRenewableKwh": 0.0,
+     "solarSpaceHeatingKwh": 0.0,
+     "storageLossKwh": 0.0
+    },
+    {
+     "ambientHeatKwh": 0.0,
+     "auxiliaryElectricityKwh": 0.0,
+     "biomassKwh": 0.0,
+     "biomassOutputKwh": 0.0,
+     "carrierInputKwh": 341.44030800278864,
+     "chpElectricityKwh": 0.0,
+     "chpExcessKwh": 0.0,
+     "circulationLossKwh": 0.0,
+     "conversionLossKwh": 0.0,
+     "distributionEfficiency": 1.0,
+     "districtHeatKwh": 0.0,
+     "electricityKwh": 0.0,
+     "emissionInputKwh": 195.38756561445308,
+     "extraElectricOutputKwh": 0.0,
+     "generationEfficiency": 0.5722451656553019,
+     "generatorOutputKwh": 195.38756561445308,
+     "heatingSystemLoadKwh": 0.0,
+     "month": 8,
+     "naturalGasKwh": 341.44030800278864,
+     "netNeedKwh": 165.75912328767123,
+     "oilKwh": 0.0,
+     "recoverableLossKwh": 0.0,
+     "recoveredKwh": 0.0,
+     "solarAuxiliaryKwh": 0.0,
+     "solarBackupStorageLossKwh": 0.0,
+     "solarRecoverableKwh": 0.0,
+     "solarRenewableKwh": 0.0,
+     "solarSpaceHeatingKwh": 0.0,
+     "storageLossKwh": 0.0
+    },
+    {
+     "ambientHeatKwh": 0.0,
+     "auxiliaryElectricityKwh": 0.0,
+     "biomassKwh": 0.0,
+     "biomassOutputKwh": 0.0,
+     "carrierInputKwh": 330.4261045188277,
+     "chpElectricityKwh": 0.0,
+     "chpExcessKwh": 0.0,
+     "circulationLossKwh": 0.0,
+     "conversionLossKwh": 0.0,
+     "distributionEfficiency": 1.0,
+     "districtHeatKwh": 0.0,
+     "electricityKwh": 0.0,
+     "emissionInputKwh": 189.08474091721266,
+     "extraElectricOutputKwh": 0.0,
+     "generationEfficiency": 0.5722451656553019,
+     "generatorOutputKwh": 189.08474091721266,
+     "heatingSystemLoadKwh": 0.0,
+     "month": 9,
+     "naturalGasKwh": 330.4261045188277,
+     "netNeedKwh": 160.41205479452054,
+     "oilKwh": 0.0,
+     "recoverableLossKwh": 0.0,
+     "recoveredKwh": 0.0,
+     "solarAuxiliaryKwh": 0.0,
+     "solarBackupStorageLossKwh": 0.0,
+     "solarRecoverableKwh": 0.0,
+     "solarRenewableKwh": 0.0,
+     "solarSpaceHeatingKwh": 0.0,
+     "storageLossKwh": 0.0
+    },
+    {
+     "ambientHeatKwh": 0.0,
+     "auxiliaryElectricityKwh": 0.0,
+     "biomassKwh": 0.0,
+     "biomassOutputKwh": 0.0,
+     "carrierInputKwh": 341.44030800278864,
+     "chpElectricityKwh": 0.0,
+     "chpExcessKwh": 0.0,
+     "circulationLossKwh": 0.0,
+     "conversionLossKwh": 0.0,
+     "distributionEfficiency": 1.0,
+     "districtHeatKwh": 0.0,
+     "electricityKwh": 0.0,
+     "emissionInputKwh": 195.38756561445308,
+     "extraElectricOutputKwh": 0.0,
+     "generationEfficiency": 0.5722451656553019,
+     "generatorOutputKwh": 195.38756561445308,
+     "heatingSystemLoadKwh": 0.0,
+     "month": 10,
+     "naturalGasKwh": 341.44030800278864,
+     "netNeedKwh": 165.75912328767123,
+     "oilKwh": 0.0,
+     "recoverableLossKwh": 0.0,
+     "recoveredKwh": 0.0,
+     "solarAuxiliaryKwh": 0.0,
+     "solarBackupStorageLossKwh": 0.0,
+     "solarRecoverableKwh": 0.0,
+     "solarRenewableKwh": 0.0,
+     "solarSpaceHeatingKwh": 0.0,
+     "storageLossKwh": 0.0
+    },
+    {
+     "ambientHeatKwh": 0.0,
+     "auxiliaryElectricityKwh": 0.0,
+     "biomassKwh": 0.0,
+     "biomassOutputKwh": 0.0,
+     "carrierInputKwh": 330.4261045188277,
+     "chpElectricityKwh": 0.0,
+     "chpExcessKwh": 0.0,
+     "circulationLossKwh": 0.0,
+     "conversionLossKwh": 0.0,
+     "distributionEfficiency": 1.0,
+     "districtHeatKwh": 0.0,
+     "electricityKwh": 0.0,
+     "emissionInputKwh": 189.08474091721266,
+     "extraElectricOutputKwh": 0.0,
+     "generationEfficiency": 0.5722451656553019,
+     "generatorOutputKwh": 189.08474091721266,
+     "heatingSystemLoadKwh": 0.0,
+     "month": 11,
+     "naturalGasKwh": 330.4261045188277,
+     "netNeedKwh": 160.41205479452054,
+     "oilKwh": 0.0,
+     "recoverableLossKwh": 0.0,
+     "recoveredKwh": 0.0,
+     "solarAuxiliaryKwh": 0.0,
+     "solarBackupStorageLossKwh": 0.0,
+     "solarRecoverableKwh": 0.0,
+     "solarRenewableKwh": 0.0,
+     "solarSpaceHeatingKwh": 0.0,
+     "storageLossKwh": 0.0
+    },
+    {
+     "ambientHeatKwh": 0.0,
+     "auxiliaryElectricityKwh": 0.0,
+     "biomassKwh": 0.0,
+     "biomassOutputKwh": 0.0,
+     "carrierInputKwh": 341.44030800278864,
+     "chpElectricityKwh": 0.0,
+     "chpExcessKwh": 0.0,
+     "circulationLossKwh": 0.0,
+     "conversionLossKwh": 0.0,
+     "distributionEfficiency": 1.0,
+     "districtHeatKwh": 0.0,
+     "electricityKwh": 0.0,
+     "emissionInputKwh": 195.38756561445308,
+     "extraElectricOutputKwh": 0.0,
+     "generationEfficiency": 0.5722451656553019,
+     "generatorOutputKwh": 195.38756561445308,
+     "heatingSystemLoadKwh": 0.0,
+     "month": 12,
+     "naturalGasKwh": 341.44030800278864,
+     "netNeedKwh": 165.75912328767123,
+     "oilKwh": 0.0,
+     "recoverableLossKwh": 0.0,
+     "recoveredKwh": 0.0,
+     "solarAuxiliaryKwh": 0.0,
+     "solarBackupStorageLossKwh": 0.0,
+     "solarRecoverableKwh": 0.0,
+     "solarRenewableKwh": 0.0,
+     "solarSpaceHeatingKwh": 0.0,
+     "storageLossKwh": 0.0
+    }
+   ]
+  },
+  "indicativeLabelClass": "A+",
+  "indicators": {
+   "bengCalculationAvailable": false,
+   "draftSource": "NTA 8800:2025+C1:2026, §5.3.1, formules 5.1–5.8 (p. 72–79)",
+   "finalEditionVerified": false,
+   "inputFingerprint": "sha256:784422c3b62becf78cd144b74fbec99d2dc644febdd2192726294a3526019036",
+   "issues": [],
+   "kernelVersion": "0.1.0",
+   "labelAvailable": false,
+   "needIndicatorKwhPerM2Year": 51.37,
+   "referenceVerified": false,
+   "scenarios": [
+    {
+     "kind": "ordinary",
+     "primaryFossilIndicatorKwhPerM2Year": 80.56,
+     "renewableIndicatorKwhPerM2Year": 23.2,
+     "renewableSharePercent": 22.3
+    }
+   ],
+   "scope": "public_chapter_5_draft_indicators_from_supplied_annual_totals_only",
+   "status": "input_valid",
+   "targetNormVersion": "NTA 8800:2022"
+  },
+  "inputFingerprint": "sha256:ae5e0deddb8c63c8b10e802d213c45d4b9f106d7da61f54d6d7392507ed34227",
+  "issues": [],
+  "kernelVersion": "0.1.0",
+  "labelAvailable": false,
+  "labelPrimaryFossilIndicatorKwhPerM2Year": 80.56,
+  "labelRenewableSharePercent": 22.3,
+  "labelSource": "Omgevingsregeling art. 5.11/5.12 lid 4, bijlagen IX en X (BWBR0045528, versie 2026-10-01)",
+  "lighting": [],
+  "needIndicatorKwhPerM2Year": 51.37,
+  "normVersion": "2022",
+  "primaryFossilIndicatorKwhPerM2Year": 80.56,
+  "pvSystems": [
+   {
+    "annualKwh": 1600.166016,
+    "id": "pv",
+    "monthlyKwh": [
+     58.93015679999999,
+     68.11983359999999,
+     128.85246719999998,
+     186.846912,
+     206.3064384,
+     194.33260800000002,
+     188.29151999999996,
+     196.942752,
+     155.229696,
+     111.34644480000001,
+     60.08256000000001,
+     44.884627200000004
+    ]
+   }
+  ],
+  "referenceVerified": false,
+  "registrationEligible": false,
+  "renewableSharePercent": 22.3,
+  "scope": "nta8800_single_zone_building_performance_unverified",
+  "spaceHeating": {
+   "additionalZoneDemands": [],
+   "annexQ": null,
+   "annualAuxiliaryElectricityKwh": 124.83732343782498,
+   "annualBiomassKwh": 0.0,
+   "annualCollectiveSourceHeatKwh": 0.0,
+   "annualDistrictHeatKwh": 0.0,
+   "annualGeneratorElectricityKwh": 0.0,
+   "annualNaturalGasKwh": 5893.623522750909,
+   "bengCalculationAvailable": false,
+   "chapter9Source": "NTA 8800:2025+C1:2026, §9.3, formules 9.9–9.12a en tabellen 9.2–9.4 (p. 294–297)",
+   "demand": {
+    "annualCoolingNeedKwh": 139.5232047242523,
+    "annualCoolingNeedWithoutRecoverableKwh": 139.5232047242523,
+    "annualHeatingNeedKwh": 4996.767769288813,
+    "annualHeatingNeedWithoutRecoverableKwh": 4996.767769288813,
+    "bengCalculationAvailable": false,
+    "climateSource": "NTA 8800:2025+C1:2026 tables 17.1/17.2 (transcribed via Open Heatloss Studio; review pending)",
+    "finalEditionVerified": false,
+    "fixedC1": {
+     "annualCoolingNeedKwh": 139.5232047242523,
+     "annualHeatingNeedKwh": 4996.767769288813,
+     "issues": [],
+     "monthlyCoolingNeedKwh": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      9.638897453441132,
+      15.048662659722936,
+      38.977779421569494,
+      64.48667027014392,
+      11.37119491937483,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "monthlyHeatingNeedKwh": [
+      1160.7471183613816,
+      942.4521265845981,
+      642.7246111187807,
+      285.2315143829536,
+      22.530545422553814,
+      4.483037013422745,
+      0.0,
+      0.0,
+      7.9909630678437225,
+      292.3889913044626,
+      613.879195824343,
+      1024.339666208473
+     ],
+     "status": "calculated_unverified"
+    },
+    "heatingLimitNeedKwh": [
+     1160.7471183613816,
+     942.4521265845981,
+     642.7246111187807,
+     285.2315143829536,
+     22.530545422553814,
+     4.483037013422745,
+     0.0,
+     0.0,
+     7.9909630678437225,
+     292.3889913044626,
+     613.879195824343,
+     1024.339666208473
+    ],
+    "inputFingerprint": "sha256:07f50305b5ee328bbf7081eec29f2b770a5c1a2f3cbd58813dc16d8408afd5d0",
+    "issues": [],
+    "kernelVersion": "0.1.0",
+    "monthly": [
+     {
+      "cooling": {
+       "a": 6.866849395367519,
+       "calculationTemperatureC": 24.0,
+       "gainsKwh": 449.64805925376004,
+       "gamma": 0.20018292370753665,
+       "heatTransferKwh": 2246.185893011969,
+       "needKwh": 0.0,
+       "operativeTemperatureC": 6.8919127381042085,
+       "reductionFactor": 1.0,
+       "setpointC": 24.0,
+       "timeConstantH": 88.00274093051279,
+       "transmissionKwh": 1052.9859676898177,
+       "utilization": 0.2001803685146103,
+       "ventilationConductanceWPerK": 74.97724826960085,
+       "ventilationKwh": 1193.199925322151
+      },
+      "groundConductanceWPerK": 12.382858305323413,
+      "heating": {
+       "a": 6.4760443006677075,
+       "calculationTemperatureC": 17.103294523910442,
+       "gainsKwh": 338.09457413376003,
+       "gamma": 0.22557312463066498,
+       "heatTransferKwh": 1498.8247145457974,
+       "needKwh": 1160.7471183613816,
+       "operativeTemperatureC": 17.103294523910442,
+       "reductionFactor": 0.981022247931228,
+       "setpointC": 17.383665484624622,
+       "timeConstantH": 82.14066451001561,
+       "transmissionKwh": 689.5332934213764,
+       "utilization": 0.999949783431492,
+       "ventilationConductanceWPerK": 75.05245164672655,
+       "ventilationKwh": 809.291421124421
+      },
+      "hours": 744.0,
+      "internalGainsKwh": 305.3376,
+      "month": 1,
+      "opaqueSolarGainsKwh": -4.998020106239996,
+      "outdoorTemperatureC": 2.61,
+      "sunroomCoolingGainsKwh": 0.0,
+      "sunroomGainsKwh": 0.0,
+      "windowSolarByWindow": [
+       {
+        "coolingKwh": 10.397013120000004,
+        "heatingKwh": 10.397013120000004,
+        "id": "window:win-N",
+        "orientation": "north"
+       },
+       {
+        "coolingKwh": 138.91146624000004,
+        "heatingKwh": 27.357981120000012,
+        "id": "window:win-S",
+        "orientation": "south"
+       }
+      ],
+      "windowSolarCoolingKwh": 149.30847936000004,
+      "windowSolarGainsKwh": 37.754994240000016
+     },
+     {
+      "cooling": {
+       "a": 6.059458143711933,
+       "calculationTemperatureC": 24.0,
+       "gainsKwh": 433.41645699072006,
+       "gamma": 0.20370024086297517,
+       "heatTransferKwh": 2127.7169587750764,
+       "needKwh": 0.0,
+       "operativeTemperatureC": 8.726970619751864,
+       "reductionFactor": 1.0,
+       "setpointC": 24.0,
+       "timeConstantH": 75.891872155679,
+       "transmissionKwh": 869.1842821393117,
+       "utilization": 0.20368969852217308,
+       "ventilationConductanceWPerK": 97.64423790870362,
+       "ventilationKwh": 1258.5326766357646
+      },
+      "groundConductanceWPerK": 12.930437121223344,
+      "heating": {
+       "a": 5.761706041245048,
+       "calculationTemperatureC": 17.245254257831974,
+       "gainsKwh": 420.34624515072005,
+       "gamma": 0.30851858420468253,
+       "heatTransferKwh": 1362.4665309362595,
+       "needKwh": 942.4521265845981,
+       "operativeTemperatureC": 17.245254257831974,
+       "reductionFactor": 0.9805670726881879,
+       "setpointC": 17.491498568444282,
+       "timeConstantH": 71.42559061867571,
+       "transmissionKwh": 545.1760979673832,
+       "utilization": 0.9992105536735801,
+       "ventilationConductanceWPerK": 97.88177981751745,
+       "ventilationKwh": 817.2904329688764
+      },
+      "hours": 672.0,
+      "internalGainsKwh": 275.7888,
+      "month": 2,
+      "opaqueSolarGainsKwh": -0.7462386892800006,
+      "outdoorTemperatureC": 4.82,
+      "sunroomCoolingGainsKwh": 0.0,
+      "sunroomGainsKwh": 0.0,
+      "windowSolarByWindow": [
+       {
+        "coolingKwh": 18.53542656000001,
+        "heatingKwh": 18.53542656000001,
+        "id": "window:win-N",
+        "orientation": "north"
+       },
+       {
+        "coolingKwh": 139.83846912000007,
+        "heatingKwh": 126.76825728000006,
+        "id": "window:win-S",
+        "orientation": "south"
+       }
+      ],
+      "windowSolarCoolingKwh": 158.3738956800001,
+      "windowSolarGainsKwh": 145.30368384000008
+     },
+     {
+      "cooling": {
+       "a": 6.598584464760166,
+       "calculationTemperatureC": 24.0,
+       "gainsKwh": 594.4550610124801,
+       "gamma": 0.29415367903503326,
+       "heatTransferKwh": 2020.8996296173518,
+       "needKwh": 0.0,
+       "operativeTemperatureC": 11.231240053743752,
+       "reductionFactor": 1.0,
+       "setpointC": 24.0,
+       "timeConstantH": 83.9787669714025,
+       "transmissionKwh": 920.1805727328193,
+       "utilization": 0.294089014411274,
+       "ventilationConductanceWPerK": 81.78336638823002,
+       "ventilationKwh": 1100.7190568845324
+      },
+      "groundConductanceWPerK": 13.461801312593385,
+      "heating": {
+       "a": 6.522817936101792,
+       "calculationTemperatureC": 17.740537650900233,
+       "gainsKwh": 594.4550610124801,
+       "gamma": 0.48151668302803496,
+       "heatTransferKwh": 1234.547175550031,
+       "needKwh": 642.7246111187807,
+       "operativeTemperatureC": 17.740537650900233,
+       "reductionFactor": 0.9873170642861753,
+       "setpointC": 17.892511068471855,
+       "timeConstantH": 82.84226904152689,
+       "transmissionKwh": 585.2855882547893,
+       "utilization": 0.9955715801683207,
+       "ventilationConductanceWPerK": 73.7636318428455,
+       "ventilationKwh": 649.2615872952416
+      },
+      "hours": 744.0,
+      "internalGainsKwh": 305.3376,
+      "month": 3,
+      "opaqueSolarGainsKwh": 10.723493652480002,
+      "outdoorTemperatureC": 5.91,
+      "sunroomCoolingGainsKwh": 0.0,
+      "sunroomGainsKwh": 0.0,
+      "windowSolarByWindow": [
+       {
+        "coolingKwh": 38.96214912000001,
+        "heatingKwh": 38.96214912000001,
+        "id": "window:win-N",
+        "orientation": "north"
+       },
+       {
+        "coolingKwh": 239.4318182400001,
+        "heatingKwh": 239.4318182400001,
+        "id": "window:win-S",
+        "orientation": "south"
+       }
+      ],
+      "windowSolarCoolingKwh": 278.3939673600001,
+      "windowSolarGainsKwh": 278.3939673600001
+     },
+     {
+      "cooling": {
+       "a": 6.013231534460629,
+       "calculationTemperatureC": 24.0,
+       "gainsKwh": 682.7081061888001,
+       "gamma": 0.3795601151752239,
+       "heatTransferKwh": 1798.6824191831324,
+       "needKwh": 0.0,
+       "operativeTemperatureC": 14.891942490772287,
+       "reductionFactor": 1.0,
+       "setpointC": 24.0,
+       "timeConstantH": 75.19847301690943,
+       "transmissionKwh": 750.5692012147584,
+       "utilization": 0.3788641559170403,
+       "ventilationConductanceWPerK": 99.1629974614341,
+       "ventilationKwh": 1048.1132179683739
+      },
+      "groundConductanceWPerK": 13.834572273469124,
+      "heating": {
+       "a": 6.480172615117767,
+       "calculationTemperatureC": 18.331994891856034,
+       "gainsKwh": 682.1319045888001,
+       "gamma": 0.7242670749262261,
+       "heatTransferKwh": 941.8237114510309,
+       "needKwh": 285.2315143829536,
+       "operativeTemperatureC": 18.331994891856034,
+       "reductionFactor": 0.9931645718767759,
+       "setpointC": 18.39401970131308,
+       "timeConstantH": 82.2025892267665,
+       "transmissionKwh": 455.57949488785266,
+       "utilization": 0.9625589899124883,
+       "ventilationConductanceWPerK": 74.93781318954942,
+       "ventilationKwh": 486.2442165631783
+      },
+      "hours": 720.0,
+      "internalGainsKwh": 295.488,
+      "month": 4,
+      "opaqueSolarGainsKwh": 23.0949093888,
+      "outdoorTemperatureC": 9.32,
+      "sunroomCoolingGainsKwh": 0.0,
+      "sunroomGainsKwh": 0.0,
+      "windowSolarByWindow": [
+       {
+        "coolingKwh": 54.73474560000002,
+        "heatingKwh": 54.158544000000006,
+        "id": "window:win-N",
+        "orientation": "north"
+       },
+       {
+        "coolingKwh": 309.3904512000001,
+        "heatingKwh": 309.3904512000001,
+        "id": "window:win-S",
+        "orientation": "south"
+       }
+      ],
+      "windowSolarCoolingKwh": 364.1251968000001,
+      "windowSolarGainsKwh": 363.5489952000001
+     },
+     {
+      "cooling": {
+       "a": 5.667959514870524,
+       "calculationTemperatureC": 24.0,
+       "gainsKwh": 702.0384080947202,
+       "gamma": 0.535836480852485,
+       "heatTransferKwh": 1310.1728478393586,
+       "needKwh": 9.638897453441132,
+       "operativeTemperatureC": 19.765403254853858,
+       "reductionFactor": 1.0,
+       "setpointC": 24.0,
+       "timeConstantH": 70.01939272305786,
+       "transmissionKwh": 541.4590939231282,
+       "utilization": 0.5284795145794189,
+       "ventilationConductanceWPerK": 111.45818890806137,
+       "ventilationKwh": 768.7137539162304
+      },
+      "groundConductanceWPerK": 13.948866325922127,
+      "heating": {
+       "a": 6.571254140641757,
+       "calculationTemperatureC": 19.216478642624285,
+       "gainsKwh": 699.8002031347202,
+       "gamma": 1.3313385291384356,
+       "heatTransferKwh": 525.636558860495,
+       "needKwh": 22.530545422553814,
+       "operativeTemperatureC": 19.216478642624285,
+       "reductionFactor": 1.0,
+       "setpointC": 19.216478642624285,
+       "timeConstantH": 83.56881210962635,
+       "transmissionKwh": 283.79675927638687,
+       "utilization": 0.7189280757340494,
+       "ventilationConductanceWPerK": 72.45180908172725,
+       "ventilationKwh": 241.83979958410814
+      },
+      "hours": 744.0,
+      "internalGainsKwh": 305.3376,
+      "month": 5,
+      "opaqueSolarGainsKwh": 29.959816734720008,
+      "outdoorTemperatureC": 14.73,
+      "sunroomCoolingGainsKwh": 0.0,
+      "sunroomGainsKwh": 0.0,
+      "windowSolarByWindow": [
+       {
+        "coolingKwh": 71.62523712000002,
+        "heatingKwh": 69.38703216000002,
+        "id": "window:win-N",
+        "orientation": "north"
+       },
+       {
+        "coolingKwh": 295.1157542400002,
+        "heatingKwh": 295.1157542400002,
+        "id": "window:win-S",
+        "orientation": "south"
+       }
+      ],
+      "windowSolarCoolingKwh": 366.7409913600002,
+      "windowSolarGainsKwh": 364.5027864000002
+     },
+     {
+      "cooling": {
+       "a": 5.47143687566769,
+       "calculationTemperatureC": 24.0,
+       "gainsKwh": 665.9661141504002,
+       "gamma": 0.5838204840603736,
+       "heatTransferKwh": 1140.703576412252,
+       "needKwh": 15.048662659722936,
+       "operativeTemperatureC": 20.824461835862913,
+       "reductionFactor": 1.0,
+       "setpointC": 24.0,
+       "timeConstantH": 67.07155313501535,
+       "transmissionKwh": 463.8184227669208,
+       "utilization": 0.5706280447878904,
+       "ventilationConductanceWPerK": 119.3043488517575,
+       "ventilationKwh": 676.8851536453311
+      },
+      "groundConductanceWPerK": 13.774058470897936,
+      "heating": {
+       "a": 6.737527314434079,
+       "calculationTemperatureC": 19.434781843837822,
+       "gainsKwh": 663.4116981504002,
+       "gamma": 1.705459341793384,
+       "heatTransferKwh": 388.9929720944191,
+       "needKwh": 4.483037013422745,
+       "operativeTemperatureC": 19.434781843837822,
+       "reductionFactor": 1.0,
+       "setpointC": 19.434781843837822,
+       "timeConstantH": 86.06290971651119,
+       "transmissionKwh": 226.42185452650324,
+       "utilization": 0.5795947466000595,
+       "ventilationConductanceWPerK": 68.11706757235838,
+       "ventilationKwh": 162.57111756791585
+      },
+      "hours": 720.0,
+      "internalGainsKwh": 295.488,
+      "month": 6,
+      "opaqueSolarGainsKwh": 31.080597350400005,
+      "outdoorTemperatureC": 16.12,
+      "sunroomCoolingGainsKwh": 0.0,
+      "sunroomGainsKwh": 0.0,
+      "windowSolarByWindow": [
+       {
+        "coolingKwh": 82.26178560000002,
+        "heatingKwh": 79.70736960000004,
+        "id": "window:win-N",
+        "orientation": "north"
+       },
+       {
+        "coolingKwh": 257.1357312000001,
+        "heatingKwh": 257.1357312000001,
+        "id": "window:win-S",
+        "orientation": "south"
+       }
+      ],
+      "windowSolarCoolingKwh": 339.3975168000002,
+      "windowSolarGainsKwh": 336.8431008000002
+     },
+     {
+      "cooling": {
+       "a": 5.615344158805337,
+       "calculationTemperatureC": 24.0,
+       "gainsKwh": 669.6093179750402,
+       "gamma": 0.7493172220315336,
+       "heatTransferKwh": 893.6259547853565,
+       "needKwh": 38.977779421569494,
+       "operativeTemperatureC": 22.76796192459798,
+       "reductionFactor": 1.0,
+       "setpointC": 24.0,
+       "timeConstantH": 69.23016238208005,
+       "transmissionKwh": 391.21356594407393,
+       "utilization": 0.7056996668197093,
+       "ventilationConductanceWPerK": 113.49335611305742,
+       "ventilationKwh": 502.4123888412825
+      },
+      "groundConductanceWPerK": 13.356988331980894,
+      "heating": {
+       "a": 6.881552710235909,
+       "calculationTemperatureC": 19.72081545259003,
+       "gainsKwh": 667.1975526950401,
+       "gamma": 2.74730053475569,
+       "heatTransferKwh": 242.85568479109702,
+       "needKwh": 0.0,
+       "operativeTemperatureC": 19.72081545259003,
+       "reductionFactor": 1.0,
+       "setpointC": 19.72081545259003,
+       "timeConstantH": 88.22329065353864,
+       "transmissionKwh": 162.60148798324877,
+       "utilization": 0.36377268987220374,
+       "ventilationConductanceWPerK": 64.56041804578523,
+       "ventilationKwh": 80.25419680784825
+      },
+      "hours": 744.0,
+      "internalGainsKwh": 305.3376,
+      "month": 7,
+      "opaqueSolarGainsKwh": 28.38589461504001,
+      "outdoorTemperatureC": 18.05,
+      "sunroomCoolingGainsKwh": 0.0,
+      "sunroomGainsKwh": 0.0,
+      "windowSolarByWindow": [
+       {
+        "coolingKwh": 77.41058112000003,
+        "heatingKwh": 74.99881584000003,
+        "id": "window:win-N",
+        "orientation": "north"
+       },
+       {
+        "coolingKwh": 258.4752422400001,
+        "heatingKwh": 258.4752422400001,
+        "id": "window:win-S",
+        "orientation": "south"
+       }
+      ],
+      "windowSolarCoolingKwh": 335.88582336000013,
+      "windowSolarGainsKwh": 333.47405808000013
+     },
+     {
+      "cooling": {
+       "a": 5.731830045016192,
+       "calculationTemperatureC": 24.0,
+       "gainsKwh": 700.0347706214402,
+       "gamma": 0.8590092467136488,
+       "heatTransferKwh": 814.932753401195,
+       "needKwh": 64.48667027014392,
+       "operativeTemperatureC": 23.65853569648334,
+       "reductionFactor": 1.0,
+       "setpointC": 24.0,
+       "timeConstantH": 70.97745067524288,
+       "transmissionKwh": 367.08369707414437,
+       "utilization": 0.7798779687020546,
+       "ventilationConductanceWPerK": 109.04848846984831,
+       "ventilationKwh": 447.84905632705056
+      },
+      "groundConductanceWPerK": 12.809409516080967,
+      "heating": {
+       "a": 6.999387199901816,
+       "calculationTemperatureC": 19.785396293038506,
+       "gainsKwh": 698.6872675814402,
+       "gamma": 3.431024305186586,
+       "heatTransferKwh": 203.63809913128674,
+       "needKwh": 0.0,
+       "operativeTemperatureC": 19.785396293038506,
+       "reductionFactor": 1.0,
+       "setpointC": 19.785396293038506,
+       "timeConstantH": 89.99080799852723,
+       "transmissionKwh": 143.6388236729597,
+       "utilization": 0.2914212255345647,
+       "ventilationConductanceWPerK": 61.77755205377253,
+       "ventilationKwh": 59.99927545832705
+      },
+      "hours": 744.0,
+      "internalGainsKwh": 305.3376,
+      "month": 8,
+      "opaqueSolarGainsKwh": 26.509843261440004,
+      "outdoorTemperatureC": 18.48,
+      "sunroomCoolingGainsKwh": 0.0,
+      "sunroomGainsKwh": 0.0,
+      "windowSolarByWindow": [
+       {
+        "coolingKwh": 64.39355712000003,
+        "heatingKwh": 63.04605408000002,
+        "id": "window:win-N",
+        "orientation": "north"
+       },
+       {
+        "coolingKwh": 303.79377024000013,
+        "heatingKwh": 303.79377024000013,
+        "id": "window:win-S",
+        "orientation": "south"
+       }
+      ],
+      "windowSolarCoolingKwh": 368.18732736000015,
+      "windowSolarGainsKwh": 366.83982432000016
+     },
+     {
+      "cooling": {
+       "a": 5.902623107788896,
+       "calculationTemperatureC": 24.0,
+       "gainsKwh": 636.9304499712,
+       "gamma": 0.5841909851538097,
+       "heatTransferKwh": 1090.2777792839522,
+       "needKwh": 11.37119491937483,
+       "operativeTemperatureC": 20.606974557160896,
+       "reductionFactor": 1.0,
+       "setpointC": 24.0,
+       "timeConstantH": 73.53934661683344,
+       "transmissionKwh": 470.0813598886612,
+       "utilization": 0.5737613541593646,
+       "ventilationConductanceWPerK": 102.91325159220946,
+       "ventilationKwh": 620.1964193952911
+      },
+      "groundConductanceWPerK": 12.278045324710922,
+      "heating": {
+       "a": 6.795313265343726,
+       "calculationTemperatureC": 19.367835808937024,
+       "gainsKwh": 636.9304499712,
+       "gamma": 1.539911737547188,
+       "heatTransferKwh": 413.6149069074047,
+       "needKwh": 7.9909630678437225,
+       "operativeTemperatureC": 19.367835808937024,
+       "reductionFactor": 1.0,
+       "setpointC": 19.367835808937024,
+       "timeConstantH": 86.92969898015589,
+       "transmissionKwh": 234.1929617630804,
+       "utilization": 0.6368418150802839,
+       "ventilationConductanceWPerK": 66.66883158376375,
+       "ventilationKwh": 179.42194514432427
+      },
+      "hours": 720.0,
+      "internalGainsKwh": 295.488,
+      "month": 9,
+      "opaqueSolarGainsKwh": 16.508293171200002,
+      "outdoorTemperatureC": 15.63,
+      "sunroomCoolingGainsKwh": 0.0,
+      "sunroomGainsKwh": 0.0,
+      "windowSolarByWindow": [
+       {
+        "coolingKwh": 45.40354560000002,
+        "heatingKwh": 45.40354560000002,
+        "id": "window:win-N",
+        "orientation": "north"
+       },
+       {
+        "coolingKwh": 279.53061120000007,
+        "heatingKwh": 279.53061120000007,
+        "id": "window:win-S",
+        "orientation": "south"
+       }
+      ],
+      "windowSolarCoolingKwh": 324.9341568000001,
+      "windowSolarGainsKwh": 324.9341568000001
+     },
+     {
+      "cooling": {
+       "a": 6.262099361621319,
+       "calculationTemperatureC": 24.0,
+       "gainsKwh": 566.7220360396801,
+       "gamma": 0.3469770196063076,
+       "heatTransferKwh": 1633.3128824574692,
+       "needKwh": 0.0,
+       "operativeTemperatureC": 15.118887466645784,
+       "reductionFactor": 1.0,
+       "setpointC": 24.0,
+       "timeConstantH": 78.93149042431978,
+       "transmissionKwh": 709.4887783731355,
+       "utilization": 0.34667727880881094,
+       "ventilationConductanceWPerK": 91.30140181099125,
+       "ventilationKwh": 923.8241040843338
+      },
+      "groundConductanceWPerK": 11.905274363835186,
+      "heating": {
+       "a": 6.712422707204167,
+       "calculationTemperatureC": 18.532362068545783,
+       "gainsKwh": 559.76515987968,
+       "gamma": 0.6669486128416587,
+       "heatTransferKwh": 839.2927867331432,
+       "needKwh": 292.3889913044626,
+       "operativeTemperatureC": 18.532362068545783,
+       "reductionFactor": 0.9920845373204418,
+       "setpointC": 18.597247071817876,
+       "timeConstantH": 85.68634060806251,
+       "transmissionKwh": 423.2899706528842,
+       "utilization": 0.9770236424614852,
+       "ventilationConductanceWPerK": 68.75537086119105,
+       "ventilationKwh": 416.00281608025904
+      },
+      "hours": 744.0,
+      "internalGainsKwh": 305.3376,
+      "month": 10,
+      "opaqueSolarGainsKwh": 6.613956679680006,
+      "outdoorTemperatureC": 10.4,
+      "sunroomCoolingGainsKwh": 0.0,
+      "sunroomGainsKwh": 0.0,
+      "windowSolarByWindow": [
+       {
+        "coolingKwh": 28.837797120000012,
+        "heatingKwh": 28.837797120000012,
+        "id": "window:win-N",
+        "orientation": "north"
+       },
+       {
+        "coolingKwh": 225.93268224000008,
+        "heatingKwh": 218.97580608000007,
+        "id": "window:win-S",
+        "orientation": "south"
+       }
+      ],
+      "windowSolarCoolingKwh": 254.77047936000008,
+      "windowSolarGainsKwh": 247.81360320000007
+     },
+     {
+      "cooling": {
+       "a": 6.746985611565362,
+       "calculationTemperatureC": 24.0,
+       "gainsKwh": 437.4928129536001,
+       "gamma": 0.25958504869132437,
+       "heatTransferKwh": 1685.354434545373,
+       "needKwh": 0.0,
+       "operativeTemperatureC": 12.145956629548103,
+       "reductionFactor": 1.0,
+       "setpointC": 24.0,
+       "timeConstantH": 86.20478417348043,
+       "transmissionKwh": 786.9271065677345,
+       "utilization": 0.25956357430093463,
+       "ventilationConductanceWPerK": 77.93977097453313,
+       "ventilationKwh": 898.4273279776382
+      },
+      "groundConductanceWPerK": 11.790980311382183,
+      "heating": {
+       "a": 6.6622802160720545,
+       "calculationTemperatureC": 18.08417488828318,
+       "gainsKwh": 383.3601889536001,
+       "gamma": 0.3845778517190201,
+       "heatTransferKwh": 996.833767831462,
+       "needKwh": 613.879195824343,
+       "operativeTemperatureC": 18.08417488828318,
+       "reductionFactor": 0.9853438700159937,
+       "setpointC": 18.234316928788864,
+       "timeConstantH": 84.93420324108082,
+       "transmissionKwh": 487.7441424709505,
+       "utilization": 0.9989419429607744,
+       "ventilationConductanceWPerK": 70.04722346672952,
+       "ventilationKwh": 509.08962536051143
+      },
+      "hours": 720.0,
+      "internalGainsKwh": 295.488,
+      "month": 11,
+      "opaqueSolarGainsKwh": -4.003583846399996,
+      "outdoorTemperatureC": 7.99,
+      "sunroomCoolingGainsKwh": 0.0,
+      "sunroomGainsKwh": 0.0,
+      "windowSolarByWindow": [
+       {
+        "coolingKwh": 12.977625600000005,
+        "heatingKwh": 12.977625600000005,
+        "id": "window:win-N",
+        "orientation": "north"
+       },
+       {
+        "coolingKwh": 133.03077120000003,
+        "heatingKwh": 78.89814720000003,
+        "id": "window:win-S",
+        "orientation": "south"
+       }
+      ],
+      "windowSolarCoolingKwh": 146.00839680000004,
+      "windowSolarGainsKwh": 91.87577280000004
+     },
+     {
+      "cooling": {
+       "a": 7.063410271420995,
+       "calculationTemperatureC": 24.0,
+       "gainsKwh": 410.47173384192007,
+       "gamma": 0.20165171382260608,
+       "heatTransferKwh": 2035.547955734281,
+       "needKwh": 0.0,
+       "operativeTemperatureC": 8.03303427645212,
+       "reductionFactor": 1.0,
+       "setpointC": 24.0,
+       "timeConstantH": 90.95115407131493,
+       "transmissionKwh": 988.403269580088,
+       "utilization": 0.20164974179301193,
+       "ventilationConductanceWPerK": 70.37262675767424,
+       "ventilationKwh": 1047.1446861541929
+      },
+      "groundConductanceWPerK": 11.965788166406377,
+      "heating": {
+       "a": 6.646741249949875,
+       "calculationTemperatureC": 17.39590247610745,
+       "gainsKwh": 320.26375752192,
+       "gamma": 0.23818766766434987,
+       "heatTransferKwh": 1344.5858077473197,
+       "needKwh": 1024.339666208473,
+       "operativeTemperatureC": 17.39590247610745,
+       "reductionFactor": 0.9818718172639374,
+       "setpointC": 17.643229432367434,
+       "timeConstantH": 84.70111874924812,
+       "transmissionKwh": 642.4201299009675,
+       "utilization": 0.9999449953900191,
+       "ventilationConductanceWPerK": 70.45222030075334,
+       "ventilationKwh": 702.1656778463522
+      },
+      "hours": 744.0,
+      "internalGainsKwh": 305.3376,
+      "month": 12,
+      "opaqueSolarGainsKwh": -8.015945518079995,
+      "outdoorTemperatureC": 4.0,
+      "sunroomCoolingGainsKwh": 0.0,
+      "sunroomGainsKwh": 0.0,
+      "windowSolarByWindow": [
+       {
+        "coolingKwh": 7.745397120000004,
+        "heatingKwh": 7.745397120000004,
+        "id": "window:win-N",
+        "orientation": "north"
+       },
+       {
+        "coolingKwh": 105.40468224000006,
+        "heatingKwh": 15.196705920000008,
+        "id": "window:win-S",
+        "orientation": "south"
+       }
+      ],
+      "windowSolarCoolingKwh": 113.15007936000006,
+      "windowSolarGainsKwh": 22.942103040000013
+     }
+    ],
+    "omittedCorrections": [
+     "6.2b (p. 160): in a residential project with several calculation zones each zone takes N_woon;zi = A_g;zi / Σ A_g;zi × N_woon (the dwellingCount is N_woon of the building, 6.6.6) unless internalGains.dwellingShare states the share",
+     "7.3–7.5 and 7.7–7.9 recoverable losses are applied by the heating chain (apply_recoverable_losses); Q_C;ls;rbl = 0 is prescribed by 10.4/10.43",
+     "8.5: H_A = 0 for adjacent heated spaces is prescribed by the norm",
+     "§17.3.8 extended obstruction method (hourly NEN 5060) enters as declared factors",
+     "table 7.10 footnote c is the caller's column choice"
+    ],
+    "recoverableLossesApplied": true,
+    "referenceVerified": false,
+    "scope": "nta8800_chapter_7_monthly_need_single_zone_unverified",
+    "specificHeatCapacityKjPerM2k": 450.0,
+    "status": "calculated_unverified",
+    "targetNormVersion": "NTA 8800:2022",
+    "transmission": {
+     "annualMeanOutdoorTemperatureC": 10.67,
+     "conductanceWPerK": 58.449753099730465,
+     "directConductanceWPerK": 54.849753099730464,
+     "groundCoolingAdjustedWPerK": 8.614029033006192,
+     "groundHeatingAdjustedWPerK": 18.675770371772575,
+     "groundMonthlyConductanceWPerK": [
+      12.382858305323413,
+      12.930437121223344,
+      13.461801312593385,
+      13.834572273469124,
+      13.948866325922127,
+      13.774058470897936,
+      13.356988331980894,
+      12.809409516080967,
+      12.278045324710922,
+      11.905274363835186,
+      11.790980311382183,
+      11.965788166406377
+     ],
+     "groundSteadyConductanceWPerK": 12.869923318652155,
+     "method": "components",
+     "unheatedConductanceWPerK": null,
+     "verticalPipeConductanceWPerK": 3.6
+    },
+    "ventilation": {
+     "annualFanElectricityKwh": 193.6421052631579,
+     "annualFrostProtectionElectricityKwh": 0.0,
+     "annualGrillePreheatingElectricityKwh": 0.0,
+     "demandFlows": [
+      {
+       "id": "z1:infiltration",
+       "months": [
+        {
+         "coolingConductanceWPerK": 10.627749298334919,
+         "coolingSupplyTemperatureC": 2.61,
+         "heatingConductanceWPerK": 10.641378493376239,
+         "heatingLimitSupplyTemperatureC": 2.61,
+         "heatingSupplyTemperatureC": 2.61,
+         "month": 1
+        },
+        {
+         "coolingConductanceWPerK": 14.888204524087755,
+         "coolingSupplyTemperatureC": 4.82,
+         "heatingConductanceWPerK": 14.934360513425665,
+         "heatingLimitSupplyTemperatureC": 4.82,
+         "heatingSupplyTemperatureC": 4.82,
+         "month": 2
+        },
+        {
+         "coolingConductanceWPerK": 10.075082814096394,
+         "coolingSupplyTemperatureC": 5.91,
+         "heatingConductanceWPerK": 10.408308248237145,
+         "heatingLimitSupplyTemperatureC": 5.91,
+         "heatingSupplyTemperatureC": 5.91,
+         "month": 3
+        },
+        {
+         "coolingConductanceWPerK": 9.771743655782032,
+         "coolingSupplyTemperatureC": 9.32,
+         "heatingConductanceWPerK": 10.620603883876477,
+         "heatingLimitSupplyTemperatureC": 9.32,
+         "heatingSupplyTemperatureC": 9.32,
+         "month": 4
+        },
+        {
+         "coolingConductanceWPerK": 9.025233520878269,
+         "coolingSupplyTemperatureC": 14.73,
+         "heatingConductanceWPerK": 10.172187692819461,
+         "heatingLimitSupplyTemperatureC": 14.73,
+         "heatingSupplyTemperatureC": 14.73,
+         "month": 5
+        },
+        {
+         "coolingConductanceWPerK": 8.094311594794421,
+         "coolingSupplyTemperatureC": 16.12,
+         "heatingConductanceWPerK": 9.400127597316358,
+         "heatingLimitSupplyTemperatureC": 16.12,
+         "heatingSupplyTemperatureC": 16.12,
+         "month": 6
+        },
+        {
+         "coolingConductanceWPerK": 7.5817799420581755,
+         "coolingSupplyTemperatureC": 18.05,
+         "heatingConductanceWPerK": 8.776358058972635,
+         "heatingLimitSupplyTemperatureC": 18.05,
+         "heatingSupplyTemperatureC": 18.05,
+         "month": 7
+        },
+        {
+         "coolingConductanceWPerK": 7.195058961480219,
+         "coolingSupplyTemperatureC": 18.48,
+         "heatingConductanceWPerK": 8.294662031673484,
+         "heatingLimitSupplyTemperatureC": 18.48,
+         "heatingSupplyTemperatureC": 18.48,
+         "month": 8
+        },
+        {
+         "coolingConductanceWPerK": 8.133342670353509,
+         "coolingSupplyTemperatureC": 15.63,
+         "heatingConductanceWPerK": 9.145054229136933,
+         "heatingLimitSupplyTemperatureC": 15.63,
+         "heatingSupplyTemperatureC": 15.63,
+         "month": 9
+        },
+        {
+         "coolingConductanceWPerK": 8.778964081707315,
+         "coolingSupplyTemperatureC": 10.4,
+         "heatingConductanceWPerK": 9.51301322636128,
+         "heatingLimitSupplyTemperatureC": 10.4,
+         "heatingSupplyTemperatureC": 10.4,
+         "month": 10
+        },
+        {
+         "coolingConductanceWPerK": 9.470077996414826,
+         "coolingSupplyTemperatureC": 7.99,
+         "heatingConductanceWPerK": 9.742336647344873,
+         "heatingLimitSupplyTemperatureC": 7.99,
+         "heatingSupplyTemperatureC": 7.99,
+         "month": 11
+        },
+        {
+         "coolingConductanceWPerK": 9.80027973112459,
+         "coolingSupplyTemperatureC": 4.0,
+         "heatingConductanceWPerK": 9.814463488532366,
+         "heatingLimitSupplyTemperatureC": 4.0,
+         "heatingSupplyTemperatureC": 4.0,
+         "month": 12
+        }
+       ]
+      },
+      {
+       "id": "z1:natural_supply",
+       "months": [
+        {
+         "coolingConductanceWPerK": 54.0752092195512,
+         "coolingSupplyTemperatureC": 2.61,
+         "heatingConductanceWPerK": 54.12695222970615,
+         "heatingLimitSupplyTemperatureC": 2.61,
+         "heatingSupplyTemperatureC": 2.61,
+         "month": 1
+        },
+        {
+         "coolingConductanceWPerK": 69.54288519715618,
+         "coolingSupplyTemperatureC": 4.82,
+         "heatingConductanceWPerK": 69.70371370091748,
+         "heatingLimitSupplyTemperatureC": 4.82,
+         "heatingSupplyTemperatureC": 4.82,
+         "month": 2
+        },
+        {
+         "coolingConductanceWPerK": 51.962524329082335,
+         "coolingSupplyTemperatureC": 5.91,
+         "heatingConductanceWPerK": 53.239767726561645,
+         "heatingLimitSupplyTemperatureC": 5.91,
+         "heatingSupplyTemperatureC": 5.91,
+         "month": 3
+        },
+        {
+         "coolingConductanceWPerK": 50.79048511684776,
+         "coolingSupplyTemperatureC": 9.32,
+         "heatingConductanceWPerK": 54.04807504678399,
+         "heatingLimitSupplyTemperatureC": 9.32,
+         "heatingSupplyTemperatureC": 9.32,
+         "month": 4
+        },
+        {
+         "coolingConductanceWPerK": 47.8658670033566,
+         "coolingSupplyTemperatureC": 14.73,
+         "heatingConductanceWPerK": 52.33581629319981,
+         "heatingLimitSupplyTemperatureC": 14.73,
+         "heatingSupplyTemperatureC": 14.73,
+         "month": 5
+        },
+        {
+         "coolingConductanceWPerK": 44.13096716546154,
+         "coolingSupplyTemperatureC": 16.12,
+         "heatingConductanceWPerK": 49.341966365581534,
+         "heatingLimitSupplyTemperatureC": 16.12,
+         "heatingSupplyTemperatureC": 16.12,
+         "month": 6
+        },
+        {
+         "coolingConductanceWPerK": 42.028403242460016,
+         "coolingSupplyTemperatureC": 18.05,
+         "heatingConductanceWPerK": 46.87736133345596,
+         "heatingLimitSupplyTemperatureC": 18.05,
+         "heatingSupplyTemperatureC": 18.05,
+         "month": 7
+        },
+        {
+         "coolingConductanceWPerK": 40.41802758268575,
+         "coolingSupplyTemperatureC": 18.48,
+         "heatingConductanceWPerK": 44.94360506058744,
+         "heatingLimitSupplyTemperatureC": 18.48,
+         "heatingSupplyTemperatureC": 18.48,
+         "month": 8
+        },
+        {
+         "coolingConductanceWPerK": 44.28967706628783,
+         "coolingSupplyTemperatureC": 15.63,
+         "heatingConductanceWPerK": 48.339308701367074,
+         "heatingLimitSupplyTemperatureC": 15.63,
+         "heatingSupplyTemperatureC": 15.63,
+         "month": 9
+        },
+        {
+         "coolingConductanceWPerK": 46.887748709820414,
+         "coolingSupplyTemperatureC": 10.4,
+         "heatingConductanceWPerK": 49.78349381078132,
+         "heatingLimitSupplyTemperatureC": 10.4,
+         "heatingSupplyTemperatureC": 10.4,
+         "month": 10
+        },
+        {
+         "coolingConductanceWPerK": 49.615719549361096,
+         "coolingSupplyTemperatureC": 7.99,
+         "heatingConductanceWPerK": 50.67637547847449,
+         "heatingLimitSupplyTemperatureC": 7.99,
+         "heatingSupplyTemperatureC": 7.99,
+         "month": 11
+        },
+        {
+         "coolingConductanceWPerK": 50.90113195508374,
+         "coolingSupplyTemperatureC": 4.0,
+         "heatingConductanceWPerK": 50.956098161530235,
+         "heatingLimitSupplyTemperatureC": 4.0,
+         "heatingSupplyTemperatureC": 4.0,
+         "month": 12
+        }
+       ]
+      },
+      {
+       "id": "z1:purge",
+       "months": [
+        {
+         "coolingConductanceWPerK": 10.27428975171473,
+         "coolingSupplyTemperatureC": 2.61,
+         "heatingConductanceWPerK": 10.284120923644169,
+         "heatingLimitSupplyTemperatureC": 2.61,
+         "heatingSupplyTemperatureC": 2.61,
+         "month": 1
+        },
+        {
+         "coolingConductanceWPerK": 13.213148187459675,
+         "coolingSupplyTemperatureC": 4.82,
+         "heatingConductanceWPerK": 13.243705603174323,
+         "heatingLimitSupplyTemperatureC": 4.82,
+         "heatingSupplyTemperatureC": 4.82,
+         "month": 2
+        },
+        {
+         "coolingConductanceWPerK": 19.74575924505129,
+         "coolingSupplyTemperatureC": 5.91,
+         "heatingConductanceWPerK": 10.115555868046712,
+         "heatingLimitSupplyTemperatureC": 5.91,
+         "heatingSupplyTemperatureC": 5.91,
+         "month": 3
+        },
+        {
+         "coolingConductanceWPerK": 38.60076868880431,
+         "coolingSupplyTemperatureC": 9.32,
+         "heatingConductanceWPerK": 10.26913425888896,
+         "heatingLimitSupplyTemperatureC": 9.32,
+         "heatingSupplyTemperatureC": 9.32,
+         "month": 4
+        },
+        {
+         "coolingConductanceWPerK": 54.567088383826515,
+         "coolingSupplyTemperatureC": 14.73,
+         "heatingConductanceWPerK": 9.943805095707965,
+         "heatingLimitSupplyTemperatureC": 14.73,
+         "heatingSupplyTemperatureC": 14.73,
+         "month": 5
+        },
+        {
+         "coolingConductanceWPerK": 67.07907009150153,
+         "coolingSupplyTemperatureC": 16.12,
+         "heatingConductanceWPerK": 9.374973609460493,
+         "heatingLimitSupplyTemperatureC": 16.12,
+         "heatingSupplyTemperatureC": 16.12,
+         "month": 6
+        },
+        {
+         "coolingConductanceWPerK": 63.88317292853923,
+         "coolingSupplyTemperatureC": 18.05,
+         "heatingConductanceWPerK": 8.906698653356633,
+         "heatingLimitSupplyTemperatureC": 18.05,
+         "heatingSupplyTemperatureC": 18.05,
+         "month": 7
+        },
+        {
+         "coolingConductanceWPerK": 61.43540192568234,
+         "coolingSupplyTemperatureC": 18.48,
+         "heatingConductanceWPerK": 8.539284961511612,
+         "heatingLimitSupplyTemperatureC": 18.48,
+         "heatingSupplyTemperatureC": 18.48,
+         "month": 8
+        },
+        {
+         "coolingConductanceWPerK": 50.490231855568126,
+         "coolingSupplyTemperatureC": 15.63,
+         "heatingConductanceWPerK": 9.184468653259744,
+         "heatingLimitSupplyTemperatureC": 15.63,
+         "heatingSupplyTemperatureC": 15.63,
+         "month": 9
+        },
+        {
+         "coolingConductanceWPerK": 35.634689019463515,
+         "coolingSupplyTemperatureC": 10.4,
+         "heatingConductanceWPerK": 9.45886382404845,
+         "heatingLimitSupplyTemperatureC": 10.4,
+         "heatingSupplyTemperatureC": 10.4,
+         "month": 10
+        },
+        {
+         "coolingConductanceWPerK": 18.853973428757218,
+         "coolingSupplyTemperatureC": 7.99,
+         "heatingConductanceWPerK": 9.628511340910153,
+         "heatingLimitSupplyTemperatureC": 7.99,
+         "heatingSupplyTemperatureC": 7.99,
+         "month": 11
+        },
+        {
+         "coolingConductanceWPerK": 9.671215071465912,
+         "coolingSupplyTemperatureC": 4.0,
+         "heatingConductanceWPerK": 9.681658650690743,
+         "heatingLimitSupplyTemperatureC": 4.0,
+         "heatingSupplyTemperatureC": 4.0,
+         "month": 12
+        }
+       ]
+      }
+     ],
+     "infiltrationQV1M3PerH": 30.786654088832137,
+     "interpretations": [
+      "table 11.8 f_τ for dwellings uses the whole-dwelling area when given, otherwise the mean dwelling area A_g;zi/N_woon",
+      "fan energy (11.132) uses q_V;ODA;req of the heating balance",
+      "ventilative cooling flows are computed for the whole zone and split over airflow zones by 11.6–11.10",
+      "ΔC_p for cross ventilation uses the table 11.3 class of the building height",
+      "the 11.14 accuracy uses zone totals for every airflow zone",
+      "at H = 50 m the zone is split into two airflow zones (11.6/11.7)",
+      "9.29 is applied literally: Q_air uses θ_SUP;dis;out − Δθ_hr − Δθ_rca − Δθ_fan, added to Q_H;ve without changing H_ve or τ",
+      "q_V;comb;out counts as an outflow in the mass balance (11.3), although 11.82 defines it as positive",
+      "AHU with both coils (11.100/11.101, p. 493–494): table 11.15 sets θ_SUP;dis;out only when the coil active in the balance is needed; the cooling balance assumes no reheating (θ_rh = 0) and the heating balance no cooling (Q_C;ahu = 0), as the last paragraph on p. 494 states; the p. 494 reference to table 11.16 is read as table 11.15",
+      "Q_H;ahu (11.119) and Q_C;ahu (11.115) use θ_SUP;dis;in after the supply fan as printed, so the coil load includes the fan rise ΔT_fan (figure 11.1 places the coil before the fan)",
+      "flow-reduction x of 11.60/11.61 more favourable than 20/80 needs an evidenceReference (notes 1 and 2, p. 468); the opname passes the survey reference for a surveyed percentage"
+     ],
+     "months": [
+      {
+       "ahuCoolingKwh": 0.0,
+       "ahuHeatingKwh": 0.0,
+       "cooling": {
+        "combustionM3PerH": 0.0,
+        "conductanceWPerK": 74.97724826960085,
+        "effectiveOutdoorAirM3PerH": 160.74874853152025,
+        "heatFlowPerSetpointW": 1603.7633404867622,
+        "infiltrationM3PerH": 31.592987323965822,
+        "mechanicalExtractM3PerH": 159.1578947368421,
+        "mechanicalSupplyM3PerH": 0.0,
+        "mechanicalSupplyTemperatureC": 2.61,
+        "naturalSupplyM3PerH": 160.74874853152025,
+        "naturalSupplyTemperatureC": 2.61,
+        "purgeM3PerH": 30.54226222098885,
+        "requiredOutdoorAirM3PerH": 159.1578947368421,
+        "ventilativeCoolingM3PerH": 0.0,
+        "ventilativeCoolingTemperatureC": 2.61,
+        "weightedConductanceWPerK": 74.97724826960085
+       },
+       "coolingLimitAirKwh": 0.0,
+       "coolingReferencePressurePa": [
+        -6.673339131785369
+       ],
+       "fanElectricityKwh": 16.446315789473683,
+       "frostProtectionElectricityKwh": 0.0,
+       "grillePreheatingElectricityKwh": 0.0,
+       "heating": {
+        "combustionM3PerH": 0.0,
+        "conductanceWPerK": 75.05245164672655,
+        "effectiveOutdoorAirM3PerH": 160.9025643788874,
+        "heatFlowPerSetpointW": 1305.1621341365749,
+        "infiltrationM3PerH": 31.63350267430851,
+        "mechanicalExtractM3PerH": 159.1578947368421,
+        "mechanicalSupplyM3PerH": 0.0,
+        "mechanicalSupplyTemperatureC": 2.61,
+        "naturalSupplyM3PerH": 160.9025643788874,
+        "naturalSupplyTemperatureC": 2.61,
+        "purgeM3PerH": 30.57148723198861,
+        "requiredOutdoorAirM3PerH": 159.1578947368421,
+        "ventilativeCoolingM3PerH": 0.0,
+        "ventilativeCoolingTemperatureC": 2.61,
+        "weightedConductanceWPerK": 75.05245164672655
+       },
+       "heatingLimitAirKwh": 0.0,
+       "heatingReferencePressurePa": [
+        -5.964724359058096
+       ],
+       "month": 1,
+       "outdoorAirFraction": null
+      },
+      {
+       "ahuCoolingKwh": 0.0,
+       "ahuHeatingKwh": 0.0,
+       "cooling": {
+        "combustionM3PerH": 0.0,
+        "conductanceWPerK": 97.64423790870362,
+        "effectiveOutdoorAirM3PerH": 206.729329873258,
+        "heatFlowPerSetpointW": 1872.8164830889352,
+        "infiltrationM3PerH": 44.257993259194414,
+        "mechanicalExtractM3PerH": 159.1578947368421,
+        "mechanicalSupplyM3PerH": 0.0,
+        "mechanicalSupplyTemperatureC": 4.82,
+        "naturalSupplyM3PerH": 206.729329873258,
+        "naturalSupplyTemperatureC": 4.82,
+        "purgeM3PerH": 39.278572675919015,
+        "requiredOutdoorAirM3PerH": 159.1578947368421,
+        "ventilativeCoolingM3PerH": 0.0,
+        "ventilativeCoolingTemperatureC": 13.97,
+        "weightedConductanceWPerK": 97.64423790870362
+       },
+       "coolingLimitAirKwh": 0.0,
+       "coolingReferencePressurePa": [
+        -7.635597498840397
+       ],
+       "fanElectricityKwh": 14.854736842105263,
+       "frostProtectionElectricityKwh": 0.0,
+       "grillePreheatingElectricityKwh": 0.0,
+       "heating": {
+        "combustionM3PerH": 0.0,
+        "conductanceWPerK": 97.88177981751745,
+        "effectiveOutdoorAirM3PerH": 207.20742290481445,
+        "heatFlowPerSetpointW": 1485.8454176299151,
+        "infiltrationM3PerH": 44.395200634448,
+        "mechanicalExtractM3PerH": 159.1578947368421,
+        "mechanicalSupplyM3PerH": 0.0,
+        "mechanicalSupplyTemperatureC": 4.82,
+        "naturalSupplyM3PerH": 207.20742290481445,
+        "naturalSupplyTemperatureC": 4.82,
+        "purgeM3PerH": 39.36941035191475,
+        "requiredOutdoorAirM3PerH": 159.1578947368421,
+        "ventilativeCoolingM3PerH": 0.0,
+        "ventilativeCoolingTemperatureC": 13.97,
+        "weightedConductanceWPerK": 97.88177981751747
+       },
+       "heatingLimitAirKwh": 0.0,
+       "heatingReferencePressurePa": [
+        -6.950420226113124
+       ],
+       "month": 2,
+       "outdoorAirFraction": null
+      },
+      {
+       "ahuCoolingKwh": 0.0,
+       "ahuHeatingKwh": 0.0,
+       "cooling": {
+        "combustionM3PerH": 0.0,
+        "conductanceWPerK": 81.78336638823002,
+        "effectiveOutdoorAirM3PerH": 154.46839461175153,
+        "heatFlowPerSetpointW": 1479.461097963081,
+        "infiltrationM3PerH": 29.950082063332314,
+        "mechanicalExtractM3PerH": 159.1578947368421,
+        "mechanicalSupplyM3PerH": 0.0,
+        "mechanicalSupplyTemperatureC": 5.91,
+        "naturalSupplyM3PerH": 154.46839461175153,
+        "naturalSupplyTemperatureC": 5.91,
+        "purgeM3PerH": 58.69798995246559,
+        "requiredOutdoorAirM3PerH": 159.1578947368421,
+        "ventilativeCoolingM3PerH": 0.0,
+        "ventilativeCoolingTemperatureC": 13.0,
+        "weightedConductanceWPerK": 81.78336638823002
+       },
+       "coolingLimitAirKwh": 0.0,
+       "coolingReferencePressurePa": [
+        -5.756849737209535
+       ],
+       "fanElectricityKwh": 16.446315789473683,
+       "frostProtectionElectricityKwh": 0.0,
+       "grillePreheatingElectricityKwh": 0.0,
+       "heating": {
+        "combustionM3PerH": 0.0,
+        "conductanceWPerK": 73.7636318428455,
+        "effectiveOutdoorAirM3PerH": 158.2652412754666,
+        "heatFlowPerSetpointW": 1039.3295726656931,
+        "infiltrationM3PerH": 30.940657454349594,
+        "mechanicalExtractM3PerH": 159.1578947368421,
+        "mechanicalSupplyM3PerH": 0.0,
+        "mechanicalSupplyTemperatureC": 5.91,
+        "naturalSupplyM3PerH": 158.2652412754666,
+        "naturalSupplyTemperatureC": 5.91,
+        "purgeM3PerH": 30.07039584233865,
+        "requiredOutdoorAirM3PerH": 159.1578947368421,
+        "ventilativeCoolingM3PerH": 0.0,
+        "ventilativeCoolingTemperatureC": 13.0,
+        "weightedConductanceWPerK": 73.7636318428455
+       },
+       "heatingLimitAirKwh": 0.0,
+       "heatingReferencePressurePa": [
+        -5.227922464482262
+       ],
+       "month": 3,
+       "outdoorAirFraction": null
+      },
+      {
+       "ahuCoolingKwh": 0.0,
+       "ahuHeatingKwh": 0.0,
+       "cooling": {
+        "combustionM3PerH": 0.0,
+        "conductanceWPerK": 99.1629974614341,
+        "effectiveOutdoorAirM3PerH": 150.98428721178502,
+        "heatFlowPerSetpointW": 1455.7128027338526,
+        "infiltrationM3PerH": 29.04834925853332,
+        "mechanicalExtractM3PerH": 159.1578947368421,
+        "mechanicalSupplyM3PerH": 0.0,
+        "mechanicalSupplyTemperatureC": 9.32,
+        "naturalSupplyM3PerH": 150.98428721178502,
+        "naturalSupplyTemperatureC": 9.32,
+        "purgeM3PerH": 114.74805828095663,
+        "requiredOutdoorAirM3PerH": 159.1578947368421,
+        "ventilativeCoolingM3PerH": 0.0,
+        "ventilativeCoolingTemperatureC": 13.7,
+        "weightedConductanceWPerK": 99.1629974614341
+       },
+       "coolingLimitAirKwh": 0.0,
+       "coolingReferencePressurePa": [
+        -4.86471273240069
+       ],
+       "fanElectricityKwh": 15.91578947368421,
+       "frostProtectionElectricityKwh": 0.0,
+       "grillePreheatingElectricityKwh": 0.0,
+       "heating": {
+        "combustionM3PerH": 0.0,
+        "conductanceWPerK": 74.93781318954942,
+        "effectiveOutdoorAirM3PerH": 160.66808709021066,
+        "heatFlowPerSetpointW": 800.3358448643878,
+        "infiltrationM3PerH": 31.57174623311271,
+        "mechanicalExtractM3PerH": 159.1578947368421,
+        "mechanicalSupplyM3PerH": 0.0,
+        "mechanicalSupplyTemperatureC": 9.32,
+        "naturalSupplyM3PerH": 160.66808709021066,
+        "naturalSupplyTemperatureC": 9.32,
+        "purgeM3PerH": 30.52693654714003,
+        "requiredOutdoorAirM3PerH": 159.1578947368421,
+        "ventilativeCoolingM3PerH": 0.0,
+        "ventilativeCoolingTemperatureC": 13.7,
+        "weightedConductanceWPerK": 74.93781318954942
+       },
+       "heatingLimitAirKwh": 0.0,
+       "heatingReferencePressurePa": [
+        -4.624847959673417
+       ],
+       "month": 4,
+       "outdoorAirFraction": null
+      },
+      {
+       "ahuCoolingKwh": 0.0,
+       "ahuHeatingKwh": 0.0,
+       "cooling": {
+        "combustionM3PerH": 0.0,
+        "conductanceWPerK": 111.45818890806137,
+        "effectiveOutdoorAirM3PerH": 142.29030879798827,
+        "heatFlowPerSetpointW": 1033.217411177729,
+        "infiltrationM3PerH": 26.829207221289213,
+        "mechanicalExtractM3PerH": 159.1578947368421,
+        "mechanicalSupplyM3PerH": 0.0,
+        "mechanicalSupplyTemperatureC": 14.73,
+        "naturalSupplyM3PerH": 142.29030879798827,
+        "naturalSupplyTemperatureC": 14.73,
+        "purgeM3PerH": 162.21095202970662,
+        "requiredOutdoorAirM3PerH": 159.1578947368421,
+        "ventilativeCoolingM3PerH": 0.0,
+        "ventilativeCoolingTemperatureC": 14.56,
+        "weightedConductanceWPerK": 111.45818890806139
+       },
+       "coolingLimitAirKwh": 0.0,
+       "coolingReferencePressurePa": [
+        -3.5348325689033686
+       ],
+       "fanElectricityKwh": 16.446315789473683,
+       "frostProtectionElectricityKwh": 0.0,
+       "grillePreheatingElectricityKwh": 0.0,
+       "heating": {
+        "combustionM3PerH": 0.0,
+        "conductanceWPerK": 72.45180908172725,
+        "effectiveOutdoorAirM3PerH": 155.57807531266434,
+        "heatFlowPerSetpointW": 381.8210338607025,
+        "infiltrationM3PerH": 30.238744612332578,
+        "mechanicalExtractM3PerH": 159.1578947368421,
+        "mechanicalSupplyM3PerH": 0.0,
+        "mechanicalSupplyTemperatureC": 14.73,
+        "naturalSupplyM3PerH": 155.57807531266434,
+        "naturalSupplyTemperatureC": 14.73,
+        "purgeM3PerH": 29.559834309406227,
+        "requiredOutdoorAirM3PerH": 159.1578947368421,
+        "ventilativeCoolingM3PerH": 0.0,
+        "ventilativeCoolingTemperatureC": 14.56,
+        "weightedConductanceWPerK": 72.45180908172723
+       },
+       "heatingLimitAirKwh": 0.0,
+       "heatingReferencePressurePa": [
+        -3.4434052961760955
+       ],
+       "month": 5,
+       "outdoorAirFraction": null
+      },
+      {
+       "ahuCoolingKwh": 0.0,
+       "ahuHeatingKwh": 0.0,
+       "cooling": {
+        "combustionM3PerH": 0.0,
+        "conductanceWPerK": 119.3043488517575,
+        "effectiveOutdoorAirM3PerH": 131.1876152809905,
+        "heatFlowPerSetpointW": 940.1182689518489,
+        "infiltrationM3PerH": 24.06186638695313,
+        "mechanicalExtractM3PerH": 159.1578947368421,
+        "mechanicalSupplyM3PerH": 0.0,
+        "mechanicalSupplyTemperatureC": 16.12,
+        "naturalSupplyM3PerH": 131.1876152809905,
+        "naturalSupplyTemperatureC": 16.12,
+        "purgeM3PerH": 199.4051752271056,
+        "requiredOutdoorAirM3PerH": 159.1578947368421,
+        "ventilativeCoolingM3PerH": 0.0,
+        "ventilativeCoolingTemperatureC": 15.62,
+        "weightedConductanceWPerK": 119.3043488517575
+       },
+       "coolingLimitAirKwh": 0.0,
+       "coolingReferencePressurePa": [
+        -2.968213402275552
+       ],
+       "fanElectricityKwh": 15.91578947368421,
+       "frostProtectionElectricityKwh": 0.0,
+       "grillePreheatingElectricityKwh": 0.0,
+       "heating": {
+        "combustionM3PerH": 0.0,
+        "conductanceWPerK": 68.11706757235838,
+        "effectiveOutdoorAirM3PerH": 146.67829228636364,
+        "heatFlowPerSetpointW": 264.29422218075047,
+        "infiltrationM3PerH": 27.94365050295319,
+        "mechanicalExtractM3PerH": 159.1578947368421,
+        "mechanicalSupplyM3PerH": 0.0,
+        "mechanicalSupplyTemperatureC": 16.12,
+        "naturalSupplyM3PerH": 146.67829228636364,
+        "naturalSupplyTemperatureC": 16.12,
+        "purgeM3PerH": 27.868875534409096,
+        "requiredOutdoorAirM3PerH": 159.1578947368421,
+        "ventilativeCoolingM3PerH": 0.0,
+        "ventilativeCoolingTemperatureC": 15.62,
+        "weightedConductanceWPerK": 68.11706757235838
+       },
+       "heatingLimitAirKwh": 0.0,
+       "heatingReferencePressurePa": [
+        -2.931473629548279
+       ],
+       "month": 6,
+       "outdoorAirFraction": null
+      },
+      {
+       "ahuCoolingKwh": 0.0,
+       "ahuHeatingKwh": 0.0,
+       "cooling": {
+        "combustionM3PerH": 0.0,
+        "conductanceWPerK": 113.49335611305742,
+        "effectiveOutdoorAirM3PerH": 124.93734784406273,
+        "heatFlowPerSetpointW": 675.2854688726916,
+        "infiltrationM3PerH": 22.538269475369567,
+        "mechanicalExtractM3PerH": 159.1578947368421,
+        "mechanicalSupplyM3PerH": 0.0,
+        "mechanicalSupplyTemperatureC": 18.05,
+        "naturalSupplyM3PerH": 124.93734784406273,
+        "naturalSupplyTemperatureC": 18.05,
+        "purgeM3PerH": 189.90476872297535,
+        "requiredOutdoorAirM3PerH": 159.1578947368421,
+        "ventilativeCoolingM3PerH": 0.0,
+        "ventilativeCoolingTemperatureC": 16.17,
+        "weightedConductanceWPerK": 113.49335611305742
+       },
+       "coolingLimitAirKwh": 0.0,
+       "coolingReferencePressurePa": [
+        -2.4888240340011123
+       ],
+       "fanElectricityKwh": 16.446315789473683,
+       "frostProtectionElectricityKwh": 0.0,
+       "grillePreheatingElectricityKwh": 0.0,
+       "heating": {
+        "combustionM3PerH": 0.0,
+        "conductanceWPerK": 64.56041804578523,
+        "effectiveOutdoorAirM3PerH": 139.3517894349344,
+        "heatFlowPerSetpointW": 125.89281518928115,
+        "infiltrationM3PerH": 26.089378016392303,
+        "mechanicalExtractM3PerH": 159.1578947368421,
+        "mechanicalSupplyM3PerH": 0.0,
+        "mechanicalSupplyTemperatureC": 18.05,
+        "naturalSupplyM3PerH": 139.3517894349344,
+        "naturalSupplyTemperatureC": 18.05,
+        "purgeM3PerH": 26.47683999263754,
+        "requiredOutdoorAirM3PerH": 159.1578947368421,
+        "ventilativeCoolingM3PerH": 0.0,
+        "ventilativeCoolingTemperatureC": 16.17,
+        "weightedConductanceWPerK": 64.56041804578523
+       },
+       "heatingLimitAirKwh": 0.0,
+       "heatingReferencePressurePa": [
+        -2.373959261273839
+       ],
+       "month": 7,
+       "outdoorAirFraction": null
+      },
+      {
+       "ahuCoolingKwh": 0.0,
+       "ahuHeatingKwh": 0.0,
+       "cooling": {
+        "combustionM3PerH": 0.0,
+        "conductanceWPerK": 109.04848846984831,
+        "effectiveOutdoorAirM3PerH": 120.15020276019793,
+        "heatFlowPerSetpointW": 601.9476563535627,
+        "infiltrationM3PerH": 21.388668492664305,
+        "mechanicalExtractM3PerH": 159.1578947368421,
+        "mechanicalSupplyM3PerH": 0.0,
+        "mechanicalSupplyTemperatureC": 18.48,
+        "naturalSupplyM3PerH": 120.15020276019793,
+        "naturalSupplyTemperatureC": 18.48,
+        "purgeM3PerH": 182.62830819550086,
+        "requiredOutdoorAirM3PerH": 159.1578947368421,
+        "ventilativeCoolingM3PerH": 0.0,
+        "ventilativeCoolingTemperatureC": 16.9,
+        "weightedConductanceWPerK": 109.04848846984832
+       },
+       "coolingLimitAirKwh": 0.0,
+       "coolingReferencePressurePa": [
+        -2.3194926290767626
+       ],
+       "fanElectricityKwh": 16.446315789473683,
+       "frostProtectionElectricityKwh": 0.0,
+       "grillePreheatingElectricityKwh": 0.0,
+       "heating": {
+        "combustionM3PerH": 0.0,
+        "conductanceWPerK": 61.77755205377253,
+        "effectiveOutdoorAirM3PerH": 133.6033345456244,
+        "heatFlowPerSetpointW": 93.90187912173421,
+        "infiltrationM3PerH": 24.657445811626136,
+        "mechanicalExtractM3PerH": 159.1578947368421,
+        "mechanicalSupplyM3PerH": 0.0,
+        "mechanicalSupplyTemperatureC": 18.48,
+        "naturalSupplyM3PerH": 133.6033345456244,
+        "naturalSupplyTemperatureC": 18.48,
+        "purgeM3PerH": 25.384633563668633,
+        "requiredOutdoorAirM3PerH": 159.1578947368421,
+        "ventilativeCoolingM3PerH": 0.0,
+        "ventilativeCoolingTemperatureC": 16.9,
+        "weightedConductanceWPerK": 61.777552053772524
+       },
+       "heatingLimitAirKwh": 0.0,
+       "heatingReferencePressurePa": [
+        -2.1421278563494894
+       ],
+       "month": 8,
+       "outdoorAirFraction": null
+      },
+      {
+       "ahuCoolingKwh": 0.0,
+       "ahuHeatingKwh": 0.0,
+       "cooling": {
+        "combustionM3PerH": 0.0,
+        "conductanceWPerK": 102.91325159220946,
+        "effectiveOutdoorAirM3PerH": 131.65941036612472,
+        "heatFlowPerSetpointW": 861.3839158267931,
+        "infiltrationM3PerH": 24.177893613486617,
+        "mechanicalExtractM3PerH": 159.1578947368421,
+        "mechanicalSupplyM3PerH": 0.0,
+        "mechanicalSupplyTemperatureC": 15.63,
+        "naturalSupplyM3PerH": 131.65941036612472,
+        "naturalSupplyTemperatureC": 15.63,
+        "purgeM3PerH": 150.09172781738218,
+        "requiredOutdoorAirM3PerH": 159.1578947368421,
+        "ventilativeCoolingM3PerH": 0.0,
+        "ventilativeCoolingTemperatureC": 15.11,
+        "weightedConductanceWPerK": 102.91325159220946
+       },
+       "coolingLimitAirKwh": 0.0,
+       "coolingReferencePressurePa": [
+        -3.1360736636732867
+       ],
+       "fanElectricityKwh": 15.91578947368421,
+       "frostProtectionElectricityKwh": 0.0,
+       "grillePreheatingElectricityKwh": 0.0,
+       "heating": {
+        "combustionM3PerH": 0.0,
+        "conductanceWPerK": 66.66883158376375,
+        "effectiveOutdoorAirM3PerH": 143.69770345362107,
+        "heatFlowPerSetpointW": 291.34279402104755,
+        "infiltrationM3PerH": 27.18539685381636,
+        "mechanicalExtractM3PerH": 159.1578947368421,
+        "mechanicalSupplyM3PerH": 0.0,
+        "mechanicalSupplyTemperatureC": 15.63,
+        "naturalSupplyM3PerH": 143.69770345362107,
+        "naturalSupplyTemperatureC": 15.63,
+        "purgeM3PerH": 27.302563656188006,
+        "requiredOutdoorAirM3PerH": 159.1578947368421,
+        "ventilativeCoolingM3PerH": 0.0,
+        "ventilativeCoolingTemperatureC": 15.11,
+        "weightedConductanceWPerK": 66.66883158376375
+       },
+       "heatingLimitAirKwh": 0.0,
+       "heatingReferencePressurePa": [
+        -2.9430838909460135
+       ],
+       "month": 9,
+       "outdoorAirFraction": null
+      },
+      {
+       "ahuCoolingKwh": 0.0,
+       "ahuHeatingKwh": 0.0,
+       "cooling": {
+        "combustionM3PerH": 0.0,
+        "conductanceWPerK": 91.30140181099125,
+        "effectiveOutdoorAirM3PerH": 139.38266786842013,
+        "heatFlowPerSetpointW": 1241.6990646294807,
+        "infiltrationM3PerH": 26.097124910011217,
+        "mechanicalExtractM3PerH": 159.1578947368421,
+        "mechanicalSupplyM3PerH": 0.0,
+        "mechanicalSupplyTemperatureC": 10.4,
+        "naturalSupplyM3PerH": 139.38266786842013,
+        "naturalSupplyTemperatureC": 10.4,
+        "purgeM3PerH": 105.9308275799993,
+        "requiredOutdoorAirM3PerH": 159.1578947368421,
+        "ventilativeCoolingM3PerH": 0.0,
+        "ventilativeCoolingTemperatureC": 15.04,
+        "weightedConductanceWPerK": 91.30140181099124
+       },
+       "coolingLimitAirKwh": 0.0,
+       "coolingReferencePressurePa": [
+        -4.382601126908639
+       ],
+       "fanElectricityKwh": 16.446315789473683,
+       "frostProtectionElectricityKwh": 0.0,
+       "grillePreheatingElectricityKwh": 0.0,
+       "heating": {
+        "combustionM3PerH": 0.0,
+        "conductanceWPerK": 68.75537086119105,
+        "effectiveOutdoorAirM3PerH": 147.99081581207057,
+        "heatFlowPerSetpointW": 660.0515602674341,
+        "infiltrationM3PerH": 28.27922430577454,
+        "mechanicalExtractM3PerH": 159.1578947368421,
+        "mechanicalSupplyM3PerH": 0.0,
+        "mechanicalSupplyTemperatureC": 10.4,
+        "naturalSupplyM3PerH": 147.99081581207057,
+        "naturalSupplyTemperatureC": 10.4,
+        "purgeM3PerH": 28.118255004293406,
+        "requiredOutdoorAirM3PerH": 159.1578947368421,
+        "ventilativeCoolingM3PerH": 0.0,
+        "ventilativeCoolingTemperatureC": 15.04,
+        "weightedConductanceWPerK": 68.75537086119105
+       },
+       "heatingLimitAirKwh": 0.0,
+       "heatingReferencePressurePa": [
+        -4.056798854181366
+       ],
+       "month": 10,
+       "outdoorAirFraction": null
+      },
+      {
+       "ahuCoolingKwh": 0.0,
+       "ahuHeatingKwh": 0.0,
+       "cooling": {
+        "combustionM3PerH": 0.0,
+        "conductanceWPerK": 77.93977097453313,
+        "effectiveOutdoorAirM3PerH": 147.4920752071179,
+        "heatFlowPerSetpointW": 1247.8157333022755,
+        "infiltrationM3PerH": 28.151591244683946,
+        "mechanicalExtractM3PerH": 159.1578947368421,
+        "mechanicalSupplyM3PerH": 0.0,
+        "mechanicalSupplyTemperatureC": 7.99,
+        "naturalSupplyM3PerH": 147.4920752071179,
+        "naturalSupplyTemperatureC": 7.99,
+        "purgeM3PerH": 56.0469885787048,
+        "requiredOutdoorAirM3PerH": 159.1578947368421,
+        "ventilativeCoolingM3PerH": 0.0,
+        "ventilativeCoolingTemperatureC": 13.43,
+        "weightedConductanceWPerK": 77.93977097453315
+       },
+       "coolingLimitAirKwh": 0.0,
+       "coolingReferencePressurePa": [
+        -5.167273153786212
+       ],
+       "fanElectricityKwh": 15.91578947368421,
+       "frostProtectionElectricityKwh": 0.0,
+       "grillePreheatingElectricityKwh": 0.0,
+       "heating": {
+        "combustionM3PerH": 0.0,
+        "conductanceWPerK": 70.04722346672952,
+        "effectiveOutdoorAirM3PerH": 150.64507481060107,
+        "heatFlowPerSetpointW": 841.2671538354215,
+        "infiltrationM3PerH": 28.960931384935524,
+        "mechanicalExtractM3PerH": 159.1578947368421,
+        "mechanicalSupplyM3PerH": 0.0,
+        "mechanicalSupplyTemperatureC": 7.99,
+        "naturalSupplyM3PerH": 150.64507481060107,
+        "naturalSupplyTemperatureC": 7.99,
+        "purgeM3PerH": 28.622564214014204,
+        "requiredOutdoorAirM3PerH": 159.1578947368421,
+        "ventilativeCoolingM3PerH": 0.0,
+        "ventilativeCoolingTemperatureC": 13.43,
+        "weightedConductanceWPerK": 70.04722346672952
+       },
+       "heatingLimitAirKwh": 0.0,
+       "heatingReferencePressurePa": [
+        -4.599283381058939
+       ],
+       "month": 11,
+       "outdoorAirFraction": null
+      },
+      {
+       "ahuCoolingKwh": 0.0,
+       "ahuHeatingKwh": 0.0,
+       "cooling": {
+        "combustionM3PerH": 0.0,
+        "conductanceWPerK": 70.37262675767424,
+        "effectiveOutdoorAirM3PerH": 151.3132057870824,
+        "heatFlowPerSetpointW": 1407.4525351534849,
+        "infiltrationM3PerH": 29.133178119401766,
+        "mechanicalExtractM3PerH": 159.1578947368421,
+        "mechanicalSupplyM3PerH": 0.0,
+        "mechanicalSupplyTemperatureC": 4.0,
+        "naturalSupplyM3PerH": 151.3132057870824,
+        "naturalSupplyTemperatureC": 4.0,
+        "purgeM3PerH": 28.74950909954566,
+        "requiredOutdoorAirM3PerH": 159.1578947368421,
+        "ventilativeCoolingM3PerH": 0.0,
+        "ventilativeCoolingTemperatureC": 4.0,
+        "weightedConductanceWPerK": 70.37262675767424
+       },
+       "coolingLimitAirKwh": 0.0,
+       "coolingReferencePressurePa": [
+        -6.1284336332642795
+       ],
+       "fanElectricityKwh": 16.446315789473683,
+       "frostProtectionElectricityKwh": 0.0,
+       "grillePreheatingElectricityKwh": 0.0,
+       "heating": {
+        "combustionM3PerH": 0.0,
+        "conductanceWPerK": 70.45222030075334,
+        "effectiveOutdoorAirM3PerH": 151.47660319275724,
+        "heatFlowPerSetpointW": 1127.2355248120534,
+        "infiltrationM3PerH": 29.17534201087221,
+        "mechanicalExtractM3PerH": 159.1578947368421,
+        "mechanicalSupplyM3PerH": 0.0,
+        "mechanicalSupplyTemperatureC": 4.0,
+        "naturalSupplyM3PerH": 151.47660319275724,
+        "naturalSupplyTemperatureC": 4.0,
+        "purgeM3PerH": 28.780554606623873,
+        "requiredOutdoorAirM3PerH": 159.1578947368421,
+        "ventilativeCoolingM3PerH": 0.0,
+        "ventilativeCoolingTemperatureC": 4.0,
+        "weightedConductanceWPerK": 70.45222030075334
+       },
+       "heatingLimitAirKwh": 0.0,
+       "heatingReferencePressurePa": [
+        -5.419818860537006
+       ],
+       "month": 12,
+       "outdoorAirFraction": null
+      }
+     ],
+     "ventilationSystemOp": [
+      "extract"
+     ],
+     "zoneId": "z1"
+    }
+   },
+   "distribution": null,
+   "emissionTemperatureIncrementK": 4.550000000000001,
+   "finalEditionVerified": false,
+   "generationEfficiency": 0.975,
+   "inputFingerprint": "sha256:729cae6061f76fed984f5c8726897f01137f07add94c8f7fc19c832553350c4b",
+   "issues": [],
+   "kernelVersion": "0.1.0",
+   "monthly": [
+    {
+     "ahuHeatingLoadKwh": 0.0,
+     "auxiliaryElectricityKwh": 22.474937240091634,
+     "biomassClassAKwh": 0.0,
+     "biomassClassCKwh": 0.0,
+     "biomassKwh": 0.0,
+     "biomassOutputKwh": 0.0,
+     "chpElectricityKwh": 0.0,
+     "chpExcessKwh": 0.0,
+     "chpGeneratorAuxiliaryKwh": 0.0,
+     "chpInputKwh": 0.0,
+     "chpOperatingHours": 0.0,
+     "chpThermalOutputKwh": 0.0,
+     "collectiveSourceHeatKwh": 0.0,
+     "distributionAuxiliaryElectricityKwh": 0.0,
+     "distributionAuxiliaryToMediumKwh": 0.0,
+     "distributionLossKwh": 0.0,
+     "districtHeatKwh": 0.0,
+     "emissionFanElectricityKwh": 0.0,
+     "emissionInputKwh": 1334.8591861155887,
+     "emissionLossKwh": 174.11206775420723,
+     "generatorElectricityKwh": 0.0,
+     "generatorOutputKwh": 1334.8591861155887,
+     "generatorRecoverableLossKwh": 0.0,
+     "heatPumpOutputKwh": 0.0,
+     "heatingNeedKwh": 1160.7471183613816,
+     "hotWaterLoadKwh": 0.0,
+     "humidificationElectricityKwh": 0.0,
+     "humidificationFuelKwh": 0.0,
+     "humidificationLoadKwh": 0.0,
+     "month": 1,
+     "naturalGasKwh": 1369.0863447339373,
+     "nodeLossKwh": 0.0,
+     "oilKwh": 0.0,
+     "recoverableLossKwh": 0.0,
+     "solarGainKwh": 0.0
+    },
+    {
+     "ahuHeatingLoadKwh": 0.0,
+     "auxiliaryElectricityKwh": 18.934640258070726,
+     "biomassClassAKwh": 0.0,
+     "biomassClassCKwh": 0.0,
+     "biomassKwh": 0.0,
+     "biomassOutputKwh": 0.0,
+     "chpElectricityKwh": 0.0,
+     "chpExcessKwh": 0.0,
+     "chpGeneratorAuxiliaryKwh": 0.0,
+     "chpInputKwh": 0.0,
+     "chpOperatingHours": 0.0,
+     "chpThermalOutputKwh": 0.0,
+     "collectiveSourceHeatKwh": 0.0,
+     "distributionAuxiliaryElectricityKwh": 0.0,
+     "distributionAuxiliaryToMediumKwh": 0.0,
+     "distributionLossKwh": 0.0,
+     "districtHeatKwh": 0.0,
+     "emissionFanElectricityKwh": 0.0,
+     "emissionInputKwh": 1083.819945572288,
+     "emissionLossKwh": 141.3678189876897,
+     "generatorElectricityKwh": 0.0,
+     "generatorOutputKwh": 1083.819945572288,
+     "generatorRecoverableLossKwh": 0.0,
+     "heatPumpOutputKwh": 0.0,
+     "heatingNeedKwh": 942.4521265845981,
+     "hotWaterLoadKwh": 0.0,
+     "humidificationElectricityKwh": 0.0,
+     "humidificationFuelKwh": 0.0,
+     "humidificationLoadKwh": 0.0,
+     "month": 2,
+     "naturalGasKwh": 1111.610200586962,
+     "nodeLossKwh": 0.0,
+     "oilKwh": 0.0,
+     "recoverableLossKwh": 0.0,
+     "solarGainKwh": 0.0
+    },
+    {
+     "ahuHeatingLoadKwh": 0.0,
+     "auxiliaryElectricityKwh": 14.073674782887917,
+     "biomassClassAKwh": 0.0,
+     "biomassClassCKwh": 0.0,
+     "biomassKwh": 0.0,
+     "biomassOutputKwh": 0.0,
+     "chpElectricityKwh": 0.0,
+     "chpExcessKwh": 0.0,
+     "chpGeneratorAuxiliaryKwh": 0.0,
+     "chpInputKwh": 0.0,
+     "chpOperatingHours": 0.0,
+     "chpThermalOutputKwh": 0.0,
+     "collectiveSourceHeatKwh": 0.0,
+     "distributionAuxiliaryElectricityKwh": 0.0,
+     "distributionAuxiliaryToMediumKwh": 0.0,
+     "distributionLossKwh": 0.0,
+     "districtHeatKwh": 0.0,
+     "emissionFanElectricityKwh": 0.0,
+     "emissionInputKwh": 739.1333027865978,
+     "emissionLossKwh": 96.4086916678171,
+     "generatorElectricityKwh": 0.0,
+     "generatorOutputKwh": 739.1333027865978,
+     "generatorRecoverableLossKwh": 0.0,
+     "heatPumpOutputKwh": 0.0,
+     "heatingNeedKwh": 642.7246111187807,
+     "hotWaterLoadKwh": 0.0,
+     "humidificationElectricityKwh": 0.0,
+     "humidificationFuelKwh": 0.0,
+     "humidificationLoadKwh": 0.0,
+     "month": 3,
+     "naturalGasKwh": 758.0854387554849,
+     "nodeLossKwh": 0.0,
+     "oilKwh": 0.0,
+     "recoverableLossKwh": 0.0,
+     "solarGainKwh": 0.0
+    },
+    {
+     "ahuHeatingLoadKwh": 0.0,
+     "auxiliaryElectricityKwh": 8.275870073005594,
+     "biomassClassAKwh": 0.0,
+     "biomassClassCKwh": 0.0,
+     "biomassKwh": 0.0,
+     "biomassOutputKwh": 0.0,
+     "chpElectricityKwh": 0.0,
+     "chpExcessKwh": 0.0,
+     "chpGeneratorAuxiliaryKwh": 0.0,
+     "chpInputKwh": 0.0,
+     "chpOperatingHours": 0.0,
+     "chpThermalOutputKwh": 0.0,
+     "collectiveSourceHeatKwh": 0.0,
+     "distributionAuxiliaryElectricityKwh": 0.0,
+     "distributionAuxiliaryToMediumKwh": 0.0,
+     "distributionLossKwh": 0.0,
+     "districtHeatKwh": 0.0,
+     "emissionFanElectricityKwh": 0.0,
+     "emissionInputKwh": 328.01624154039666,
+     "emissionLossKwh": 42.78472715744304,
+     "generatorElectricityKwh": 0.0,
+     "generatorOutputKwh": 328.01624154039666,
+     "generatorRecoverableLossKwh": 0.0,
+     "heatPumpOutputKwh": 0.0,
+     "heatingNeedKwh": 285.2315143829536,
+     "hotWaterLoadKwh": 0.0,
+     "humidificationElectricityKwh": 0.0,
+     "humidificationFuelKwh": 0.0,
+     "humidificationLoadKwh": 0.0,
+     "month": 4,
+     "naturalGasKwh": 336.4269144004068,
+     "nodeLossKwh": 0.0,
+     "oilKwh": 0.0,
+     "recoverableLossKwh": 0.0,
+     "solarGainKwh": 0.0
+    },
+    {
+     "ahuHeatingLoadKwh": 0.0,
+     "auxiliaryElectricityKwh": 4.015399230250392,
+     "biomassClassAKwh": 0.0,
+     "biomassClassCKwh": 0.0,
+     "biomassKwh": 0.0,
+     "biomassOutputKwh": 0.0,
+     "chpElectricityKwh": 0.0,
+     "chpExcessKwh": 0.0,
+     "chpGeneratorAuxiliaryKwh": 0.0,
+     "chpInputKwh": 0.0,
+     "chpOperatingHours": 0.0,
+     "chpThermalOutputKwh": 0.0,
+     "collectiveSourceHeatKwh": 0.0,
+     "distributionAuxiliaryElectricityKwh": 0.0,
+     "distributionAuxiliaryToMediumKwh": 0.0,
+     "distributionLossKwh": 0.0,
+     "districtHeatKwh": 0.0,
+     "emissionFanElectricityKwh": 0.0,
+     "emissionInputKwh": 25.910127235936887,
+     "emissionLossKwh": 3.379581813383072,
+     "generatorElectricityKwh": 0.0,
+     "generatorOutputKwh": 25.910127235936887,
+     "generatorRecoverableLossKwh": 0.0,
+     "heatPumpOutputKwh": 0.0,
+     "heatingNeedKwh": 22.530545422553814,
+     "hotWaterLoadKwh": 0.0,
+     "humidificationElectricityKwh": 0.0,
+     "humidificationFuelKwh": 0.0,
+     "humidificationLoadKwh": 0.0,
+     "month": 5,
+     "naturalGasKwh": 26.574489472755783,
+     "nodeLossKwh": 0.0,
+     "oilKwh": 0.0,
+     "recoverableLossKwh": 0.0,
+     "solarGainKwh": 0.0
+    },
+    {
+     "ahuHeatingLoadKwh": 0.0,
+     "auxiliaryElectricityKwh": 3.722705664384356,
+     "biomassClassAKwh": 0.0,
+     "biomassClassCKwh": 0.0,
+     "biomassKwh": 0.0,
+     "biomassOutputKwh": 0.0,
+     "chpElectricityKwh": 0.0,
+     "chpExcessKwh": 0.0,
+     "chpGeneratorAuxiliaryKwh": 0.0,
+     "chpInputKwh": 0.0,
+     "chpOperatingHours": 0.0,
+     "chpThermalOutputKwh": 0.0,
+     "collectiveSourceHeatKwh": 0.0,
+     "distributionAuxiliaryElectricityKwh": 0.0,
+     "distributionAuxiliaryToMediumKwh": 0.0,
+     "distributionLossKwh": 0.0,
+     "districtHeatKwh": 0.0,
+     "emissionFanElectricityKwh": 0.0,
+     "emissionInputKwh": 5.155492565436157,
+     "emissionLossKwh": 0.6724555520134118,
+     "generatorElectricityKwh": 0.0,
+     "generatorOutputKwh": 5.155492565436157,
+     "generatorRecoverableLossKwh": 0.0,
+     "heatPumpOutputKwh": 0.0,
+     "heatingNeedKwh": 4.483037013422745,
+     "hotWaterLoadKwh": 0.0,
+     "humidificationElectricityKwh": 0.0,
+     "humidificationFuelKwh": 0.0,
+     "humidificationLoadKwh": 0.0,
+     "month": 6,
+     "naturalGasKwh": 5.287684682498623,
+     "nodeLossKwh": 0.0,
+     "oilKwh": 0.0,
+     "recoverableLossKwh": 0.0,
+     "solarGainKwh": 0.0
+    },
+    {
+     "ahuHeatingLoadKwh": 0.0,
+     "auxiliaryElectricityKwh": 3.65,
+     "biomassClassAKwh": 0.0,
+     "biomassClassCKwh": 0.0,
+     "biomassKwh": 0.0,
+     "biomassOutputKwh": 0.0,
+     "chpElectricityKwh": 0.0,
+     "chpExcessKwh": 0.0,
+     "chpGeneratorAuxiliaryKwh": 0.0,
+     "chpInputKwh": 0.0,
+     "chpOperatingHours": 0.0,
+     "chpThermalOutputKwh": 0.0,
+     "collectiveSourceHeatKwh": 0.0,
+     "distributionAuxiliaryElectricityKwh": 0.0,
+     "distributionAuxiliaryToMediumKwh": 0.0,
+     "distributionLossKwh": 0.0,
+     "districtHeatKwh": 0.0,
+     "emissionFanElectricityKwh": 0.0,
+     "emissionInputKwh": 0.0,
+     "emissionLossKwh": 0.0,
+     "generatorElectricityKwh": 0.0,
+     "generatorOutputKwh": 0.0,
+     "generatorRecoverableLossKwh": 0.0,
+     "heatPumpOutputKwh": 0.0,
+     "heatingNeedKwh": 0.0,
+     "hotWaterLoadKwh": 0.0,
+     "humidificationElectricityKwh": 0.0,
+     "humidificationFuelKwh": 0.0,
+     "humidificationLoadKwh": 0.0,
+     "month": 7,
+     "naturalGasKwh": 0.0,
+     "nodeLossKwh": 0.0,
+     "oilKwh": 0.0,
+     "recoverableLossKwh": 0.0,
+     "solarGainKwh": 0.0
+    },
+    {
+     "ahuHeatingLoadKwh": 0.0,
+     "auxiliaryElectricityKwh": 3.65,
+     "biomassClassAKwh": 0.0,
+     "biomassClassCKwh": 0.0,
+     "biomassKwh": 0.0,
+     "biomassOutputKwh": 0.0,
+     "chpElectricityKwh": 0.0,
+     "chpExcessKwh": 0.0,
+     "chpGeneratorAuxiliaryKwh": 0.0,
+     "chpInputKwh": 0.0,
+     "chpOperatingHours": 0.0,
+     "chpThermalOutputKwh": 0.0,
+     "collectiveSourceHeatKwh": 0.0,
+     "distributionAuxiliaryElectricityKwh": 0.0,
+     "distributionAuxiliaryToMediumKwh": 0.0,
+     "distributionLossKwh": 0.0,
+     "districtHeatKwh": 0.0,
+     "emissionFanElectricityKwh": 0.0,
+     "emissionInputKwh": 0.0,
+     "emissionLossKwh": 0.0,
+     "generatorElectricityKwh": 0.0,
+     "generatorOutputKwh": 0.0,
+     "generatorRecoverableLossKwh": 0.0,
+     "heatPumpOutputKwh": 0.0,
+     "heatingNeedKwh": 0.0,
+     "hotWaterLoadKwh": 0.0,
+     "humidificationElectricityKwh": 0.0,
+     "humidificationFuelKwh": 0.0,
+     "humidificationLoadKwh": 0.0,
+     "month": 8,
+     "naturalGasKwh": 0.0,
+     "nodeLossKwh": 0.0,
+     "oilKwh": 0.0,
+     "recoverableLossKwh": 0.0,
+     "solarGainKwh": 0.0
+    },
+    {
+     "ahuHeatingLoadKwh": 0.0,
+     "auxiliaryElectricityKwh": 3.7795970292413115,
+     "biomassClassAKwh": 0.0,
+     "biomassClassCKwh": 0.0,
+     "biomassKwh": 0.0,
+     "biomassOutputKwh": 0.0,
+     "chpElectricityKwh": 0.0,
+     "chpExcessKwh": 0.0,
+     "chpGeneratorAuxiliaryKwh": 0.0,
+     "chpInputKwh": 0.0,
+     "chpOperatingHours": 0.0,
+     "chpThermalOutputKwh": 0.0,
+     "collectiveSourceHeatKwh": 0.0,
+     "distributionAuxiliaryElectricityKwh": 0.0,
+     "distributionAuxiliaryToMediumKwh": 0.0,
+     "distributionLossKwh": 0.0,
+     "districtHeatKwh": 0.0,
+     "emissionFanElectricityKwh": 0.0,
+     "emissionInputKwh": 9.18960752802028,
+     "emissionLossKwh": 1.1986444601765582,
+     "generatorElectricityKwh": 0.0,
+     "generatorOutputKwh": 9.18960752802028,
+     "generatorRecoverableLossKwh": 0.0,
+     "heatPumpOutputKwh": 0.0,
+     "heatingNeedKwh": 7.9909630678437225,
+     "hotWaterLoadKwh": 0.0,
+     "humidificationElectricityKwh": 0.0,
+     "humidificationFuelKwh": 0.0,
+     "humidificationLoadKwh": 0.0,
+     "month": 9,
+     "naturalGasKwh": 9.425238490277211,
+     "nodeLossKwh": 0.0,
+     "oilKwh": 0.0,
+     "recoverableLossKwh": 0.0,
+     "solarGainKwh": 0.0
+    },
+    {
+     "ahuHeatingLoadKwh": 0.0,
+     "auxiliaryElectricityKwh": 8.391949666668529,
+     "biomassClassAKwh": 0.0,
+     "biomassClassCKwh": 0.0,
+     "biomassKwh": 0.0,
+     "biomassOutputKwh": 0.0,
+     "chpElectricityKwh": 0.0,
+     "chpExcessKwh": 0.0,
+     "chpGeneratorAuxiliaryKwh": 0.0,
+     "chpInputKwh": 0.0,
+     "chpOperatingHours": 0.0,
+     "chpThermalOutputKwh": 0.0,
+     "collectiveSourceHeatKwh": 0.0,
+     "distributionAuxiliaryElectricityKwh": 0.0,
+     "distributionAuxiliaryToMediumKwh": 0.0,
+     "distributionLossKwh": 0.0,
+     "districtHeatKwh": 0.0,
+     "emissionFanElectricityKwh": 0.0,
+     "emissionInputKwh": 336.247340000132,
+     "emissionLossKwh": 43.858348695669385,
+     "generatorElectricityKwh": 0.0,
+     "generatorOutputKwh": 336.247340000132,
+     "generatorRecoverableLossKwh": 0.0,
+     "heatPumpOutputKwh": 0.0,
+     "heatingNeedKwh": 292.3889913044626,
+     "hotWaterLoadKwh": 0.0,
+     "humidificationElectricityKwh": 0.0,
+     "humidificationFuelKwh": 0.0,
+     "humidificationLoadKwh": 0.0,
+     "month": 10,
+     "naturalGasKwh": 344.86906666680204,
+     "nodeLossKwh": 0.0,
+     "oilKwh": 0.0,
+     "recoverableLossKwh": 0.0,
+     "solarGainKwh": 0.0
+    },
+    {
+     "ahuHeatingLoadKwh": 0.0,
+     "auxiliaryElectricityKwh": 13.605861316894792,
+     "biomassClassAKwh": 0.0,
+     "biomassClassCKwh": 0.0,
+     "biomassKwh": 0.0,
+     "biomassOutputKwh": 0.0,
+     "chpElectricityKwh": 0.0,
+     "chpExcessKwh": 0.0,
+     "chpGeneratorAuxiliaryKwh": 0.0,
+     "chpInputKwh": 0.0,
+     "chpOperatingHours": 0.0,
+     "chpThermalOutputKwh": 0.0,
+     "collectiveSourceHeatKwh": 0.0,
+     "distributionAuxiliaryElectricityKwh": 0.0,
+     "distributionAuxiliaryToMediumKwh": 0.0,
+     "distributionLossKwh": 0.0,
+     "districtHeatKwh": 0.0,
+     "emissionFanElectricityKwh": 0.0,
+     "emissionInputKwh": 705.9610751979944,
+     "emissionLossKwh": 92.08187937365145,
+     "generatorElectricityKwh": 0.0,
+     "generatorOutputKwh": 705.9610751979944,
+     "generatorRecoverableLossKwh": 0.0,
+     "heatPumpOutputKwh": 0.0,
+     "heatingNeedKwh": 613.879195824343,
+     "hotWaterLoadKwh": 0.0,
+     "humidificationElectricityKwh": 0.0,
+     "humidificationFuelKwh": 0.0,
+     "humidificationLoadKwh": 0.0,
+     "month": 11,
+     "naturalGasKwh": 724.0626412287122,
+     "nodeLossKwh": 0.0,
+     "oilKwh": 0.0,
+     "recoverableLossKwh": 0.0,
+     "solarGainKwh": 0.0
+    },
+    {
+     "ahuHeatingLoadKwh": 0.0,
+     "auxiliaryElectricityKwh": 20.262688176329718,
+     "biomassClassAKwh": 0.0,
+     "biomassClassCKwh": 0.0,
+     "biomassKwh": 0.0,
+     "biomassOutputKwh": 0.0,
+     "chpElectricityKwh": 0.0,
+     "chpExcessKwh": 0.0,
+     "chpGeneratorAuxiliaryKwh": 0.0,
+     "chpInputKwh": 0.0,
+     "chpOperatingHours": 0.0,
+     "chpThermalOutputKwh": 0.0,
+     "collectiveSourceHeatKwh": 0.0,
+     "distributionAuxiliaryElectricityKwh": 0.0,
+     "distributionAuxiliaryToMediumKwh": 0.0,
+     "distributionLossKwh": 0.0,
+     "districtHeatKwh": 0.0,
+     "emissionFanElectricityKwh": 0.0,
+     "emissionInputKwh": 1177.9906161397441,
+     "emissionLossKwh": 153.65094993127096,
+     "generatorElectricityKwh": 0.0,
+     "generatorOutputKwh": 1177.9906161397441,
+     "generatorRecoverableLossKwh": 0.0,
+     "heatPumpOutputKwh": 0.0,
+     "heatingNeedKwh": 1024.339666208473,
+     "hotWaterLoadKwh": 0.0,
+     "humidificationElectricityKwh": 0.0,
+     "humidificationFuelKwh": 0.0,
+     "humidificationLoadKwh": 0.0,
+     "month": 12,
+     "naturalGasKwh": 1208.1955037330708,
+     "nodeLossKwh": 0.0,
+     "oilKwh": 0.0,
+     "recoverableLossKwh": 0.0,
+     "solarGainKwh": 0.0
+    }
+   ],
+   "omittedTerms": [
+    "§9.1 (p. 285): a heat-pump quality declaration (kwaliteitsverklaring, e.g. BCRG) replaces the table 9.27/9.29 COP, rounded down to 0,05; c_source of footnote a still applies; the value is read from the declaration for this system's design supply temperature and demand by the user (linear interpolation allowed)",
+    "§9.1: a declared energy fraction F_H;gen;gpref below 1 is completed by the appliance's integrated electric backup heater at η = 1 (the assumption under which such declarations are drawn up); in a set of several generators it is refused, because 9.6.1 shares the load there",
+    "§9.1: a declared annual W_H;aux replaces the 9.85 forfait and is spread over the months by the heat-pump output",
+    "f_prac with a declared heat-pump COP: 9.62 (table route, p. 337) has f_prac 1 and 9.63 (data per NEN-EN 14511/14825 via annex Q, p. 340) has 0,95. A heat-pump quality declaration for space heating is drawn up per annex Q (p. 615 speaks of a 'kwaliteitsverklaring voor het opwekkingsrendement voor verwarming volgens bijlage Q'), so the declared COP is taken with f_prac 0,95. For hot water 13.152 (p. 616–617) gives 1,0 only to the forfait values of 13.8.4.5–13.8.4.7; a declared value takes 0,95 ('alle overige gevallen'). Both readings agree with the electricity printed in three public reports of attested software",
+    "9.6.1: generators with the same preference share their energy by nominal power; product-specific hybrid switching and domestic hot water priority are not modelled",
+    "7.82: ϑ_ztu of the unheated space follows from distributionSystem.unheatedReductionFactor (b_U); without it and without entered values 13 °C is used",
+    "annex Q: c_source (annex V) is not applied to method 1 (9.63 has no c_source; tables 9.27/9.29 only); the degree of regeneration is reported",
+    "annex Q: W_H;gen;aux = W_H;aux;hp;an/(12·3,6) is booked literally per 9.6.3.2 (p. 340); Q.4 (p. 1029) already includes the source pump in η_H;gen;hp, so the norm counts it twice (norm issue, followed as written)",
+    "annex Q: F_H;gen = 1 (Q.1) is taken as met when every bin of table Q.6 is fully covered; the rounded table hours sum to 277,757 instead of 277,778",
+    "annex Q: V.1 hot-water term not needed, because c_source is not applied to method 1",
+    "annex N: E_H;gen;in converted to the gross calorific value (N.3) with f_Hs/Hi of table M.3 (biomass as wood 1,08)",
+    "annex M: ϑ_brm (M.12) from 9.4.2: heating setpoint for a heated space, ϑ_ztu of the distribution system for an installation room; table M.6 otherwise",
+    "9.6.1 with §9.6.3 (p. 331) and 9.6.3.2 (p. 340): an annex Q heat pump in a multiple set takes F_H;gen;gpref from annex Q on the whole node output instead of table 9.23; it must be the only first preference, and the other generators share 1 − F by 9.60 with their preferences renumbered from 1 (estimated β rebased on the share left by the heat pump)",
+    "annex Q with a gas backup: the 9.6.8.1 auxiliary energy of the backup boiler is booked in every month, also when full coverage leaves the boiler without output (literal stand-by term)",
+    "annex M: LPG, hard coal and lignite of table M.3 are refused (boiler_fuel_without_primary_factor), because tables 5.2/5.3 (p. 94, p. 97) give them no f_P;del or K_CO2",
+    "annex M: β above 1 (M.24/M.25) is refused as a capacity shortfall, as annex N does; the plausibility bounds P_int ≥ 0,05·P_n and f_gen;ls;P0 ≤ 0,1 are program choices",
+    "annex M: stand-by losses (M.4/M.6) burn fuel in every hour of the month even when the 9.7 feedback of recoverable losses brings the generator output to 0 (a grossly oversized boiler in a small zone); the norm is followed literally",
+    "tables 5.2/5.4 (biomass classes): a type-plate power above 500 kW classes the boiler as bmA regardless of the entered 500 kW flag",
+    "tables 5.2/5.4 (p. 94, 'per installatie'): the biomass class follows how the stoves or boilers are modelled. The generators of one multiple set add up; identical systems (§9.1, p. 287, for example one stove per dwelling) and separate heating systems (for example local heaters in different zones) are separate installations and are classed one by one",
+    "9.56 (p. 323) with remark 4 (p. 324): when preference 1 of an annex Q set is estimated at β ≥ 1, the remaining preferences are weighted by their entered nominal powers; only when all of them are missing does each count with the same power (program choice); a partly known set must complete its powers (remark 1, p. 323)",
+    "annex V, V.1 (p. 1115): η_H;gen is referred to 14.6, which in this edition is the lighting daylight factor; the kernel uses the delivered COP with η_el = 1/f_P;del;el, so extraction is Q·(1 − η_el/COP). Reading η_H;gen as COP·η_el gives Q·(1 − 1/COP) and a higher R; the kernel's reading is the conservative one"
+   ],
+   "referenceVerified": false,
+   "scope": "nta8800_space_heating_zones_single_generator_unverified",
+   "status": "calculated_unverified",
+   "targetNormVersion": "NTA 8800:2022",
+   "zoneRecoverableLosses": [
+    {
+     "monthlyKwh": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "zoneId": "z1"
+    }
+   ]
+  },
+  "status": "calculated_unverified",
+  "targetNormVersion": "NTA 8800:2022",
+  "tojuli": [
+   {
+    "activeCooling": false,
+    "annexAa": null,
+    "issues": [],
+    "maxTojuliK": 0.85,
+    "meetsBblLimit": true,
+    "orientations": [
+     {
+      "areaM2": 65.36,
+      "assessed": true,
+      "boosterHeatPumpJulyKwh": 0.0,
+      "conductanceWPerK": 89.07004877238438,
+      "coolingNeedJulyKwh": 3.5875917327105356,
+      "orientation": "north",
+      "share": 0.5,
+      "tojuliK": 0.06
+     },
+     {
+      "areaM2": 0.0,
+      "assessed": false,
+      "boosterHeatPumpJulyKwh": 0.0,
+      "conductanceWPerK": 0.0,
+      "coolingNeedJulyKwh": 0.0,
+      "orientation": "north_east",
+      "share": 0.0,
+      "tojuliK": null
+     },
+     {
+      "areaM2": 0.0,
+      "assessed": false,
+      "boosterHeatPumpJulyKwh": 0.0,
+      "conductanceWPerK": 0.0,
+      "coolingNeedJulyKwh": 0.0,
+      "orientation": "east",
+      "share": 0.0,
+      "tojuliK": null
+     },
+     {
+      "areaM2": 0.0,
+      "assessed": false,
+      "boosterHeatPumpJulyKwh": 0.0,
+      "conductanceWPerK": 0.0,
+      "coolingNeedJulyKwh": 0.0,
+      "orientation": "south_east",
+      "share": 0.0,
+      "tojuliK": null
+     },
+     {
+      "areaM2": 65.36,
+      "assessed": true,
+      "boosterHeatPumpJulyKwh": 0.0,
+      "conductanceWPerK": 92.63004877238438,
+      "coolingNeedJulyKwh": 58.236212654135386,
+      "orientation": "south",
+      "share": 0.5,
+      "tojuliK": 0.85
+     },
+     {
+      "areaM2": 0.0,
+      "assessed": false,
+      "boosterHeatPumpJulyKwh": 0.0,
+      "conductanceWPerK": 0.0,
+      "coolingNeedJulyKwh": 0.0,
+      "orientation": "south_west",
+      "share": 0.0,
+      "tojuliK": null
+     },
+     {
+      "areaM2": 0.0,
+      "assessed": false,
+      "boosterHeatPumpJulyKwh": 0.0,
+      "conductanceWPerK": 0.0,
+      "coolingNeedJulyKwh": 0.0,
+      "orientation": "west",
+      "share": 0.0,
+      "tojuliK": null
+     },
+     {
+      "areaM2": 0.0,
+      "assessed": false,
+      "boosterHeatPumpJulyKwh": 0.0,
+      "conductanceWPerK": 0.0,
+      "coolingNeedJulyKwh": 0.0,
+      "orientation": "north_west",
+      "share": 0.0,
+      "tojuliK": null
+     }
+    ],
+    "status": "calculated_unverified",
+    "zoneId": "z1"
+   }
+  ],
+  "tojuliMaxK": 0.85,
+  "tojuliMeetsBblLimit": true,
+  "zebPrimaryTotalIndicatorKwhPerM2": null
+ },
+ "registration": null,
+ "registrationEligible": false,
+ "schematisation": [],
+ "status": "calculated_legacy_edition",
+ "targetNormVersion": "NTA 8800:2022",
+ "warnings": []
+}

@@ -1,0 +1,869 @@
+{
+  "id": "public-comparison-e",
+  "name": "Vergelijking openbaar rapport E (vrijstaande woning)",
+  "description": "Fictieve herbouw van een openbaar BENG-rapport (Uniec 3.1.5.0, NTA 8800:2022); niet de echte woning.",
+  "buildingFunction": "residential",
+  "address": "Fictief adres",
+  "city": "Fictief",
+  "zones": [
+    {
+      "id": "z1",
+      "name": "Rekenzone 1",
+      "floorArea": 209.4,
+      "volume": 544.44,
+      "height": 2.6,
+      "surfaces": [
+        {
+          "id": "VG-spouw",
+          "name": "VG spouw",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 50.5,
+          "orientation": "W",
+          "constructionId": "c-spouw",
+          "zoneId": "z1",
+          "windows": [
+            {
+              "id": "VG-Adeur",
+              "name": "Adeur",
+              "area": 2.39,
+              "uValue": 2.0,
+              "gValue": 0.0,
+              "orientation": "W",
+              "surfaceId": "VG-spouw"
+            },
+            {
+              "id": "VG-Abov",
+              "name": "Abovenlicht",
+              "area": 0.52,
+              "uValue": 1.6,
+              "gValue": 0.6,
+              "orientation": "W",
+              "surfaceId": "VG-spouw"
+            },
+            {
+              "id": "VG-B",
+              "name": "B",
+              "area": 5.25,
+              "uValue": 1.3,
+              "gValue": 0.6,
+              "orientation": "W",
+              "surfaceId": "VG-spouw"
+            },
+            {
+              "id": "VG-D",
+              "name": "D",
+              "area": 2.05,
+              "uValue": 1.5,
+              "gValue": 0.6,
+              "orientation": "W",
+              "surfaceId": "VG-spouw"
+            },
+            {
+              "id": "VG-N1",
+              "name": "N",
+              "area": 1.33,
+              "uValue": 1.7,
+              "gValue": 0.6,
+              "orientation": "W",
+              "surfaceId": "VG-spouw"
+            },
+            {
+              "id": "VG-N2",
+              "name": "N",
+              "area": 1.33,
+              "uValue": 1.7,
+              "gValue": 0.6,
+              "orientation": "W",
+              "surfaceId": "VG-spouw"
+            },
+            {
+              "id": "VG-O1",
+              "name": "O",
+              "area": 1.33,
+              "uValue": 1.7,
+              "gValue": 0.6,
+              "orientation": "W",
+              "surfaceId": "VG-spouw"
+            },
+            {
+              "id": "VG-O2",
+              "name": "O",
+              "area": 1.33,
+              "uValue": 1.7,
+              "gValue": 0.6,
+              "orientation": "W",
+              "surfaceId": "VG-spouw"
+            },
+            {
+              "id": "VG-L",
+              "name": "L",
+              "area": 0.95,
+              "uValue": 1.7,
+              "gValue": 0.6,
+              "orientation": "W",
+              "surfaceId": "VG-spouw"
+            }
+          ]
+        },
+        {
+          "id": "VG-betim",
+          "name": "VG betim",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 8.02,
+          "orientation": "W",
+          "constructionId": "c-betim",
+          "zoneId": "z1",
+          "windows": []
+        },
+        {
+          "id": "RZG-spouw",
+          "name": "RZG spouw",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 19.52,
+          "orientation": "S",
+          "constructionId": "c-spouw",
+          "zoneId": "z1",
+          "windows": [
+            {
+              "id": "RZG-H1",
+              "name": "H (2x)",
+              "area": 0.4,
+              "uValue": 2.1,
+              "gValue": 0.6,
+              "orientation": "S",
+              "surfaceId": "RZG-spouw"
+            },
+            {
+              "id": "RZG-K",
+              "name": "K",
+              "area": 2.45,
+              "uValue": 2.0,
+              "gValue": 0.0,
+              "orientation": "S",
+              "surfaceId": "RZG-spouw"
+            },
+            {
+              "id": "RZG-M",
+              "name": "M",
+              "area": 0.16,
+              "uValue": 2.2,
+              "gValue": 0.6,
+              "orientation": "S",
+              "surfaceId": "RZG-spouw"
+            },
+            {
+              "id": "RZG-H2",
+              "name": "H",
+              "area": 0.2,
+              "uValue": 2.1,
+              "gValue": 0.6,
+              "orientation": "S",
+              "surfaceId": "RZG-spouw"
+            }
+          ]
+        },
+        {
+          "id": "RZG-zijwang",
+          "name": "RZG zijwang",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 3.41,
+          "orientation": "S",
+          "constructionId": "c-zijwang",
+          "zoneId": "z1",
+          "windows": []
+        },
+        {
+          "id": "RZG-betim",
+          "name": "RZG betim",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 27.82,
+          "orientation": "S",
+          "constructionId": "c-betim",
+          "zoneId": "z1",
+          "windows": []
+        },
+        {
+          "id": "AG-spouw",
+          "name": "AG spouw",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 51.73,
+          "orientation": "E",
+          "constructionId": "c-spouw",
+          "zoneId": "z1",
+          "windows": [
+            {
+              "id": "AG-J",
+              "name": "J",
+              "area": 6.6,
+              "uValue": 1.3,
+              "gValue": 0.6,
+              "orientation": "E",
+              "surfaceId": "AG-spouw"
+            },
+            {
+              "id": "AG-F",
+              "name": "F",
+              "area": 13.19,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "E",
+              "surfaceId": "AG-spouw"
+            },
+            {
+              "id": "AG-E",
+              "name": "E",
+              "area": 4.09,
+              "uValue": 1.5,
+              "gValue": 0.6,
+              "orientation": "E",
+              "surfaceId": "AG-spouw"
+            },
+            {
+              "id": "AG-D",
+              "name": "D",
+              "area": 2.05,
+              "uValue": 1.5,
+              "gValue": 0.6,
+              "orientation": "E",
+              "surfaceId": "AG-spouw"
+            }
+          ]
+        },
+        {
+          "id": "LZG-zijwang",
+          "name": "LZG zijwang",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 9.52,
+          "orientation": "N",
+          "constructionId": "c-zijwang",
+          "zoneId": "z1",
+          "windows": [
+            {
+              "id": "LZG-I",
+              "name": "I",
+              "area": 0.95,
+              "uValue": 1.7,
+              "gValue": 0.6,
+              "orientation": "N",
+              "surfaceId": "LZG-zijwang"
+            },
+            {
+              "id": "LZG-H",
+              "name": "H",
+              "area": 0.2,
+              "uValue": 2.1,
+              "gValue": 0.6,
+              "orientation": "N",
+              "surfaceId": "LZG-zijwang"
+            },
+            {
+              "id": "LZG-P",
+              "name": "P",
+              "area": 0.23,
+              "uValue": 2.1,
+              "gValue": 0.6,
+              "orientation": "N",
+              "surfaceId": "LZG-zijwang"
+            },
+            {
+              "id": "LZG-O",
+              "name": "O",
+              "area": 1.33,
+              "uValue": 1.7,
+              "gValue": 0.6,
+              "orientation": "N",
+              "surfaceId": "LZG-zijwang"
+            },
+            {
+              "id": "LZG-C",
+              "name": "C",
+              "area": 0.95,
+              "uValue": 1.7,
+              "gValue": 0.6,
+              "orientation": "N",
+              "surfaceId": "LZG-zijwang"
+            },
+            {
+              "id": "LZG-Gdeur",
+              "name": "Gdeur",
+              "area": 1.21,
+              "uValue": 2.0,
+              "gValue": 0.0,
+              "orientation": "N",
+              "surfaceId": "LZG-zijwang"
+            },
+            {
+              "id": "LZG-G",
+              "name": "G",
+              "area": 1.24,
+              "uValue": 2.5,
+              "gValue": 0.6,
+              "orientation": "N",
+              "surfaceId": "LZG-zijwang"
+            }
+          ]
+        },
+        {
+          "id": "LZG-spouw",
+          "name": "LZG spouw",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 50.77,
+          "orientation": "N",
+          "constructionId": "c-spouw",
+          "zoneId": "z1",
+          "windows": []
+        },
+        {
+          "id": "VG-HD",
+          "name": "VG-HD",
+          "type": "roof",
+          "thermalBoundary": "outdoor",
+          "area": 72.94,
+          "orientation": "W",
+          "constructionId": "c-dak",
+          "zoneId": "z1",
+          "windows": [
+            {
+              "id": "VG-HD-fer",
+              "name": "dakraam Ferolux (2x)",
+              "area": 0.48,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "W",
+              "surfaceId": "VG-HD"
+            }
+          ]
+        },
+        {
+          "id": "AG-HD",
+          "name": "AG-HD",
+          "type": "roof",
+          "thermalBoundary": "outdoor",
+          "area": 82.31,
+          "orientation": "E",
+          "constructionId": "c-dak",
+          "zoneId": "z1",
+          "windows": [
+            {
+              "id": "AG-HD-velux",
+              "name": "dakraam Velux (4x)",
+              "area": 2.16,
+              "uValue": 1.8,
+              "gValue": 0.6,
+              "orientation": "E",
+              "surfaceId": "AG-HD"
+            }
+          ]
+        },
+        {
+          "id": "LZG-HD",
+          "name": "LZG-HD",
+          "type": "roof",
+          "thermalBoundary": "outdoor",
+          "area": 28.48,
+          "orientation": "N",
+          "constructionId": "c-dak",
+          "zoneId": "z1",
+          "windows": [
+            {
+              "id": "LZG-HD-velux",
+              "name": "dakraam Velux",
+              "area": 0.54,
+              "uValue": 1.8,
+              "gValue": 0.6,
+              "orientation": "N",
+              "surfaceId": "LZG-HD"
+            }
+          ]
+        },
+        {
+          "id": "RZG-HD",
+          "name": "RZG-HD",
+          "type": "roof",
+          "thermalBoundary": "outdoor",
+          "area": 41.29,
+          "orientation": "S",
+          "constructionId": "c-dak",
+          "zoneId": "z1",
+          "windows": []
+        },
+        {
+          "id": "BG",
+          "name": "Begane grond",
+          "type": "floor",
+          "thermalBoundary": "ground",
+          "area": 139.08,
+          "orientation": "horizontal",
+          "constructionId": "c-vloer",
+          "zoneId": "z1",
+          "windows": []
+        }
+      ],
+      "thermalBridges": [],
+      "pointThermalBridges": [],
+      "pointBridgeInventoryComplete": true,
+      "airTightness": {
+        "qv10": 0.4
+      }
+    }
+  ],
+  "heatingSystems": [],
+  "ventilationSystems": [],
+  "coolingSystems": [],
+  "hotWaterSystems": [],
+  "solarPV": [],
+  "solarThermal": [],
+  "unheatedSpaces": [],
+  "constructions": [
+    {
+      "id": "c-spouw",
+      "name": "Spouwmuur Rc 5,99",
+      "layers": [],
+      "rcValue": 5.99,
+      "uValue": 0.1623
+    },
+    {
+      "id": "c-betim",
+      "name": "Betimmering Rc 5,19",
+      "layers": [],
+      "rcValue": 5.19,
+      "uValue": 0.1866
+    },
+    {
+      "id": "c-zijwang",
+      "name": "Zijwang dakkapel Rc 4,70",
+      "layers": [],
+      "rcValue": 4.7,
+      "uValue": 0.2053
+    },
+    {
+      "id": "c-dak",
+      "name": "Hellend dak Rc 6,30",
+      "layers": [],
+      "rcValue": 6.3,
+      "uValue": 0.1553
+    },
+    {
+      "id": "c-vloer",
+      "name": "Begane grond Rc 3,98",
+      "layers": [],
+      "rcValue": 3.98,
+      "uValue": 0.2387
+    }
+  ],
+  "ntaCalculation": {
+    "calculationScope": "residential",
+    "constructionYear": 2023,
+    "areaSourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023): Ag 209,40 m2",
+    "usageFunction": "residential",
+    "dwellingType": "other",
+    "setpoints": {
+      "heatingC": 20.0,
+      "coolingC": 24.0,
+      "sourceReference": "table 7.13"
+    },
+    "thermalMass": {
+      "floor": "heavy",
+      "wall": "heavy",
+      "ceiling": "open_or_none",
+      "massKgPerM2": 800,
+      "sourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023): dragend metselwerk met massieve betonnen vloeren (tabel 7.10 > 750 kg/m2)"
+    },
+    "internalGains": {
+      "method": "residential",
+      "dwellingCount": 1,
+      "sourceReference": "one dwelling"
+    },
+    "surfaceTilts": [
+      {
+        "surfaceId": "VG-HD",
+        "tiltDeg": 50.0,
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023)"
+      },
+      {
+        "surfaceId": "AG-HD",
+        "tiltDeg": 50.0,
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023)"
+      },
+      {
+        "surfaceId": "LZG-HD",
+        "tiltDeg": 50.0,
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023)"
+      },
+      {
+        "surfaceId": "RZG-HD",
+        "tiltDeg": 50.0,
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023)"
+      }
+    ],
+    "windowSolar": {
+      "frameFraction": 0.25,
+      "obstruction": {
+        "method": "minimal"
+      },
+      "sourceReference": "default F_F; openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023): minimale belemmering tenzij per raam anders"
+    },
+    "groundFloors": [
+      {
+        "surfaceId": "BG",
+        "exposedPerimeterM": 65.53,
+        "constructionResistanceM2kPerW": 3.98,
+        "edgeThermalBridges": {
+          "method": "forfait"
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023): op/boven mv, z <= 0,3, h 0,10 m, P 65,53 m; geen lineaire bruggen in de uitdraai, dus forfaitaire toeslag (8.37)"
+      }
+    ],
+    "ventilationFlows": [],
+    "emission": {
+      "system": "floor_heating",
+      "balancing": "none_or_unknown",
+      "control": "individual_room_thermostats",
+      "sourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023): vloerverwarming, autom. temperatuurregeling per ruimte"
+    },
+    "distribution": {
+      "method": "calculated",
+      "sourceReference": "openbare bron Uniec 3.1.6.2 woning 2"
+    },
+    "distributionSystem": {
+      "designTemperatureClass": "45_40",
+      "installation": "individual",
+      "usageFunction": "residential",
+      "connectedStoreys": 2,
+      "pipeTransmittance": {
+        "method": "forfait",
+        "insulation": {
+          "state": "uninsulated"
+        }
+      },
+      "valvesInsulated": false,
+      "pump": {
+        "method": "calculated",
+        "heatMeterPresent": false,
+        "energyEfficiencyIndex": 0.23,
+        "electricPowerKw": 0.164,
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023): aanvullende distributiepomp 164 W, EEI 0,23"
+      },
+      "sourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023): tweepijps 45 C, niet ingeregeld, leidinggegevens onbekend",
+      "unheatedPipeLengthM": 20.1
+    },
+    "generator": {
+      "kind": "heat_pump_forfait",
+      "forfait": {
+        "generatorId": "hp",
+        "classificationSourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023): Nefit EnviLine A/W Monoblock 9.0 T-S, productspecifiek COP 4,15",
+        "scope": "residential_at_most25_kw",
+        "source": "outdoor_air",
+        "sink": "hydronic",
+        "designSupplyTemperatureC": 45,
+        "thermalCapacityKw": 9,
+        "capacitySourceReference": "type name 9.0",
+        "collectiveBuildingInstallation": false,
+        "qualityDeclaration": {
+          "declarationReference": "BCRG-kwaliteitsverklaring lucht/water-warmtepomp (fictief voorbeeld)",
+          "generationEfficiency": 4.15,
+          "energyFraction": 0.992,
+          "auxiliaryKwhPerYear": 281
+        }
+      },
+      "sourceSystem": "individual",
+      "sourceSystemReference": "buitenlucht"
+    },
+    "heatPumpRenewable": {
+      "sourceBelow20C": true,
+      "exhaustAirSource": false,
+      "sourceReference": "outdoor air"
+    },
+    "bacsFactor": 1.0,
+    "bacsSourceReference": "residential without BACS",
+    "useInventoryComplete": true,
+    "declaredUses": [],
+    "productionInventoryComplete": true,
+    "pvSystems": [
+      {
+        "id": "pv",
+        "peakPower": {
+          "method": "declared_specific",
+          "peakPowerWPerM2": 200.0,
+          "panelAreaM2": 20.25
+        },
+        "azimuthDeg": 180.0,
+        "tiltDeg": 50.0,
+        "mounting": "moderately_ventilated",
+        "obstructionFactors": [
+          1.0
+        ],
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023): 10 x 405 Wp zuid 50 graden; paneeloppervlak aangenomen (200 W/m2)"
+      }
+    ],
+    "demandUsesFixedC1Ventilation": false,
+    "batteryStoragePresent": false,
+    "bblFunction": "other_residential",
+    "activeCooling": {
+      "system": "compression_table10_29",
+      "capacity": {
+        "method": "dynamic_cooling_load",
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023): actieve koeling"
+      },
+      "sourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023)"
+    },
+    "cooling": {
+      "emission": {
+        "emitter": "floor_cooling",
+        "balancing": "none_or_unknown",
+        "control": "standalone_per_room",
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023)"
+      },
+      "distribution": {
+        "designTemperature": "t17_to21",
+        "pipe": {
+          "kind": "insulated_from1995"
+        },
+        "fittingsInsulated": false,
+        "pipeLengthM": 134.02,
+        "pump": {
+          "hydraulicallyBalanced": false,
+          "floorCount": 3,
+          "heatMeter": false,
+          "individualDwellingInstallation": true,
+          "labelPowerKw": 0.033,
+          "energyEfficiencyIndex": 0.23,
+          "sourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023)"
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023)",
+        "unconditionedPipeLengthM": 0.0
+      },
+      "generators": [
+        {
+          "id": "cool",
+          "generator": {
+            "kind": "compression"
+          },
+          "equipmentReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023): compressiekoeling forfaitair"
+        }
+      ]
+    },
+    "verticalPipes": [
+      {
+        "id": "fictief",
+        "storeys": 3,
+        "insulated": false,
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023): verticale leidingen onbekend (7.3.3 fictieve leiding)"
+      }
+    ],
+    "ventilation": {
+      "zoneId": "z1",
+      "usableFloorAreaM2": 209.4,
+      "category": "residential",
+      "functions": [
+        {
+          "function": "residential",
+          "areaM2": 209.4
+        }
+      ],
+      "dwellingCount": 1,
+      "apartmentBuilding": false,
+      "buildingHeightM": 6.25,
+      "constructionYear": 2023,
+      "floorAboveCrawlspace": false,
+      "heatingSetpointC": 20.0,
+      "coolingSetpointC": 24.0,
+      "system": {
+        "kind": "single",
+        "unit": {
+          "variant": "d2",
+          "heatRecovery": {
+            "efficiency": {
+              "method": "declared",
+              "value": 0.893,
+              "standard": "en13141_7",
+              "sourceReference": "BCRG Itho HRU ECO 350"
+            },
+            "bypass": {
+              "kind": "full",
+              "coldRecoveryEvidence": "BCRG Itho HRU ECO 350: koudeterugwinning via WTW"
+            },
+            "layout": "central",
+            "supplyDuctInsulation": {
+              "kind": "insulated"
+            },
+            "equipmentReference": "Itho HRU ECO 350"
+          },
+          "ducts": "unknown",
+          "equipmentReference": "Itho HRU ECO 350"
+        }
+      },
+      "flowReduction": {
+        "collective": false
+      },
+      "infiltration": {
+        "method": "measured",
+        "qv10DmPerSM2": 0.63,
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023): meetwaarde 0,63"
+      },
+      "combustionAppliances": [],
+      "fans": {
+        "method": "declared",
+        "fans": [
+          {
+            "id": "f1",
+            "power": {
+              "method": "nominal",
+              "nominalPowerW": 170.8
+            }
+          }
+        ],
+        "control": {
+          "method": "declared",
+          "monthly": [
+            0.364,
+            0.364,
+            0.364,
+            0.364,
+            0.364,
+            0.364,
+            0.364,
+            0.364,
+            0.364,
+            0.364,
+            0.364,
+            0.364
+          ],
+          "sourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023): f 0,364"
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023): P 170,8 W"
+      },
+      "sourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023)"
+    },
+    "hotWater": {
+      "need": {
+        "method": "residential",
+        "dwellingCount": 1,
+        "sourceReference": "one dwelling"
+      },
+      "emission": {
+        "method": "residential",
+        "served": "bathroom_only",
+        "bathroomLengthM": 11.0,
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023): leidinglengte naar badruimte 10-12 m"
+      },
+      "generator": {
+        "kind": "heat_pump",
+        "exhaustAirSource": false,
+        "declared": {
+          "value": 1.6,
+          "sourceReference": "BCRG-kwaliteitsverklaring tapwater (fictief voorbeeld)"
+        }
+      },
+      "equipmentReference": "Nefit EnviLine A/W Monoblock 9.0 T-S / TS-S",
+      "connectedTaps": {
+        "bathrooms": 1,
+        "kitchens": 0
+      }
+    },
+    "normVersion": "2022",
+    "windowObstructions": [
+      {
+        "windowId": "VG-D",
+        "obstruction": {
+          "method": "side_obstruction",
+          "side": "left",
+          "relativeWidth": 3.009,
+          "coolingHeightCondition": false
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023), raam D: zijbelemmering links, hoogte < 2,5 m, afstand 3,31 m, breedte 1,1 m, hoek 72°; b_b = afstand / breedte (2022 p. 673)"
+      },
+      {
+        "windowId": "VG-L",
+        "obstruction": {
+          "method": "side_obstruction",
+          "side": "right",
+          "relativeWidth": 1.331,
+          "coolingHeightCondition": false
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023), raam L: zijbelemmering rechts, hoogte < 2,5 m, afstand 2,33 m, breedte 1,75 m, hoek 53°; b_b = afstand / breedte (2022 p. 673)"
+      },
+      {
+        "windowId": "AG-F",
+        "obstruction": {
+          "method": "full",
+          "coolingConditionsMet": false
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023): volledige belemmering"
+      },
+      {
+        "windowId": "LZG-I",
+        "obstruction": {
+          "method": "side_obstruction",
+          "side": "left",
+          "relativeWidth": 0.359,
+          "coolingHeightCondition": false
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023), raam I: zijbelemmering links, hoogte < 2,5 m, afstand 4,61 m, breedte 12,85 m, hoek 20°; b_b = afstand / breedte (2022 p. 673)"
+      },
+      {
+        "windowId": "LZG-H",
+        "obstruction": {
+          "method": "side_obstruction",
+          "side": "left",
+          "relativeWidth": 0.116,
+          "coolingHeightCondition": false
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023), raam H: zijbelemmering links, hoogte < 2,5 m, afstand 1,49 m, breedte 12,85 m, hoek 7°; b_b = afstand / breedte (2022 p. 673)"
+      },
+      {
+        "windowId": "LZG-G",
+        "obstruction": {
+          "method": "full",
+          "coolingConditionsMet": false
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023): volledige belemmering"
+      }
+    ],
+    "additionalHotWaterSystems": [
+      {
+        "need": {
+          "method": "residential",
+          "dwellingCount": 1,
+          "sourceReference": "one dwelling"
+        },
+        "emission": {
+          "method": "residential",
+          "served": "kitchen_only",
+          "kitchenLengthM": 1.0,
+          "sourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023): leidinglengte naar aanrecht < 2 m"
+        },
+        "storage": [
+          {
+            "id": "quooker",
+            "volumeL": 7,
+            "loss": {
+              "method": "measured",
+              "transmissionWPerK": 0.12
+            },
+            "connectionFactor": 1,
+            "inHeatedZone": true,
+            "sourceReference": "openbare bron Uniec 3.1.5.0 printout (vrijstaande woning 209,40 m2, 31-01-2023): Quooker COMBI E, H 0,12 W/K"
+          }
+        ],
+        "boilingWaterTap": true,
+        "generator": {
+          "kind": "electric_boiler"
+        },
+        "connectedTaps": {
+          "bathrooms": 0,
+          "kitchens": 1
+        },
+        "equipmentReference": "Quooker COMBI E 7 l"
+      }
+    ]
+  }
+}

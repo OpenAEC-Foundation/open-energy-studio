@@ -25,9 +25,8 @@
 
 **Openstaand, externe gegevens of besluiten.**
 - officiële referentiegevallen: de EDR-testen van ISSO-publicatie 54 versie 5.0:2026 met hun verwachte uitkomsten (BRL 9501 van 29-05-2026, §4.2 en §11). Openbaar is alleen versie 2.0 van 2022, voor NTA 8800:2022, zonder de uitkomsten;
-- het EP-Online-uitwisselschema (XSD);
-- het uurklimaat van 17.3.8;
-- ISO 6946 tabel 8 (spouwen kleiner dan 20 mm);
+- het EP-Online-uitwisselschema voor **aanlevering/registratie** (XSD); de openbare RVO-XSD voor het opvragen van het totaalbestand is een ander contract, zie het [bronnenregister](nta8800-bronnenregister.md);
+- het uurklimaat van 17.3.8 (uurwaarden van NEN 5060:2018+A1:2021);
 - het attestnummer.
 
 **Interne controle op `aace329` (4 oktober).** De volledige Rust-kern (751 tests), HTTP/MCP-service (53 tests), frontend (385 tests in 61 bestanden) en TypeScript-/Vite-build zijn geslaagd. Daarna is een extra regressietest toegevoegd voor de onderwijsgrens van Bbl-tabel 4.148A; deze gerichte test en `cargo fmt --check` slaagden. Deze controles leveren geen externe normtoets of attest op.
@@ -104,6 +103,16 @@ De eerste desktopbouw met die libraryset stopte op de ingebouwde Tauri-versiecon
 
 **Technische gate na UI-fase F10 (5 oktober).** Op de schone commit `837eb02` slaagde de [volledige lokale technische gate en desktopdevbuild](nta8800-build-verificatie-2026-10-05-837eb02.md): 797 kern- en 57 servicetests plus integratie-/CLI-groepen, 744 frontendtests in 87 bestanden, Rust 1.77.2, format, Clippy, Tauri-check, TypeScript/Vite en de Linux-debugbundel. Het bewaarde manifest en alle vier artefacthashes zijn opnieuw gecontroleerd. De officiële referentiebatch werd wegens ontbrekende actuele W/U-cases overgeslagen; visuele UI-acceptatie en externe attestering blijven open.
 
+**Bouwbewijscontrole (5 oktober).** De aparte manifestlezer weigert nu ook symbolische links voor artefacten, zodat een ogenschijnlijk veilige bestandsnaam niet buiten de manifestmap kan verwijzen. Een kleine positieve en negatieve test slaagde; het bewaarde F10-manifest met echte artefacten is opnieuw gecontroleerd. Dit versterkt alleen de integriteit van lokaal bouwbewijs en verandert de externe norm- en atteststatus niet.
+
+**Vergrendelde technische gate (5 oktober).** Alle Cargo-test-, Clippy-, Tauri- en optionele referentiegate-oproepen in `scripts/verify-nta.sh` gebruiken nu `--locked`. De volledige offline gate met die wijziging slaagde: 797 kern- en 57 servicetests plus integratiegroepen, de kern op Rust 1.77.2, format, Clippy, Tauri, TypeScript, 744 frontendtests in 87 bestanden en de Vite-bundel. De actuele officiële referentiebatch is nog niet beschikbaar en werd expliciet overgeslagen; deze run bouwde geen nieuw desktoppakket.
+
+**Bronobjectcontrole (5 oktober).** De manifestlezer eist bij `--source-repo` nu een werkelijk Git-commitobject; een boom- of tag-SHA kan de broncommitcontrole niet meer passeren. Twee gerichte manifesttests en hercontrole van het bewaarde F10-pakket slaagden. Dit is een controle van bewijsmetadata, niet van bouwherkomst of normatieve uitkomsten.
+
+**JSON-uitvoerbewaking (5 oktober).** De gedeelde HTTP/MCP-operatielaag geeft nu een expliciete 500-fout `serialization_failed` wanneer een kernresultaat niet als JSON kan worden voorgesteld. Voorheen kon de conversie dan stilzwijgend `null` als geslaagd resultaat leveren. De nieuwe regressietest, alle 58 servicetests plus integratiegroepen, Rust-formatcontrole en Clippy slaagden. Dit bewaakt de transportuitvoer en verandert de NTA-reken- of atteststatus niet.
+
+**Desktopdevbuild op `413e932` (5 oktober).** De [nieuwe debugbundel en drie servicebinaries](nta8800-build-verificatie-2026-10-05-413e932.md) zijn vanuit de schone bronstand gebouwd en met een afzonderlijke manifestlezer gecontroleerd. De servicewijziging die niet-serialiseerbare JSON-uitvoer weigert zit in deze API/MCP-binaries. De officiële actuele referentiegevallen, visuele UI-acceptatie en attestering blijven open.
+
 **Aparte labelscenario-indicatoren in het harnas (4 oktober).** Naast BENG 2/3 zijn nu `labelPrimaryFossil` en `labelRenewableShare` numeriek vergelijkbaar. Zij lezen de bestaande Rust-uitvoer van het labelscenario, zodat bij een woning met EMG-maatregelen een forfaitaire labelwaarde niet met de declaratiegebaseerde BENG-waarde wordt verward. De gerichte vergelijkingstest en Clippy slaagden. De verwachting kwam uit een interne synthetische fixture; een onafhankelijke actuele EDR-labelvergelijking ontbreekt nog.
 
 **Technische controle op `37ccce1` (4 oktober).** 760 kerntests plus drie integratietests, 56 servicetests, Rust-formatcontrole, Clippy, TypeScript/Vite, de Linux-debugbuild en de API-/MCP-binaries slaagden. Pakket- en binaryhashes staan in het [bouwdossier](nta8800-build-verificatie-2026-10-04-37ccce1.md). De officiële referentie- en atteststatus verandert hierdoor niet.
@@ -177,8 +186,8 @@ Na audit 2 zijn de echte gaten gedicht. De kern dekt nu:
   - woningen: aangrenzende onverwarmde serre (AOS), daklichten, woonboot en caravan.
 
 Wat buiten bereik blijft:
-- 17.3.8: daarvoor zijn uurdata volgens NEN 5060 nodig. De kern accepteert opgegeven factoren.
-- Spouwen dunner dan 20 mm: de waarden staan in NEN-EN-ISO 6946 tabel 8, die niet beschikbaar is. Zo'n spouw kan als opgegeven R-laag worden ingevoerd.
+- 17.3.8: daarvoor zijn de uurwaarden van NEN 5060:2018+A1:2021 nodig: per uur de zonnestand, de totale zonnestraling op het vlak en het deel dat uit de richting van de zon komt (direct plus circumsolair) (2025+C1 p. 764–765). Die norm is niet beschikbaar. De kern accepteert opgegeven factoren met bron.
+- Spouwen dunner dan 20 mm (9 oktober 2026): niet-geventileerd zonder werkzame reflecterende laag rekent de kern met bijlage D.2 van NEN-EN-ISO 6946:2017 en de parameters van voetnoot e van tabel C.3/C.4 (p. 782 en 784). Dezelfde methode reproduceert alle waarden van tabel C.3 en C.4. Zwak geventileerd of met reflecterende laag blijft `air_cavity_below_20_mm_unsupported`; zo'n spouw wordt als opgegeven R-laag ingevoerd.
 - Bijlage J: dit is een productbepaling.
 - Bijlage K: dit zijn meetregels; de oppervlakken zijn invoer.
 

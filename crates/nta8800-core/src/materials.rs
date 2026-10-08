@@ -123,7 +123,11 @@ impl Ageing {
                 practice_tested,
             } => {
                 let iso = match product {
-                    InSituProduct::FibresAndFlakes => 1.00,
+                    // Mineral-wool flakes 1,05 in NTA 8800:2022 (p. 775),
+                    // 1,00 from 2023 (p. 785).
+                    InSituProduct::FibresAndFlakes => {
+                        crate::norm_versions::profile().mineral_wool_flakes_ageing
+                    }
                     InSituProduct::EpsBeads => 1.05,
                     InSituProduct::Polyurethane if *practice_tested => 1.05,
                     InSituProduct::Polyurethane => 1.10,
@@ -248,7 +252,11 @@ impl ForfaitMaterial {
         }
         match self {
             GlassWool | StoneWool | EpsBoard | Xps => 0.040,
-            MineralWoolFlakes | EpsWhiteBeads | CellularGlass | WoodFibre | CelluloseLoose => 0.045,
+            MineralWoolFlakes | EpsWhiteBeads | CellularGlass => 0.045,
+            // Table E.10: 0,045 from 2024 (p. 790), 0,050 in 2023 (p. 791).
+            WoodFibre | CelluloseLoose => {
+                crate::norm_versions::profile().wood_fibre_cellulose_lambda
+            }
             EpsGreyBeads | PurSprayedClosedCell => 0.035,
             PurPirBoard | PhenolicFoam => 0.030,
             PurSprayedOpenCell => 0.045,

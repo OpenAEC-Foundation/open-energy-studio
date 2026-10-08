@@ -32,10 +32,20 @@ export function Inspector({ onClose }: { onClose: () => void }) {
   // On Installaties a building selection is left over from Gebouw: show the energy per service instead.
   const installationsContext = state.route.step === 'installations' && (!state.selectedItemId || element != null);
   const [checkOpen, setCheckOpen] = useState(false);
-  const tab: InspectorTab = checkOpen ? 'check' : preview ? 'preview' : 'properties';
+  // A new selection shows its properties ("Klik selecteert, eigenschappen rechts"), also while the
+  // preview is on; choosing Voorbeeld again keeps the preview until the next selection.
+  const [previewChosenFor, setPreviewChosenFor] = useState<string | null>(null);
+  const showSelection = state.selectedItemId != null && state.selectedItemId !== previewChosenFor;
+  const tab: InspectorTab = checkOpen ? 'check' : preview && !showSelection ? 'preview' : 'properties';
   const select = (next: InspectorTab) => {
     setCheckOpen(next === 'check');
-    if (next !== 'check' && (next === 'preview') !== preview) dispatch({ type: 'TOGGLE_PREVIEW' });
+    if (next === 'check') return;
+    if (next === 'preview') {
+      setPreviewChosenFor(state.selectedItemId);
+      if (!preview) dispatch({ type: 'TOGGLE_PREVIEW' });
+    } else if (preview && !showSelection) {
+      dispatch({ type: 'TOGGLE_PREVIEW' });
+    }
   };
   const tabs: Array<{ id: InspectorTab; label: string }> = [
     { id: 'properties', label: t('shell.inspector.properties') },

@@ -185,8 +185,8 @@ export interface DeclaredHeatingTableAssessment {
   issues: Array<{ code: string; path: string }>;
 }
 
-export async function diagnoseDeclaredHeatingTableWithRust(input: DeclaredHeatingTableInput): Promise<DeclaredHeatingTableAssessment> {
-  return kernelCall<DeclaredHeatingTableAssessment>('diagnose_declared_heating_table', '/api/v1/nta8800/heat-pumps/declared-heating-table/diagnose', { input });
+export async function diagnoseDeclaredHeatingTableWithRust(input: DeclaredHeatingTableInput, normVersion?: NormVersion | null): Promise<DeclaredHeatingTableAssessment> {
+  return kernelCall<DeclaredHeatingTableAssessment>('diagnose_declared_heating_table', '/api/v1/nta8800/heat-pumps/declared-heating-table/diagnose', { input, ...editionArgs(normVersion) });
 }
 
 export interface DeclaredDhwAssessment {
@@ -212,8 +212,8 @@ export interface DeclaredDhwAssessment {
   issues: Array<{ code: string; path: string }>;
 }
 
-export async function diagnoseDeclaredDhwWithRust(input: INtaHeatPumpInput): Promise<DeclaredDhwAssessment> {
-  return kernelCall<DeclaredDhwAssessment>('diagnose_declared_dhw', '/api/v1/nta8800/heat-pumps/declared-dhw/diagnose', { input });
+export async function diagnoseDeclaredDhwWithRust(input: INtaHeatPumpInput, normVersion?: NormVersion | null): Promise<DeclaredDhwAssessment> {
+  return kernelCall<DeclaredDhwAssessment>('diagnose_declared_dhw', '/api/v1/nta8800/heat-pumps/declared-dhw/diagnose', { input, ...editionArgs(normVersion) });
 }
 
 export interface FinalEnergyDraftInput {
@@ -251,8 +251,8 @@ export interface FinalEnergyDraftAssessment {
   issues: Array<{ code: string; path: string }>;
 }
 
-export async function diagnoseFinalEnergyDraftWithRust(input: FinalEnergyDraftInput): Promise<FinalEnergyDraftAssessment> {
-  return kernelCall<FinalEnergyDraftAssessment>('diagnose_final_energy_draft', '/api/v1/nta8800/energy/final-draft/diagnose', { input });
+export async function diagnoseFinalEnergyDraftWithRust(input: FinalEnergyDraftInput, normVersion?: NormVersion | null): Promise<FinalEnergyDraftAssessment> {
+  return kernelCall<FinalEnergyDraftAssessment>('diagnose_final_energy_draft', '/api/v1/nta8800/energy/final-draft/diagnose', { input, ...editionArgs(normVersion) });
 }
 
 export interface EpusDraftMonthlyUse {
@@ -307,8 +307,8 @@ export interface EpusDraftAssessment {
   issues: Array<{ code: string; path: string }>;
 }
 
-export async function diagnoseEpusDraftWithRust(input: EpusDraftInput): Promise<EpusDraftAssessment> {
-  return kernelCall<EpusDraftAssessment>('diagnose_epus_draft', '/api/v1/nta8800/energy/epus-draft/diagnose', { input });
+export async function diagnoseEpusDraftWithRust(input: EpusDraftInput, normVersion?: NormVersion | null): Promise<EpusDraftAssessment> {
+  return kernelCall<EpusDraftAssessment>('diagnose_epus_draft', '/api/v1/nta8800/energy/epus-draft/diagnose', { input, ...editionArgs(normVersion) });
 }
 
 export type NtaOrientation =
@@ -350,6 +350,9 @@ export type OpnameHeatingGenerator =
     sourceTemperatureReference?: string | null;
     /** Quality declaration of a source of 20 °C or more (otherwise the groundwater row). */
     sourceQualityDeclarationReference?: string | null;
+    /** ISSO 82.1 p. 28, as for the boiler; only NTA 8800:2020+A1 uses the year (9.85). */
+    manufactureYear?: number | null;
+    installationYear?: number | null;
   }
   /** Table 9.3 / NTA table 9.25: local gas heating incl. pilot, oil heating or a steam boiler (0,65 with flue, 0,10 without). */
   | { kind: 'local_fired'; appliance: 'gas_heater' | 'oil_heater' | 'steam_boiler'; fuel?: 'natural_gas' | 'oil' | null; flueGasExhaust: boolean; electricityConnected?: boolean | null }
@@ -707,8 +710,8 @@ export interface MonthlyDemandAssessment {
   issues: Array<{ code: string; path: string }>;
 }
 
-export async function calculateMonthlyDemandWithRust(input: MonthlyDemandInput): Promise<MonthlyDemandAssessment> {
-  return kernelCall<MonthlyDemandAssessment>('calculate_monthly_demand', '/api/v1/nta8800/demand/monthly/calculate', { input });
+export async function calculateMonthlyDemandWithRust(input: MonthlyDemandInput, normVersion?: NormVersion | null): Promise<MonthlyDemandAssessment> {
+  return kernelCall<MonthlyDemandAssessment>('calculate_monthly_demand', '/api/v1/nta8800/demand/monthly/calculate', { input, ...editionArgs(normVersion) });
 }
 
 export interface BacsDraftInput {
@@ -760,8 +763,8 @@ export interface BacsDraftAssessment {
   issues: Array<{ code: string; path: string }>;
 }
 
-export async function diagnoseBacsDraftWithRust(input: BacsDraftInput): Promise<BacsDraftAssessment> {
-  return kernelCall<BacsDraftAssessment>('diagnose_bacs_draft', '/api/v1/nta8800/energy/bacs-draft/diagnose', { input });
+export async function diagnoseBacsDraftWithRust(input: BacsDraftInput, normVersion?: NormVersion | null): Promise<BacsDraftAssessment> {
+  return kernelCall<BacsDraftAssessment>('diagnose_bacs_draft', '/api/v1/nta8800/energy/bacs-draft/diagnose', { input, ...editionArgs(normVersion) });
 }
 
 export interface IndicatorsDraftInput {
@@ -800,8 +803,8 @@ export interface IndicatorsDraftAssessment {
   issues: Array<{ code: string; path: string }>;
 }
 
-export async function diagnoseIndicatorsDraftWithRust(input: IndicatorsDraftInput): Promise<IndicatorsDraftAssessment> {
-  return kernelCall<IndicatorsDraftAssessment>('diagnose_indicators_draft', '/api/v1/nta8800/energy/indicators-draft/diagnose', { input });
+export async function diagnoseIndicatorsDraftWithRust(input: IndicatorsDraftInput, normVersion?: NormVersion | null): Promise<IndicatorsDraftAssessment> {
+  return kernelCall<IndicatorsDraftAssessment>('diagnose_indicators_draft', '/api/v1/nta8800/energy/indicators-draft/diagnose', { input, ...editionArgs(normVersion) });
 }
 
 export interface HeatingAuxDraftInput {
@@ -836,8 +839,8 @@ export interface HeatingAuxDraftAssessment {
   issues: Array<{ code: string; path: string }>;
 }
 
-export async function diagnoseHeatingAuxDraftWithRust(input: HeatingAuxDraftInput): Promise<HeatingAuxDraftAssessment> {
-  return kernelCall<HeatingAuxDraftAssessment>('diagnose_heating_aux_draft', '/api/v1/nta8800/heat-pumps/heating-aux-draft/diagnose', { input });
+export async function diagnoseHeatingAuxDraftWithRust(input: HeatingAuxDraftInput, normVersion?: NormVersion | null): Promise<HeatingAuxDraftAssessment> {
+  return kernelCall<HeatingAuxDraftAssessment>('diagnose_heating_aux_draft', '/api/v1/nta8800/heat-pumps/heating-aux-draft/diagnose', { input, ...editionArgs(normVersion) });
 }
 
 export interface HeatingAuxMeasuredDraftInput extends Omit<HeatingAuxDraftInput, 'coefficients'> {
@@ -881,6 +884,9 @@ export interface ForfaitHeatPumpDraftInput {
   sourceQualityDeclarationReference?: string | null;
   /** §9.1 (p. 285): a quality declaration (e.g. BCRG) replacing the table COP. */
   qualityDeclaration?: HeatPumpQualityDeclaration | null;
+  /** NTA 8800:2020+A1 (9.85, p. 336): build year of the device; A 13,0 kWh from 2015. */
+  installationYear?: number | null;
+  installationYearReference?: string | null;
 }
 
 /** Declared heat-pump values for space heating (kwaliteitsverklaring, §9.1). */
@@ -917,8 +923,8 @@ export interface ForfaitHeatPumpDraftAssessment {
   issues: Array<{ code: string; path: string }>;
 }
 
-export async function diagnoseForfaitHeatPumpDraftWithRust(input: ForfaitHeatPumpDraftInput): Promise<ForfaitHeatPumpDraftAssessment> {
-  return kernelCall<ForfaitHeatPumpDraftAssessment>('diagnose_forfait_heat_pump_draft', '/api/v1/nta8800/heat-pumps/forfait-cop-draft/diagnose', { input });
+export async function diagnoseForfaitHeatPumpDraftWithRust(input: ForfaitHeatPumpDraftInput, normVersion?: NormVersion | null): Promise<ForfaitHeatPumpDraftAssessment> {
+  return kernelCall<ForfaitHeatPumpDraftAssessment>('diagnose_forfait_heat_pump_draft', '/api/v1/nta8800/heat-pumps/forfait-cop-draft/diagnose', { input, ...editionArgs(normVersion) });
 }
 
 export interface GasHeatPumpForfaitDraftInput {
@@ -956,8 +962,8 @@ export interface GasHeatPumpForfaitDraftAssessment {
   issues: Array<{ code: string; path: string }>;
 }
 
-export async function diagnoseGasHeatPumpForfaitDraftWithRust(input: GasHeatPumpForfaitDraftInput): Promise<GasHeatPumpForfaitDraftAssessment> {
-  return kernelCall<GasHeatPumpForfaitDraftAssessment>('diagnose_gas_heat_pump_forfait_draft', '/api/v1/nta8800/heat-pumps/gas-forfait-cop-draft/diagnose', { input });
+export async function diagnoseGasHeatPumpForfaitDraftWithRust(input: GasHeatPumpForfaitDraftInput, normVersion?: NormVersion | null): Promise<GasHeatPumpForfaitDraftAssessment> {
+  return kernelCall<GasHeatPumpForfaitDraftAssessment>('diagnose_gas_heat_pump_forfait_draft', '/api/v1/nta8800/heat-pumps/gas-forfait-cop-draft/diagnose', { input, ...editionArgs(normVersion) });
 }
 
 export interface GasHeatPumpAuxDraftInput {
@@ -996,8 +1002,8 @@ export interface GasHeatPumpAuxDraftAssessment {
   issues: Array<{ code: string; path: string }>;
 }
 
-export async function diagnoseGasHeatPumpAuxDraftWithRust(input: GasHeatPumpAuxDraftInput): Promise<GasHeatPumpAuxDraftAssessment> {
-  return kernelCall<GasHeatPumpAuxDraftAssessment>('diagnose_gas_heat_pump_aux_draft', '/api/v1/nta8800/heat-pumps/gas-aux-draft/diagnose', { input });
+export async function diagnoseGasHeatPumpAuxDraftWithRust(input: GasHeatPumpAuxDraftInput, normVersion?: NormVersion | null): Promise<GasHeatPumpAuxDraftAssessment> {
+  return kernelCall<GasHeatPumpAuxDraftAssessment>('diagnose_gas_heat_pump_aux_draft', '/api/v1/nta8800/heat-pumps/gas-aux-draft/diagnose', { input, ...editionArgs(normVersion) });
 }
 
 export interface GasHeatPumpMonthlyDraftInput {
@@ -1036,8 +1042,8 @@ export interface GasHeatPumpMonthlyDraftAssessment {
   issues: Array<{ code: string; path: string }>;
 }
 
-export async function diagnoseGasHeatPumpMonthlyDraftWithRust(input: GasHeatPumpMonthlyDraftInput): Promise<GasHeatPumpMonthlyDraftAssessment> {
-  return kernelCall<GasHeatPumpMonthlyDraftAssessment>('diagnose_gas_heat_pump_monthly_draft', '/api/v1/nta8800/heat-pumps/gas-forfait-monthly-draft/diagnose', { input });
+export async function diagnoseGasHeatPumpMonthlyDraftWithRust(input: GasHeatPumpMonthlyDraftInput, normVersion?: NormVersion | null): Promise<GasHeatPumpMonthlyDraftAssessment> {
+  return kernelCall<GasHeatPumpMonthlyDraftAssessment>('diagnose_gas_heat_pump_monthly_draft', '/api/v1/nta8800/heat-pumps/gas-forfait-monthly-draft/diagnose', { input, ...editionArgs(normVersion) });
 }
 
 export interface GasHeatPumpChainDraftInput {
@@ -1070,8 +1076,8 @@ export interface GasHeatPumpChainDraftAssessment {
   issues: Array<{ code: string; path: string }>;
 }
 
-export async function diagnoseGasHeatPumpChainDraftWithRust(input: GasHeatPumpChainDraftInput): Promise<GasHeatPumpChainDraftAssessment> {
-  return kernelCall<GasHeatPumpChainDraftAssessment>('diagnose_gas_heat_pump_chain_draft', '/api/v1/nta8800/heat-pumps/gas-chain-draft/diagnose', { input });
+export async function diagnoseGasHeatPumpChainDraftWithRust(input: GasHeatPumpChainDraftInput, normVersion?: NormVersion | null): Promise<GasHeatPumpChainDraftAssessment> {
+  return kernelCall<GasHeatPumpChainDraftAssessment>('diagnose_gas_heat_pump_chain_draft', '/api/v1/nta8800/heat-pumps/gas-chain-draft/diagnose', { input, ...editionArgs(normVersion) });
 }
 
 export type GasCollectiveSourceTemperatureClass = 'below20_c' | 'at_least20_c' | 'unknown';
@@ -1104,8 +1110,8 @@ export interface GasCollectiveSourceDraftAssessment {
   issues: Array<{ code: string; path: string }>;
 }
 
-export async function diagnoseGasCollectiveSourceDraftWithRust(input: GasCollectiveSourceDraftInput): Promise<GasCollectiveSourceDraftAssessment> {
-  return kernelCall<GasCollectiveSourceDraftAssessment>('diagnose_gas_collective_source_draft', '/api/v1/nta8800/heat-pumps/gas-collective-source-draft/diagnose', { input });
+export async function diagnoseGasCollectiveSourceDraftWithRust(input: GasCollectiveSourceDraftInput, normVersion?: NormVersion | null): Promise<GasCollectiveSourceDraftAssessment> {
+  return kernelCall<GasCollectiveSourceDraftAssessment>('diagnose_gas_collective_source_draft', '/api/v1/nta8800/heat-pumps/gas-collective-source-draft/diagnose', { input, ...editionArgs(normVersion) });
 }
 
 export type GasChainDiagnosticMetric = 'equation962_unallocated_input_term'
@@ -1190,8 +1196,9 @@ export interface ForfaitHeatPumpMonthlyDraftAssessment {
 
 export async function diagnoseForfaitHeatPumpMonthlyDraftWithRust(
   input: ForfaitHeatPumpMonthlyDraftInput,
+  normVersion?: NormVersion | null,
 ): Promise<ForfaitHeatPumpMonthlyDraftAssessment> {
-  return kernelCall<ForfaitHeatPumpMonthlyDraftAssessment>('diagnose_forfait_heat_pump_monthly_draft', '/api/v1/nta8800/heat-pumps/forfait-monthly-draft/diagnose', { input });
+  return kernelCall<ForfaitHeatPumpMonthlyDraftAssessment>('diagnose_forfait_heat_pump_monthly_draft', '/api/v1/nta8800/heat-pumps/forfait-monthly-draft/diagnose', { input, ...editionArgs(normVersion) });
 }
 
 export type NtaDispatchDesignContext = 'new_build' | 'existing' | 'existing_added_preferred';
@@ -1242,8 +1249,9 @@ export interface GeneratorDispatchDraftAssessment {
 
 export async function diagnoseGeneratorDispatchDraftWithRust(
   input: GeneratorDispatchDraftInput,
+  normVersion?: NormVersion | null,
 ): Promise<GeneratorDispatchDraftAssessment> {
-  return kernelCall<GeneratorDispatchDraftAssessment>('diagnose_generator_dispatch_draft', '/api/v1/nta8800/heating/generator-dispatch-draft/diagnose', { input });
+  return kernelCall<GeneratorDispatchDraftAssessment>('diagnose_generator_dispatch_draft', '/api/v1/nta8800/heating/generator-dispatch-draft/diagnose', { input, ...editionArgs(normVersion) });
 }
 
 export interface BoilerForfaitDraftInput {
@@ -1282,8 +1290,8 @@ export interface BoilerForfaitMonthlyDraftAssessment {
   issues: Array<{ code: string; path: string }>;
 }
 
-export async function diagnoseBoilerForfaitDraftWithRust(input: BoilerForfaitDraftInput): Promise<BoilerForfaitDraftAssessment> {
-  return kernelCall<BoilerForfaitDraftAssessment>('diagnose_boiler_forfait_draft', '/api/v1/nta8800/boilers/forfait-draft/diagnose', { input });
+export async function diagnoseBoilerForfaitDraftWithRust(input: BoilerForfaitDraftInput, normVersion?: NormVersion | null): Promise<BoilerForfaitDraftAssessment> {
+  return kernelCall<BoilerForfaitDraftAssessment>('diagnose_boiler_forfait_draft', '/api/v1/nta8800/boilers/forfait-draft/diagnose', { input, ...editionArgs(normVersion) });
 }
 
 export interface HybridHeatPumpMonthlyDraftInput {
@@ -1317,8 +1325,9 @@ export interface HybridHeatPumpMonthlyDraftAssessment {
 
 export async function diagnoseHybridHeatPumpMonthlyDraftWithRust(
   input: HybridHeatPumpMonthlyDraftInput,
+  normVersion?: NormVersion | null,
 ): Promise<HybridHeatPumpMonthlyDraftAssessment> {
-  return kernelCall<HybridHeatPumpMonthlyDraftAssessment>('diagnose_hybrid_heat_pump_monthly_draft', '/api/v1/nta8800/heat-pumps/hybrid-monthly-draft/diagnose', { input });
+  return kernelCall<HybridHeatPumpMonthlyDraftAssessment>('diagnose_hybrid_heat_pump_monthly_draft', '/api/v1/nta8800/heat-pumps/hybrid-monthly-draft/diagnose', { input, ...editionArgs(normVersion) });
 }
 
 export interface HeatingAuxMeasuredDraftAssessment {
@@ -1338,8 +1347,8 @@ export interface HeatingAuxMeasuredDraftAssessment {
   issues: Array<{ code: string; path: string }>;
 }
 
-export async function diagnoseHeatingAuxMeasuredDraftWithRust(input: HeatingAuxMeasuredDraftInput): Promise<HeatingAuxMeasuredDraftAssessment> {
-  return kernelCall<HeatingAuxMeasuredDraftAssessment>('diagnose_heating_aux_measured_draft', '/api/v1/nta8800/heat-pumps/heating-aux-measured-draft/diagnose', { input });
+export async function diagnoseHeatingAuxMeasuredDraftWithRust(input: HeatingAuxMeasuredDraftInput, normVersion?: NormVersion | null): Promise<HeatingAuxMeasuredDraftAssessment> {
+  return kernelCall<HeatingAuxMeasuredDraftAssessment>('diagnose_heating_aux_measured_draft', '/api/v1/nta8800/heat-pumps/heating-aux-measured-draft/diagnose', { input, ...editionArgs(normVersion) });
 }
 
 export async function assessProjectWithRust(input: IProject): Promise<KernelAssessment> {
@@ -1368,6 +1377,8 @@ export interface SpaceHeatingChainInput {
     balancing: 'none_or_unknown' | 'static' | 'dynamic' | 'not_applicable';
     control: 'main_room_thermostat' | 'central_with_room_valves' | 'individual_room_thermostats' | 'other_or_unknown';
     sourceReference: string;
+    /** NTA 8800:2023 tables 9.2–9.10 only; without it a 2023 run takes the unknown values of that edition. */
+    edition2023?: NtaHeatingEmission2023 | null;
     /** Room fans (9.21/9.22, table 9.11); required for fan-assisted emitters. */
     fans?: {
       kind: 'fan_convector' | 'electric_heating' | 'dynamic_storage' | 'unknown';
@@ -1709,6 +1720,14 @@ export interface NtaBoosterHeatPump {
   testReportReference: string;
 }
 
+/** §13.8.4.4 booster heat pump with the forfait values of 13.162/13.163. */
+export interface NtaBoosterHeatPumpForfait {
+  /** Design supply temperature of the feeding heating system; absent when unknown. */
+  designSupplyTemperatureC?: number | null;
+  heatSource: NtaBoosterHeatPump['heatSource'];
+  sourceReference: string;
+}
+
 /** 9.91/9.92 inputs for generators outside 9.85. */
 export interface NtaOtherGeneratorAuxiliary {
   electricallyConnectedDevices: number;
@@ -1751,6 +1770,46 @@ export type NtaPipeTransmittance =
       surfaceCoefficientWPerM2K?: number | null;
     };
 
+/** NTA 8800:2023 9.3.2–9.3.3 (p. 273–285): the heating emission in that edition's terms. */
+export interface NtaHeatingEmission2023 {
+  kind:
+    | { type: 'radiators'; control: 'central' | 'room';
+        overTemperature: 'mechanical_ventilation' | 'fan_assisted' | 'local_heater' | 'two_pipe60_k_or_unknown' | 'two_pipe42_k'
+          | 'two_pipe30_k' | 'two_pipe20_k' | 'one_pipe60_k_or_unknown' | 'one_pipe42_k' | 'unknown';
+        position: 'inner_wall' | 'outer_wall_glass_without_protection' | 'outer_wall_glass_with_protection' | 'outer_wall' | 'unknown' }
+    | { type: 'surface'; control: 'central' | 'room';
+        system: 'mechanical_ventilation' | 'floor_wet_or_unknown' | 'floor_dry' | 'floor_thin_screed' | 'wall' | 'ceiling' | 'unknown';
+        insulation: 'without_insulation' | 'minimal_insulation' | 'double_insulation' | 'unknown' }
+    | { type: 'dwelling_air'; control: 'central' | 'room' }
+    | { type: 'electric_air'; wall: 'outer_wall' | 'inner_wall' | 'unknown';
+        control: 'p_per_zone' | 'central_with_local_p' | 'p_per_room' | 'pi_per_room' | 'unknown' }
+    | { type: 'ventilation_air'; configuration: 'reheat_room_air' | 'reheat_cascade' | 'reheat_extract_air' | 'reheat_unknown' | 'recirculation' }
+    | { type: 'high_room'; heightM: number;
+        emitter: 'warm_air_horizontal' | 'warm_air_horizontal_low_temperature' | 'warm_air_from_ceiling'
+          | 'warm_air_from_ceiling_low_temperature' | 'recirculation_two_step' | 'recirculation_pi' | 'dark_radiators'
+          | 'high_temperature_radiators' | 'ceiling_panels' | 'floor_uninsulated_spacing_up_to20_cm'
+          | 'floor_uninsulated_spacing_above20_cm' | 'floor_minimal_insulation_up_to10_cm'
+          | 'floor_minimal_insulation_above10_cm' | 'floor_thermally_decoupled' | 'floor_unknown';
+        control: 'not_controlled' | 'controlled';
+        /** 9.20: RF (default 0,55) and p_h of dark and high-temperature radiators. */
+        radiant?: { radiationFactor?: number | null; specificPowerWPerM2: number } | null };
+  /** NEN-EN 215/15500 certified control: Δθ_ctr,2, variation a of table 9.6, high quality of table 9.7. */
+  certifiedControl?: boolean;
+  roomAutomation?: 'unknown' | 'individual_per_room' | 'individual_with_manual_override' | 'network_with_override_and_adaptive';
+  pipeSystem?: 'one_pipe' | 'two_pipe' | 'unknown' | 'not_hydronic';
+  /** Row of table 9.2, top to bottom. */
+  balancing?: 'none_or_unknown' | 'static' | 'static_or_dynamic_with_groups' | 'dynamic_with_load_control' | 'dynamic_full';
+}
+
+/** NTA 8800:2023 10.3.3 (tables 10.2–10.5, p. 360–364): the cooling emission in that edition's terms. */
+export interface NtaCoolingEmission2023 {
+  control: 'central' | 'p_before1988' | 'room';
+  certifiedControl?: boolean;
+  balancing?: 'none_or_unknown' | 'static_per_emitter' | 'static_with_group_balancing' | 'static_with_dynamic_groups'
+    | 'dynamic_or_direct_expansion';
+  roomAutomation?: 'unknown' | 'standalone' | 'standalone_with_manual_override' | 'network_with_override_and_adaptive';
+}
+
 export interface NtaDistributionSystem {
   designTemperatureClass?: NtaDesignTemperatureClass | null;
   installation: 'individual' | 'collective';
@@ -1768,6 +1827,8 @@ export interface NtaDistributionSystem {
   unheatedAmbientC?: number[] | null;
   /** b_U of the unheated space with the pipes: ϑ_ztu per 7.82 when no ϑ_ztu is entered. */
   unheatedReductionFactor?: number | null;
+  /** NTA 8800:2023 9.4.3 only: uninsulated pipes in an uninsulated outer wall or floor, f_H;dis;rbl = 0,5. */
+  uninsulatedPipesInUninsulatedShell?: boolean;
   bufferVessel?: {
     volumeL: number;
     standingLossW?: number | null;
@@ -2014,7 +2075,9 @@ export type EnvelopeElementKind =
   | { kind: 'forfait_opaque'; element: Record<string, unknown> }
   | { kind: 'forfait_window'; glass: string; frame: FrameGroup; exterior: boolean }
   | { kind: 'forfait_door'; insulated: boolean; exterior: boolean; glassFraction?: number; glass?: string; frame?: FrameGroup }
-  | { kind: 'forfait_panel'; insulation: Record<string, unknown>; cavity: boolean; frame: FrameGroup; exterior: boolean }
+  | { kind: 'forfait_panel'; insulation: Record<string, unknown>; cavity: boolean; frame: FrameGroup; exterior: boolean;
+      /** NTA 8800:2023 tables I.13/I.14 only: build year of the building (part). */
+      buildYear?: number | null }
   | { kind: 'rooflight'; uRcWPerM2K: number; areaWithUpstandM2: number; sourceReference: string }
   | { kind: 'ventilation_grille' }
   | { kind: 'numerical'; couplingWPerK: number; constructionAreaM2: number; deltaUWPerM2K?: number; sourceReference: string };
@@ -2034,8 +2097,11 @@ export interface EnvelopeInput {
 }
 
 export interface EnvelopeAssessment {
-  status: 'calculated_unverified' | 'invalid';
+  status: 'calculated_unverified' | 'calculated_legacy_edition' | 'invalid';
   scope: string;
+  /** Edition the constructions were calculated in. */
+  normVersion?: NormVersion;
+  targetNormVersion?: string;
   issues: Array<{ code: string; path: string }>;
   elements: Array<{
     id: string;
@@ -2056,8 +2122,9 @@ export interface EnvelopeAssessment {
   referenceVerified: false;
 }
 
-export async function calculateConstructionsWithRust(input: EnvelopeInput): Promise<EnvelopeAssessment> {
-  return kernelCall<EnvelopeAssessment>('calculate_constructions', '/api/v1/nta8800/constructions/calculate', { input });
+/** Construction U/Rc values in `normVersion` (absent: the current edition). */
+export async function calculateConstructionsWithRust(input: EnvelopeInput, normVersion?: NormVersion | null): Promise<EnvelopeAssessment> {
+  return kernelCall<EnvelopeAssessment>('calculate_constructions', '/api/v1/nta8800/constructions/calculate', { input, ...editionArgs(normVersion) });
 }
 
 export type VentilationSystemVariant =
@@ -2099,6 +2166,8 @@ export interface VentilationSystemUnit {
     coolingCoil?: boolean;
   };
   equipmentReference: string;
+  /** f_ctrl from a kwaliteitsverklaring, replacing table 11.5 (not on the E.1 decentral part). */
+  declaredControlFactor?: { value: number; declarationReference: string } | null;
 }
 
 /** Chapter 11 input for one zone; see crates/nta8800-core/src/ventilation.rs. */
@@ -2154,7 +2223,9 @@ export interface VentilationInput {
       area:
         | { method: 'declared'; netAreaM2: number }
         | { method: 'discharge'; grossAreaM2: number; dischargeCoefficient: number; entryLossCoefficient: number }
-        | { method: 'opening_angle'; maxNetAreaM2: number; maxAngleDeg: number };
+        | { method: 'opening_angle'; maxNetAreaM2: number; maxAngleDeg: number;
+            /** No louvre/mesh specification: NEN 1087 opening × 0,3 (2024+) or 0,5 (2023). */
+            screenUnspecified?: boolean };
       centreHeightM: number;
       openingHeightM: number;
       azimuthDeg: number;
@@ -2263,8 +2334,8 @@ export interface VentilationAssessment {
   referenceVerified: false;
 }
 
-export async function calculateVentilationWithRust(input: VentilationInput): Promise<VentilationAssessment> {
-  return kernelCall<VentilationAssessment>('calculate_ventilation', '/api/v1/nta8800/ventilation/calculate', { input });
+export async function calculateVentilationWithRust(input: VentilationInput, normVersion?: NormVersion | null): Promise<VentilationAssessment> {
+  return kernelCall<VentilationAssessment>('calculate_ventilation', '/api/v1/nta8800/ventilation/calculate', { input, ...editionArgs(normVersion) });
 }
 
 /** ISSO 82.1 basic survey of an existing dwelling; see docs/nta8800-basisopname.md. */
@@ -2306,6 +2377,8 @@ export interface OpnameGrilleHeatingStrips {
 
 export interface ResidentialSurvey {
   id: string;
+  /** NTA 8800 edition to calculate in (the project's); absent is 2025+C1. Older: comparison only. */
+  normVersion?: NormVersion;
   constructionYear: number;
   renovation?: {
     envelopePostInsulated: boolean;
@@ -2427,7 +2500,7 @@ export interface ResidentialSurvey {
     /** Table 9.7 nominal power of the main generator, kW; required with additionalGenerators. */
     nominalPowerKw?: number | null;
     /** §9.3.2: further unequal generators (kernel `multiple`, preference per p. 112). */
-    additionalGenerators?: Array<{ generator: OpnameHeatingGenerator; nominalPowerKw?: number | null }>;
+    additionalGenerators?: Array<{ /** Stable id for evidence and photo links; not used in the calculation. */ id?: string; generator: OpnameHeatingGenerator; nominalPowerKw?: number | null }>;
     /** §9.3.6: a preferred generator added after delivery. */
     addedPreferredGenerator?: boolean;
     /** Collective installation (p. 106, 121–122). */
@@ -2446,6 +2519,8 @@ export interface ResidentialSurvey {
     sourceReference: string;
   };
   hotWater: {
+    /** Stable id of a further hot-water system (evidence and photo links); not used in the calculation. */
+    id?: string;
     generator: OpnameHotWaterGenerator;
     served: 'kitchen_and_bathroom' | 'bathroom_only' | 'kitchen_only';
     kitchenLengthM?: number;
@@ -2463,7 +2538,7 @@ export interface ResidentialSurvey {
     /** 13.141 nominal power of the main generator, kW. */
     nominalPowerKw?: number | null;
     /** NTA 13.8.2 further generators. */
-    additionalGenerators?: Array<{ generator: OpnameHotWaterGenerator; nominalPowerKw?: number | null }>;
+    additionalGenerators?: Array<{ /** Stable id for evidence and photo links; not used in the calculation. */ id?: string; generator: OpnameHotWaterGenerator; nominalPowerKw?: number | null }>;
     /** Collective hot-water system (p. 164, 176). */
     collective?: { buildingUsableAreaM2?: number | null; connectedDwellings?: number | null } | null;
     /** Solar water heaters (§15.3–15.4). */
@@ -2533,9 +2608,15 @@ export interface OpnameStorage {
 }
 
 export interface OpnameAssessment {
-  status: 'calculated_unverified' | 'derived_input_rejected' | 'invalid';
+  status: 'calculated_unverified' | 'calculated_legacy_edition' | 'derived_input_rejected' | 'invalid';
   scope: string;
   source: string;
+  /** Label of the NTA 8800 edition the survey was calculated in. */
+  targetNormVersion?: string;
+  /** Edition the survey was calculated in (the project's `ntaCalculation.normVersion`). */
+  normVersion?: NormVersion;
+  /** Only a 2025+C1 survey may be registered. */
+  registrationEligible?: boolean;
   appliedDefaults: Array<{ rule: string; path: string; value: string; source: string; inklapReden?: string }>;
   warnings: Array<{ code: string; path: string; note: string }>;
   issues: Array<{ code: string; path: string }>;
@@ -2553,6 +2634,8 @@ export async function assessResidentialSurveyWithRust(survey: ResidentialSurvey)
 /** ISSO 75.1 basic survey of an existing utility building (one calculation zone). */
 export interface UtilitySurvey {
   id: string;
+  /** NTA 8800 edition to calculate in (the project's); absent is 2025+C1. */
+  normVersion?: NormVersion;
   constructionYear: number;
   renovation?: ResidentialSurvey['renovation'];
   buildingType:
@@ -2661,6 +2744,8 @@ export interface UtilitySurvey {
     sourceReference: string;
   } | null;
   hotWater: {
+    /** Stable id of a further hot-water system (evidence and photo links); not used in the calculation. */
+    id?: string;
     generator:
       | { kind: 'none' | 'electric_boiler' | 'electric_instantaneous' | 'district_heat' | 'collective_unknown' }
       | { kind: 'gas_appliance'; applianceType: 'bath_geyser' | 'combi' | 'kitchen_geyser' | 'unknown'; gaskeur: 'none' | 'gaskeur' | 'gaskeur_cw' | 'gaskeur_hr_cw' | 'unknown'; burnerLoadKw?: number }
@@ -2684,7 +2769,7 @@ export interface UtilitySurvey {
     /** 13.141 nominal power of the main generator, kW. */
     nominalPowerKw?: number | null;
     /** NTA 13.8.2 further generators with the utility generator types. */
-    additionalGenerators?: Array<{ generator: UtilitySurvey['hotWater']['generator']; nominalPowerKw?: number | null }>;
+    additionalGenerators?: Array<{ /** Stable id for evidence and photo links; not used in the calculation. */ id?: string; generator: UtilitySurvey['hotWater']['generator']; nominalPowerKw?: number | null }>;
     /** Areas served by an additional system (13.20a); ignored on the main system. */
     servedAreas?: UtilitySurvey['functions'];
     sourceReference: string;
@@ -2766,8 +2851,8 @@ export async function assessUtilitySurveyWithRust(survey: UtilitySurvey): Promis
   return kernelCall<OpnameAssessment>('assess_utility_survey', '/api/v1/nta8800/opname/utility', { survey });
 }
 
-export async function calculateSpaceHeatingChainWithRust(input: SpaceHeatingChainInput): Promise<SpaceHeatingChainAssessment> {
-  return kernelCall<SpaceHeatingChainAssessment>('calculate_space_heating_chain', '/api/v1/nta8800/heating/space-heating-chain/calculate', { input });
+export async function calculateSpaceHeatingChainWithRust(input: SpaceHeatingChainInput, normVersion?: NormVersion | null): Promise<SpaceHeatingChainAssessment> {
+  return kernelCall<SpaceHeatingChainAssessment>('calculate_space_heating_chain', '/api/v1/nta8800/heating/space-heating-chain/calculate', { input, ...editionArgs(normVersion) });
 }
 
 /** Table 5.2/5.5 carriers delivered to the generators of a collective system. */
@@ -3250,7 +3335,7 @@ export interface NtaActiveCoolingEvidence {
     | 'external_cold_with_cooling_emitter' | 'split_units_in_every_habitable_room' | 'other_utility';
   capacity:
     | { method: 'dynamic_cooling_load'; sourceReference: string }
-    | { method: 'annex_aa'; calculation?: NtaAnnexAaInput | null; sourceReference: string }
+    | { method: 'annex_aa'; calculation?: NtaAnnexAaInput | null; zoneCalculations?: NtaAnnexAaInput[]; sourceReference: string }
     | { method: 'solar_limitation'; criterion: 'small_window_area' | 'shaded_glazing'; sourceReference: string };
   sourceReference: string;
 }
@@ -3313,6 +3398,8 @@ export interface NtaTojuliAssessment {
 
 /** Annex AA input per calculation zone (dwellings). */
 export interface NtaAnnexAaInput {
+  /** The cooled rekenzone; required when more than one zone is cooled (2025+C1 p. 1135). */
+  zoneId?: string;
   constructionYear: number;
   postInsulated?: boolean;
   /** B_C;inst;zi in kW; omit when every room has its own generator. */
@@ -3478,6 +3565,8 @@ export interface NtaCoolingSystem {
     control: 'unknown_or_other' | 'standalone_per_room' | 'central_with_room_control';
     fanCoilCount?: number;
     sourceReference: string;
+    /** NTA 8800:2023 tables 10.2–10.5 only. */
+    edition2023?: NtaCoolingEmission2023 | null;
   };
   distribution?: {
     designTemperature: 't6_to12_or_unknown' | 't12_to16' | 't12_to18' | 't17_to21';
@@ -3672,6 +3761,7 @@ export type NtaHotWaterGenerator =
     | { kind: 'indirect_heat_pump'; alsoSpaceHeating: boolean }
     | { kind: 'external_heat' }
     | ({ kind: 'booster_heat_pump' } & NtaBoosterHeatPump)
+    | ({ kind: 'booster_heat_pump_forfait' } & NtaBoosterHeatPumpForfait)
     | ({ kind: 'measured_two_profiles' } & NtaTwoProfileTest)
     | { kind: 'heating_system' }
     /** §13.8.4.7.4/§13.8.4.8 building CHP: method 2 (`chp`) or method 1 (`method1`), exclusive. */
@@ -3690,7 +3780,10 @@ export interface NtaHotWaterSystem {
     | { method: 'utility'; areas: Array<{ function: NtaLabelFunction; areaM2: number }>; sourceReference: string };
   emission:
     | { method: 'residential'; served: 'kitchen_and_bathroom' | 'bathroom_only' | 'kitchen_only';
-        kitchenLengthM?: number | null; bathroomLengthM?: number | null; sourceReference: string }
+        kitchenLengthM?: number | null;
+        /** Table 13.2 of NTA 8800:2023 only: inner diameter of the kitchen pipe over two thirds of its length. */
+        kitchenPipeDiameter?: 'up_to_8_mm' | 'up_to_10_mm' | 'other' | null;
+        bathroomLengthM?: number | null; sourceReference: string }
     | { method: 'utility'; meanLengthM: number; sourceReference: string };
   showerHeatRecovery?: {
     showers: Array<
@@ -3907,7 +4000,16 @@ export interface NtaProjectHeatingSystem {
 export type NormVersion = '2020+A1' | '2022' | '2023' | '2024' | '2025+C1';
 export const DEFAULT_NORM_VERSION: NormVersion = '2025+C1';
 /** Editions the kernel can calculate; only the default one is registrable (BRL 9500). */
-export const IMPLEMENTED_NORM_VERSIONS: NormVersion[] = ['2025+C1', '2024'];
+export const IMPLEMENTED_NORM_VERSIONS: NormVersion[] = ['2025+C1', '2024', '2023', '2022', '2020+A1'];
+
+/**
+ * The `normVersion` member of a diagnostic call (desktop command or HTTP
+ * body): the kernel runs it with that edition active. The current edition
+ * is the absent one.
+ */
+export function editionArgs(normVersion?: NormVersion | null): { normVersion?: NormVersion } {
+  return normVersion && normVersion !== DEFAULT_NORM_VERSION ? { normVersion } : {};
+}
 
 export interface NtaCalculationInput {
   /** Edition to calculate in; older editions give `calculated_legacy_edition`, never registrable. */
@@ -3928,6 +4030,20 @@ export interface NtaCalculationInput {
   };
   /** Annex A dynamic transparent elements per project window id. */
   dynamicWindows?: Array<{ windowId: string; dynamic: NtaDynamicTransparent }>;
+  /** External obstruction per project window; others keep `windowSolar.obstruction`. */
+  windowObstructions?: Array<{ windowId: string; obstruction: NtaObstruction; sourceReference: string }>;
+  /** Movable shading per project window (absent: none on that window); others keep `windowSolar.movableShading`. */
+  windowShadings?: Array<{ windowId: string; movableShading?: NtaMovableShading | null; sourceReference: string }>;
+  /** Glazing details per project window (table 7.4 type, fixed louvres 7.41a/b, diffusing 7.41); others use their gValue. */
+  windowGlazings?: Array<{
+    windowId: string;
+    glazing: {
+      glazingType?: string;
+      fixedLouvres?: { kind: string; control?: string };
+      diffusing?: { gAltitude45: number; gDiffuse: number; sourceReference: string };
+    };
+    sourceReference: string;
+  }>;
   groundFloors: Array<{
     surfaceId: string;
     exposedPerimeterM: number;
@@ -4130,6 +4246,8 @@ export interface NtaRegistration {
   software?: NtaSoftwareIdentity;
   /** WLC-GWP result, required for new buildings > 1000 m² checked against the Bbl from 2028. */
   wlcGwp?: { valueKgCo2EqPerM2Year?: number; reportReference?: string };
+  /** The adviser's yes/no statements for label elements k and l (Omgevingsregeling art. 5.13a lid 1, since 29 May 2026). */
+  labelStatements?: NtaLabelStatements;
   /** Delivery: date of the toets Bbl it follows (YYYY-MM-DD); the WLC-GWP duty follows that check. */
   bblCheckDate?: string;
   /** A_g of the whole building when the calculation covers one dwelling (WLC-GWP threshold per building). */
@@ -4251,6 +4369,11 @@ export interface RelabelAssessment {
   originalLabelInputHash?: string;
   /** Kernel hash of the compared project's label input; differs after a later edit. */
   currentLabelInputHash?: string;
+  /** Edition of the original project; the relabel is calculated in it (BRL 9500-W §4.2.4). */
+  normVersion?: NormVersion;
+  targetNormVersion?: string;
+  /** Edition of the current project; another edition than the original's is not allowed. */
+  currentNormVersion?: NormVersion;
 }
 
 export async function assessRelabelWithRust(original: unknown, current: unknown): Promise<RelabelAssessment> {
@@ -4483,9 +4606,13 @@ export interface MwaRegressionLine {
 }
 
 export interface MaatwerkadviesAssessment {
-  status: 'calculated_unverified' | 'partially_calculated' | 'invalid';
+  status: 'calculated_unverified' | 'calculated_legacy_edition' | 'partially_calculated' | 'invalid';
   scope: string;
   targetNormVersion: string;
+  /** Edition of the base situation; every variant is calculated in it. */
+  normVersion?: NormVersion;
+  /** Only a 2025+C1 advice may be registered. */
+  registrationEligible?: boolean;
   kernelVersion: string;
   inputFingerprint: string;
   attestStatus: string;
@@ -4675,6 +4802,14 @@ export interface LabelData {
       lowTemperatureHeating: boolean | null;
     };
   } | null;
+}
+
+/** Omgevingsregeling art. 5.13a lid 1 onder k and l: statements of the adviser, not calculated. */
+export interface NtaLabelStatements {
+  /** k. The building can respond to external signals and adapt its energy use. */
+  respondsToExternalSignals?: boolean;
+  /** l. The heating distribution system is designed to work at low temperature. */
+  lowTemperatureHeating?: boolean;
 }
 
 export async function calculateProjectPerformanceWithRust(input: IProject): Promise<ProjectPerformanceAssessment> {

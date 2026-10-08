@@ -61,7 +61,7 @@ export async function downloadProjectDossier(project: IProject) {
   const reportHtml = assessment
     ? generateNtaCalculationReportHTML(project, assessment, await interpretationsOrEmpty(), generatedAt)
     : null;
-  const opname = await assessStoredSurvey(project.basisopname);
+  const opname = await assessStoredSurvey(project.basisopname, project.ntaCalculation?.normVersion);
   const bundle = await buildProjectDossier({ project, assessment, opname, reportHtml, generatedAt: generatedAt.toISOString() });
   const zip = zipProjectDossier(bundle);
   const fileName = `Projectdossier-${(project.name || 'project').replace(/[^\p{L}\p{N}._-]+/gu, '-')}.zip`;

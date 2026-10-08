@@ -47,6 +47,7 @@ pub const INTERPRETATIONS: &[&str] = &[
     "table C.4 footnote b: a reflective layer facing upward earns no bracket value unless the cavity is hermetically sealed; footnote b is applied to vertical cavities only when the input marks the layer as facing up",
     "table C.4: R_se 0,05 (bracket value) applies to upward heat flow when a horizontal cavity with an effective reflective layer is present; R_C subtracts the same R_se",
     "table F.1 (U ≤ 1,0) and tables F.2/F.3 (U > 1,0) are checked against the U_C of the whole construction",
+    "tables C.3/C.4 footnotes c and e: an unventilated cavity thinner than 20 mm without an effective reflective layer follows D.2 of NEN-EN-ISO 6946:2017 with ε1 = ε2 = 0,9 and h_r0 at 10 °C (h_a = max(table value, λ_air/d), λ_air 0,025 W/(m·K)), rounded to 2 decimals like the table values; the same D.2 parameters reproduce every value of tables C.3 and C.4",
 ];
 
 /// Direction of the heat flow through the element (table C.2 note 3).
@@ -159,7 +160,9 @@ pub enum Layer {
     ReflectiveFoil {
         system: ReflectiveFoilSystem,
     },
-    /// C.3: air layer with a thickness of at least 20 mm and at most 300 mm.
+    /// C.3: air layer of at most 300 mm. Below 20 mm only unventilated
+    /// without an effective reflective layer (footnotes c and e of tables
+    /// C.3/C.4), or strongly ventilated.
     AirCavity {
         #[serde(rename = "thicknessMm")]
         thickness_mm: f64,
@@ -342,6 +345,38 @@ pub fn cavity_table(thickness_mm: f64, heat_flow: HeatFlow, reflective: bool) ->
     }
 }
 
+/// Stefan–Boltzmann constant, W/(m²·K⁴).
+const STEFAN_BOLTZMANN: f64 = 5.67e-8;
+/// Thermal conductivity of still air behind the conduction limit of the
+/// D.2 convection coefficient, W/(m·K).
+const LAMBDA_AIR: f64 = 0.025;
+
+/// R of an unventilated air layer by D.2 of NEN-EN-ISO 6946:2017 with the
+/// parameters of footnote e of tables C.3/C.4 (2025+C1 p. 782 and 784):
+/// ε1 = 0,9, ε2 = `emissivity_2`, h_r0 at 10 °C. Unrounded.
+fn iso6946_d2_resistance(thickness_m: f64, heat_flow: HeatFlow, emissivity_2: f64) -> f64 {
+    let conduction = LAMBDA_AIR / thickness_m;
+    let h_a = match heat_flow {
+        HeatFlow::Horizontal => conduction.max(1.25),
+        HeatFlow::Upward => conduction.max(1.95),
+        HeatFlow::Downward => conduction.max(0.12 * thickness_m.powf(-0.44)),
+    };
+    let e = 1.0 / (1.0 / 0.9 + 1.0 / emissivity_2 - 1.0);
+    let h_r0 = 4.0 * STEFAN_BOLTZMANN * (273.15f64 + 10.0).powi(3);
+    1.0 / (h_a + e * h_r0)
+}
+
+/// Footnotes c and e of tables C.3/C.4: R_cav;nv of an unventilated air
+/// layer thinner than 20 mm without an effective reflective layer, rounded
+/// to 2 decimals like the table values (table 8 of NEN-EN-ISO 6946:2017 is
+/// built on the same D.2 method).
+pub fn thin_cavity_resistance(thickness_mm: f64, heat_flow: HeatFlow) -> f64 {
+    round_half_up(
+        iso6946_d2_resistance(thickness_mm / 1000.0, heat_flow, 0.9),
+        2,
+    )
+}
+
 /// Exterior surface resistance at a strongly ventilated cavity (C.3.3,
 /// footnotes b of tables C.3/C.4).
 pub fn still_air_exterior_resistance(heat_flow: HeatFlow, reflective: bool) -> f64 {
@@ -387,6 +422,14 @@ impl Layer {
                 ventilation,
                 ..
             } => {
+                if *thickness_mm < 20.0 {
+                    // Footnotes c and e of tables C.3/C.4; validation refuses
+                    // the thin cases D.2 does not cover here.
+                    return match ventilation {
+                        CavityVentilation::Strongly => None,
+                        _ => Some(thin_cavity_resistance(*thickness_mm, heat_flow)),
+                    };
+                }
                 let (nv, zv) = cavity_table(*thickness_mm, heat_flow, self.effective_reflective());
                 match ventilation {
                     CavityVentilation::Unventilated => Some(nv),
@@ -569,7 +612,14 @@ impl Layer {
                 ventilation,
                 ..
             } => {
-                if !(thickness_mm.is_finite() && *thickness_mm >= 20.0) {
+                if !positive(*thickness_mm) {
+                    issues.push(issue("thickness_invalid", format!("{path}.thicknessMm")));
+                } else if *thickness_mm < 20.0
+                    && (matches!(ventilation, CavityVentilation::Weakly { .. })
+                        || self.effective_reflective())
+                {
+                    // Footnote c of tables C.3/C.4 covers only unventilated
+                    // layers without reflective foil below 20 mm.
                     issues.push(issue(
                         "air_cavity_below_20_mm_unsupported",
                         format!("{path}.thicknessMm"),
@@ -1713,6 +1763,74 @@ mod tests {
         assert!((rooflight_u(1.5, 2.0, 1.6) - 1.875).abs() < 1e-12);
     }
 
+    /// Footnote e of tables C.3/C.4 (2025+C1 p. 782 and 784): D.2 of
+    /// NEN-EN-ISO 6946:2017 with ε1 = ε2 = 0,9 (ε2 = 0,1 for the bracket
+    /// values) and h_r0 at 10 °C reproduces every unventilated value of
+    /// tables C.3 and C.4, including the conduction branch of the downward
+    /// rows of 20–50 mm.
+    #[test]
+    fn d2_method_reproduces_tables_c3_and_c4() {
+        for heat_flow in [HeatFlow::Horizontal, HeatFlow::Upward, HeatFlow::Downward] {
+            for d in [20.0, 25.0, 50.0, 100.0, 300.0] {
+                for reflective in [false, true] {
+                    let (table, _) = cavity_table(d, heat_flow, reflective);
+                    let eps2 = if reflective { 0.1 } else { 0.9 };
+                    let r = round_half_up(iso6946_d2_resistance(d / 1000.0, heat_flow, eps2), 2);
+                    assert!(
+                        (r - table).abs() < 1e-9,
+                        "{heat_flow:?} {d} mm reflective {reflective}: {r} vs {table}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// Footnote c of tables C.3/C.4: below 20 mm the still-air conduction
+    /// λ/d governs h_a; R falls towards 0 with the thickness.
+    #[test]
+    fn thin_unventilated_cavity_follows_d2() {
+        let h = |d| thin_cavity_resistance(d, HeatFlow::Horizontal);
+        assert_eq!(h(5.0), 0.11);
+        assert_eq!(h(7.0), 0.13);
+        assert_eq!(h(10.0), 0.15);
+        assert_eq!(h(15.0), 0.17);
+        assert_eq!(thin_cavity_resistance(15.0, HeatFlow::Upward), 0.16);
+        assert_eq!(thin_cavity_resistance(10.0, HeatFlow::Upward), 0.15);
+        assert_eq!(thin_cavity_resistance(15.0, HeatFlow::Downward), 0.17);
+        assert!(h(1.0) < h(5.0));
+        // Continuous with the table at 20 mm.
+        assert_eq!(thin_cavity_resistance(19.99, HeatFlow::Horizontal), 0.18);
+
+        let layer = |thickness_mm, ventilation, reflective_surface| Layer::AirCavity {
+            thickness_mm,
+            ventilation,
+            reflective_surface,
+            reflective_facing_up: false,
+            hermetically_sealed: false,
+        };
+        let codes = |layer: &Layer| {
+            let mut issues = Vec::new();
+            layer.validate("l", &mut issues);
+            issues.into_iter().map(|i| i.code).collect::<Vec<_>>()
+        };
+        let unventilated = layer(10.0, CavityVentilation::Unventilated, false);
+        assert_eq!(unventilated.resistance(HeatFlow::Horizontal), Some(0.15));
+        assert!(codes(&unventilated).is_empty());
+        // Strongly ventilated: truncation as for thicker layers.
+        let strong = layer(10.0, CavityVentilation::Strongly, false);
+        assert_eq!(strong.resistance(HeatFlow::Horizontal), None);
+        assert!(codes(&strong).is_empty());
+        // Weak ventilation and an effective reflective layer stay refused.
+        for refused in [
+            layer(10.0, CavityVentilation::Weakly { opening_mm2: None }, false),
+            layer(10.0, CavityVentilation::Unventilated, true),
+        ] {
+            assert_eq!(codes(&refused), vec!["air_cavity_below_20_mm_unsupported"]);
+        }
+        let zero = layer(0.0, CavityVentilation::Unventilated, false);
+        assert_eq!(codes(&zero), vec!["thickness_invalid"]);
+    }
+
     #[test]
     fn validation_catches_unsupported_layers() {
         let wall = OpaqueConstruction {
@@ -1725,7 +1843,7 @@ mod tests {
                     },
                     Layer::AirCavity {
                         thickness_mm: 10.0,
-                        ventilation: CavityVentilation::Unventilated,
+                        ventilation: CavityVentilation::Weakly { opening_mm2: None },
                         reflective_surface: false,
                         reflective_facing_up: false,
                         hermetically_sealed: false,

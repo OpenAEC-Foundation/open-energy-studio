@@ -7,10 +7,12 @@
  * order; the step pages render the entries of their own page. Fields and paths
  * are unchanged.
  */
+import { ThermalMassPerM22022Field } from './NtaEdition2022Fields';
 import type { ComponentType } from 'react';
 import { DEFAULT_NORM_VERSION, IMPLEMENTED_NORM_VERSIONS } from '../../core/nta/KernelClient';
 import type { IProject } from '../../core/energy/types';
 import type { StepId } from '../../core/navigation/routes';
+import { HeatingEmission2023Fields } from './NtaEdition2023Fields';
 import { useI18n } from '../../i18n/i18n';
 import {
   CheckField, NumberField, read, SelectField, TextField, TriStateField, useFieldPath, type Draft, type Path,
@@ -21,11 +23,17 @@ import {
 } from './NtaAdvancedSections';
 import { NtaVentilationSection } from './NtaVentilationSection';
 import { DynamicWindowsFields } from './NtaDynamicWindows';
+import { WindowObstructionsFields } from './NtaWindowObstructions';
+import { WindowShadingsFields } from './NtaWindowShadings';
+import { WindowGlazingsFields } from './NtaWindowGlazings';
+import { CirculationPsiFields } from './NtaPipeGeometry';
+import { AnnexAaCalculationFields } from './NtaAnnexAaFields';
+import { annexAaCalculations, annexAaEditionRules } from '../../core/nta/annexAaForm';
 import { DeclaredHeatingTableTool, GroundFloorDetailFields } from './NtaProductGenerators';
 import { NtaDistributionFields, NtaLightingSection, NtaUtilityGainsFields } from './NtaExtraSections';
 import { ExternalSupplyFields } from './NtaExternalSupply';
 import {
-  AdditionalHeatingSystemsFields, AdditionalHotWaterSystemsFields, HotWaterGeneratorFields, HotWaterGeneratorsFields, HotWaterStorageFields, SolarWaterHeaterFields,
+  AdditionalHeatingSystemsFields, AdditionalHotWaterSystemsFields, HotWaterGeneratorFields, KitchenPipeDiameterField, HotWaterGeneratorsFields, HotWaterStorageFields, SolarWaterHeaterFields,
   SpaceGeneratorFields, WindowObstructionFields,
 } from './NtaSystemSections';
 import {
@@ -274,7 +282,7 @@ function GeneralSection(props: NtaSectionProps) {
   const { draft } = props;
   const f = fieldOf(props);
   return <>
-    <SelectField {...f} path={['normVersion']} label={t('nta.form.normVersion')}
+    <SelectField {...f} path={['normVersion']} label={t('nta.form.normVersion')} fallback={DEFAULT_NORM_VERSION}
       options={IMPLEMENTED_NORM_VERSIONS.map((edition) => [edition, t(`nta.edition.${edition}`)])} />
     {read(draft, ['normVersion']) != null && read(draft, ['normVersion']) !== DEFAULT_NORM_VERSION
       && <p className="nta-form-note" role="note">{t('nta.form.normVersionLegacy')}</p>}
@@ -286,6 +294,8 @@ function GeneralSection(props: NtaSectionProps) {
     {read(draft, ['usageFunction']) === 'residential' && <SelectField {...f} path={['dwellingType']}
       label={t('nta.form.dwellingType')} options={[
         ['apartment_building', t('nta.form.dwellingType.apartment')], ['other', t('nta.form.dwellingType.other')]]} />}
+    <SelectField {...f} path={['labelFunction']} label={t('nta.form.labelFunction')}
+      options={LABEL_FUNCTIONS.map((key) => [key, t(`nta.form.labelFn.${key}`)])} />
     <SelectField {...f} path={['bblFunction']} label={t('nta.form.bblFunction')} options={[
       ['other_residential', t('nta.form.bbl.other_residential')], ['residential_building', t('nta.form.bbl.residential_building')],
       ['office', t('nta.form.bbl.office')], ['education', t('nta.form.bbl.education')], ['retail', t('nta.form.bbl.retail')],
@@ -310,38 +320,47 @@ function GeneralSection(props: NtaSectionProps) {
 /**
  * Annex AA inputs that only the 2024 edition reads (INT-V1:2024): the effective
  * mass per m² and the roof area per room. The rest of the annex AA calculation
- * is entered in the JSON editor.
+ * is entered in `AnnexAaCalculationFields`.
  */
 export function AnnexAa2024Fields(props: NtaSectionProps) {
   const { t } = useI18n();
   const { draft } = props;
   const f = fieldOf(props);
-  const base: Path = ['activeCooling', 'capacity', 'calculation'];
-  const calculation = read(draft, base);
-  if (read(draft, ['normVersion']) !== '2024') {
+  const rules = annexAaEditionRules(read(draft, ['normVersion']));
+  const calculations = annexAaCalculations(read(draft, ['activeCooling', 'capacity']));
+  if (!rules.monthly2024) {
     // Values left behind by a switch from the 2024 edition: offer to remove them.
-    const rooms = (read(draft, [...base, 'rooms']) as Draft[] | undefined) ?? [];
-    const stale = read(draft, [...base, 'effectiveMassKgPerM2']) != null || rooms.some((room) => room?.roofAreaM2 != null);
+    const stale = calculations.some(({ value }) => value.effectiveMassKgPerM2 != null
+      || ((value.rooms as Draft[] | undefined) ?? []).some((room) => room?.roofAreaM2 != null));
     if (!stale) return null;
     return <p className="nta-form-note nta-form-error" role="alert">
       {t('ntaStep.staleEdition', { field: t('ntaStep.annexAa.fields') })}{' '}
       <button type="button" onClick={() => props.update((current) => {
         const clone = structuredClone(current) as Draft;
-        const target = read(clone, base) as Draft;
-        delete target.effectiveMassKgPerM2;
-        for (const room of (target.rooms as Draft[] | undefined) ?? []) delete room.roofAreaM2;
+        for (const { path } of annexAaCalculations(read(clone, ['activeCooling', 'capacity']))) {
+          const target = read(clone, path) as Draft;
+          delete target.effectiveMassKgPerM2;
+          for (const room of (target.rooms as Draft[] | undefined) ?? []) delete room.roofAreaM2;
+        }
         return clone;
       })}>{t('nta.form.remove')}</button>
     </p>;
   }
-  if (calculation == null || typeof calculation !== 'object') {
-    return <p className="nta-form-note" role="note">{t('ntaStep.annexAa.noCalculation')}</p>;
-  }
-  const rooms = (read(draft, [...base, 'rooms']) as Draft[] | undefined) ?? [];
+  // Older editions build on the 2024 method but have no annex AA route; the
+  // calculation form already says so.
+  if (!rules.route) return null;
+  // Without a calculation, `AnnexAaCalculationFields` offers to add one.
+  if (calculations.length === 0) return null;
   return <div className="nta-form-row" data-testid="nta-annex-aa-2024">
-    <NumberField {...f} path={[...base, 'effectiveMassKgPerM2']} label={t('ntaStep.annexAa.effectiveMass')} optional />
-    {rooms.map((room, index) => <NumberField key={String(room?.id ?? index)} {...f} path={[...base, 'rooms', index, 'roofAreaM2']}
-      label={t('ntaStep.annexAa.roofArea', { room: String(room?.id ?? index + 1) })} optional />)}
+    {calculations.map(({ path: base, zoneId, value }) => {
+      const rooms = (value.rooms as Draft[] | undefined) ?? [];
+      return <div key={base.join('.')} className="nta-form-row">
+        {zoneId != null && <strong>{t('ntaStep.annexAa.zone', { zone: zoneId })}</strong>}
+        <NumberField {...f} path={[...base, 'effectiveMassKgPerM2']} label={t('ntaStep.annexAa.effectiveMass')} optional />
+        {rooms.map((room, index) => <NumberField key={String(room?.id ?? index)} {...f} path={[...base, 'rooms', index, 'roofAreaM2']}
+          label={t('ntaStep.annexAa.roofArea', { room: String(room?.id ?? index + 1) })} optional />)}
+      </div>;
+    })}
     <p className="nta-form-note">{t('ntaStep.annexAa.note')}</p>
   </div>;
 }
@@ -367,7 +386,10 @@ function ActiveCoolingSection(props: NtaSectionProps) {
       {read(draft, ['activeCooling', 'capacity', 'method']) === 'solar_limitation' &&
         <SelectField {...f} path={['activeCooling', 'capacity', 'criterion']} label={t('nta.form.ac.criterion')} options={[
           ['small_window_area', t('nta.form.ac.smallWindows')], ['shaded_glazing', t('nta.form.ac.shaded')]]} />}
-      {read(draft, ['activeCooling', 'capacity', 'method']) === 'annex_aa' && <AnnexAa2024Fields {...props} />}
+      {read(draft, ['activeCooling', 'capacity', 'method']) === 'annex_aa' && <>
+        <AnnexAaCalculationFields draft={draft} change={change} project={props.project} />
+        <AnnexAa2024Fields {...props} />
+      </>}
       <TextField {...f} path={['activeCooling', 'capacity', 'sourceReference']} label={t('nta.form.source')} />
       <TextField {...f} path={['activeCooling', 'sourceReference']} label={t('nta.form.source')} />
     </>}
@@ -400,6 +422,7 @@ function MassSection(props: NtaSectionProps) {
       label={t(`nta.form.mass.${part}`)} options={[['light', t('nta.form.mass.light')], ['heavy', t('nta.form.mass.heavy')], ['very_heavy', t('nta.form.mass.veryHeavy')]]} />)}
     <SelectField {...f} path={['thermalMass', 'ceiling']} label={t('nta.form.mass.ceiling')}
       options={[['open_or_none', t('nta.form.mass.open')], ['closed_or_suspended', t('nta.form.mass.closed')]]} />
+    <ThermalMassPerM22022Field draft={props.draft} change={props.change} path={['thermalMass', 'massKgPerM2']} />
     <TextField {...f} path={['thermalMass', 'sourceReference']} label={t('nta.form.source')} />
   </>;
 }
@@ -566,6 +589,7 @@ function EmissionSection(props: NtaSectionProps) {
       ['air_heating', t('nta.form.emission.air')], ['local_heater', t('nta.form.emission.local')], ['other_or_unknown', t('nta.form.unknown')]]} />
     {(read(draft, ['emission', 'system']) === 'air_heating' || read(draft, ['emission', 'airHeaters']) != null) &&
       <AirHeatersFields draft={draft} change={change} />}
+    <HeatingEmission2023Fields draft={draft} change={change} />
     <TextField {...f} path={['emission', 'sourceReference']} label={t('nta.form.source')} />
   </>;
 }
@@ -644,12 +668,14 @@ function HotWaterSection(props: NtaSectionProps) {
       <SelectField {...f} path={['hotWater', 'emission', 'served']} label={t('nta.form.hotWaterTaps')} options={[
         ['kitchen_and_bathroom', t('nta.form.dhwTaps.both')], ['bathroom_only', t('nta.form.dhwTaps.bathroom')], ['kitchen_only', t('nta.form.dhwTaps.kitchen')]]} />
       <NumberField {...f} path={['hotWater', 'emission', 'kitchenLengthM']} label={t('nta.form.hotWaterKitchenLength')} />
+      <KitchenPipeDiameterField draft={draft} change={change} path={['hotWater', 'emission', 'kitchenPipeDiameter']} />
       <NumberField {...f} path={['hotWater', 'emission', 'bathroomLengthM']} label={t('nta.form.hotWaterBathroomLength')} />
     </> : <NumberField {...f} path={['hotWater', 'emission', 'meanLengthM']} label={t('nta.form.hotWaterMeanLength')} />}
     <TextField {...f} path={['hotWater', 'emission', 'sourceReference']} label={t('nta.form.source')} />
     <HotWaterGeneratorFields draft={draft} change={change} base={['hotWater', 'generator']} />
     <HotWaterGeneratorsFields draft={draft} change={change} />
     <HotWaterStorageFields draft={draft} change={change} />
+    <CirculationPsiFields draft={draft} change={change} />
     <TextField {...f} path={['hotWater', 'equipmentReference']} label={t('nta.form.boilerEquipmentSource')} />
   </>;
 }
@@ -712,7 +738,7 @@ const listed = (key: string) => (_: IProject, draft: Draft) => ((read(draft, [ke
 /** All sections, in the order of the full form. */
 export const NTA_SECTIONS: NtaSectionDef[] = [
   { id: 'general', step: 'project', titleKey: 'nta.form.general', Component: GeneralSection,
-    paths: ['normVersion', 'calculationScope', 'areaSourceReference', 'usageFunction', 'dwellingType', 'bblFunction',
+    paths: ['normVersion', 'calculationScope', 'areaSourceReference', 'usageFunction', 'dwellingType', 'labelFunction', 'bblFunction',
       'zebHeatDeliveryTemperature', 'permitApplicationAfter20260529', 'constructionYear', 'fossilAppliancesOutsideCalculation'] },
   { id: 'activeCooling', step: 'installations', sub: 'cooling', titleKey: 'ntaStep.section.activeCooling', Component: ActiveCoolingSection,
     paths: ['activeCooling'] },
@@ -722,6 +748,15 @@ export const NTA_SECTIONS: NtaSectionDef[] = [
   { id: 'mass', step: 'building', sub: 'zones', titleKey: 'nta.form.mass', Component: MassSection, paths: ['thermalMass'] },
   { id: 'internalGains', step: 'building', sub: 'zones', titleKey: 'nta.form.internalGains', Component: InternalGainsSection, paths: ['internalGains'] },
   { id: 'windows', step: 'building', sub: 'envelope', titleKey: 'nta.form.windows', Component: WindowsSection, paths: ['windowSolar'] },
+  { id: 'windowObstructions', step: 'building', sub: 'envelope', titleKey: 'nta.form.windowObstructions.title',
+    Component: ({ draft, change, project }) => <WindowObstructionsFields draft={draft} change={change} project={project} />,
+    paths: ['windowObstructions'] },
+  { id: 'windowShadings', step: 'building', sub: 'envelope', titleKey: 'nta.form.windowShadings.title',
+    Component: ({ draft, change, project }) => <WindowShadingsFields draft={draft} change={change} project={project} />,
+    paths: ['windowShadings'] },
+  { id: 'windowGlazings', step: 'building', sub: 'envelope', titleKey: 'nta.form.windowGlazings.title',
+    Component: ({ draft, change, project }) => <WindowGlazingsFields draft={draft} change={change} project={project} />,
+    paths: ['windowGlazings'] },
   { id: 'dynamicWindows', step: 'building', sub: 'envelope', titleKey: 'nta.form.dynamic.title', Component: DynamicWindowsSection,
     paths: ['dynamicWindows'], advanced: true },
   { id: 'sunrooms', step: 'building', sub: 'unheated', titleKey: 'nta.form.sunroom.title',

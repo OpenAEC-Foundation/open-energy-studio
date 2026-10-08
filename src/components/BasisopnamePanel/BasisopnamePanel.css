@@ -127,3 +127,17 @@
 .opname-panel .opname-card-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 14px 12px 44px; }
 .opname-panel .opname-card-actions .opname-remove { margin-left: auto; }
 .opname-panel .opname-list-controls { display: flex; gap: 8px; flex-wrap: wrap; }
+/* Outcome after "Opname doorrekenen", shown in the section the user is on. */
+.opname-panel .opname-section-outcome {
+  margin: 12px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-inline-start: 3px solid var(--accent);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+}
+
+.opname-panel .opname-section-outcome p,
+.opname-panel .opname-section-outcome .opname-issues {
+  margin: 0 0 8px;
+}

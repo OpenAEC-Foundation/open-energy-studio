@@ -53,6 +53,8 @@ export function ConstructionEditorDialog({ editId, onClose }: ConstructionEditor
   const shownU = keepStored ? existing.uValue : uValue;
 
   const handleLayerChange = (index: number, field: keyof IConstructionLayer, value: string | number) => {
+    // A negative thickness or λ is no layer; it would give a negative R_c.
+    if (typeof value === 'number' && (!Number.isFinite(value) || value < 0)) return;
     setNtaResult(null);
     setLayersEdited(true);
     setLayers((prev) =>

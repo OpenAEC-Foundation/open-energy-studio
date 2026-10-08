@@ -6,13 +6,13 @@
  */
 import { useRef, type KeyboardEvent } from 'react';
 import {
-  Box, Calculator, Check, ChevronRight, Download, Flame, MessageSquare, SlidersHorizontal, Upload, Wrench,
+  BookOpen, Box, Calculator, Check, ChevronRight, Download, Flame, MessageSquare, SlidersHorizontal, Upload, Wrench,
 } from 'lucide-react';
 import { useI18n } from '../../i18n/i18n';
 import { formatNumber } from '../../i18n/format';
 import { Kbd, Tag } from '../ui';
 import { useMenu } from './TopBar';
-import { WORKFLOW_STEPS, TOOL_STEP, type Route, type StepId } from '../../core/navigation/routes';
+import { HELP_TOOL_SUBS, WORKFLOW_STEPS, TOOL_STEP, type Route, type StepId } from '../../core/navigation/routes';
 import { isNewBuild, isSurveyProject, type StepStatus } from '../../core/nta/stepStatus';
 import type { IProject } from '../../core/energy/types';
 import type { ShellActions } from './ShellActions';
@@ -254,7 +254,7 @@ export function WorkflowNav({ project, route, statuses, floorAreaM2, actions }: 
         {tools.open && (
           <div ref={tools.menuRef} role="menu" aria-label={t('nav.tools.menu')} className="shell-menu shell-menu--up" onKeyDown={tools.onKeyDown}>
             <div className="shell-menu-group" role="presentation">{t('nav.tools.calculators')}</div>
-            {TOOL_STEP.subs.map((sub) => (
+            {TOOL_STEP.subs.filter((sub) => !HELP_TOOL_SUBS.has(sub.id)).map((sub) => (
               <button key={sub.id} type="button" role="menuitem" className="shell-menu-item"
                 onClick={tools.select(() => actions.navigate({ step: 'tool', sub: sub.id }))}>
                 {sub.id === 'heat-pump-sizing' ? <Flame aria-hidden="true" /> : <Calculator aria-hidden="true" />}<span>{t(sub.labelKey)}</span>
@@ -272,6 +272,9 @@ export function WorkflowNav({ project, route, statuses, floorAreaM2, actions }: 
             <button type="button" role="menuitem" className="shell-menu-item" onClick={tools.select(actions.exportModelIFC)}>
               <Box aria-hidden="true" /><span>{t('ribbon.exportModelIFC')}</span></button>
             <div className="shell-menu-sep" role="separator" />
+            <button type="button" role="menuitem" className="shell-menu-item"
+              onClick={tools.select(() => actions.navigate({ step: 'tool', sub: 'manual' }))}>
+              <BookOpen aria-hidden="true" /><span>{t('manual.title')}</span></button>
             <button type="button" role="menuitem" className="shell-menu-item" onClick={tools.select(actions.openFeedback)}>
               <MessageSquare aria-hidden="true" /><span>{t('nav.feedback')}</span></button>
           </div>

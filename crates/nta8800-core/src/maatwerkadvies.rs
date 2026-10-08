@@ -38,6 +38,7 @@ use crate::building_performance::{
 use crate::climate::OUTDOOR_TEMPERATURE_C;
 use crate::indicators_draft::CalculationScope;
 use crate::monthly_demand::{occupants_per_dwelling, InternalGains, MonthlyDemandInput, UsageFit};
+use crate::norm_versions::{self, NormVersion};
 use crate::project_performance::assess_project_performance;
 use crate::{input_fingerprint, KERNEL_VERSION};
 use serde::{Deserialize, Serialize};
@@ -680,6 +681,10 @@ pub struct MaatwerkadviesAssessment {
     pub status: &'static str,
     pub scope: &'static str,
     pub target_norm_version: &'static str,
+    /// Edition of the base situation; every variant is calculated in it.
+    pub norm_version: NormVersion,
+    /// Only a 2025+C1:2026 advice may be registered.
+    pub registration_eligible: bool,
     pub kernel_version: &'static str,
     pub input_fingerprint: String,
     pub attest_status: &'static str,
@@ -1368,6 +1373,20 @@ fn variant_input(
         return None;
     }
     match serde_json::from_value::<BuildingPerformanceInput>(building_value) {
+        // A measure never changes the edition: all variants are compared in
+        // the base situation's edition.
+        Ok(input) if input.norm_version != norm_versions::current() => {
+            issues.push(MwaIssue {
+                code: "measure_changes_norm_version",
+                path: "measures".into(),
+                detail: Some(format!(
+                    "{} instead of the base edition {}",
+                    input.norm_version.id(),
+                    norm_versions::current().id()
+                )),
+            });
+            None
+        }
         Ok(input) => Some(input),
         Err(message) => {
             issues.push(MwaIssue {
@@ -2183,8 +2202,22 @@ fn validate(input: &MaatwerkadviesInput, issues: &mut Vec<MwaIssue>) {
     }
 }
 
+/// Edition of the base situation: the project's `ntaCalculation.normVersion`
+/// or the building input's `normVersion` (default 2025+C1:2026).
+pub fn base_norm_version(base: &MwaBase) -> NormVersion {
+    let value = match base {
+        MwaBase::Project { project } => project.pointer("/ntaCalculation/normVersion"),
+        MwaBase::Building { input } => input.get("normVersion"),
+    };
+    value
+        .filter(|value| !value.is_null())
+        .and_then(|value| serde_json::from_value(value.clone()).ok())
+        .unwrap_or_default()
+}
+
 pub fn assess_maatwerkadvies(input: &MaatwerkadviesInput) -> MaatwerkadviesAssessment {
-    let assessment = assess_unchecked(input);
+    let assessment =
+        norm_versions::with_version(base_norm_version(&input.base), || assess_unchecked(input));
     // serde would write NaN or infinity as null; withhold the results instead.
     match crate::finite::first_non_finite(&assessment) {
         None => assessment,
@@ -2215,7 +2248,9 @@ fn assess_unchecked(input: &MaatwerkadviesInput) -> MaatwerkadviesAssessment {
     let empty = |issues: Vec<MwaIssue>| MaatwerkadviesAssessment {
         status: "invalid",
         scope: SCOPE,
-        target_norm_version: crate::norm_versions::current_label(),
+        target_norm_version: norm_versions::current_label(),
+        norm_version: norm_versions::current(),
+        registration_eligible: norm_versions::current().registration_eligible(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint: fingerprint.clone(),
         attest_status: "unattested",
@@ -2515,13 +2550,17 @@ fn assess_unchecked(input: &MaatwerkadviesInput) -> MaatwerkadviesAssessment {
     let all_valid =
         measure_results.iter().all(|r| r.valid) && package_results.iter().all(|r| r.valid);
     MaatwerkadviesAssessment {
-        status: if all_valid {
+        status: if all_valid && !norm_versions::current().registration_eligible() {
+            "calculated_legacy_edition"
+        } else if all_valid {
             "calculated_unverified"
         } else {
             "partially_calculated"
         },
         scope: SCOPE,
-        target_norm_version: crate::norm_versions::current_label(),
+        target_norm_version: norm_versions::current_label(),
+        norm_version: norm_versions::current(),
+        registration_eligible: norm_versions::current().registration_eligible(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint: fingerprint,
         attest_status: "unattested",
@@ -2971,6 +3010,7 @@ mod tests {
                 },
                 daylight: Daylight::None,
                 extracted_luminaires: false,
+                constant_illuminance: None,
             }],
             source_reference: "plan".into(),
             burning_hours_factor: None,
@@ -3620,5 +3660,85 @@ mod tests {
         ] {
             assert!(codes.contains(&code), "{code}");
         }
+    }
+
+    fn edition_measure(id: &str, path: &str, value: Value) -> Measure {
+        Measure {
+            id: id.into(),
+            name: id.into(),
+            category: MeasureCategory::Other,
+            target: PatchTarget::Building,
+            patch: vec![PatchOperation::Replace {
+                path: path.into(),
+                value,
+            }],
+            investment_eur: 1000.0,
+            cost_source: "offerte".into(),
+            lifetime_years: 20.0,
+            maintenance_eur_per_year: 0.0,
+            phase_year: None,
+            specialist_note: None,
+            template: None,
+            incomplete: Vec::new(),
+        }
+    }
+
+    /// Every variant is calculated in the base situation's edition; a
+    /// measure may not change it.
+    #[test]
+    fn variants_follow_the_base_edition() {
+        let mut base = building();
+        base["normVersion"] = json!("2024");
+        let mut input = mwa(base);
+        input.measures = vec![
+            edition_measure("noop", "/areaSourceReference", json!("patched")),
+            edition_measure("edition", "/normVersion", json!("2025+C1")),
+        ];
+        let result = assess_maatwerkadvies(&input);
+        assert_eq!(result.norm_version, NormVersion::V2024);
+        assert_eq!(result.target_norm_version, "NTA 8800:2024 met INT-V1:2024");
+        assert!(!result.registration_eligible);
+        let noop = &result.measures[0];
+        assert!(noop.valid, "{:?}", noop.issues);
+        let edition = &result.measures[1];
+        assert!(!edition.valid);
+        assert!(
+            edition
+                .issues
+                .iter()
+                .any(|item| item.code == "measure_changes_norm_version"),
+            "{:?}",
+            edition.issues
+        );
+        assert_eq!(result.status, "partially_calculated");
+
+        // Only valid variants: the legacy status.
+        input.measures.truncate(1);
+        let legacy = assess_maatwerkadvies(&input);
+        assert_eq!(
+            legacy.status, "calculated_legacy_edition",
+            "{:?}",
+            legacy.issues
+        );
+        let current = assess_maatwerkadvies(&mwa(building()));
+        assert_eq!(current.status, "calculated_unverified");
+        assert_eq!(current.norm_version, NormVersion::V2025C1);
+        assert!(current.registration_eligible);
+        // The two editions give different results for the same building.
+        assert_ne!(
+            serde_json::to_value(&legacy.current).unwrap(),
+            serde_json::to_value(&current.current).unwrap()
+        );
+        assert_eq!(norm_versions::current(), NormVersion::V2025C1);
+    }
+
+    #[test]
+    fn base_edition_is_read_from_project_or_building() {
+        let project = MwaBase::Project {
+            project: json!({"ntaCalculation": {"normVersion": "2024"}}),
+        };
+        assert_eq!(base_norm_version(&project), NormVersion::V2024);
+        let building = MwaBase::Building { input: json!({}) };
+        assert_eq!(base_norm_version(&building), NormVersion::V2025C1);
     }
 }

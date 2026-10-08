@@ -145,7 +145,7 @@ describe('standalone NTA heat pump inventory', () => {
     renderWithProviders(<InventoryWithState />);
     await user.click(screen.getByRole('button', { name: 'Add heat pump' }));
     await user.selectOptions(screen.getByLabelText('Heat source'), 'surface_water');
-    await user.click(screen.getByRole('checkbox', { name: 'Woonfunctie' }));
+    await user.click(screen.getByLabelText('Woonfunctie'));
     await user.click(screen.getByRole('button', { name: 'Save' }));
     expect(screen.getByTestId('assets')).toHaveTextContent('surface_water:zone-main');
     expect(screen.getByRole('alert')).toHaveTextContent(/indicative calculator cannot include/i);
@@ -170,7 +170,7 @@ describe('standalone NTA heat pump inventory', () => {
     await user.click(screen.getByRole('button', { name: 'Add heat pump' }));
     await user.selectOptions(screen.getByLabelText('Performance evidence'), 'controlled_quality_declaration');
     await user.type(screen.getByLabelText('Quality declaration reference'), '20260214GK');
-    await user.click(screen.getByRole('checkbox', { name: 'Record registry identity' }));
+    await user.click(screen.getByLabelText('Record registry identity'));
     await user.type(screen.getByLabelText('Registration number'), '20260214GK');
     await user.click(screen.getByRole('button', { name: 'Save' }));
     expect(screen.getByRole('alert')).toHaveTextContent('Complete the declaration registration');

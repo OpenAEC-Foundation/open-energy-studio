@@ -33,7 +33,7 @@ describe('SettingsDialog', () => {
     renderWithProviders(<SettingsDialog onClose={onClose} previewSetting={{ enabled: true, onChange }} />);
     await user.click(screen.getByRole('tab', { name: 'Calculation' }));
     await user.click(screen.getByRole('switch'));
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Edition for new calculations' }), '2024');
+    await user.selectOptions(screen.getByLabelText('Edition for new calculations'), '2024');
     expect(screen.getByRole('note')).toHaveTextContent('cannot be registered');
     expect(readDefaultEdition()).toBe('2025+C1');
     await user.click(screen.getByRole('button', { name: 'OK' }));
@@ -56,8 +56,8 @@ describe('default edition', () => {
     expect(buildNtaCalculationTemplate(project)).not.toHaveProperty('normVersion');
     localStorage.setItem(DEFAULT_EDITION_KEY, '2024');
     expect(buildNtaCalculationTemplate(project)).toMatchObject({ normVersion: '2024' });
-    localStorage.setItem(DEFAULT_EDITION_KEY, '2020+A1');
-    // Not implemented by the kernel: falls back to the current edition.
+    localStorage.setItem(DEFAULT_EDITION_KEY, '2019');
+    // Not an edition of the kernel: falls back to the current edition.
     expect(readDefaultEdition()).toBe('2025+C1');
     expect(buildNtaCalculationTemplate(project)).not.toHaveProperty('normVersion');
   });

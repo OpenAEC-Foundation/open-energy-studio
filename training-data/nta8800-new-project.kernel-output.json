@@ -1,0 +1,52 @@
+{
+ "attestStatus": "unattested",
+ "derivedInput": null,
+ "gaps": [
+  {
+   "code": "nta_calculation_block_missing",
+   "path": "ntaCalculation"
+  },
+  {
+   "code": "zone_required",
+   "path": "zones"
+  }
+ ],
+ "geometry": {
+  "envelopeAreaM2": 0.0,
+  "lossAreaM2": 0.0,
+  "lossAreaRatio": null,
+  "unclassifiedSurfaceCount": 0,
+  "usableFloorAreaM2": 0.0
+ },
+ "inputFingerprint": "sha256:caae7fb4308c461d603b89ca4c090bb2503605d8b5bd81f7d1a295e3cf6e4c3c",
+ "kernelVersion": "0.1.0",
+ "labelData": {
+  "envelope": [],
+  "general": {
+   "constructionYear": null,
+   "dwellingType": null,
+   "usableFloorAreaM2": null,
+   "useFunction": "residential"
+  },
+  "installations": {
+   "coolingGenerators": [],
+   "heatingGenerator": null,
+   "heatingGenerators": [],
+   "hotWaterGenerator": null,
+   "lightingZoneCount": 0,
+   "pvSystemCount": 0,
+   "solarWaterHeaterCount": 0,
+   "solarWaterHeaterUses": [],
+   "ventilationSystems": []
+  },
+  "source": "Omgevingsregeling art. 5.13 en 5.13a (BWBR0045528, versie 2026-10-01; gegevens en verplichte elementen energielabel)"
+ },
+ "normVersion": "2025+C1",
+ "performance": null,
+ "registration": null,
+ "registrationEligible": true,
+ "schematisation": [],
+ "status": "incomplete",
+ "targetNormVersion": "NTA 8800:2025+C1:2026",
+ "warnings": []
+}

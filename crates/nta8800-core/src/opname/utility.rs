@@ -35,10 +35,8 @@ use super::ventilation::{
     apply_passive_cooling, ExchangerAnswer, MotorAnswer, PressureClass, RecoveryLayout,
     SurveyCombined, SurveyGrilleHeatingStrips, SurveyPassiveCooling, VentilationPrinciple,
 };
-use super::{
-    loss_area, AppliedDefault, MeasuredInfiltration, OpnameAssessment, OpnameIssue, Recorder,
-};
-use crate::building_performance::{assess_building_performance, BuildingPerformanceInput};
+use super::{loss_area, AppliedDefault, MeasuredInfiltration, OpnameAssessment, Recorder};
+use crate::building_performance::assess_building_performance;
 use crate::humidification::{Humidification, Humidifier, SteamCarrier};
 use crate::label_class::LabelFunction;
 use crate::monthly_demand::UsageFunction;
@@ -568,6 +566,10 @@ pub enum UtilityHotWaterGenerator {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct UtilityHotWater {
+    /// Stable id of this survey item, for evidence and photo links
+    /// (`/…/@id`); not used in the calculation. Unique within its list.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
     pub generator: UtilityHotWaterGenerator,
     /// Mean draw-off length, m; `None` unknown (> 3 m, p. 177).
     #[serde(default)]
@@ -604,6 +606,10 @@ pub struct UtilityHotWater {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct UtilityAdditionalHotWater {
+    /// Stable id of this survey item, for evidence and photo links
+    /// (`/…/@id`); not used in the calculation. Unique within its list.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
     pub generator: UtilityHotWaterGenerator,
     #[serde(default)]
     pub nominal_power_kw: Option<f64>,
@@ -746,6 +752,14 @@ fn daylight_none() -> DaylightAnswer {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct UtilitySurvey {
     pub id: String,
+    /// NTA 8800 edition to calculate with; default 2025+C1:2026. The ISSO
+    /// survey protocol is always the 2025 edition, so an older edition gives
+    /// a comparison only (`survey_protocol_edition_differs`).
+    #[serde(
+        default,
+        skip_serializing_if = "crate::norm_versions::NormVersion::is_default"
+    )]
+    pub norm_version: crate::norm_versions::NormVersion,
     pub construction_year: i32,
     #[serde(default)]
     pub renovation: Option<Renovation>,
@@ -2355,6 +2369,14 @@ fn ventilation_value(
     if combined.is_some() && vent.principle == VentilationPrinciple::Balanced {
         recorder.issue("combined_other_part_not_balanced", "ventilation.combined");
     }
+    // An entered unit year outside the range of tables 11.20/11.23 is refused
+    // here, at the survey field, instead of deep in the derived input.
+    if !crate::ventilation::manufacture_year_valid(vent.unit_manufacture_year) {
+        recorder.issue(
+            "manufacture_year_invalid",
+            "ventilation.unitManufactureYear",
+        );
+    }
     let mut recovery = None;
     if vent.principle == VentilationPrinciple::Balanced || combined.is_some() {
         let exchanger = match vent.heat_recovery {
@@ -2616,14 +2638,18 @@ fn ventilation_value(
     // Table 11.15: fan manufacture year unknown → construction year. This
     // specific rule takes precedence over the general installation-year
     // fallback (and is the conservative one).
+    // A construction year before EARLIEST_MANUFACTURE_YEAR falls in the same
+    // (oldest) rows of tables 11.20 and 11.23 as that year (2025+C1 p. 516,
+    // p. 519), so the substitute is clamped to it rather than refused.
     let fan_year = vent.unit_manufacture_year.unwrap_or_else(|| {
+        let substitute = year.max(crate::ventilation::EARLIEST_MANUFACTURE_YEAR);
         recorder.record(
             "fan_year_unknown_construction_year",
             "ventilation.fans",
-            year.to_string(),
+            substitute.to_string(),
             "ISSO 75.1 p. 154 (table 11.15; specific rule over p. 30)",
         );
-        year
+        substitute
     });
     let current = match vent.motor.unwrap_or(MotorAnswer::Unknown) {
         MotorAnswer::Ac => "ac",
@@ -2938,6 +2964,7 @@ fn hot_water_value(
     let mut system = match shared {
         Some(generator) => derive_hot_water(
             &SurveyHotWater {
+                id: None,
                 generator,
                 served: TapsServed::KitchenAndBathroom,
                 kitchen_length_m: None,
@@ -3375,6 +3402,43 @@ fn lighting_value(
 }
 
 fn validate(survey: &UtilitySurvey, recorder: &mut Recorder) {
+    // Ids of the lists without a natural key (evidence and photo links).
+    super::validate_item_ids(
+        survey
+            .heating
+            .additional_generators
+            .iter()
+            .map(|item| item.id.as_deref()),
+        "heating.additionalGenerators",
+        recorder,
+    );
+    super::validate_item_ids(
+        survey
+            .hot_water
+            .additional_generators
+            .iter()
+            .map(|item| item.id.as_deref()),
+        "hotWater.additionalGenerators",
+        recorder,
+    );
+    super::validate_item_ids(
+        survey
+            .additional_hot_water_systems
+            .iter()
+            .map(|item| item.id.as_deref()),
+        "additionalHotWaterSystems",
+        recorder,
+    );
+    for (index, system) in survey.additional_hot_water_systems.iter().enumerate() {
+        super::validate_item_ids(
+            system
+                .additional_generators
+                .iter()
+                .map(|item| item.id.as_deref()),
+            &format!("additionalHotWaterSystems[{index}].additionalGenerators"),
+            recorder,
+        );
+    }
     if survey.id.trim().is_empty() {
         recorder.issue("survey_id_required", "id");
     }
@@ -4542,23 +4606,16 @@ fn humidifier_value(survey: &UtilitySurvey, zone_id: &str) -> Option<Value> {
     }))
 }
 
-/// Survey → kernel input → building performance (utility).
+/// Survey → kernel input → building performance (utility), in the
+/// survey's edition.
 pub fn assess_utility_survey(survey: &UtilitySurvey) -> OpnameAssessment {
+    crate::norm_versions::with_version(survey.norm_version, || assess_utility_in_edition(survey))
+}
+
+fn assess_utility_in_edition(survey: &UtilitySurvey) -> OpnameAssessment {
     let mut recorder = Recorder::default();
     let derived = derive_utility_input(survey, &mut recorder);
-    let derived_input =
-        derived.and_then(
-            |value| match serde_json::from_value::<BuildingPerformanceInput>(value) {
-                Ok(input) => Some(input),
-                Err(error) => {
-                    recorder.issues.push(OpnameIssue {
-                        code: "derived_input_shape_invalid",
-                        path: error.to_string(),
-                    });
-                    None
-                }
-            },
-        );
+    let derived_input = super::parse_derived_input(derived, survey.norm_version, &mut recorder);
     let performance = derived_input.as_ref().map(assess_building_performance);
     remap_sources(&mut recorder.applied);
     super::apply_collapse_reasons(&mut recorder, &survey.collapse_reasons);
@@ -4569,10 +4626,14 @@ pub fn assess_utility_survey(survey: &UtilitySurvey) -> OpnameAssessment {
         None => "invalid",
     };
     super::surface_rejection(status, performance.as_ref(), &mut recorder.issues);
+    let status = super::edition_status(status, survey.norm_version, &mut recorder);
     super::refuse_non_finite(OpnameAssessment {
         status,
         scope: "isso_75_1_basisopname_utility_unverified",
         source: ISSO_UTILITY_SOURCE,
+        target_norm_version: survey.norm_version.label(),
+        norm_version: survey.norm_version,
+        registration_eligible: survey.norm_version.registration_eligible(),
         applied_defaults: recorder.applied,
         warnings: recorder.warnings,
         issues: recorder.issues,
@@ -4626,6 +4687,7 @@ mod tests {
             };
             survey.heating.additional_generators =
                 vec![super::super::heating::AdditionalHeatingGenerator {
+                    id: None,
                     generator: super::super::heating::HeatingGenerator::Boiler {
                         boiler_type: super::super::heating::BoilerType::Hr107,
                         pilot_flame: Some(false),
@@ -4709,6 +4771,7 @@ mod tests {
         survey.hot_water.storage.clear();
         survey.hot_water.nominal_power_kw = Some(30.0);
         survey.hot_water.additional_generators = vec![UtilityAdditionalHotWater {
+            id: None,
             generator: UtilityHotWaterGenerator::ElectricInstantaneous,
             nominal_power_kw: Some(10.0),
         }];
@@ -4745,6 +4808,7 @@ mod tests {
             low_temperature: false,
         };
         survey.heating.additional_generators = vec![AdditionalHeatingGenerator {
+            id: None,
             generator: HeatingGenerator::Boiler {
                 boiler_type: BoilerType::Hr107,
                 pilot_flame: Some(false),
@@ -5061,6 +5125,8 @@ mod tests {
             source_temperature_c: None,
             source_temperature_reference: None,
             source_quality_declaration_reference: None,
+            manufacture_year: None,
+            installation_year: None,
         };
         let (input, _) = derive(&survey);
         let forfait = &input["spaceHeating"]["generator"]["forfait"];
@@ -5092,6 +5158,8 @@ mod tests {
             source_temperature_c: None,
             source_temperature_reference: None,
             source_quality_declaration_reference: None,
+            manufacture_year: None,
+            installation_year: None,
         };
         let (input, _) = derive(&survey);
         let generator = &input["spaceHeating"]["generator"];
@@ -6418,6 +6486,33 @@ mod tests {
         assert!(applied(&recorder, "ahu_cooling_from_direct_expansion"));
     }
 
+    /// Review 3: a utility building from before 1900 with an unknown fan year
+    /// gets the clamped substitute 1900 (tables 11.20 and 11.23 have the same
+    /// oldest row, 2025+C1 p. 516, p. 519), which the kernel accepts.
+    #[test]
+    fn utility_survey_before_1900_clamps_the_substituted_fan_year() {
+        let mut survey = fixture("1985");
+        survey.construction_year = 1899;
+        survey.ventilation.principle = VentilationPrinciple::MechanicalExtract;
+        survey.ventilation.unit_manufacture_year = None;
+        survey.ventilation.ahu = None;
+        let (input, _) = derive(&survey);
+        let ventilation = &input["spaceHeating"]["demand"]["ventilation"];
+        assert_eq!(ventilation["fans"]["manufactureYear"], 1900);
+        let parsed: crate::ventilation::VentilationInput =
+            serde_json::from_value(ventilation.clone()).expect("kernel input");
+        assert!(crate::ventilation::validate_ventilation(&parsed).is_empty());
+        // An entered unit year outside the tables is refused at the survey field.
+        survey.ventilation.unit_manufacture_year = Some(1850);
+        let mut recorder = Recorder::default();
+        let _ = derive_utility_input(&survey, &mut recorder);
+        assert!(recorder
+            .issues
+            .iter()
+            .any(|issue| issue.code == "manufacture_year_invalid"
+                && issue.path == "ventilation.unitManufactureYear"));
+    }
+
     #[test]
     fn utility_ventilation_options_of_chapter_11() {
         let mut survey = fixture("1985");
@@ -6787,5 +6882,35 @@ mod tests {
             Some("unit closed")
         );
         assert!(recorder.warnings.is_empty());
+    }
+
+    #[test]
+    fn utility_survey_is_calculated_in_its_edition() {
+        use crate::norm_versions::NormVersion;
+        let current = assess_utility_survey(&fixture("1985"));
+        let mut survey = fixture("1985");
+        survey.norm_version = NormVersion::V2024;
+        let legacy = assess_utility_survey(&survey);
+        assert_eq!(
+            current.status, "calculated_unverified",
+            "{:?}",
+            current.issues
+        );
+        assert!(current.registration_eligible);
+        assert_eq!(
+            legacy.status, "calculated_legacy_edition",
+            "{:?}",
+            legacy.issues
+        );
+        assert_eq!(legacy.norm_version, NormVersion::V2024);
+        assert!(!legacy.registration_eligible);
+        assert!(legacy
+            .warnings
+            .iter()
+            .any(|item| item.code == "survey_protocol_edition_differs"));
+        let then = legacy.performance.as_ref().unwrap();
+        assert_eq!(then.norm_version, NormVersion::V2024);
+        assert!(current.performance.as_ref().unwrap().chapter5.is_some());
+        assert!(then.chapter5.is_none());
     }
 }

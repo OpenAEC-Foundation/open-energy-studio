@@ -555,6 +555,14 @@ pub fn derive_ventilation(
     if combined.is_some() && survey.principle == VentilationPrinciple::Balanced {
         recorder.issue("combined_other_part_not_balanced", "ventilation.combined");
     }
+    // An entered unit year outside the range of tables 11.20/11.23 is refused
+    // here, at the survey field, instead of deep in the derived input.
+    if !crate::ventilation::manufacture_year_valid(survey.unit_manufacture_year) {
+        recorder.issue(
+            "manufacture_year_invalid",
+            "ventilation.unitManufactureYear",
+        );
+    }
     let recovery_unit = survey.principle == VentilationPrinciple::Balanced || combined.is_some();
     let exchanger = if recovery_unit {
         exchanger_kind(survey.heat_recovery, recorder)
@@ -650,14 +658,18 @@ pub fn derive_ventilation(
     // Table 11.15: fan manufacture year unknown → construction year. This
     // specific rule takes precedence over the general installation-year
     // fallback (and is the conservative one).
+    // A construction year before EARLIEST_MANUFACTURE_YEAR falls in the same
+    // (oldest) rows of tables 11.20 and 11.23 as that year (2025+C1 p. 516,
+    // p. 519), so the substitute is clamped to it rather than refused.
     let fan_year = survey.unit_manufacture_year.unwrap_or_else(|| {
+        let substitute = construction_year.max(crate::ventilation::EARLIEST_MANUFACTURE_YEAR);
         recorder.record(
             "fan_year_unknown_construction_year",
             "ventilation.fans",
-            construction_year.to_string(),
+            substitute.to_string(),
             "ISSO 82.1 p. 154 (table 11.15; specific rule over p. 28)",
         );
-        construction_year
+        substitute
     });
     let current = match survey.motor.unwrap_or(MotorAnswer::Unknown) {
         MotorAnswer::Ac => "ac",
@@ -1097,5 +1109,66 @@ mod tests {
         assert_eq!(bypass(&wtw, 2015), json!({"kind": "none"}));
         wtw.unit_manufacture_year = None;
         assert_eq!(bypass(&wtw, 2015), json!({"kind": "none"}));
+    }
+
+    /// Review 3: a survey from before 1900 substitutes its construction year
+    /// for an unknown fan year (table 11.15). Tables 11.20 and 11.23 put
+    /// every such year in their oldest row (2025+C1 p. 516, p. 519), so the
+    /// substitute is clamped to 1900 and the kernel accepts it.
+    #[test]
+    fn survey_before_1900_clamps_the_substituted_fan_year() {
+        for year in [1899, 1800, 1650] {
+            let mut recorder = Recorder::default();
+            let input = derive_ventilation(
+                &survey(VentilationPrinciple::MechanicalExtract),
+                DwellingKind::SingleFamily,
+                year,
+                None,
+                100.0,
+                9.0,
+                false,
+                "pitched_roof_terraced",
+                None,
+                &mut recorder,
+            )
+            .input;
+            assert!(recorder.issues.is_empty(), "{year}: {:?}", recorder.issues);
+            assert_eq!(input["fans"]["manufactureYear"], 1900, "{year}");
+            let parsed: crate::ventilation::VentilationInput =
+                serde_json::from_value(input).expect("kernel input");
+            let issues = crate::ventilation::validate_ventilation(&parsed);
+            assert!(
+                issues
+                    .iter()
+                    .all(|issue| issue.code != "manufacture_year_invalid"),
+                "{year}: {issues:?}"
+            );
+            // The kernel's own infiltration rule (constructionYear from 1800)
+            // is unchanged; within it the survey now calculates.
+            if year >= 1800 {
+                assert!(issues.is_empty(), "{year}: {issues:?}");
+            }
+        }
+        // From 1900 on the construction year itself is used.
+        assert_eq!(
+            derive(&survey(VentilationPrinciple::MechanicalExtract), 1975)["fans"]
+                ["manufactureYear"],
+            1975
+        );
+    }
+
+    #[test]
+    fn entered_unit_year_outside_the_tables_is_a_survey_issue() {
+        let mut entered = survey(VentilationPrinciple::MechanicalExtract);
+        entered.unit_manufacture_year = Some(1850);
+        let (_, recorder) = derive_with(&entered);
+        assert!(recorder
+            .issues
+            .iter()
+            .any(|issue| issue.code == "manufacture_year_invalid"
+                && issue.path == "ventilation.unitManufactureYear"));
+        entered.unit_manufacture_year = Some(1990);
+        let (_, recorder) = derive_with(&entered);
+        assert!(recorder.issues.is_empty());
     }
 }

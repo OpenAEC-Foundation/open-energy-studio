@@ -126,6 +126,12 @@ pub fn assess_forfait_heat_pump_monthly_draft(
     if lookup.status == "invalid" || lookup.corrected_cop.is_none() {
         issues.push(issue("forfait_lookup_invalid", "forfait"));
     }
+    // An input the chosen edition lacks keeps its own code.
+    for item in &lookup.issues {
+        if item.code == "route_not_in_edition" {
+            issues.push(issue(item.code, format!("forfait.{}", item.path)));
+        }
+    }
     if input.generator_output_reference.trim().is_empty() {
         issues.push(issue("source_required", "generatorOutputReference"));
     }
@@ -346,6 +352,9 @@ mod tests {
         assert!(invalid.monthly.is_empty());
     }
 
+    /// A correction that would drive the generator input to overflow (here
+    /// 10⁻³⁰⁸) is no annex V value (1,00, 1,02 or 1,04); the lookup refuses
+    /// it, so no monthly value is formed.
     #[test]
     fn generator_input_overflow_suppresses_all_monthly_values() {
         let mut input = sample("ground", SourceSystem::Individual);
@@ -358,6 +367,6 @@ mod tests {
         assert!(invalid
             .issues
             .iter()
-            .any(|item| item.code == "generator_input_invalid"));
+            .any(|item| item.code == "forfait_lookup_invalid"));
     }
 }

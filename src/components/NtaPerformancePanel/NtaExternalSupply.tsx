@@ -519,20 +519,21 @@ export function AnnexPRouteFields({ draft, change, base, fn, label }: SectionPro
 
 /** §5.8 / annex P: the external-supply block of the NTA input. */
 /**
- * INT-V1:2024: a collective heat-pump source realised from 2013 on. Only the 2024
- * edition has this input; under another edition a value left behind is offered
+ * 9.6.8.1.1.2.3: a collective heat-pump source realised from 2013 on. Only the 2023
+ * (p. 349) and 2024 (INT-V1:2024) editions have this input; under another edition a value left behind is offered
  * for removal (the kernel reports it as route_not_in_edition).
  */
 export function RealisedFrom2013Field({ draft, change, path }: SectionProps & { path: Path }) {
   const { t } = useI18n();
   const value = read(draft, path);
-  if (read(draft, ['normVersion']) === '2024') {
+  const edition = read(draft, ['normVersion']);
+  if (edition === '2024' || edition === '2023') {
     return <TriStateField draft={draft} onChange={change} path={path} label={t('ntaStep.realisedFrom2013')}
       yes={t('nta.form.yes')} no={t('nta.form.no')} />;
   }
   if (value == null) return null;
   return <p className="nta-form-note nta-form-error" role="alert">
-    {t('ntaStep.staleEdition', { field: t('ntaStep.realisedFrom2013') })}{' '}
+    {t('ntaStep.staleEdition2023And2024', { field: t('ntaStep.realisedFrom2013') })}{' '}
     <button type="button" onClick={() => change(path, undefined)}>{t('nta.form.remove')}</button>
   </p>;
 }

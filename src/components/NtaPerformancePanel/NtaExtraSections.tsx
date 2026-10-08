@@ -1,3 +1,5 @@
+import { DistributionShell2023Field } from './NtaEdition2023Fields';
+import { ConstantIlluminance2022Field } from './NtaEdition2022Fields';
 import { useI18n } from '../../i18n/i18n';
 import type { IProject } from '../../core/energy/types';
 import { distributionSystemTemplate, lightingTemplate } from '../../core/nta/NtaFormModels';
@@ -112,6 +114,7 @@ export function NtaLightingSection({ draft, change, project, measureOnly = false
         {read(draft, ['lighting', 0, 'lightingZones', index, 'daylight', 'method']) === 'sectors' &&
           <DaylightSectorsFields draft={draft} change={change} base={['lighting', 0, 'lightingZones', index, 'daylight']} />}
         <CheckField {...field} path={['lighting', 0, 'lightingZones', index, 'extractedLuminaires']} label={t('nta.light.extracted')} />
+        <ConstantIlluminance2022Field draft={draft} change={change} path={['lighting', 0, 'lightingZones', index, 'constantIlluminance']} />
         {!measureOnly && zones.length > 1 && <button type="button" className="nta-form-remove"
           onClick={() => change(['lighting', 0, 'lightingZones'], zones.filter((__, other) => other !== index))}>{t('nta.form.remove')}</button>}
       </div>)}
@@ -165,6 +168,7 @@ export function NtaDistributionFields({ draft, change }: SectionProps) {
         {pipe === 'insulated' && <SelectField {...field} path={['distributionSystem', 'pipeTransmittance', 'insulation', 'period']}
           label={t('nta.dist.pipePeriod')} options={[['from1995', '≥ 1995'], ['from1980_to1995', '1980–1995'], ['before1980_or_unknown', t('nta.dist.before1980')]]} />}
         <CheckField {...field} path={['distributionSystem', 'valvesInsulated']} label={t('nta.dist.valves')} />
+        <DistributionShell2023Field draft={draft} change={change} />
         <NumberField {...field} path={['distributionSystem', 'actualPipeLengthM']} label={t('nta.dist.pipeLength')} />
         <NumberField {...field} path={['distributionSystem', 'unheatedPipeLengthM']} label={t('nta.dist.unheatedLength')} />
       </>}

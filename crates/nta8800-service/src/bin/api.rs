@@ -8,11 +8,16 @@
 //! | `--port PORT` | `OES_API_PORT` | `3007` |
 //! | `--cors-origin ORIGIN` (repeatable, `*` for any) | `OES_API_CORS_ORIGINS` (comma separated) | none |
 //! | `--body-limit-mb N` | `OES_API_BODY_LIMIT_MB` | `16` |
+//! | `--max-calculations N` | `OES_API_MAX_CALCULATIONS` | number of cores (at most 1024) |
+//! | `--max-waiting N` | `OES_API_MAX_WAITING` | twice the calculations |
+//! | `--queue-timeout-s N` | `OES_API_QUEUE_TIMEOUT_S` | `30` |
+//! | `--calculation-timeout-s N` | `OES_API_CALCULATION_TIMEOUT_S` | `120` |
 //! | `--log` / `--no-log` | `OES_API_LOG` (`1`/`0`) | on |
 //!
 //! SIGINT and SIGTERM stop accepting connections and let running requests finish.
 
 use std::net::{IpAddr, SocketAddr};
+use std::time::Duration;
 
 use nta8800_service::HttpConfig;
 
@@ -22,7 +27,7 @@ struct Options {
     http: HttpConfig,
 }
 
-const USAGE: &str = "usage: api [--bind ADDR] [--port PORT] [--cors-origin ORIGIN]... [--body-limit-mb N] [--log|--no-log] [--version]";
+const USAGE: &str = "usage: api [--bind ADDR] [--port PORT] [--cors-origin ORIGIN]... [--body-limit-mb N] [--max-calculations N] [--max-waiting N] [--queue-timeout-s N] [--calculation-timeout-s N] [--log|--no-log] [--version]";
 
 fn parse(args: Vec<String>) -> Result<Options, String> {
     let env = |key: &str| {
@@ -41,6 +46,12 @@ fn parse(args: Vec<String>) -> Result<Options, String> {
         })
         .unwrap_or_default();
     let mut limit = env("OES_API_BODY_LIMIT_MB").unwrap_or_else(|| "16".into());
+    let mut calculations = env("OES_API_MAX_CALCULATIONS").unwrap_or_else(|| {
+        nta8800_service::http::default_max_concurrent_calculations().to_string()
+    });
+    let mut waiting = env("OES_API_MAX_WAITING");
+    let mut queue_timeout = env("OES_API_QUEUE_TIMEOUT_S").unwrap_or_else(|| "30".into());
+    let mut timeout = env("OES_API_CALCULATION_TIMEOUT_S").unwrap_or_else(|| "120".into());
     let mut log = env("OES_API_LOG").map(|value| value != "0").unwrap_or(true);
     let mut iter = args.into_iter();
     while let Some(arg) = iter.next() {
@@ -50,6 +61,10 @@ fn parse(args: Vec<String>) -> Result<Options, String> {
             "--port" => port = value("--port")?,
             "--cors-origin" => origins.push(value("--cors-origin")?),
             "--body-limit-mb" => limit = value("--body-limit-mb")?,
+            "--max-calculations" => calculations = value("--max-calculations")?,
+            "--max-waiting" => waiting = Some(value("--max-waiting")?),
+            "--queue-timeout-s" => queue_timeout = value("--queue-timeout-s")?,
+            "--calculation-timeout-s" => timeout = value("--calculation-timeout-s")?,
             "--log" => log = true,
             "--no-log" => log = false,
             "--help" | "-h" => return Err(USAGE.to_string()),
@@ -65,6 +80,33 @@ fn parse(args: Vec<String>) -> Result<Options, String> {
         .ok()
         .filter(|mb: &usize| (1..=1024).contains(mb))
         .ok_or(format!("invalid body limit {limit} (1–1024 MB)"))?;
+    let calculations: usize = calculations
+        .parse()
+        .ok()
+        .filter(|n: &usize| (1..=nta8800_service::http::MAX_CALCULATION_SLOTS).contains(n))
+        .ok_or(format!(
+            "invalid number of calculations {calculations} (1–1024)"
+        ))?;
+    let waiting: usize = match waiting {
+        None => calculations * 2,
+        Some(waiting) => waiting
+            .parse()
+            .ok()
+            .filter(|n: &usize| *n <= 65_536)
+            .ok_or(format!(
+                "invalid number of waiting requests {waiting} (0–65536)"
+            ))?,
+    };
+    let queue_timeout: u64 = queue_timeout
+        .parse()
+        .ok()
+        .filter(|s: &u64| (1..=86_400).contains(s))
+        .ok_or(format!("invalid queue timeout {queue_timeout} (1–86400 s)"))?;
+    let timeout: u64 = timeout
+        .parse()
+        .ok()
+        .filter(|s: &u64| (1..=86_400).contains(s))
+        .ok_or(format!("invalid calculation timeout {timeout} (1–86400 s)"))?;
     Ok(Options {
         bind,
         port,
@@ -72,6 +114,10 @@ fn parse(args: Vec<String>) -> Result<Options, String> {
             body_limit_bytes: limit * 1024 * 1024,
             cors_origins: origins,
             log_requests: log,
+            max_concurrent_calculations: calculations,
+            max_waiting_requests: waiting,
+            queue_timeout: Duration::from_secs(queue_timeout),
+            calculation_timeout: Duration::from_secs(timeout),
         },
     })
 }
@@ -161,6 +207,14 @@ mod tests {
                 "http://localhost:5173",
                 "--body-limit-mb",
                 "2",
+                "--max-calculations",
+                "3",
+                "--max-waiting",
+                "0",
+                "--queue-timeout-s",
+                "5",
+                "--calculation-timeout-s",
+                "30",
                 "--no-log",
             ]
             .iter()
@@ -176,6 +230,22 @@ mod tests {
         );
         assert_eq!(options.http.body_limit_bytes, 2 * 1024 * 1024);
         assert!(!options.http.log_requests);
+        assert_eq!(options.http.max_concurrent_calculations, 3);
+        assert_eq!(options.http.calculation_timeout.as_secs(), 30);
+        assert_eq!(options.http.max_waiting_requests, 0);
+        assert_eq!(options.http.queue_timeout.as_secs(), 5);
+    }
+
+    #[test]
+    fn defaults_are_within_the_accepted_ranges() {
+        let defaults = nta8800_service::HttpConfig::default();
+        assert!((1..=nta8800_service::http::MAX_CALCULATION_SLOTS)
+            .contains(&defaults.max_concurrent_calculations));
+        assert_eq!(
+            defaults.max_waiting_requests,
+            defaults.max_concurrent_calculations * 2
+        );
+        assert!(defaults.queue_timeout < defaults.calculation_timeout);
     }
 
     #[test]
@@ -183,5 +253,10 @@ mod tests {
         assert!(parse(vec!["--port".into(), "x".into()]).is_err());
         assert!(parse(vec!["--body-limit-mb".into(), "0".into()]).is_err());
         assert!(parse(vec!["--frobnicate".into()]).is_err());
+        assert!(parse(vec!["--max-calculations".into(), "0".into()]).is_err());
+        assert!(parse(vec!["--calculation-timeout-s".into(), "0".into()]).is_err());
+        assert!(parse(vec!["--queue-timeout-s".into(), "0".into()]).is_err());
+        assert!(parse(vec!["--max-waiting".into(), "-1".into()]).is_err());
+        assert!(parse(vec!["--max-waiting".into(), "70000".into()]).is_err());
     }
 }

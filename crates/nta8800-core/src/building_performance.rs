@@ -478,8 +478,9 @@ fn resolve_external(
         },
         // NTA 8800:2024 9.6.3.1.3 (p. 323): without a declaration the
         // source heat takes table 5.2 (p. 93) for external heat.
-        None if norm_versions::profile().heat_pump_source_route
-            == norm_versions::HeatPumpSourceRoute::AnySourceFrom15C2024 =>
+        None if norm_versions::profile()
+            .heat_pump_source_route
+            .books_table_sources() =>
         {
             Some(ScenarioFactors {
                 declared: heat_forfait(),
@@ -1370,6 +1371,62 @@ impl BuildingPerformanceInput {
 }
 
 /// §5.7.1 system class against the calculated cooling generators.
+/// Ids of the zones the active-cooling evidence covers (§10.2: the zones a
+/// calculated system serves, or every zone with declared cooling).
+fn actively_cooled_zone_ids(input: &BuildingPerformanceInput) -> Vec<&str> {
+    input
+        .zone_ids()
+        .into_iter()
+        .filter(|id| !input.has_cooling() || input.zone_cooled(id))
+        .collect()
+}
+
+/// Annex AA is determined per cooled rekenzone (2025+C1 p. 1135). With more
+/// than one cooled zone every calculation names its zone, once.
+fn annex_aa_zone_issues(input: &BuildingPerformanceInput) -> Vec<PerformanceIssue> {
+    let Some(ActiveCoolingEvidence {
+        capacity:
+            crate::tojuli::CoolingCapacityEvidence::AnnexAa {
+                calculation,
+                zone_calculations,
+                ..
+            },
+        ..
+    }) = &input.active_cooling
+    else {
+        return Vec::new();
+    };
+    let cooled = actively_cooled_zone_ids(input);
+    let calculations = calculation
+        .iter()
+        .map(|aa| (aa, "activeCooling.capacity.calculation".to_string()))
+        .chain(zone_calculations.iter().enumerate().map(|(index, aa)| {
+            (
+                aa,
+                format!("activeCooling.capacity.zoneCalculations[{index}]"),
+            )
+        }));
+    let mut issues = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    for (aa, path) in calculations {
+        match aa.zone_id.as_deref() {
+            None if cooled.len() > 1 => {
+                issues.push(issue("annex_aa_zone_id_required", format!("{path}.zoneId")))
+            }
+            None => {}
+            Some(zone) if !cooled.contains(&zone) => {
+                issues.push(issue("annex_aa_zone_unknown", format!("{path}.zoneId")))
+            }
+            // The first calculation of a zone counts; a second one is a duplicate.
+            Some(zone) if !seen.insert(zone) => {
+                issues.push(issue("annex_aa_zone_duplicate", format!("{path}.zoneId")))
+            }
+            Some(_) => {}
+        }
+    }
+    issues
+}
+
 fn active_cooling_matches(
     system: crate::tojuli::ActiveCoolingSystem,
     cooling: &CoolingSystem,
@@ -1976,7 +2033,8 @@ fn validate_edition(input: &BuildingPerformanceInput, issues: &mut Vec<Performan
         issues.push(issue("route_not_in_edition", "bacsFactor"));
     }
     // EER_bron of 9.6.8.1.1.2.3 exists in NTA 8800:2024 only (p. 346).
-    if profile.heat_pump_source_route != norm_versions::HeatPumpSourceRoute::AnySourceFrom15C2024
+    // Also in NTA 8800:2023 (p. 349).
+    if !profile.heat_pump_source_route.books_table_sources()
         && input
             .external_supply
             .collective_heat_pump_source
@@ -2168,9 +2226,12 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
             .heat_pump()
             .is_some_and(|(_, source)| source != SourceSystem::Individual)
     });
-    // NTA 8800:2024 (p. 323): any table source of at least 15 °C books its heat.
-    let warm_source_2024 = norm_versions::profile().heat_pump_source_route
-        == norm_versions::HeatPumpSourceRoute::AnySourceFrom15C2024
+    // NTA 8800:2024 (p. 323): any table source of at least 15 °C books its
+    // heat; NTA 8800:2023 books it from 20 °C (p. 326) and keeps EER_bron
+    // of the declared 15–20 °C source (p. 349).
+    let warm_source_2024 = norm_versions::profile()
+        .heat_pump_source_route
+        .books_table_sources()
         && input.heating_systems().into_iter().any(|system| {
             system.generator.heat_pump().is_some_and(|(forfait, _)| {
                 matches!(
@@ -2445,6 +2506,7 @@ fn validate(input: &BuildingPerformanceInput, issues: &mut Vec<PerformanceIssue>
             "activeCooling",
         ));
     }
+    issues.extend(annex_aa_zone_issues(input));
     if !input.lighting.is_empty() {
         if residential {
             // 14.2.1: W_L;spec = 0 for the indicators of dwellings.
@@ -3583,6 +3645,7 @@ fn assess_in_edition(input: &BuildingPerformanceInput) -> BuildingPerformanceAss
                         // Q_C;ls;rbl: chapter 10 has no recoverable cooling
                         // losses (L_C;zi = 0, pump heat goes to the load).
                         cooling_recoverable_july_kwh: 0.0,
+                        cooled_zone_count: actively_cooled_zone_ids(input).len(),
                     },
                 )
             })
@@ -3729,7 +3792,8 @@ fn assess_in_edition(input: &BuildingPerformanceInput) -> BuildingPerformanceAss
             let external = delivered(&["dh", "dw", "dc"]) * 3.6 / 1000.0;
             // 5.19a names ci ≠ el, dh; dw and dc are in 5.18a already.
             let other = delivered(&["gas", "oil", "bm"]) * 3.6 / 35.17;
-            let renovation = if residential {
+            // Table 5.7 does not exist in NTA 8800:2023 (p. 70–72).
+            let renovation = if residential || !norm_versions::profile().renovation_standard {
                 None
             } else {
                 renovation_standard(&label_functions)
@@ -4042,8 +4106,10 @@ fn compute(
         16.0
     };
     let source_aux_kwh = |index: usize| -> f64 {
-        if norm_versions::profile().heat_pump_source_route
-            != norm_versions::HeatPumpSourceRoute::AnySourceFrom15C2024
+        // 9.6.8.1.1.2.3: 2024 p. 346 and NTA 8800:2023 p. 349.
+        if !norm_versions::profile()
+            .heat_pump_source_route
+            .books_table_sources()
         {
             return 0.0;
         }
@@ -5210,6 +5276,8 @@ mod tests {
         let mut sample = input();
         sample.norm_version = NormVersion::V2024;
         let forfait = crate::forfait_heat_pump_draft::ForfaitHeatPumpDraftInput {
+            installation_year: None,
+            installation_year_reference: None,
             generator_id: "hp".into(),
             classification_source_reference: "system design".into(),
             scope: crate::forfait_heat_pump_draft::TableScope::ResidentialAtMost25Kw,
@@ -5301,6 +5369,8 @@ mod tests {
         use crate::annex_p::SourceTemperatureClass;
         let mut sample = input();
         let forfait = crate::forfait_heat_pump_draft::ForfaitHeatPumpDraftInput {
+            installation_year: None,
+            installation_year_reference: None,
             generator_id: "hp".into(),
             classification_source_reference: "system design".into(),
             scope: crate::forfait_heat_pump_draft::TableScope::ResidentialAtMost25Kw,
@@ -5378,6 +5448,8 @@ mod tests {
     fn heat_pump_ambient_heat_counts_as_renewable() {
         let mut sample = input();
         let forfait = crate::forfait_heat_pump_draft::ForfaitHeatPumpDraftInput {
+            installation_year: None,
+            installation_year_reference: None,
             generator_id: "hp".into(),
             classification_source_reference: "system design".into(),
             scope: crate::forfait_heat_pump_draft::TableScope::ResidentialAtMost25Kw,
@@ -5494,6 +5566,7 @@ mod tests {
         sample.on_site_production.clear();
         let base = assess_building_performance(&sample);
         sample.space_heating.generator = Generator::Chp(ChpGenerator {
+            declared_efficiencies: None,
             chp: Some(crate::space_cooling::ChpClass {
                 power_kw: 50.0,
                 built_after_2006: true,
@@ -5825,6 +5898,7 @@ mod tests {
             .declared_uses
             .retain(|item| item.service != Service::DomesticHotWater);
         sample.space_heating.generator = Generator::Chp(crate::space_heating_chain::ChpGenerator {
+            declared_efficiencies: None,
             chp: None,
             method1: Some(product.clone()),
             auxiliary: None,
@@ -5845,6 +5919,7 @@ mod tests {
             emission: HotWaterEmission::Residential {
                 served: ServedTaps::KitchenAndBathroom,
                 kitchen_length_m: Some(1.0),
+                kitchen_pipe_diameter: None,
                 bathroom_length_m: Some(1.0),
                 source_reference: "drawing".into(),
             },
@@ -5944,6 +6019,7 @@ mod tests {
             outer_diameter_mm: None,
             insulation: PipeInsulation::None,
             declared_psi_w_per_mk: None,
+            calculated_psi: None,
             fittings_insulated: false,
             length_m: None,
             unheated_length_m: None,
@@ -5969,6 +6045,7 @@ mod tests {
             emission: HotWaterEmission::Residential {
                 served: ServedTaps::KitchenAndBathroom,
                 kitchen_length_m: Some(1.0),
+                kitchen_pipe_diameter: None,
                 bathroom_length_m: Some(1.0),
                 source_reference: "drawing".into(),
             },
@@ -6037,6 +6114,7 @@ mod tests {
             emission: HotWaterEmission::Residential {
                 served: ServedTaps::KitchenAndBathroom,
                 kitchen_length_m: Some(1.0),
+                kitchen_pipe_diameter: None,
                 bathroom_length_m: Some(1.0),
                 source_reference: "drawing".into(),
             },
@@ -6107,6 +6185,7 @@ mod tests {
             emission: HotWaterEmission::Residential {
                 served: ServedTaps::KitchenAndBathroom,
                 kitchen_length_m: Some(1.0),
+                kitchen_pipe_diameter: None,
                 bathroom_length_m: Some(1.0),
                 source_reference: "drawing".into(),
             },
@@ -6177,6 +6256,7 @@ mod tests {
             emission: HotWaterEmission::Residential {
                 served: ServedTaps::KitchenAndBathroom,
                 kitchen_length_m: Some(1.0),
+                kitchen_pipe_diameter: None,
                 bathroom_length_m: Some(1.0),
                 source_reference: "drawing".into(),
             },
@@ -6327,6 +6407,8 @@ mod tests {
         use crate::domestic_hot_water::HotWaterGenerator;
         let mut sample = input();
         let forfait = crate::forfait_heat_pump_draft::ForfaitHeatPumpDraftInput {
+            installation_year: None,
+            installation_year_reference: None,
             generator_id: "hp".into(),
             classification_source_reference: "system design".into(),
             scope: crate::forfait_heat_pump_draft::TableScope::ResidentialAtMost25Kw,
@@ -6405,6 +6487,7 @@ mod tests {
             emission: HotWaterEmission::Residential {
                 served: ServedTaps::KitchenAndBathroom,
                 kitchen_length_m: Some(1.0),
+                kitchen_pipe_diameter: None,
                 bathroom_length_m: Some(1.0),
                 source_reference: "drawing".into(),
             },
@@ -6487,6 +6570,7 @@ mod tests {
         bathroom.emission = HotWaterEmission::Residential {
             served: ServedTaps::BathroomOnly,
             kitchen_length_m: None,
+            kitchen_pipe_diameter: None,
             bathroom_length_m: Some(1.0),
             source_reference: "drawing".into(),
         };
@@ -6501,6 +6585,7 @@ mod tests {
         kitchen.emission = HotWaterEmission::Residential {
             served: ServedTaps::KitchenOnly,
             kitchen_length_m: Some(1.0),
+            kitchen_pipe_diameter: None,
             bathroom_length_m: None,
             source_reference: "drawing".into(),
         };
@@ -6773,6 +6858,8 @@ mod tests {
         sample.space_heating.generator = Generator::HeatPumpForfait(HeatPumpGenerator {
             regeneration: None,
             forfait: crate::forfait_heat_pump_draft::ForfaitHeatPumpDraftInput {
+                installation_year: None,
+                installation_year_reference: None,
                 generator_id: "hp".into(),
                 classification_source_reference: "system design".into(),
                 scope: crate::forfait_heat_pump_draft::TableScope::UtilityCollectiveOrOver25Kw,
@@ -7071,6 +7158,7 @@ mod tests {
             insulation: PipeInsulation::None,
             fittings_insulated: false,
             declared_psi_w_per_mk: Some(0.3),
+            calculated_psi: None,
             connected_dwellings: Some(1),
             floor_count: 1,
             sport_hall_area_m2: 0.0,
@@ -7145,6 +7233,7 @@ mod tests {
                     label: StorageLabel::C,
                 },
                 connection_factor: 1,
+                electric_boiler_insulated_pipe: false,
                 in_heated_zone: true,
                 unheated_ambient_c: None,
                 not_in_appliance_test: false,
@@ -7316,6 +7405,7 @@ mod tests {
                 control: CoolingControl::CentralWithRoomControl,
                 fan_coil_count: 0,
                 source_reference: "design".into(),
+                edition2023: None,
             },
             distribution: None,
             generators: vec![CoolingGenerator {
@@ -7483,6 +7573,8 @@ mod tests {
         system.generator = Generator::HeatPumpForfait(HeatPumpGenerator {
             regeneration: None,
             forfait: crate::forfait_heat_pump_draft::ForfaitHeatPumpDraftInput {
+                installation_year: None,
+                installation_year_reference: None,
                 generator_id: "hp".into(),
                 classification_source_reference: "system design".into(),
                 scope: crate::forfait_heat_pump_draft::TableScope::ResidentialAtMost25Kw,
@@ -7544,6 +7636,8 @@ mod tests {
         use crate::space_heating_chain::ChainZone;
         let mut sample = input();
         let forfait = crate::forfait_heat_pump_draft::ForfaitHeatPumpDraftInput {
+            installation_year: None,
+            installation_year_reference: None,
             generator_id: "hp".into(),
             classification_source_reference: "system design".into(),
             scope: crate::forfait_heat_pump_draft::TableScope::ResidentialAtMost25Kw,
@@ -7799,6 +7893,7 @@ mod tests {
         // so it stays undetermined instead of 0).
         let window = sample.space_heating.demand.windows[0].id.clone();
         let calculation = |area_m2: f64, window_id: String| crate::annex_aa::AnnexAaInput {
+            zone_id: None,
             construction_year: 2020,
             post_insulated: false,
             generator_capacity_kw: Some(0.0),
@@ -7819,6 +7914,7 @@ mod tests {
         sample.active_cooling.as_mut().unwrap().capacity =
             crate::tojuli::CoolingCapacityEvidence::AnnexAa {
                 calculation: Some(calculation(2.0, window)),
+                zone_calculations: Vec::new(),
                 source_reference: "annex AA".into(),
             };
         let short = assess_building_performance(&sample);
@@ -7832,6 +7928,7 @@ mod tests {
         sample.active_cooling.as_mut().unwrap().capacity =
             crate::tojuli::CoolingCapacityEvidence::AnnexAa {
                 calculation: Some(calculation(40.0, "missing".into())),
+                zone_calculations: Vec::new(),
                 source_reference: "annex AA".into(),
             };
         let unknown = assess_building_performance(&sample);
@@ -7841,6 +7938,134 @@ mod tests {
             .iter()
             .any(|item| item.code == "annex_aa_window_unknown"));
     }
+    /// Annex AA is determined per cooled rekenzone (2025+C1 p. 1135): with two
+    /// cooled zones each zone takes the calculation that names it.
+    #[test]
+    fn annex_aa_is_selected_per_cooled_zone() {
+        use crate::annex_aa::{AnnexAaInput, AnnexAaRoom, AnnexAaWindow};
+        use crate::space_heating_chain::ChainZone;
+        use crate::tojuli::CoolingCapacityEvidence;
+        let mut sample = input();
+        sample.cooling = Some(cooling_system(CoolingGeneratorKind::ExternalCold));
+        let first = sample.space_heating.demand.zone_id.clone();
+        let mut second = sample.space_heating.demand.clone();
+        second.zone_id = "z2".into();
+        sample.space_heating.additional_zones.push(ChainZone {
+            demand: second,
+            emission: sample.space_heating.emission.clone(),
+            distribution: sample.space_heating.distribution.clone(),
+        });
+        sample.total_usable_floor_area_m2 *= 2.0;
+        let window = sample.space_heating.demand.windows[0].id.clone();
+        let calculation = |zone_id: Option<&str>| AnnexAaInput {
+            zone_id: zone_id.map(Into::into),
+            construction_year: 2020,
+            post_insulated: false,
+            generator_capacity_kw: Some(100.0),
+            effective_mass_kg_per_m2: None,
+            rooms: vec![AnnexAaRoom {
+                id: "living".into(),
+                area_m2: 40.0,
+                living: true,
+                opaque_inner_area_m2: 20.0,
+                windows: vec![AnnexAaWindow {
+                    window_id: window.clone(),
+                    u_with_shutter_w_per_m2k: None,
+                }],
+                installed_capacity_kw: 100.0,
+                roof_area_m2: None,
+            }],
+        };
+        let run = |calculation: Option<AnnexAaInput>, zones: Vec<AnnexAaInput>| {
+            let mut sample = sample.clone();
+            sample.active_cooling = Some(ActiveCoolingEvidence {
+                system: crate::tojuli::ActiveCoolingSystem::ExternalColdWithCoolingEmitter,
+                capacity: CoolingCapacityEvidence::AnnexAa {
+                    calculation,
+                    zone_calculations: zones,
+                    source_reference: "annex AA".into(),
+                },
+                source_reference: "design".into(),
+            });
+            assess_building_performance(&sample)
+        };
+        let has = |result: &BuildingPerformanceAssessment, code: &str, path: &str| {
+            result
+                .issues
+                .iter()
+                .any(|item| item.code == code && item.path == path)
+        };
+
+        // One calculation per zone: both zones pass and TOjuli is 0.
+        let both = run(
+            None,
+            vec![calculation(Some(&first)), calculation(Some("z2"))],
+        );
+        assert_eq!(both.status, "calculated_unverified", "{:?}", both.issues);
+        assert_eq!(both.tojuli.len(), 2);
+        assert!(both
+            .tojuli
+            .iter()
+            .all(|zone| zone.max_tojuli_k == Some(0.0)));
+        assert!(both.tojuli.iter().all(|zone| zone.annex_aa.is_some()));
+        // `calculation` may name one of the zones itself.
+        let mixed = run(
+            Some(calculation(Some("z2"))),
+            vec![calculation(Some(&first))],
+        );
+        assert_eq!(mixed.status, "calculated_unverified", "{:?}", mixed.issues);
+
+        // Without a zone id the calculation cannot be placed.
+        let unnamed = run(Some(calculation(None)), Vec::new());
+        assert!(has(
+            &unnamed,
+            "annex_aa_zone_id_required",
+            "activeCooling.capacity.calculation.zoneId"
+        ));
+        // A zone that is not cooled, or a zone named twice.
+        let unknown = run(None, vec![calculation(Some("zx"))]);
+        assert!(has(
+            &unknown,
+            "annex_aa_zone_unknown",
+            "activeCooling.capacity.zoneCalculations[0].zoneId"
+        ));
+        let twice = run(None, vec![calculation(Some("z2")), calculation(Some("z2"))]);
+        assert!(has(
+            &twice,
+            "annex_aa_zone_duplicate",
+            "activeCooling.capacity.zoneCalculations[1].zoneId"
+        ));
+        // A cooled zone without its own calculation has no capacity proof.
+        let missing = run(None, vec![calculation(Some(&first))]);
+        assert_eq!(missing.tojuli[0].max_tojuli_k, Some(0.0));
+        assert!(missing.tojuli[1]
+            .issues
+            .iter()
+            .any(|item| item.code == "annex_aa_zone_calculation_required"
+                && item.path == "activeCooling.capacity.zoneCalculations"));
+
+        // One cooled zone keeps the single calculation without an id.
+        let mut single = sample.clone();
+        single.space_heating.additional_zones.clear();
+        single.total_usable_floor_area_m2 /= 2.0;
+        single.active_cooling = Some(ActiveCoolingEvidence {
+            system: crate::tojuli::ActiveCoolingSystem::ExternalColdWithCoolingEmitter,
+            capacity: CoolingCapacityEvidence::AnnexAa {
+                calculation: Some(calculation(None)),
+                zone_calculations: Vec::new(),
+                source_reference: "annex AA".into(),
+            },
+            source_reference: "design".into(),
+        });
+        let single = assess_building_performance(&single);
+        assert_eq!(
+            single.status, "calculated_unverified",
+            "{:?}",
+            single.issues
+        );
+        assert_eq!(single.tojuli_max_k, Some(0.0));
+    }
+
     #[test]
     fn review_fixes_bacs_on_district_heat_and_consistency_checks() {
         use crate::space_heating_chain::ExternalHeatGenerator;
@@ -7920,6 +8145,7 @@ mod tests {
                 },
                 daylight: Daylight::None,
                 extracted_luminaires: false,
+                constant_illuminance: None,
             }],
             source_reference: "lighting plan".into(),
             burning_hours_factor: None,

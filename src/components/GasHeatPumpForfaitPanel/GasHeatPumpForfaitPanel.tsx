@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useProjectEdition } from '../../context/EnergyContext';
 import type { BuildingFunction, INtaHeatPumpInput } from '../../core/energy/types';
 import { diagnoseGasHeatPumpForfaitDraftWithRust, type GasHeatPumpForfaitDraftAssessment, type GasHeatPumpForfaitDraftInput } from '../../core/nta/KernelClient';
 import { useI18n } from '../../i18n/i18n';
@@ -30,6 +31,7 @@ export function GasHeatPumpForfaitPanel({ pump, buildingFunction, onSave }: {
   const [result, setResult] = useState<GasHeatPumpForfaitDraftAssessment | null>(null);
   const [error, setError] = useState<string | null>(null);
   const sequence = useRef(0);
+  const edition = useProjectEdition();
   useEffect(() => () => { sequence.current += 1; }, []);
   const invalidate = () => { sequence.current += 1; setResult(null); setError(null); };
   const source = sourceMap[pump.source];
@@ -53,7 +55,9 @@ export function GasHeatPumpForfaitPanel({ pump, buildingFunction, onSave }: {
       || (application === 'over25_kw' && thermalCapacityKw <= 25)
       || (application === 'utility' && buildingFunction === 'residential')
       || (correctionRequired && (sourceCorrectionFactor === null || !Number.isFinite(sourceCorrectionFactor)
-        || sourceCorrectionFactor <= 0 || !correctionReference.trim()))) {
+        // Annex V table V.1 (2025+C1 p. 1114) gives only 1,00, 1,02 and 1,04.
+        || ![1, 1.02, 1.04].some((allowed) => Math.abs(sourceCorrectionFactor - allowed) < 1e-9)
+        || !correctionReference.trim()))) {
       setError(t('kernel.gasForfait.invalid')); setResult(null); return;
     }
     const input: GasHeatPumpForfaitDraftInput = {
@@ -68,7 +72,7 @@ export function GasHeatPumpForfaitPanel({ pump, buildingFunction, onSave }: {
     const current = ++sequence.current;
     setError(null);
     try {
-      const assessment = await diagnoseGasHeatPumpForfaitDraftWithRust(input);
+      const assessment = await diagnoseGasHeatPumpForfaitDraftWithRust(input, edition);
       if (current !== sequence.current) return;
       setResult(assessment);
       if (assessment.status === 'invalid') setError(assessment.issues.map((issue) => issue.code).join(', '));

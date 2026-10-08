@@ -7,6 +7,7 @@ Elke projectberekening krijgt één status:
 | Status | Betekenis | Wat te doen |
 |---|---|---|
 | `calculated_unverified` | De berekening is volledig doorgerekend. "Unverified" betekent dat het programma niet geattesteerd is en niet tegen officiële referentiegevallen is getoetst. | Uitkomst gebruiken als onverifieerde berekening. |
+| `calculated_legacy_edition` | Volledig doorgerekend in een oudere uitgave van NTA 8800 (2024, 2023, 2022 of 2020+A1). Alleen ter vergelijking; de registratiecontrole weigert het project met `legacy_edition_not_registrable`. | Voor registratie de aangewezen uitgave kiezen (zie [hoofdstuk 10](10-normversies.md)). |
 | `incomplete` | Er ontbreekt invoer: de kern kon geen rekeninvoer afleiden. De gaten staan in de uitvoer. | Gaten aanvullen. |
 | `invalid` | De invoer is wel compleet, maar de kern weigert haar: fysiek onmogelijk, tegenstrijdig, buiten de blokkerende grenzen, of met een niet-eindige uitkomst. | Meldingen lezen en de invoer corrigeren. |
 
@@ -58,7 +59,7 @@ Een uitkomst mag nooit oneindig of NaN zijn. De kern controleert elke uitkomst v
 - **API:** elke route geeft dan HTTP 500 met `{"error":"non_finite_result","path":…}`.
 - **Desktop-app:** elk kerncommando geeft dan een foutmelding met het pad.
 
-Een robuustheidstest (`crates/nta8800-core/tests/robustness.rs`) varieert de voorbeeldprojecten en opnames willekeurig. Hij faalt bij een paniek, een niet-eindig getal, of een ingreep van het vangnet.
+Een dekkingstest (`crates/nta8800-core/tests/option_coverage.rs`) zet elke keuzemogelijkheid van de kerninvoer (elke variant en elk optioneel veld) een keer in de voorbeeldprojecten en rekent ze in alle vijf uitgaven. Elke run moet zonder paniek en met eindige getallen eindigen, als berekening of als weigering met een vertaalde meldcode. Een robuustheidstest (`crates/nta8800-core/tests/robustness.rs`) varieert de voorbeeldprojecten en opnames willekeurig. Hij faalt bij een paniek, een niet-eindig getal, of een ingreep van het vangnet.
 
 ## Plausibiliteit bij registratie
 

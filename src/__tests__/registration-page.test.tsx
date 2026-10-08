@@ -35,13 +35,13 @@ describe('registration page', () => {
     const user = userEvent.setup();
     renderWithProviders(<Harness />);
     expect(screen.getByTestId('reg-software').textContent).toContain('not yet attested under BRL 9501');
-    await user.type(screen.getByRole('textbox', { name: 'BAG object id' }), '0363010000000001');
+    await user.type(screen.getByLabelText('BAG object id'), '0363010000000001');
     expect(screen.getByRole('alert').textContent).toContain('Woning elders');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Message type (BRL 9500 §4.2.5)' }), 'replacement');
+    await user.selectOptions(screen.getByLabelText('Message type (BRL 9500 §4.2.5)'), 'replacement');
     expect(screen.queryByRole('alert')).toBeNull();
-    await user.type(screen.getByRole('textbox', { name: 'EP-Online number of the replaced label' }), 'EP-1');
-    await user.type(screen.getByRole('spinbutton', { name: 'WLC-GWP, kg CO₂-eq/m²·yr' }), '7.5');
-    await user.type(screen.getByRole('textbox', { name: 'Report in the project dossier' }), 'wlc.pdf');
+    await user.type(screen.getByLabelText('EP-Online number of the replaced label'), 'EP-1');
+    await user.type(screen.getByLabelText('WLC-GWP, kg CO₂-eq/m²·yr'), '7.5');
+    await user.type(screen.getByLabelText('Report in the project dossier'), 'wlc.pdf');
     await user.click(screen.getByRole('button', { name: 'Save' }));
     const stored = JSON.parse(screen.getByTestId('registration').textContent ?? 'null');
     expect(stored).toMatchObject({
@@ -57,12 +57,12 @@ describe('registration page', () => {
     const user = userEvent.setup();
     renderWithProviders(<RegistrationForm />);
     expect(screen.getByRole('form', { name: 'Registration data' })).toBeInTheDocument();
-    expect(screen.queryByRole('textbox', { name: 'Kernel version of original survey (relabel)' })).not.toBeInTheDocument();
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Message type (BRL 9500 §4.2.5)' }), 'relabel');
-    expect(screen.getByRole('textbox', { name: 'Kernel version of original survey (relabel)' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Kernel version of original survey (relabel)')).not.toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText('Message type (BRL 9500 §4.2.5)'), 'relabel');
+    expect(screen.getByLabelText('Kernel version of original survey (relabel)')).toBeInTheDocument();
     expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Discard' }));
-    expect(screen.queryByRole('textbox', { name: 'Kernel version of original survey (relabel)' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Kernel version of original survey (relabel)')).not.toBeInTheDocument();
   }, 60000);
 
   it('names every reason a registration is not ready', () => {
@@ -81,7 +81,7 @@ describe('registration step', () => {
     renderWithProviders(<RegistrationPage project={createDefaultProject()} actions={{ navigate: vi.fn(), openDialog: vi.fn() }} />);
     expect(screen.getByText('Registration in EP-Online requires a BRL 9501 attest')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Calculation program and attest' })).toBeInTheDocument();
-    expect(screen.getByRole('textbox', { name: 'BAG object id' })).toBeEnabled();
+    expect(screen.getByLabelText('BAG object id')).toBeEnabled();
   }, 60000);
 });
 
@@ -97,12 +97,12 @@ describe('project information dialog', () => {
       </>;
     }
     renderWithProviders(<Basics />);
-    expect(screen.queryByRole('combobox', { name: 'Message type (BRL 9500 §4.2.5)' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Message type (BRL 9500 §4.2.5)')).not.toBeInTheDocument();
     expect(screen.getByText(/now in the Registration step/)).toBeInTheDocument();
-    const name = screen.getByRole('textbox', { name: 'Project Name' });
+    const name = screen.getByLabelText('Project Name');
     await user.clear(name);
     await user.type(name, 'Woning 1');
-    const city = screen.getByRole('textbox', { name: 'City' });
+    const city = screen.getByLabelText('City');
     await user.clear(city);
     await user.type(city, 'Delft');
     await user.click(screen.getByRole('button', { name: 'Save' }));

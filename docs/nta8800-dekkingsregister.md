@@ -38,6 +38,18 @@ De [herstelde desktopbouw op `dc1b917`](nta8800-build-verificatie-2026-10-05-dc1
 
 Na UI-fase F10 slaagde de [volledige technische gate en devbuild op `837eb02`](nta8800-build-verificatie-2026-10-05-837eb02.md) met 744 frontendtests, 797 kern- en 57 servicetests plus hun integratiegroepen, MSRV-controle, format, Clippy en TypeScript/Vite. Het debugpakket en drie servicebinaries hebben gecontroleerde hashes. De officiële referentiebatch ontbrak nog en geen van de normatieve referentie- of attestkolommen verandert hierdoor.
 
+De manifestlezer weigert nu symbolische links naar artefacten buiten de uitvoermap. Een gerichte positieve en negatieve test en hercontrole van het F10-manifest slaagden; de NTA-reken-, referentie- en attestkolommen blijven ongewijzigd.
+
+De lokale technische gate gebruikt nu `--locked` voor alle Cargo-routes. De volledige offline run slaagde met 797 kern-, 57 service- en 744 frontendtests plus integratiegroepen, MSRV, format, Clippy, Tauri en TypeScript/Vite. Omdat officiële actuele cases ontbreken, werd de geplande referentiebatch overgeslagen en blijven alle normatieve referentie- en attestkolommen ongewijzigd.
+
+De optionele broncontrole van het bouwmanifest accepteert alleen een Git-commitobject als `sourceCommit`, geen boom- of tagobject. De gerichte tests en hercontrole van het bewaarde F10-pakket slaagden; de normatieve referentie- en attestkolommen veranderen niet.
+
+De gedeelde HTTP/MCP-operatielaag weigert een niet-serialiseerbaar kernresultaat nu met een expliciete serverfout in plaats van een geslaagd `null`-resultaat. De servicetests, formatcontrole en Clippy slaagden; dit wijzigt geen NTA-reken-, referentie- of attestkolom.
+
+De [desktopdevbuild en servicebinaries van `413e932`](nta8800-build-verificatie-2026-10-05-413e932.md) zijn gebouwd en met het manifest opnieuw gecontroleerd. Dit is technisch artefactbewijs; de normatieve referentie- en attestkolommen blijven ongewijzigd.
+
+De publiek gedocumenteerde RVO-XSD beschrijft het opvragen van het EP-Online-totaalbestand. Het registratie-uitwisselcontract blijft ontbreken; zie het [bronnenregister](nta8800-bronnenregister.md). Er is daarmee geen EP-Online-aanlevering vrijgegeven en de attestkolommen veranderen niet.
+
 De NTA-invoereditor sluit bij het openen van een ander project en verwijdert dan de nog niet opgeslagen concepttekst. Dit is met een componenttest en frontend-build gecontroleerd; de visuele desktopcontrole blijft open.
 
 De zijbalk met indicatieve BENG- en labeluitkomsten koppelt elke kernelrespons aan de exacte projectversie die de aanvraag startte. Bij een projectwijziging wordt een eerder resultaat al tijdens de eerste nieuwe weergave verborgen; de nieuwe berekening volgt na de ingestelde vertraging. Dit is met een gerichte componenttest gecontroleerd.
