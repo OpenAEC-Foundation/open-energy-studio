@@ -108,3 +108,22 @@
 .opname-panel h3.opname-result-heading { font-weight: 500; letter-spacing: -0.01em; }
 
 .opname-panel .opname-item--plain > strong { display: none; }
+
+/* Surfaces as cards with their windows, doors and rooflights below (feedback 8 Oct 2026). */
+.opname-panel .opname-card { grid-column: 1 / -1; border: 1px solid var(--line, var(--border)); border-radius: var(--radius-lg, 10px); background: var(--surface-card, transparent); }
+.opname-panel .opname-card-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 10px 14px; margin: 0; cursor: pointer; list-style: none; }
+.opname-panel details.opname-card[open] > .opname-card-head { border-bottom: 1px solid var(--line-subtle, var(--border)); }
+.opname-panel .opname-card-head::-webkit-details-marker { display: none; }
+.opname-panel .opname-card-head::before { content: '▸'; color: var(--fg-3); transition: transform .15s; }
+.opname-panel details.opname-card[open] > .opname-card-head::before { transform: rotate(90deg); }
+.opname-panel .opname-card--loose .opname-card-head::before { content: none; }
+.opname-panel .opname-card-head strong { font-size: 15px; color: var(--fg-1); }
+.opname-panel .opname-tag { font-size: 12px; color: var(--fg-2); background: var(--surface-sunken, transparent); border: 1px solid var(--line-subtle, var(--border)); border-radius: var(--radius-sm, 4px); padding: 1px 8px; }
+.opname-panel .opname-card-net { margin-left: auto; font-size: 13px; color: var(--fg-2); font-variant-numeric: tabular-nums; }
+.opname-panel .opname-card-net--invalid { color: var(--error, #f87171); }
+.opname-panel .opname-card-body { padding: 12px 14px; }
+.opname-panel .opname-sub { margin: 0 14px 10px 30px; padding-left: 14px; border-left: 2px solid var(--line-strong, var(--border)); }
+.opname-panel .opname-sub-kind { margin: 4px 0 6px; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--fg-3); }
+.opname-panel .opname-card-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 14px 12px 44px; }
+.opname-panel .opname-card-actions .opname-remove { margin-left: auto; }
+.opname-panel .opname-list-controls { display: flex; gap: 8px; flex-wrap: wrap; }

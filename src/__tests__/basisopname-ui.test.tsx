@@ -104,7 +104,7 @@ describe('basisopname panel', () => {
 
     // p. 94: product g for solar-control glass. A new survey starts empty: add a facade and a window.
     await user.click(screen.getByRole('button', { name: 'Add facade' }));
-    await user.click(screen.getByRole('button', { name: 'Add window' }));
+    await user.click(screen.getAllByRole('button', { name: 'Window in this facade' })[0]);
     await user.click(screen.getAllByRole('checkbox', { name: 'Solar-control glass or film with product data' })[0]);
     await user.type(screen.getByRole('spinbutton', { name: 'g-value from the product data' }), '0.3');
     // Table 9.9 / erratum §4.

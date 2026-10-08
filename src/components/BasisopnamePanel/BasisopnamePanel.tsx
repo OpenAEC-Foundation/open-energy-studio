@@ -948,148 +948,193 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
       </label>}
       {buildingKind === 'floating' && part !== 'roofFloor' &&
         <CheckField {...field} path={['envelope', 'buildingKind', 'newBerthSince2018']} label={t('opname.buildingKind.newBerth')} />}
-      {surfaces.map((surface, index) => {
-        if (!showSurface(surface.element)) return null;
-        const base: Path = ['envelope', 'surfaces', index];
-        const insulation = read(draft, [...base, 'insulation', 'kind']);
-        const element = read(draft, [...base, 'element']);
-        return <div key={index} className="opname-item">
-          <strong>{String(surface.id ?? index)}</strong>
-          <SelectField {...field} path={[...base, 'element']} label={t('opname.surface.element')}
-            options={opts(t, 'opname.surface.elementKind', ['facade', 'roof', 'floor'])} />
-          {element !== 'floor' && <SelectField {...field} path={[...base, 'orientation']} label={t('opname.orientation')}
-            options={opts(t, 'opname.orientationKind', ORIENTATIONS)} />}
-          {element === 'roof' && <NumberField {...field} path={[...base, 'tiltDeg']} label={t('opname.tilt')} />}
-          {element === 'floor' && <NumberField {...field} path={[...base, 'exposedPerimeterM']} label={t('opname.surface.perimeter')} />}
-          <label>{t('opname.surface.boundary')}
-            <select value={String(read(draft, [...base, 'boundary', 'kind']) ?? '')}
-              onChange={(event) => change([...base, 'boundary'], { kind: event.target.value })}>
-              {['outdoor', 'ground', 'crawlspace', 'adjacent_heated', 'unheated_cellar', 'strongly_ventilated', 'sunroom', 'water'].map((key) =>
-                <option key={key} value={key}>{t(`opname.surface.boundaryKind.${key}`)}</option>)}
-            </select>
-          </label>
-          <NumberField {...field} path={[...base, 'grossAreaM2']} label={t('opname.surface.area')} />
-          {kind === 'utility' && zoneIds.length > 1 &&
-            <ZoneSelect draft={draft} change={change} path={[...base, 'zoneId']} label={t('opname.surface.zone')}
-              ids={zoneIds} empty={t('opname.zones.splitByArea')} unknown={t('opname.zones.unknownZone')} />}
-          <label>{t('opname.surface.insulation')}
-            <select value={typeof insulation === 'string' ? insulation : ''}
-              onChange={(event) => change([...base, 'insulation'], event.target.value === 'thickness'
-                ? { kind: 'thickness', thicknessMm: 50 } : { kind: event.target.value })}>
-              {['none_or_unknown', 'present_unknown_thickness', 'cavity_filled_unknown_width', 'thickness'].map((key) =>
-                <option key={key} value={key}>{t(`opname.surface.insulationKind.${key}`)}</option>)}
-            </select>
-          </label>
-          {insulation === 'thickness' && <NumberField {...field} path={[...base, 'insulation', 'thicknessMm']} label={t('opname.surface.thicknessMm')} />}
-          <CheckField {...field} path={[...base, 'thermalCushions']} label={t('opname.surface.thermalCushions')} />
-          {insulation === 'present_unknown_thickness' && <>
-            <NumberField {...field} path={[...base, 'renovation', 'year']} label={t('opname.surface.renovationYear')} step="1" />
-            <CheckField {...field} path={[...base, 'renovation', 'meetsRequirementsOfYear']} label={t('opname.surface.renovationEvidence')} />
-          </>}
-          <RemoveButton label={t('opname.remove')} onRemove={() => {
-            // Openings on the removed surface go with it: the kernel rejects an opening without its surface.
-            const id = surface.id;
-            const keep = (items: Array<Record<string, unknown>>) => items.filter((item) => item.surfaceId !== id);
-            let next = write(draft, ['envelope', 'surfaces'], surfaces.filter((_, item) => item !== index));
-            next = write(next, ['envelope', 'windows'], keep(windows));
-            next = write(next, ['envelope', 'rooflights'], keep(rooflights));
-            if (doors.length > 0) next = write(next, ['envelope', 'doors'], keep(doors));
-            save({ kind, survey: next });
-          }} />
-        </div>;
-      })}
-      {part !== 'roofFloor' && <ListControls label={t('survey.addFacade')}
-        onAdd={() => change(['envelope', 'surfaces'], [...surfaces, surfaceTemplate(surfaces.length, 'facade')])} />}
-      {part !== 'walls' && <>
-        <ListControls label={t('survey.addRoof')}
-          onAdd={() => change(['envelope', 'surfaces'], [...surfaces, surfaceTemplate(surfaces.length, 'roof')])} />
-        <ListControls label={t('survey.addFloor')}
-          onAdd={() => change(['envelope', 'surfaces'], [...surfaces, surfaceTemplate(surfaces.length, 'floor')])} />
-      </>}
-      {windows.map((window, index) => {
-        const onRoof = surfaces.find((surface) => surface.id === window.surfaceId)?.element === 'roof';
-        if ((part === 'walls' && onRoof) || (part === 'roofFloor' && !onRoof)) return null;
-        const base: Path = ['envelope', 'windows', index];
-        const situation = read(draft, [...base, 'shading', 'situation']);
-        return <div key={`w${index}`} className="opname-item">
-          <strong>{String(window.id ?? index)}</strong>
-          <SelectField {...field} path={[...base, 'surfaceId']} label={t('opname.window.surface')}
-            options={surfaces.map((surface) => [String(surface.id), String(surface.id)])} />
-          <NumberField {...field} path={[...base, 'areaM2']} label={t('opname.window.area')} />
-          <SelectField {...field} path={[...base, 'glass']} label={t('opname.window.glass')}
-            options={opts(t, 'opname.window.glassKind', ['triple_hr', 'hr_plus_plus', 'hr_plus', 'hr', 'double', 'single'])} />
-          <SelectField {...field} path={[...base, 'frame']} label={t('opname.window.frame')}
-            options={opts(t, 'opname.window.frameKind', ['wood_or_plastic', 'metal_with_thermal_break', 'metal', 'none'])} />
-          <label>{t('opname.window.shading')}
-            <select value={typeof situation === 'string' ? situation : ''}
-              onChange={(event) => change([...base, 'shading'], event.target.value === '' ? undefined
-                : event.target.value === 'constant_height_obstruction' || event.target.value === 'constant_overhang'
-                  ? { situation: event.target.value, relativeHeight: 0.5 }
-                  : event.target.value === 'overhang_with_obstructions'
-                    ? { situation: event.target.value, overhangRelativeHeight: 0.5 }
-                    : { situation: event.target.value })}>
-              <option value="">{t('opname.window.shadingDefault')}</option>
-              {['minimal', 'constant_height_obstruction', 'constant_overhang', 'full', 'overhang_with_obstructions', 'other'].map((key) =>
-                <option key={key} value={key}>{t(`opname.window.situation.${key}`)}</option>)}
-            </select>
-          </label>
-          {(situation === 'constant_height_obstruction' || situation === 'constant_overhang') &&
-            <NumberField {...field} path={[...base, 'shading', 'relativeHeight']} label={t('opname.window.relativeHeight')} />}
-          {situation === 'overhang_with_obstructions' &&
-            <NumberField {...field} path={[...base, 'shading', 'overhangRelativeHeight']} label={t('opname.window.relativeHeight')} />}
-          <SolarControlField draft={draft} base={base} change={change} t={t} />
-          <RemoveButton label={t('opname.remove')} onRemove={() => change(['envelope', 'windows'], windows.filter((_, item) => item !== index))} />
-        </div>;
-      })}
-      {part !== 'roofFloor' && <ListControls label={t('opname.addWindow')}
-        onAdd={() => change(['envelope', 'windows'], [...windows, windowTemplate(windows.length,
-          String((surfaces.find((surface) => surface.element === 'facade') ?? surfaces[0])?.id ?? ''))])} />}
-      {part !== 'walls' && surfaces.some((surface) => surface.element === 'roof') && <ListControls label={t('survey.addRoofWindow')}
-        onAdd={() => change(['envelope', 'windows'], [...windows, windowTemplate(windows.length,
-          String(surfaces.find((surface) => surface.element === 'roof')?.id ?? ''))])} />}
-      {part !== 'roofFloor' && doors.map((door, index) => {
-        const base: Path = ['envelope', 'doors', index];
-        const glazed = Number(read(draft, [...base, 'glassFraction']) ?? 0) > 0;
-        return <div key={`d${index}`} className="opname-item">
-          <strong>{String(door.id ?? index)}</strong>
-          <SelectField {...field} path={[...base, 'surfaceId']} label={t('opname.window.surface')}
-            options={surfaces.map((surface) => [String(surface.id), String(surface.id)])} />
-          <NumberField {...field} path={[...base, 'areaM2']} label={t('survey.door.area')} />
-          <TriStateField {...field} yes={t('opname.yes')} no={t('opname.no')} path={[...base, 'insulated']} label={t('survey.door.insulated')} />
-          <NumberField {...field} path={[...base, 'glassFraction']} label={t('survey.door.glassFraction')} optional />
-          {glazed && <SelectField {...field} path={[...base, 'glass']} label={t('opname.window.glass')}
-            options={opts(t, 'opname.window.glassKind', ['triple_hr', 'hr_plus_plus', 'hr_plus', 'hr', 'double', 'single'])} />}
-          <SelectField {...field} path={[...base, 'frame']} label={t('opname.window.frame')}
-            options={opts(t, 'opname.window.frameKind', ['wood_or_plastic', 'metal_with_thermal_break', 'metal', 'none'])} />
-          <RemoveButton label={t('opname.remove')} onRemove={() => change(['envelope', 'doors'], doors.filter((_, item) => item !== index))} />
-        </div>;
-      })}
-      {part !== 'roofFloor' && <ListControls label={t('survey.addDoor')}
-        onAdd={() => change(['envelope', 'doors'], [...doors, {
-          id: `deur-${doors.length + 1}`,
-          surfaceId: String((surfaces.find((surface) => surface.element === 'facade') ?? surfaces[0])?.id ?? ''),
-          areaM2: 2, insulated: null, glassFraction: 0, frame: 'wood_or_plastic', sourceReference: '',
-        }])} />}
-      {part !== 'walls' && rooflights.map((rooflight, index) => {
-        const base: Path = ['envelope', 'rooflights', index];
-        return <div key={`r${index}`} className="opname-item">
-          <strong>{String(rooflight.id ?? index)}</strong>
-          <SelectField {...field} path={[...base, 'surfaceId']} label={t('opname.window.surface')}
-            options={surfaces.filter((surface) => surface.element === 'roof').map((surface) => [String(surface.id), String(surface.id)])} />
-          <NumberField {...field} path={[...base, 'areaM2']} label={t('opname.rooflight.area')} />
-          <NumberField {...field} path={[...base, 'uValue']} label={t('opname.rooflight.uValue')} />
-          <SelectField {...field} path={[...base, 'glass']} label={t('opname.window.glass')}
-            options={opts(t, 'opname.window.glassKind', ['triple_hr', 'hr_plus_plus', 'hr_plus', 'hr', 'double', 'single'])} />
-          <TextField {...field} path={[...base, 'qualityDeclarationReference']} label={t('opname.rooflight.declaration')} />
-          <RemoveButton label={t('opname.remove')} onRemove={() => change(['envelope', 'rooflights'], rooflights.filter((_, item) => item !== index))} />
-        </div>;
-      })}
-      {part !== 'walls' && <ListControls label={t('opname.addRooflight')}
-        onAdd={() => change(['envelope', 'rooflights'], [...rooflights, {
-          id: `lichtkoepel-${rooflights.length + 1}`,
-          surfaceId: String(surfaces.find((surface) => surface.element === 'roof')?.id ?? ''),
-          areaM2: 1, uValue: 2.5, glass: 'double', qualityDeclarationReference: '',
-        }])} />}
+      {(() => {
+        // Feedback 8 Oct 2026: every surface is a card with its windows, doors and rooflights
+        // right below it, so "In vlak" no longer has to be picked to see what belongs where.
+        const counts: Record<string, number> = {};
+        const names = new Map<string, string>();
+        surfaces.forEach((surface) => {
+          const element = String(surface.element ?? 'facade');
+          counts[element] = (counts[element] ?? 0) + 1;
+          names.set(String(surface.id ?? ''), `${t(`survey.element.${element}`)} ${counts[element]}`);
+        });
+        const surfaceOptions: Array<[string, string]> = surfaces.map((surface) => [String(surface.id), names.get(String(surface.id)) ?? String(surface.id)]);
+        const area = (items: Array<Record<string, unknown>>, id: string) =>
+          items.filter((item) => item.surfaceId === id).reduce((sum, item) => sum + (Number(item.areaM2) || 0), 0);
+        const glassOptions = opts(t, 'opname.window.glassKind', ['triple_hr', 'hr_plus_plus', 'hr_plus', 'hr', 'double', 'single']);
+        const frameOptions = opts(t, 'opname.window.frameKind', ['wood_or_plastic', 'metal_with_thermal_break', 'metal', 'none']);
+        const windowFields = (_window: Record<string, unknown>, index: number) => {
+          const base: Path = ['envelope', 'windows', index];
+          const situation = read(draft, [...base, 'shading', 'situation']);
+          return <div key={`w${index}`} className="opname-sub">
+            <p className="opname-sub-kind">{t('survey.window')} {index + 1}</p>
+            <div className="nta-form-grid">
+              <NumberField {...field} path={[...base, 'areaM2']} label={t('opname.window.area')} />
+              <SelectField {...field} path={[...base, 'glass']} label={t('opname.window.glass')} options={glassOptions} />
+              <SelectField {...field} path={[...base, 'frame']} label={t('opname.window.frame')} options={frameOptions} />
+              <label>{t('opname.window.shading')}
+                <select value={typeof situation === 'string' ? situation : ''}
+                  onChange={(event) => change([...base, 'shading'], event.target.value === '' ? undefined
+                    : event.target.value === 'constant_height_obstruction' || event.target.value === 'constant_overhang'
+                      ? { situation: event.target.value, relativeHeight: 0.5 }
+                      : event.target.value === 'overhang_with_obstructions'
+                        ? { situation: event.target.value, overhangRelativeHeight: 0.5 }
+                        : { situation: event.target.value })}>
+                  <option value="">{t('opname.window.shadingDefault')}</option>
+                  {['minimal', 'constant_height_obstruction', 'constant_overhang', 'full', 'overhang_with_obstructions', 'other'].map((key) =>
+                    <option key={key} value={key}>{t(`opname.window.situation.${key}`)}</option>)}
+                </select>
+              </label>
+              {(situation === 'constant_height_obstruction' || situation === 'constant_overhang') &&
+                <NumberField {...field} path={[...base, 'shading', 'relativeHeight']} label={t('opname.window.relativeHeight')} />}
+              {situation === 'overhang_with_obstructions' &&
+                <NumberField {...field} path={[...base, 'shading', 'overhangRelativeHeight']} label={t('opname.window.relativeHeight')} />}
+              <SelectField {...field} path={[...base, 'surfaceId']} label={t('survey.moveTo')} options={surfaceOptions} />
+              <SolarControlField draft={draft} base={base} change={change} t={t} />
+              <RemoveButton label={t('opname.remove')} onRemove={() => change(['envelope', 'windows'], windows.filter((_, item) => item !== index))} />
+            </div>
+          </div>;
+        };
+        const doorFields = (_door: Record<string, unknown>, index: number) => {
+          const base: Path = ['envelope', 'doors', index];
+          const glazed = Number(read(draft, [...base, 'glassFraction']) ?? 0) > 0;
+          return <div key={`d${index}`} className="opname-sub">
+            <p className="opname-sub-kind">{t('survey.door')} {index + 1}</p>
+            <div className="nta-form-grid">
+              <NumberField {...field} path={[...base, 'areaM2']} label={t('survey.door.area')} />
+              <TriStateField {...field} yes={t('opname.yes')} no={t('opname.no')} path={[...base, 'insulated']} label={t('survey.door.insulated')} />
+              <NumberField {...field} path={[...base, 'glassFraction']} label={t('survey.door.glassFraction')} optional />
+              {glazed && <SelectField {...field} path={[...base, 'glass']} label={t('opname.window.glass')} options={glassOptions} />}
+              <SelectField {...field} path={[...base, 'frame']} label={t('opname.window.frame')} options={frameOptions} />
+              <SelectField {...field} path={[...base, 'surfaceId']} label={t('survey.moveTo')} options={surfaceOptions} />
+              <RemoveButton label={t('opname.remove')} onRemove={() => change(['envelope', 'doors'], doors.filter((_, item) => item !== index))} />
+            </div>
+          </div>;
+        };
+        const rooflightFields = (_rooflight: Record<string, unknown>, index: number) => {
+          const base: Path = ['envelope', 'rooflights', index];
+          return <div key={`r${index}`} className="opname-sub">
+            <p className="opname-sub-kind">{t('survey.rooflight')} {index + 1}</p>
+            <div className="nta-form-grid">
+              <NumberField {...field} path={[...base, 'areaM2']} label={t('opname.rooflight.area')} />
+              <NumberField {...field} path={[...base, 'uValue']} label={t('opname.rooflight.uValue')} />
+              <SelectField {...field} path={[...base, 'glass']} label={t('opname.window.glass')} options={glassOptions} />
+              <TextField {...field} path={[...base, 'qualityDeclarationReference']} label={t('opname.rooflight.declaration')} />
+              <RemoveButton label={t('opname.remove')} onRemove={() => change(['envelope', 'rooflights'], rooflights.filter((_, item) => item !== index))} />
+            </div>
+          </div>;
+        };
+        const cards = surfaces.map((surface, index) => {
+          if (!showSurface(surface.element)) return null;
+          const base: Path = ['envelope', 'surfaces', index];
+          const id = String(surface.id ?? '');
+          const element = String(read(draft, [...base, 'element']) ?? 'facade');
+          const insulation = read(draft, [...base, 'insulation', 'kind']);
+          const thickness = read(draft, [...base, 'insulation', 'thicknessMm']);
+          const orientation = read(draft, [...base, 'orientation']);
+          const ownWindows = windows.map((item, at) => [item, at] as const).filter(([item]) => item.surfaceId === id);
+          const ownDoors = doors.map((item, at) => [item, at] as const).filter(([item]) => item.surfaceId === id);
+          const ownRooflights = rooflights.map((item, at) => [item, at] as const).filter(([item]) => item.surfaceId === id);
+          const gross = Number(surface.grossAreaM2) || 0;
+          const net = gross - area(windows, id) - area(doors, id) - area(rooflights, id);
+          return <details key={index} className="opname-card" open>
+            <summary className="opname-card-head">
+              <strong>{names.get(id) ?? id}</strong>
+              {element !== 'floor' && typeof orientation === 'string' &&
+                <span className="opname-tag">{t(`opname.orientationKind.${orientation}`)}</span>}
+              {element === 'roof' && <span className="opname-tag">{formatNumber(Number(read(draft, [...base, 'tiltDeg']) ?? 0), locale, 0)}°</span>}
+              {typeof insulation === 'string' && <span className="opname-tag">{insulation === 'thickness' && typeof thickness === 'number'
+                ? `${formatNumber(thickness, locale, 0)} mm` : t(`opname.surface.insulationKind.${insulation}`)}</span>}
+              {ownWindows.length > 0 && <span className="opname-tag">{t('survey.windowsCount', { count: ownWindows.length })}</span>}
+              {ownDoors.length > 0 && <span className="opname-tag">{t('survey.doorsCount', { count: ownDoors.length })}</span>}
+              <span className={`opname-card-net${net < 0 ? ' opname-card-net--invalid' : ''}`}>
+                {t('survey.grossNet', { gross: formatNumber(gross, locale, 2), net: formatNumber(net, locale, 2) })}</span>
+            </summary>
+            <div className="nta-form-grid opname-card-body">
+              {!embedded && <SelectField {...field} path={[...base, 'element']} label={t('opname.surface.element')}
+                options={opts(t, 'opname.surface.elementKind', ['facade', 'roof', 'floor'])} />}
+              {element !== 'floor' && <SelectField {...field} path={[...base, 'orientation']} label={t('opname.orientation')}
+                options={opts(t, 'opname.orientationKind', ORIENTATIONS)} />}
+              {element === 'roof' && <NumberField {...field} path={[...base, 'tiltDeg']} label={t('opname.tilt')} />}
+              {element === 'floor' && <NumberField {...field} path={[...base, 'exposedPerimeterM']} label={t('opname.surface.perimeter')} />}
+              <label>{t('opname.surface.boundary')}
+                <select value={String(read(draft, [...base, 'boundary', 'kind']) ?? '')}
+                  onChange={(event) => change([...base, 'boundary'], { kind: event.target.value })}>
+                  {['outdoor', 'ground', 'crawlspace', 'adjacent_heated', 'unheated_cellar', 'strongly_ventilated', 'sunroom', 'water'].map((key) =>
+                    <option key={key} value={key}>{t(`opname.surface.boundaryKind.${key}`)}</option>)}
+                </select>
+              </label>
+              <NumberField {...field} path={[...base, 'grossAreaM2']} label={t('opname.surface.area')} />
+              {kind === 'utility' && zoneIds.length > 1 &&
+                <ZoneSelect draft={draft} change={change} path={[...base, 'zoneId']} label={t('opname.surface.zone')}
+                  ids={zoneIds} empty={t('opname.zones.splitByArea')} unknown={t('opname.zones.unknownZone')} />}
+              <label>{t('opname.surface.insulation')}
+                <select value={typeof insulation === 'string' ? insulation : ''}
+                  onChange={(event) => change([...base, 'insulation'], event.target.value === 'thickness'
+                    ? { kind: 'thickness', thicknessMm: 50 } : { kind: event.target.value })}>
+                  {['none_or_unknown', 'present_unknown_thickness', 'cavity_filled_unknown_width', 'thickness'].map((key) =>
+                    <option key={key} value={key}>{t(`opname.surface.insulationKind.${key}`)}</option>)}
+                </select>
+              </label>
+              {insulation === 'thickness' && <NumberField {...field} path={[...base, 'insulation', 'thicknessMm']} label={t('opname.surface.thicknessMm')} />}
+              {insulation === 'present_unknown_thickness' && <>
+                <NumberField {...field} path={[...base, 'renovation', 'year']} label={t('opname.surface.renovationYear')} step="1" />
+                <CheckField {...field} path={[...base, 'renovation', 'meetsRequirementsOfYear']} label={t('opname.surface.renovationEvidence')} />
+              </>}
+              <CheckField {...field} path={[...base, 'thermalCushions']} label={t('opname.surface.thermalCushions')} />
+            </div>
+            {ownWindows.map(([item, at]) => windowFields(item, at))}
+            {ownDoors.map(([item, at]) => doorFields(item, at))}
+            {ownRooflights.map(([item, at]) => rooflightFields(item, at))}
+            <div className="opname-card-actions">
+              {element !== 'floor' && <button type="button" className="btn btn-sm"
+                onClick={() => change(['envelope', 'windows'], [...windows, windowTemplate(windows.length, id)])}>
+                {t(element === 'roof' ? 'survey.addRoofWindowHere' : 'survey.addWindowHere')}</button>}
+              {element === 'facade' && <button type="button" className="btn btn-sm"
+                onClick={() => change(['envelope', 'doors'], [...doors, {
+                  id: `deur-${doors.length + 1}`, surfaceId: id, areaM2: 2, insulated: null, glassFraction: 0,
+                  frame: 'wood_or_plastic', sourceReference: '',
+                }])}>{t('survey.addDoorHere')}</button>}
+              {element === 'roof' && <button type="button" className="btn btn-sm"
+                onClick={() => change(['envelope', 'rooflights'], [...rooflights, {
+                  id: `lichtkoepel-${rooflights.length + 1}`, surfaceId: id, areaM2: 1, uValue: 2.5, glass: 'double', qualityDeclarationReference: '',
+                }])}>{t('opname.addRooflight')}</button>}
+              <RemoveButton label={t('survey.removeSurface')} onRemove={() => {
+                // Openings on the removed surface go with it: the kernel rejects an opening without its surface.
+                const keep = (items: Array<Record<string, unknown>>) => items.filter((item) => item.surfaceId !== id);
+                let next = write(draft, ['envelope', 'surfaces'], surfaces.filter((_, item) => item !== index));
+                next = write(next, ['envelope', 'windows'], keep(windows));
+                next = write(next, ['envelope', 'rooflights'], keep(rooflights));
+                if (doors.length > 0) next = write(next, ['envelope', 'doors'], keep(doors));
+                save({ kind, survey: next });
+              }} />
+            </div>
+          </details>;
+        });
+        // Openings without a (shown) surface: a mistake to fix, so they stay visible with "In vlak".
+        const known = new Set(surfaces.map((surface) => String(surface.id ?? '')));
+        const loose = [
+          ...windows.map((item, at) => [item, at, 'w'] as const),
+          ...(part !== 'roofFloor' ? doors.map((item, at) => [item, at, 'd'] as const) : []),
+        ].filter(([item]) => !known.has(String(item.surfaceId ?? '')));
+        return <>
+          {cards}
+          {loose.length > 0 && <div className="opname-card opname-card--loose">
+            <p className="opname-card-head"><strong>{t('survey.unlinked')}</strong></p>
+            {loose.map(([item, at, type]) => type === 'w' ? windowFields(item, at) : doorFields(item, at))}
+          </div>}
+        </>;
+      })()}
+      <div className="opname-list-controls">
+        {part !== 'roofFloor' && <button type="button" className="btn"
+          onClick={() => change(['envelope', 'surfaces'], [...surfaces, surfaceTemplate(surfaces.length, 'facade')])}>{t('survey.addFacade')}</button>}
+        {part !== 'walls' && <>
+          <button type="button" className="btn"
+            onClick={() => change(['envelope', 'surfaces'], [...surfaces, surfaceTemplate(surfaces.length, 'roof')])}>{t('survey.addRoof')}</button>
+          <button type="button" className="btn"
+            onClick={() => change(['envelope', 'surfaces'], [...surfaces, surfaceTemplate(surfaces.length, 'floor')])}>{t('survey.addFloor')}</button>
+        </>}
+      </div>
     </Section></>}
 
     {show('heating') && <><Section title={part === 'heatingRest' ? t('survey.section.heatingRest') : t('opname.heating')}>
