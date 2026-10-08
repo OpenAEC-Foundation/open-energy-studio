@@ -1775,6 +1775,131 @@ CASES += [
 ]
 
 
+# --- Apartment variant (EP-W202f, EP-W302f, EP-W402; p. 24, 32, 33-34) ---
+# The reference dwelling as a corner apartment on the top floor of a
+# building of 4 dwellings and 4 storeys, 10,8 m high: the ground floor is
+# absent (a heated apartment below), the rest is unchanged. Infiltration:
+# table 11.14 "storey, end, top"; dwelling type apartment building (7.13).
+# The surface list is replaced, so the window indices shift: combine only
+# with patches that do not address surfaces by index.
+BUILDING_AREA = 4 * 96.0
+REFERENCE = json.loads((ROOT / "training-data" / "isso54" / "EPW001.json").read_text())
+APARTMENT = [
+    # The patch runner sets values only: the surface list without the floor.
+    setp("/zones/0/surfaces", [s for s in REFERENCE["zones"][0]["surfaces"] if s["id"] != "bg-vloer"]),
+    remove(f"{NTA}/groundFloors"),
+    setp(f"{NTA}/dwellingType", "apartment_building"),
+    setp(f"{VENT}/apartmentBuilding", True),
+    setp(f"{VENT}/buildingHeightM", 10.8),
+    setp(f"{VENT}/infiltration/buildingType", "storey_end_top"),
+]
+COLLECTIVE_PUMP = setp(
+    f"{NTA}/distributionSystem/pump",
+    {"method": "calculated", "heatMeterPresent": False, "sourceReference": "pompvermogen en EEI onbekend, geen warmtemeters"},
+)
+
+CASES += [
+    # EP-W202f: a collective HR107 of 50 kW outside the envelope; pipes through
+    # unheated spaces of unknown length, uninsulated, valves uninsulated
+    # (p. 24; 9.91 with P_H;gen 50 kW, f_gebouw with 4 x 96 m2).
+    (
+        "EPW202f",
+        24,
+        APARTMENT
+        + [
+            setp(f"{BOILER}/role", "collective"),
+            setp(f"{BOILER}/location", "outside_thermal_boundary"),
+            setp(f"{GEN}/auxiliary", {"electricallyConnectedDevices": 1, "nominalPowerKw": 50.0, "sourceReference": "ISSO 54 v2.0 EP-W202f p. 24: collectieve HR107, 50 kW"}),
+            setp(f"{NTA}/collectiveConnection", {"connectedUsableAreaM2": BUILDING_AREA, "sourceReference": "ISSO 54 v2.0 EP-W202f p. 24: 4 woningen van 96 m2"}),
+            setp(f"{NTA}/distributionSystem/installation", "collective"),
+            setp(f"{NTA}/distributionSystem/connectedStoreys", 4),
+            remove(f"{NTA}/distributionSystem/unheatedPipeLengthM"),
+            setp(f"{NTA}/distributionSystem/pipeTransmittance/insulation", {"state": "uninsulated"}),
+            setp(f"{NTA}/distributionSystem/valvesInsulated", False),
+            COLLECTIVE_PUMP,
+        ],
+    ),
+    # EP-W302f: a collective electric compression chiller; cooling pipes
+    # through unconditioned spaces of unknown length, uninsulated, fittings
+    # uninsulated (p. 32).
+    (
+        "EPW302f",
+        32,
+        APARTMENT
+        + W301A
+        + [
+            setp(f"{COOL}/collective", {"buildingUsableFloorAreaM2": BUILDING_AREA, "sourceReference": "ISSO 54 v2.0 EP-W302f p. 32: 4 woningen van 96 m2"}),
+            remove(f"{COOL}/distribution/unconditionedPipeLengthM"),
+            setp(f"{COOL}/distribution/pipe", {"kind": "uninsulated"}),
+            setp(f"{COOL}/distribution/fittingsInsulated", False),
+            setp(f"{COOL}/distribution/pump/individualDwellingInstallation", False),
+        ],
+    ),
+]
+
+# EP-W402: a collective indirectly fired 1000 l vessel on an HR100 outside the
+# envelope, T-pieces insulated (f_sto;dis;ls 2), circulation for hot water
+# only 28/25 with 20 mm insulation, none in unheated spaces, fittings
+# insulated, pump power unknown and uncontrolled (p. 33-34). The delivery set
+# of the test belongs to external heat (§13.4.2) and is not entered.
+W402A = APARTMENT + [
+    setp(f"{HW}/collective", {"buildingUsableFloorAreaM2": BUILDING_AREA, "sourceReference": "ISSO 54 v2.0 EP-W402 p. 33: 4 woningen van 96 m2"}),
+    setp(f"{HW}/storage", [vessel(1000.0, {"method": "label", "label": "c"}, 2, False)]),
+    hw_generator({"kind": "indirect_boiler", "boiler": "hr100_or104", "oil": False, "insideBoundary": False, "alsoSpaceHeating": False}),
+    setp(
+        f"{HW}/circulation",
+        {
+            "outerDiameterMm": 28.0,
+            "insulation": "mm20",
+            "fittingsInsulated": True,
+            "unheatedLengthM": 0.0,
+            "floorCount": 4,
+            "connectedDwellings": 4,
+            "pump": {"control": "uncontrolled_or_unknown"},
+            "sourceReference": "ISSO 54 v2.0 EP-W402a p. 33: circulatie alleen tapwater, 28/25, 20 mm isolatie, kleppen en beugels geisoleerd, pomp onbekend zonder regeling",
+        },
+    ),
+]
+CASES += [
+    ("EPW402a", 33, W402A),
+    ("EPW402b", 33, W402A + [remove(f"{HW}/circulation/unheatedLengthM")]),
+    ("EPW402c", 33, W402A + [setp(f"{HW}/circulation/unheatedLengthM", 20.0), setp(f"{HW}/circulation/fittingsInsulated", False)]),
+    (
+        "EPW402d",
+        33,
+        W402A
+        + [
+            remove(f"{HW}/circulation/unheatedLengthM"),
+            setp(f"{HW}/circulation/insulation", "none"),
+            setp(f"{HW}/circulation/fittingsInsulated", False),
+            setp(f"{HW}/circulation/pump/control", "constant_pressure"),
+        ],
+    ),
+    (
+        "EPW402e",
+        34,
+        W402A
+        + [
+            remove(f"{HW}/circulation/unheatedLengthM"),
+            setp(f"{HW}/circulation/pump", {"control": "uncontrolled_or_unknown", "labelPowerKw": 0.04, "energyEfficiencyIndex": 0.3}),
+        ],
+    ),
+    # EP-W402g: unheated length unknown, uninsulated, diameter unknown, fittings
+    # uninsulated (p. 34).
+    (
+        "EPW402g",
+        34,
+        W402A
+        + [
+            remove(f"{HW}/circulation/unheatedLengthM"),
+            remove(f"{HW}/circulation/outerDiameterMm"),
+            setp(f"{HW}/circulation/insulation", "none"),
+            setp(f"{HW}/circulation/fittingsInsulated", False),
+        ],
+    ),
+]
+
+
 def case(test_id, page, patch):
     utility = test_id.startswith("EPU")
     metrics = UTILITY_METRICS if utility else RESIDENTIAL_METRICS
