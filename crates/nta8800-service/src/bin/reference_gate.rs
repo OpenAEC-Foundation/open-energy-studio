@@ -1069,7 +1069,11 @@ mod tests {
         )
         .unwrap();
         let report = run_with(&[], std::slice::from_ref(&suite), None);
-        assert!(report.numeric_comparison_passed, "{:?}", report.errors.len());
+        assert!(
+            report.numeric_comparison_passed,
+            "{:?}",
+            report.errors.len()
+        );
         assert_eq!(report.pending_expectation_cases, 1);
         let comparison = &report.cases[0].comparison;
         assert_eq!(comparison.status, "pending_expectation");
@@ -1077,7 +1081,8 @@ mod tests {
         assert_eq!(comparison.recorded[0].path, "beng2");
         assert!(!report.reference_verified);
         let text = markdown(&report);
-        assert!(text.contains("| pending-case | NTA 8800:2025+C1:2026 | geen verwachting | `beng2` | – |"));
+        assert!(text
+            .contains("| pending-case | NTA 8800:2025+C1:2026 | geen verwachting | `beng2` | – |"));
         assert!(text.contains("| Zonder verwachting | 1 gevallen"));
 
         // A pending case whose project no longer calculates fails the run.

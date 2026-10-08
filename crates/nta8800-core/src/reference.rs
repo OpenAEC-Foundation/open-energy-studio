@@ -420,14 +420,13 @@ pub fn compare_reference_case(case: ReferenceCase) -> ReferenceComparison {
         .iter()
         .enumerate()
         .map(|(index, metric)| (format!("expected[{index}]"), &metric.path, &metric.unit))
-        .chain(
-            pending_metrics
-                .iter()
-                .enumerate()
-                .map(|(index, metric)| {
-                    (format!("pending.metrics[{index}]"), &metric.path, &metric.unit)
-                }),
-        );
+        .chain(pending_metrics.iter().enumerate().map(|(index, metric)| {
+            (
+                format!("pending.metrics[{index}]"),
+                &metric.path,
+                &metric.unit,
+            )
+        }));
     for (at, path, unit_given) in named {
         let unit = metric_unit(path);
         if unit.is_none() {
@@ -1338,7 +1337,11 @@ mod tests {
         let audit = audit_reference_case(case.clone());
         assert!(audit.manifest_complete, "{:?}", audit.issues);
         let recorded = compare_reference_case(case.clone());
-        assert_eq!(recorded.status, "pending_expectation", "{:?}", recorded.issues);
+        assert_eq!(
+            recorded.status, "pending_expectation",
+            "{:?}",
+            recorded.issues
+        );
         assert!(comparison_status_acceptable(recorded.status));
         assert!(recorded.metrics.is_empty());
         assert_eq!(recorded.recorded.len(), 2);

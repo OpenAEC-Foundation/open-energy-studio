@@ -13,6 +13,15 @@ Dit bestand is de wijzigingsregistratie van de rekenkern (BRL 9501 §5.2, §6.2 
 
 ## Onuitgebracht
 
+### 9 oktober 2026 — voorbereiding op de testset ISSO 54 (geen rekenwijziging)
+
+- **Gevallen zonder verwachting in het referentieharnas.** Een referentiegeval mag nu `pending` geven in plaats van `expected`: de reden en de metrieken die het vastlegt, met de band die straks geldt. Zo'n geval wordt doorgerekend en krijgt status `pending_expectation`, zonder oordeel. Het laat de gate slagen, maar een geval dat niet rekent, laat hem falen. Het rapport toont "geen verwachting" en het aantal van zulke gevallen (`pendingExpectationCases`). `pending` naast verwachte waarden of een labelklasse wordt geweigerd (`pending_with_expected_values`); verder zijn er de codes `pending_reason_required` en `pending_metrics_required`. Bestaande gevallen en uitkomsten veranderen niet.
+- **ISSO 54 versie 2.0 gecodeerd.** De referentiewoning EP-W001 en het referentiekantoor EP-U001 staan als volledige projecten in `training-data/isso54/` en rekenen in NTA 8800:2022. 52 deeltesten staan als patch op de referentie in `training-data/reference-suites/isso54-v2.json`, gegenereerd door `scripts/isso54-suite.py`:
+  - woning: isolatie en raam (EP-W003b), oriëntatie, thermische massa, infiltratie, 19 ventilatiesystemen, afgifte en opwekking;
+  - utiliteit: tien gebruiksfuncties en zonwering.
+  
+  De gate rekent ze alle door. De verwachte uitkomsten (bijlage 2 van ISSO 54) zijn niet in bezit. De codering, de interpretaties en de open deeltesten staan in [voorbereiding ISSO 54](nta8800-isso54-voorbereiding.md).
+
 ### 9 oktober 2026 — derde review: opname vóór 1900, lucht/lucht-warmtepomp, zonwering per raam
 
 - **Opname van vóór 1900 met mechanische ventilatie rekent weer.** Bij een onbekend fabricagejaar van de ventilator vult de opname het bouwjaar in (tabel 11.15). Sinds de ondergrens 1900 voor het fabricagejaar weigerde de kern dan een bouwjaar van 1800–1899 (`manufacture_year_invalid`). De opname neemt nu het bouwjaar, maar niet vroeger dan 1900. Dat verandert de uitkomst niet: tabel 11.20 en 11.23 zetten elk jaar tot en met 1900 in hun oudste rij (2025+C1 p. 516, 519). Een ingevuld fabricagejaar buiten 1900–2100 geeft nu `manufacture_year_invalid` op het opnameveld `ventilation.unitManufactureYear`, in plaats van diep in de afgeleide invoer.
