@@ -250,3 +250,6 @@
 .language-table .language-row:nth-last-child(2) { border-bottom: none; }
 .settings-warning { margin: 6px 0 0; font-size: var(--fs-xs); color: var(--warn-text); }
 .settings-about td:first-child { color: var(--fg-2); padding-inline-end: var(--space-4); }
+
+/* Slot of the NL-EPBD mark, shown only for an attested program (BRL 9501 §8.4). */
+.attest-mark { display: inline-block; margin-top: 8px; padding: 4px 10px; border: 1px solid var(--border-strong, var(--fg-3)); border-radius: var(--radius-sm, 4px); font-weight: 600; font-size: var(--fs-xs); }

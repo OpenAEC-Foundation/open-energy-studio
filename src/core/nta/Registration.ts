@@ -73,6 +73,11 @@ export function cleanRegistration(registration: NtaRegistration, kernelVersion?:
       const set = Object.entries(value).filter(([, flag]) => flag === true);
       if (set.length === 0) continue;
       value = Object.fromEntries(set);
+    } else if (key === 'labelStatements' && typeof value === 'object' && value !== null) {
+      // A "no" is an answer the label carries (Omgevingsregeling art. 5.13a lid 1 onder k en l).
+      const answers = Object.entries(value).filter(([, answer]) => typeof answer === 'boolean');
+      if (answers.length === 0) continue;
+      value = Object.fromEntries(answers);
     } else if (key === 'wlcGwp' && typeof value === 'object' && value !== null) {
       value = cleanObject(value);
     } else if (typeof value === 'object' && value !== null) {

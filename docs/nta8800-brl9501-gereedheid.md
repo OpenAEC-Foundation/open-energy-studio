@@ -31,7 +31,7 @@ Waar de BRL een eis aan de **attesthouder als organisatie** stelt (hoofdstukken 
 |---|---|---|---|---|
 | §2.1, p. 2 | Het attest dekt de gebruiksfuncties woonfunctie, andere logiesfunctie, bijeenkomst (overig en kinderopvang), cel, gezondheidszorg (klinisch en niet-klinisch), kantoor, logies in een logiesgebouw, onderwijs, sport en winkel. Er zijn twee deelgebieden: 1 energieprestatie, 2 energiegebruik. Het derde deelgebied, financiële kengetallen, is uitgesteld. | voldaan (functies) | `UsageFunction` in `crates/nta8800-core/src/monthly_demand.rs` kent alle functies. Andere logiesfunctie rekent als woningbouw volgens tabel 6.1 (openbaar geval D, [vergelijking](nta8800-vergelijking-openbare-rapporten.md)). | Met de attesteringsinstelling vastleggen voor welke deelgebieden en eventuele uitsluitingen (§2.4, §8.3) het attest wordt aangevraagd. |
 | §3.0, p. 5 | De aanvrager voert alle deeltesten van de gekozen deelgebieden zelf uit. Hij stelt het programma, de documentatie en de resultaten ter beschikking. | extern | Er is een administratief referentieharnas: `crates/nta8800-core/src/reference.rs`, `POST /v1/nta8800/reference/audit` en de MCP-tool `audit_reference_case` ([referentieprotocol](nta8800-referentieprotocol.md)). Daarnaast zijn er openbare gevallen A–F (`crates/nta8800-core/tests/public_comparison.rs`). | ISSO 54 versie 5.0:2026 met de verwachte uitkomsten, en een batchrun die alle deeltesten draait en de resultaten bewaart (taak B1). |
-| §3.0, p. 5 | Bij het programma hoort documentatie: een handleiding die ook de licentiehouders krijgen, en een globale beschrijving van het programma. | deels | [Handleiding](handleiding-nta8800/index.md) (hoofdstukken 00–09). Hoofdstuk 01 *Reikwijdte en status* en de [energieprestatieketen](nta8800-energieprestatie-keten.md) beschrijven het programma. | Eén samenhangende "globale beschrijving" voor de attesteringsinstelling, die naar de deeldocumenten verwijst (taak B6). |
+| §3.0, p. 5 | Bij het programma hoort documentatie: een handleiding die ook de licentiehouders krijgen, en een globale beschrijving van het programma. | voldaan | [Handleiding](handleiding-nta8800/index.md) (hoofdstukken 00–09) en de [globale beschrijving van het rekenprogramma](nta8800-programmabeschrijving.md) (taak B6, 8 oktober 2026). | – |
 | §3.3, p. 5–6 | De instelling controleert per deelgebied minstens 25 % van de uitkomsten, en van elke test minimaal één. Ze voert zelf in. Van alle (deel)testen moeten invoer en uitkomst beschikbaar zijn. | deels / extern | Alle normatieve invoer heeft een formulier, zodat de instelling zelf kan invoeren ([verificatiestatus](nta8800-verificatiestatus.md)). Het projectdossier bundelt invoer, kernuitvoer en rapport met SHA-256 (`src/core/report/ProjectDossier.ts`). | Projectbestanden en een uitkomstenoverzicht per deeltest van ISSO 54. Dat kan pas met de testset. |
 | §3.6, p. 6 | Het attest volgt pas als hoofdstukken 4–6 voldaan zijn en er een attesteringsovereenkomst is. | open | – | Een attesteringsinstelling kiezen en een overeenkomst sluiten. |
 
@@ -81,7 +81,7 @@ Waar de BRL een eis aan de **attesthouder als organisatie** stelt (hoofdstukken 
 | §7.1.3, p. 11 | Elke twee jaar steekproeven op minstens 10 % van de ISSO 54-tests per deelgebied. | extern | – | De testset en een herhaalbare run (taak B1). |
 | §7.2, p. 12–13 | Bij een rekenkernwijziging voert de attesthouder alle nieuwe en gewijzigde (deel)testen zelf uit. | extern | – | Hetzelfde. Daarnaast moet bekend zijn welke tests ISSO 54 als gewijzigd aanmerkt. |
 | §8.2, p. 15 | Een nieuwe rekenkern krijgt een nieuw attest. Het versienummer van de rekenkern staat op het attest. | deels | `KERNEL_VERSION` wordt per berekening vastgelegd en weigert herlabelen met een andere kern (`relabel_kernel_version_differs`). | Een versiediscipline (taak B3). Anders is niet te zien welke kern geattesteerd is. |
-| §8.4 opm., p. 15 | Een geattesteerd programma draagt het NL-EPBD-merk. | open | – | Na het attest: het merk tonen in de app en op het rapport, afhankelijk van `SOFTWARE_ATTEST_NUMBER` (taak B8). |
+| §8.4 opm., p. 15 | Een geattesteerd programma draagt het NL-EPBD-merk. | deels | Taak B8 (8 oktober 2026). Eén accessor, `src/core/nta/Attest.ts`, leest het attestnummer. Alleen met een attestnummer tonen het venster "Over" en het rapport (voorblad en kopregel) het nummer en de plaats van het merk. Zonder attestnummer staat er "niet geattesteerd" en geen merk. Getest in `src/__tests__/brl9501-attest-label-statements.test.tsx`. | Het officiële NL-EPBD-beeldmerk, na het attest en de licentie op het merk. Het hoort in `src/assets/nl-epbd/` en vervangt de tijdelijke tekst in het merkvak. |
 | §9, p. 16 | De licentiehouder krijgt bij de opdracht een volledig exemplaar van het attest. Gepubliceerd wordt alleen volledig. | open | – | Organisatorisch, na het attest. |
 
 ## 2. Testset ISSO 54
@@ -123,7 +123,7 @@ Het [attestdossier](nta8800-attestdossier.md) loopt BRL 9500-W/U, BRL 9500-MWA-W
 | Eis | Status | Toelichting |
 |---|---|---|
 | EP-Online-registratie (BRL 9500 §4.2.5; Omgevingsregeling art. 5.11/5.12 lid 3 en 5.14) | extern | Het uploadformaat is niet openbaar. |
-| Verplichte labelelementen k en l (Omgevingsregeling art. 5.13a lid 1) | deels | Dit zijn verklaringen van de adviseur. Ze hebben nog geen invoerveld (taak B9). Element m vult de uitgever van het label in. |
+| Verplichte labelelementen k en l (Omgevingsregeling art. 5.13a lid 1) | aanwezig | Taak B9 (8 oktober 2026). Dit zijn verklaringen van de adviseur, met ja of nee, in `registration.labelStatements`. Voor een registratie vanaf 29 mei 2026 vraagt de kern ze (`label_statement_external_signals_required`, `label_statement_low_temperature_required`). Het rapport toont ze bij de labelgegevens. Het EP-Online-gegevensoverzicht zet ze apart, omdat het exportschema er geen velden voor heeft. Element m vult de uitgever van het label in. |
 | Rekenregels voor de kostenberekening (ISSO-modelbeschrijving, rapport 110293) | extern | Het rapport is niet beschikbaar. De NCW gebruikt de parameters van de adviseur. |
 | Bewaren van de oorspronkelijke rekenkern voor herlabelen (24 maanden) en van het dossier (15 jaar) | organisatorisch | Hangt samen met taak B4. Het bewaren van dossiers ligt bij de certificaathouder. |
 | Maatwerkadvies, afstemming op werkelijk gebruik, renovatiepaspoort | deels | Aanwezig maar niet geverifieerd. Lokale klimaatdata ontbreken. |
@@ -132,6 +132,8 @@ Het [attestdossier](nta8800-attestdossier.md) loopt BRL 9500-W/U, BRL 9500-MWA-W
 
 ### (a) Zelf te bouwen
 
+Afgerond op 8 oktober 2026 (✔): B6, B8 en B9.
+
 | Taak | Eis | Omschrijving |
 |---|---|---|
 | **B1** | §3.0, §6.2, §6.3, §7.2 | Een testsetrunner die alle referentiecases in een map draait, met `audit_reference_case` per case. Hij schrijft een rapport (Markdown en JSON) met de commit, `KERNEL_VERSION`, `TARGET_NORM_VERSION`, het oordeel per deeltest en de SHA-256 van invoer en uitvoer. De gate roept hem aan, zodat de openbare gevallen en later ISSO 54 elke run meelopen. |
@@ -139,10 +141,10 @@ Het [attestdossier](nta8800-attestdossier.md) loopt BRL 9500-W/U, BRL 9500-MWA-W
 | **B3** | §4.3, §5.2, §6.2, §6.4, §8.2 | Het versiebeleid afdwingen. `KERNEL_VERSION` ophogen bij elke wijziging die uitkomsten verandert. Een gate-controle die faalt als de releasenotes "Resultaten die veranderen" hebben zonder ophoging. De releasenotes indelen per kern- en programmaversie in plaats van per datum. |
 | **B4** | §5.3, §6.2, §6.3 | Een releaseprocedure in een script: per vrijgave een git-tag, de gebouwde pakketten met SHA-256 gearchiveerd, en de gate- en testsetrapporten bewaard naast de release. De bestaande `docs/nta8800-build-verificatie-*.md` zijn daar een handmatige voorloper van. |
 | **B5** | §6.1 | Een leveringsdocument dat bij de build wordt gegenereerd: programmanaam, programmaversie, `KERNEL_VERSION`, `TARGET_NORM_VERSION`, attestnummer en identificatiecode (leeg tot het attest), en de SHA-256 van het pakket. |
-| **B6** | §3.0 | Een "globale beschrijving van het rekenprogramma" voor de attesteringsinstelling: architectuur, reikwijdte, uitgaven, interpretaties en verificatie, met verwijzingen naar de bestaande documenten. |
+| **B6** ✔ | §3.0 | Een "globale beschrijving van het rekenprogramma" voor de attesteringsinstelling: architectuur, reikwijdte, uitgaven, interpretaties en verificatie, met verwijzingen naar de bestaande documenten. |
 | **B7** | §4.4 | De handleiding bij elke release meeleveren, als PDF of in de app, met dezelfde versie als het programma. |
-| **B8** | §8.4 | Het NL-EPBD-merk en het attestnummer tonen in de app en op het rapport, zodra `SOFTWARE_ATTEST_NUMBER` gevuld is. |
-| **B9** | Omgevingsregeling art. 5.13a | Invoervelden voor de verklaringen van de adviseur bij labelelementen k en l. |
+| **B8** ✔ | §8.4 | Het NL-EPBD-merk en het attestnummer tonen in de app en op het rapport, zodra `SOFTWARE_ATTEST_NUMBER` gevuld is. |
+| **B9** ✔ | Omgevingsregeling art. 5.13a | Invoervelden voor de verklaringen van de adviseur bij labelelementen k en l. |
 
 ### (b) Extern
 
@@ -187,8 +189,8 @@ Telling over de eisentabel in §1 (34 rijen). Een rij met twee statussen telt bi
 
 | Status | Aantal |
 |---|---|
-| voldaan | 2 |
+| voldaan | 3 |
 | deels | 14 |
-| open | 10 |
+| open | 9 |
 | extern | 7 |
 | n.v.t. | 1 |
