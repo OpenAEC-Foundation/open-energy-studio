@@ -241,8 +241,11 @@ CASES = [
         23,
         [
             setp(f"{NTA}/emission/system", "other_or_unknown"),
+            # Only the emitter, the NEN-EN 215 declaration and the missing
+            # hydronic balancing change; room control stays as in EP-W001.
             emission2023(
                 {"type": "surface", "control": "room", "system": "wall", "insulation": "minimal_insulation"},
+                room_automation="individual_per_room",
                 certified=True,
             ),
         ],
@@ -517,6 +520,170 @@ CASES += [
             )
         ],
     ),
+]
+
+
+# --- EP-W203/W204: heating generators (p. 25-27) ---
+GEN = f"{NTA}/generator"
+GROUND_SOURCES = {"ground", "groundwater_below15_c"}
+# Table 9.28 evidence: ISSO 54 states only "voldoet aan tabel 9.28"; the test
+# points are set just above the table 9.28 minimums (fictitious values).
+HIGH_POINTS = {
+    "ground": [("b0_w45", 3.05), ("b0_w35", 3.55)],
+    "groundwater_below15_c": [("w10_w45", 3.8), ("w10_w35", 4.45)],
+    "outdoor_air": [("a7_wet6_w45", 2.8), ("a7_wet6_w35", 2.9), ("a_minus7_wet_minus8_w45", 1.95)],
+}
+
+
+def heat_pump(test_id, source, supply, high=False, declaration=None, sink="hydronic"):
+    forfait = {
+        "generatorId": "wp",
+        "classificationSourceReference": f"ISSO 54 v2.0 {test_id}: elektrische warmtepomp, bron {source}",
+        "scope": "residential_at_most25_kw",
+        "source": source,
+        "sink": sink,
+        "designSupplyTemperatureC": supply if sink == "hydronic" else None,
+    }
+    if source in GROUND_SOURCES:
+        forfait["sourceCorrectionFactor"] = 1.0
+        forfait["sourceCorrectionReference"] = "geen regeneratie genoemd in de deeltest"
+    if high:
+        forfait["rowVariant"] = "table_9_28_high_efficiency"
+        forfait["highEfficiencyEvidence"] = {
+            "productReference": f"ISSO 54 v2.0 {test_id}: COP voldoet aan tabel 9.28",
+            "testReportReference": "fictief: de deeltest geeft geen meetwaarden, hier net boven de minima van tabel 9.28",
+            "testStandardEdition": "NEN-EN 14511-2:2007",
+            "points": [{"condition": c, "measuredCop": v} for c, v in HIGH_POINTS[source]],
+        }
+    if declaration is not None:
+        forfait["qualityDeclaration"] = declaration
+    return setp(
+        GEN,
+        {
+            "kind": "heat_pump_forfait",
+            "forfait": forfait,
+            "sourceSystem": "individual",
+            "sourceSystemReference": f"ISSO 54 v2.0 {test_id}: individuele warmtepomp",
+        },
+    )
+
+
+def temperature_class(value):
+    return setp(f"{NTA}/distributionSystem/designTemperatureClass", value)
+
+
+def biomass(test_id, appliance, location, compliant, automatic=False, power=None):
+    body = {
+        "kind": "biomass",
+        "appliance": appliance,
+        "location": location,
+        "annexRCompliantAtMost500Kw": compliant,
+        "annexRReference": f"ISSO 54 v2.0 {test_id}: biomassa {'voldoet' if compliant else 'voldoet niet'} aan bijlage R",
+        "equipmentReference": f"ISSO 54 v2.0 {test_id}",
+        "automaticFuelFeed": automatic,
+    }
+    if power is not None:
+        body["auxiliary"] = {"electricallyConnectedDevices": 1, "nominalPowerKw": power, "sourceReference": f"ISSO 54 v2.0 {test_id}: vermogen {power} kW, aangesloten op het net"}
+    else:
+        body["auxiliary"] = {"electricallyConnectedDevices": 0, "sourceReference": f"ISSO 54 v2.0 {test_id}: geen aansluiting op het elektriciteitsnet"}
+    if appliance != "central_boiler":
+        # §9.6.5: the stove is the only heating in the rooms it serves (the
+        # deeltest replaces the boiler by the stove).
+        body["soleHeatingInServedRooms"] = True
+    return setp(GEN, body)
+
+
+def renewable(test_id, below_20, exhaust=False):
+    """Annex P evidence for the renewable share of a heat pump."""
+    return setp(
+        f"{NTA}/heatPumpRenewable",
+        {"sourceBelow20C": below_20, "exhaustAirSource": exhaust, "sourceReference": f"ISSO 54 v2.0 {test_id}: bron volgens de deeltest"},
+    )
+
+
+# Generators outside 9.85 (biomass, external heat) have a pump of their own
+# (9.41-9.51, power and EEI unknown: forfait).
+CALCULATED_PUMP = setp(
+    f"{NTA}/distributionSystem/pump",
+    {"method": "calculated", "heatMeterPresent": False, "sourceReference": "distributiepomp, vermogen en EEI onbekend"},
+)
+# Local stoves without a water-borne system: emission as local heater
+# (table 9.2 "overige"), no distribution.
+LOCAL = [
+    setp(
+        f"{NTA}/emission",
+        {"system": "local_heater", "balancing": "not_applicable", "control": "individual_room_thermostats", "sourceReference": "lokale toestellen, regeling individueel per ruimte"},
+    ),
+    remove(f"{NTA}/distributionSystem"),
+    setp(
+        f"{NTA}/distribution",
+        {"method": "declared", "monthlyLossKwh": [0.0] * 12, "sourceReference": "geen watergedragen distributiesysteem (lokale toestellen): geen distributieverlies"},
+    ),
+]
+
+
+CASES += [
+    (
+        "EPW203a",
+        25,
+        [
+            setp(
+                GEN,
+                {
+                    "kind": "forfait_heater",
+                    "heaterKind": "local_with_flue",
+                    "fuel": "natural_gas",
+                    "equipmentReference": "ISSO 54 v2.0 EP-W203a p. 25: lokale gasverwarming met afvoer, zonder elektriciteitsaansluiting",
+                    "auxiliary": {"electricallyConnectedDevices": 0, "sourceReference": "ISSO 54 v2.0 EP-W203a: zonder elektriciteitsaansluiting"},
+                },
+            )
+        ]
+        + LOCAL,
+    ),
+    ("EPW203d", 25, [heat_pump("EP-W203d", "ground", 35.0), temperature_class("35_30"), renewable("EP-W203d", True)]),
+    ("EPW203e", 25, [heat_pump("EP-W203e", "groundwater_below15_c", 45.0, high=True), temperature_class("45_40"), renewable("EP-W203e", True)]),
+    ("EPW203f", 25, [heat_pump("EP-W203f", "outdoor_air", 55.0, high=True), temperature_class("55_47"), renewable("EP-W203f", True)]),
+    ("EPW203h", 26, [heat_pump("EP-W203h", "ground", 50.0, high=True), temperature_class("50_42"), renewable("EP-W203h", True)]),
+    (
+        "EPW203i",
+        26,
+        [
+            heat_pump(
+                "EP-W203i",
+                "outdoor_air",
+                50.0,
+                declaration={"declarationReference": "ISSO 54 v2.0 EP-W203i p. 26: kwaliteitsverklaring", "generationEfficiency": 3.8, "auxiliaryKwhPerYear": 100.0},
+            ),
+            temperature_class("50_42"),
+            renewable("EP-W203i", True),
+        ],
+    ),
+    (
+        "EPW203p",
+        27,
+        [heat_pump("EP-W203p", "exhaust_air", 55.0), temperature_class("55_47"), renewable("EP-W203p", True, exhaust=True), unit("c1", "luka_a_b_c"), NO_PASSIVE],
+    ),
+    (
+        "EPW204a",
+        27,
+        [
+            setp(
+                GEN,
+                {
+                    "kind": "external_heat",
+                    "supplierReference": "ISSO 54 v2.0 EP-W204a p. 27: warmtelevering door derden",
+                    "qualityDeclarationPresent": False,
+                    "auxiliary": {"electricallyConnectedDevices": 1, "sourceReference": "ISSO 54 v2.0 EP-W204a: afleverset met hoofddistributiepomp"},
+                },
+            ),
+            CALCULATED_PUMP,
+        ],
+    ),
+    ("EPW204c", 27, [biomass("EP-W204c", "freestanding_wood_stove", "inside_thermal_boundary", True)] + LOCAL),
+    # EP-W204d (pellet stove not meeting annex R): table 9.30 (2022 p. 337)
+    # only covers appliances meeting annex R, so the forfait route has no
+    # efficiency and the kernel refuses (biomass_class_unsupported). Not encoded.
+    ("EPW204e", 28, [biomass("EP-W204e", "central_boiler", "outside_thermal_boundary", True, automatic=True, power=5.0), CALCULATED_PUMP]),
 ]
 
 

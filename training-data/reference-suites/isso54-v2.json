@@ -2237,7 +2237,7 @@
               "insulation": "minimal_insulation"
             },
             "certifiedControl": true,
-            "roomAutomation": "unknown",
+            "roomAutomation": "individual_per_room",
             "pipeSystem": "two_pipe",
             "balancing": "none_or_unknown"
           }
@@ -4287,6 +4287,851 @@
       "source": {
         "publisher": "ISSO / InstallQ (CCvD)",
         "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-406q, p. 39",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW203a",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/generator",
+          "value": {
+            "kind": "forfait_heater",
+            "heaterKind": "local_with_flue",
+            "fuel": "natural_gas",
+            "equipmentReference": "ISSO 54 v2.0 EP-W203a p. 25: lokale gasverwarming met afvoer, zonder elektriciteitsaansluiting",
+            "auxiliary": {
+              "electricallyConnectedDevices": 0,
+              "sourceReference": "ISSO 54 v2.0 EP-W203a: zonder elektriciteitsaansluiting"
+            }
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/emission",
+          "value": {
+            "system": "local_heater",
+            "balancing": "not_applicable",
+            "control": "individual_room_thermostats",
+            "sourceReference": "lokale toestellen, regeling individueel per ruimte"
+          }
+        },
+        {
+          "op": "remove",
+          "pointer": "/ntaCalculation/distributionSystem"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/distribution",
+          "value": {
+            "method": "declared",
+            "monthlyLossKwh": [
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "sourceReference": "geen watergedragen distributiesysteem (lokale toestellen): geen distributieverlies"
+          }
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-203a, p. 25",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW203d",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/generator",
+          "value": {
+            "kind": "heat_pump_forfait",
+            "forfait": {
+              "generatorId": "wp",
+              "classificationSourceReference": "ISSO 54 v2.0 EP-W203d: elektrische warmtepomp, bron ground",
+              "scope": "residential_at_most25_kw",
+              "source": "ground",
+              "sink": "hydronic",
+              "designSupplyTemperatureC": 35.0,
+              "sourceCorrectionFactor": 1.0,
+              "sourceCorrectionReference": "geen regeneratie genoemd in de deeltest"
+            },
+            "sourceSystem": "individual",
+            "sourceSystemReference": "ISSO 54 v2.0 EP-W203d: individuele warmtepomp"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/distributionSystem/designTemperatureClass",
+          "value": "35_30"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/heatPumpRenewable",
+          "value": {
+            "sourceBelow20C": true,
+            "exhaustAirSource": false,
+            "sourceReference": "ISSO 54 v2.0 EP-W203d: bron volgens de deeltest"
+          }
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-203d, p. 25",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW203e",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/generator",
+          "value": {
+            "kind": "heat_pump_forfait",
+            "forfait": {
+              "generatorId": "wp",
+              "classificationSourceReference": "ISSO 54 v2.0 EP-W203e: elektrische warmtepomp, bron groundwater_below15_c",
+              "scope": "residential_at_most25_kw",
+              "source": "groundwater_below15_c",
+              "sink": "hydronic",
+              "designSupplyTemperatureC": 45.0,
+              "sourceCorrectionFactor": 1.0,
+              "sourceCorrectionReference": "geen regeneratie genoemd in de deeltest",
+              "rowVariant": "table_9_28_high_efficiency",
+              "highEfficiencyEvidence": {
+                "productReference": "ISSO 54 v2.0 EP-W203e: COP voldoet aan tabel 9.28",
+                "testReportReference": "fictief: de deeltest geeft geen meetwaarden, hier net boven de minima van tabel 9.28",
+                "testStandardEdition": "NEN-EN 14511-2:2007",
+                "points": [
+                  {
+                    "condition": "w10_w45",
+                    "measuredCop": 3.8
+                  },
+                  {
+                    "condition": "w10_w35",
+                    "measuredCop": 4.45
+                  }
+                ]
+              }
+            },
+            "sourceSystem": "individual",
+            "sourceSystemReference": "ISSO 54 v2.0 EP-W203e: individuele warmtepomp"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/distributionSystem/designTemperatureClass",
+          "value": "45_40"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/heatPumpRenewable",
+          "value": {
+            "sourceBelow20C": true,
+            "exhaustAirSource": false,
+            "sourceReference": "ISSO 54 v2.0 EP-W203e: bron volgens de deeltest"
+          }
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-203e, p. 25",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW203f",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/generator",
+          "value": {
+            "kind": "heat_pump_forfait",
+            "forfait": {
+              "generatorId": "wp",
+              "classificationSourceReference": "ISSO 54 v2.0 EP-W203f: elektrische warmtepomp, bron outdoor_air",
+              "scope": "residential_at_most25_kw",
+              "source": "outdoor_air",
+              "sink": "hydronic",
+              "designSupplyTemperatureC": 55.0,
+              "rowVariant": "table_9_28_high_efficiency",
+              "highEfficiencyEvidence": {
+                "productReference": "ISSO 54 v2.0 EP-W203f: COP voldoet aan tabel 9.28",
+                "testReportReference": "fictief: de deeltest geeft geen meetwaarden, hier net boven de minima van tabel 9.28",
+                "testStandardEdition": "NEN-EN 14511-2:2007",
+                "points": [
+                  {
+                    "condition": "a7_wet6_w45",
+                    "measuredCop": 2.8
+                  },
+                  {
+                    "condition": "a7_wet6_w35",
+                    "measuredCop": 2.9
+                  },
+                  {
+                    "condition": "a_minus7_wet_minus8_w45",
+                    "measuredCop": 1.95
+                  }
+                ]
+              }
+            },
+            "sourceSystem": "individual",
+            "sourceSystemReference": "ISSO 54 v2.0 EP-W203f: individuele warmtepomp"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/distributionSystem/designTemperatureClass",
+          "value": "55_47"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/heatPumpRenewable",
+          "value": {
+            "sourceBelow20C": true,
+            "exhaustAirSource": false,
+            "sourceReference": "ISSO 54 v2.0 EP-W203f: bron volgens de deeltest"
+          }
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-203f, p. 25",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW203h",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/generator",
+          "value": {
+            "kind": "heat_pump_forfait",
+            "forfait": {
+              "generatorId": "wp",
+              "classificationSourceReference": "ISSO 54 v2.0 EP-W203h: elektrische warmtepomp, bron ground",
+              "scope": "residential_at_most25_kw",
+              "source": "ground",
+              "sink": "hydronic",
+              "designSupplyTemperatureC": 50.0,
+              "sourceCorrectionFactor": 1.0,
+              "sourceCorrectionReference": "geen regeneratie genoemd in de deeltest",
+              "rowVariant": "table_9_28_high_efficiency",
+              "highEfficiencyEvidence": {
+                "productReference": "ISSO 54 v2.0 EP-W203h: COP voldoet aan tabel 9.28",
+                "testReportReference": "fictief: de deeltest geeft geen meetwaarden, hier net boven de minima van tabel 9.28",
+                "testStandardEdition": "NEN-EN 14511-2:2007",
+                "points": [
+                  {
+                    "condition": "b0_w45",
+                    "measuredCop": 3.05
+                  },
+                  {
+                    "condition": "b0_w35",
+                    "measuredCop": 3.55
+                  }
+                ]
+              }
+            },
+            "sourceSystem": "individual",
+            "sourceSystemReference": "ISSO 54 v2.0 EP-W203h: individuele warmtepomp"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/distributionSystem/designTemperatureClass",
+          "value": "50_42"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/heatPumpRenewable",
+          "value": {
+            "sourceBelow20C": true,
+            "exhaustAirSource": false,
+            "sourceReference": "ISSO 54 v2.0 EP-W203h: bron volgens de deeltest"
+          }
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-203h, p. 26",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW203i",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/generator",
+          "value": {
+            "kind": "heat_pump_forfait",
+            "forfait": {
+              "generatorId": "wp",
+              "classificationSourceReference": "ISSO 54 v2.0 EP-W203i: elektrische warmtepomp, bron outdoor_air",
+              "scope": "residential_at_most25_kw",
+              "source": "outdoor_air",
+              "sink": "hydronic",
+              "designSupplyTemperatureC": 50.0,
+              "qualityDeclaration": {
+                "declarationReference": "ISSO 54 v2.0 EP-W203i p. 26: kwaliteitsverklaring",
+                "generationEfficiency": 3.8,
+                "auxiliaryKwhPerYear": 100.0
+              }
+            },
+            "sourceSystem": "individual",
+            "sourceSystemReference": "ISSO 54 v2.0 EP-W203i: individuele warmtepomp"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/distributionSystem/designTemperatureClass",
+          "value": "50_42"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/heatPumpRenewable",
+          "value": {
+            "sourceBelow20C": true,
+            "exhaustAirSource": false,
+            "sourceReference": "ISSO 54 v2.0 EP-W203i: bron volgens de deeltest"
+          }
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-203i, p. 26",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW203p",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/generator",
+          "value": {
+            "kind": "heat_pump_forfait",
+            "forfait": {
+              "generatorId": "wp",
+              "classificationSourceReference": "ISSO 54 v2.0 EP-W203p: elektrische warmtepomp, bron exhaust_air",
+              "scope": "residential_at_most25_kw",
+              "source": "exhaust_air",
+              "sink": "hydronic",
+              "designSupplyTemperatureC": 55.0
+            },
+            "sourceSystem": "individual",
+            "sourceSystemReference": "ISSO 54 v2.0 EP-W203p: individuele warmtepomp"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/distributionSystem/designTemperatureClass",
+          "value": "55_47"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/heatPumpRenewable",
+          "value": {
+            "sourceBelow20C": true,
+            "exhaustAirSource": true,
+            "sourceReference": "ISSO 54 v2.0 EP-W203p: bron volgens de deeltest"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/system/unit",
+          "value": {
+            "variant": "c1",
+            "ducts": "luka_a_b_c",
+            "equipmentReference": "systeem C1"
+          }
+        },
+        {
+          "op": "remove",
+          "pointer": "/ntaCalculation/ventilation/maximumCapacityForCooling"
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-203p, p. 27",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW204a",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/generator",
+          "value": {
+            "kind": "external_heat",
+            "supplierReference": "ISSO 54 v2.0 EP-W204a p. 27: warmtelevering door derden",
+            "qualityDeclarationPresent": false,
+            "auxiliary": {
+              "electricallyConnectedDevices": 1,
+              "sourceReference": "ISSO 54 v2.0 EP-W204a: afleverset met hoofddistributiepomp"
+            }
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/distributionSystem/pump",
+          "value": {
+            "method": "calculated",
+            "heatMeterPresent": false,
+            "sourceReference": "distributiepomp, vermogen en EEI onbekend"
+          }
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-204a, p. 27",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW204c",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/generator",
+          "value": {
+            "kind": "biomass",
+            "appliance": "freestanding_wood_stove",
+            "location": "inside_thermal_boundary",
+            "annexRCompliantAtMost500Kw": true,
+            "annexRReference": "ISSO 54 v2.0 EP-W204c: biomassa voldoet aan bijlage R",
+            "equipmentReference": "ISSO 54 v2.0 EP-W204c",
+            "automaticFuelFeed": false,
+            "auxiliary": {
+              "electricallyConnectedDevices": 0,
+              "sourceReference": "ISSO 54 v2.0 EP-W204c: geen aansluiting op het elektriciteitsnet"
+            },
+            "soleHeatingInServedRooms": true
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/emission",
+          "value": {
+            "system": "local_heater",
+            "balancing": "not_applicable",
+            "control": "individual_room_thermostats",
+            "sourceReference": "lokale toestellen, regeling individueel per ruimte"
+          }
+        },
+        {
+          "op": "remove",
+          "pointer": "/ntaCalculation/distributionSystem"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/distribution",
+          "value": {
+            "method": "declared",
+            "monthlyLossKwh": [
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "sourceReference": "geen watergedragen distributiesysteem (lokale toestellen): geen distributieverlies"
+          }
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-204c, p. 27",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW204e",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/generator",
+          "value": {
+            "kind": "biomass",
+            "appliance": "central_boiler",
+            "location": "outside_thermal_boundary",
+            "annexRCompliantAtMost500Kw": true,
+            "annexRReference": "ISSO 54 v2.0 EP-W204e: biomassa voldoet aan bijlage R",
+            "equipmentReference": "ISSO 54 v2.0 EP-W204e",
+            "automaticFuelFeed": true,
+            "auxiliary": {
+              "electricallyConnectedDevices": 1,
+              "nominalPowerKw": 5.0,
+              "sourceReference": "ISSO 54 v2.0 EP-W204e: vermogen 5.0 kW, aangesloten op het net"
+            }
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/distributionSystem/pump",
+          "value": {
+            "method": "calculated",
+            "heatMeterPresent": false,
+            "sourceReference": "distributiepomp, vermogen en EEI onbekend"
+          }
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-204e, p. 28",
         "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
         "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
         "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
