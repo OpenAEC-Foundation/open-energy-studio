@@ -1945,6 +1945,14 @@ export interface NtaBoosterHeatPump {
   testReportReference: string;
 }
 
+/** §13.8.4.4 booster heat pump with the forfait values of 13.162/13.163. */
+export interface NtaBoosterHeatPumpForfait {
+  /** Design supply temperature of the feeding heating system; absent when unknown. */
+  designSupplyTemperatureC?: number | null;
+  heatSource: NtaBoosterHeatPump['heatSource'];
+  sourceReference: string;
+}
+
 /** 9.91/9.92 inputs for generators outside 9.85. */
 export interface NtaOtherGeneratorAuxiliary {
   electricallyConnectedDevices: number;
@@ -4033,6 +4041,7 @@ export type NtaHotWaterGenerator =
     | { kind: 'indirect_heat_pump'; alsoSpaceHeating: boolean }
     | { kind: 'external_heat' }
     | ({ kind: 'booster_heat_pump' } & NtaBoosterHeatPump)
+    | ({ kind: 'booster_heat_pump_forfait' } & NtaBoosterHeatPumpForfait)
     | ({ kind: 'measured_two_profiles' } & NtaTwoProfileTest)
     | { kind: 'heating_system' }
     /** §13.8.4.7.4/§13.8.4.8 building CHP: method 2 (`chp`) or method 1 (`method1`), exclusive. */
