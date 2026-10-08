@@ -623,7 +623,7 @@ function AppContent() {
   // ── Import (UNIEC3 / VABI): each opens as a new document ──
   const handleImportUNIEC3 = useCallback(async () => {
     try {
-      const loaded = withImportRecord(await openUNIEC3FileDialog(), 'UNIEC3');
+      const loaded = await openUNIEC3FileDialog();
       docDispatch({ type: 'DOC_NEW', payload: { id: crypto.randomUUID(), project: loaded } });
     } catch (err) {
       toast.show({ tone: 'error', title: t('app.toast.importFailed', { format: 'UNIEC3' }), message: (err as Error).message });

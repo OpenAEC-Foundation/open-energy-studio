@@ -317,6 +317,12 @@ export function BuildCheckPage({ statuses }: { statuses: Record<StepId, StepStat
             : !calculated && <span className="survey-muted">{t('build.result.none')}</span>}
           {calculated && summary && <Indicators summary={summary} t={t} locale={locale} />}
         </section>
+        {(project.importLog ?? []).filter((record) => record.notes?.length).map((record, index) =>
+          <section key={index} className="survey-card build-import-notes" aria-label={t('build.check.imported', { tool: record.tool })}>
+            <h2>{t('build.check.imported', { tool: record.tool })}{record.fileName ? <small> · {record.fileName}</small> : null}</h2>
+            <p className="survey-muted">{t('build.check.importedLead')}</p>
+            <ul>{record.notes!.map((line, at) => <li key={at}>{line}</li>)}</ul>
+          </section>)}
         <div className="survey-check-grid">
           {inputSteps.map((step) => {
             const state = buildStepState(step, progress);

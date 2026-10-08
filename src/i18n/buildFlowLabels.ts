@@ -45,6 +45,8 @@ export const buildFlowLabelsNl: Record<string, string> = {
   'build.result.none': 'Nog geen uitkomst. Vul de vragen in of los de punten van de rekenkern op.',
   'build.result.note': 'Rekent bij elke wijziging opnieuw. Waarde / eis.',
 
+  'build.check.imported': 'Ingelezen uit {{tool}}',
+  'build.check.importedLead': 'Wat bij het inlezen niet, of met een aanname, is overgenomen. Loop deze punten na.',
   'build.check.lead': 'Alle invoer op één pagina. Wijzig een onderdeel of los de meldingen van de rekenkern op.',
   'build.check.partial': 'Nog niet alle vragen zijn afgerond.',
   'build.check.allInput': 'Alle NTA-invoer',
@@ -95,6 +97,8 @@ export const buildFlowLabelsEn: Record<string, string> = {
   'build.result.none': 'No outcome yet. Answer the questions or resolve the kernel findings.',
   'build.result.note': 'Recalculates on every change. Value / requirement.',
 
+  'build.check.imported': 'Read in from {{tool}}',
+  'build.check.importedLead': 'What the import did not, or only with an assumption, take over. Check these points.',
   'build.check.lead': 'All input on one page. Edit a part or resolve the kernel findings.',
   'build.check.partial': 'Not all questions are finished yet.',
   'build.check.allInput': 'All NTA input',

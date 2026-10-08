@@ -313,6 +313,8 @@ export interface ProjectImportRecord {
   fileName?: string;
   /** ISO timestamp of the import. */
   importedAt?: string;
+  /** What the import did not or only partly take over, for the adviser to check (Uniec3). */
+  notes?: string[];
 }
 
 export interface IProject {

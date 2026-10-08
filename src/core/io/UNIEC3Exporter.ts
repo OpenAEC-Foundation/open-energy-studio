@@ -16,6 +16,8 @@
  */
 
 import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
+import { importUniec3Export, isUniec3Export } from './UNIEC3Import';
+import { withImportRecord } from './importLog';
 import type {
   IProject,
   Orientation, SurfaceType, HeatingSystemType,
@@ -620,8 +622,16 @@ export function exportToUNIEC3(project: IProject): Uint8Array {
 // IMPORT: UNIEC3 ZIP → IProject
 // ============================================================
 
-export function importFromUNIEC3(zipData: Uint8Array): IProject {
+export function importFromUNIEC3(zipData: Uint8Array, fileName?: string): IProject {
   const files = unzipSync(zipData);
+  // A ZIP written by Uniec3 itself (meta.json without the draft marker, relations with ParentId/ChildId).
+  if (isUniec3Export(files)) return importUniec3Export(files, fileName);
+  const project = importDraftUNIEC3(files);
+  return withImportRecord(project, 'UNIEC3', fileName);
+}
+
+/** The app's own `.input-draft.uniec3` (exportToUNIEC3), not the format Uniec3 writes. */
+function importDraftUNIEC3(files: Record<string, Uint8Array>): IProject {
 
   // Find the building directory
   let buildingId = '';
@@ -999,7 +1009,7 @@ export function openUNIEC3FileDialog(): Promise<IProject> {
       reader.onload = () => {
         try {
           const data = new Uint8Array(reader.result as ArrayBuffer);
-          const project = importFromUNIEC3(data);
+          const project = importFromUNIEC3(data, file.name);
           resolve(project);
         } catch (err) {
           reject(err);
