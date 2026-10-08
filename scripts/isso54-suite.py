@@ -2375,6 +2375,166 @@ CASES += [
     ("EPW103c", 22, variant(cross_ventilation)),
 ]
 
+
+# --- EP-W303c/d: free cooling with storage next to a chiller (p. 32-33) ---
+# Free cooling (table 10.34) of 1 or 2 kW plus a compression chiller of 9 or
+# 8 kW: priority by table 10.15, capacities required with two priorities.
+# The heat pump uses the storage as its source (10.84, "regeneratie via de
+# warmtepomp"). The heating heat pump does not meet table 9.28 (base row of
+# table 9.27); its supply temperature stays the reference 45/40. Aquifer is
+# taken as groundwater below 15 degrees C (table 9.27). The test gives no
+# degree of regeneration R, so c_source stays 1,00 (table V.1 lowest row; for
+# EP-W303c also table V.3 recirculation).
+def storage_cooling(test_id, page, source, free_kw, chiller_kw):
+    return W301A + [
+        cooling_generators(
+            {
+                "id": "vrije-koeling",
+                "generator": {"kind": "free_cooling", "source": source, "heatPumpSource": True},
+                "capacityKw": free_kw,
+                "equipmentReference": f"ISSO 54 v2.0 {test_id} p. {page}: vrije koeling met opslag, {free_kw} kW, regeneratie via de warmtepomp",
+            },
+            chiller({"kind": "compression"}, capacity=chiller_kw, why=f"ISSO 54 v2.0 {test_id} p. {page}: compressiekoelmachine {chiller_kw} kW"),
+        ),
+    ]
+
+
+def regenerated(test_id, why):
+    return [
+        setp(f"{GEN}/forfait/sourceCorrectionFactor", 1.0),
+        setp(f"{GEN}/forfait/sourceCorrectionReference", f"ISSO 54 v2.0 {test_id}: {why}; geen regeneratiegraad R gegeven, tabel V.1 laagste rij c 1,00"),
+    ]
+
+
+CASES += [
+    (
+        "EPW303c",
+        33,
+        storage_cooling("EP-W303c", 33, "aquifer_from2013", 1.0, 9.0)
+        + [heat_pump("EP-W303c", "groundwater_below15_c", 45.0), temperature_class("45_40"), renewable("EP-W303c", True)]
+        + regenerated("EP-W303c", "bron aquifer, bronsysteem recirculatie (tabel V.3 c 1,00)")
+        # Hot water: a heat pump with an integrated vessel on the same
+        # aquifer, permit after 2013 (table 13.25 with c_source 1,00).
+        + [hw_generator({"kind": "heat_pump", "exhaustAirSource": False, "sourceCorrection": 1.0})],
+    ),
+    (
+        "EPW303d",
+        33,
+        storage_cooling("EP-W303d", 33, "closed_ground_loop", 2.0, 8.0)
+        + [heat_pump("EP-W303d", "ground", 45.0), temperature_class("45_40"), renewable("EP-W303d", True)]
+        + regenerated("EP-W303d", "bron bodem, regeneratie via de warmtepomp"),
+    ),
+]
+
+
+# --- EP-U202, EP-U502c, EP-U701d: the office rebuilt (p. 45-51) ---
+# Gross facade areas (net of tabel + glazing); every area field of the
+# reference office follows the usable area.
+def scale_u(project, *, area, volume, height, roof, floor, south, north, east_west, windows_, perimeter, storeys, building_height):
+    zone = project["zones"][0]
+    zone["floorArea"] = area
+    zone["volume"] = volume
+    zone["height"] = height
+    surface(project, "dak")["area"] = roof
+    surface(project, "bg-vloer")["area"] = floor
+    surface(project, "gevel-zuid")["area"] = south
+    surface(project, "gevel-noord")["area"] = north
+    surface(project, "gevel-oost")["area"] = east_west
+    surface(project, "gevel-west")["area"] = east_west
+    surface(project, "gevel-zuid")["windows"] = [window(k + 1) for k in range(windows_)]
+    nta = project["ntaCalculation"]
+    nta["groundFloors"][0]["exposedPerimeterM"] = perimeter
+    nta["distributionSystem"]["connectedStoreys"] = storeys
+    nta["cooling"]["distribution"]["pump"]["floorCount"] = storeys
+    vent = nta["ventilation"]
+    vent["usableFloorAreaM2"] = area
+    vent["functions"][0]["areaM2"] = area
+    vent["buildingHeightM"] = building_height
+    nta["hotWater"]["need"]["areas"][0]["areaM2"] = area
+    nta["lighting"][0]["functions"][0]["areaM2"] = area
+    nta["lighting"][0]["lightingZones"][0]["areaM2"] = area
+    nta["areaSourceReference"] = f"ISSO 54 v2.0: Ag {area} m2"
+
+
+# EP-U202: 8 modules stacked (p. 45): Ag 384 m2, 1036,8 m3, 21,6 m; south
+# 76,8 + 96 glazing (16 windows), east/west 129,6, north 172,8.
+def eight_storeys(project):
+    scale_u(project, area=384.0, volume=1036.8, height=21.6, roof=48.0, floor=48.0, south=172.8, north=172.8, east_west=129.6, windows_=16, perimeter=28.0, storeys=8, building_height=21.6)
+
+
+U202 = variant(eight_storeys, REFERENCE_U)
+
+
+def ahu(inside, ducts="none", why=""):
+    return setp(
+        f"{UNIT}/airHandlingUnit",
+        {"insideThermalZone": inside, "supplyDuctsOutside": ducts, "heatingCoil": True, "coolingCoil": True},
+    )
+
+
+# EP-U502c: 32 x 24 x 5,4 m, Ag 1536 m2 (2 storeys), the 4 windows of 24 m2
+# remain; front 148,8 + 24, back 172,8, sides 129,6, roof and floor 768 m2,
+# perimeter 112 m; sport with 500 m2 of sport halls (13.32a), the rest as
+# EP-U502a (p. 49).
+def sport_hall(project):
+    scale_u(project, area=1536.0, volume=4147.2, height=5.4, roof=768.0, floor=768.0, south=172.8, north=172.8, east_west=129.6, windows_=4, perimeter=112.0, storeys=2, building_height=5.4)
+
+
+UTILITY_CASES += [
+    # EP-U202a: an AHU in the heated zone that heats and cools (p. 45; 11.3.2).
+    ("EPU202a", 45, U202 + [ahu(True)]),
+    # EP-U202b: design flow 1500 dm3/s, flow control down to 60 % (11.61 x 60,
+    # design evidence), speed control, nominal fan power 100 W (p. 45).
+    (
+        "EPU202b",
+        45,
+        U202
+        + [
+            ahu(True),
+            installed(1500.0, "ISSO 54 v2.0 EP-U202b p. 45: ontwerpdebiet 1500 dm3/s"),
+            setp(f"{VENT}/flowReduction", {"collective": True, "flowControlPercent": 60, "evidenceReference": "ISSO 54 v2.0 EP-U202b p. 45: terugregeling tot 60 % van de maximale capaciteit"}),
+            setp(
+                f"{VENT}/fans",
+                {
+                    "method": "declared",
+                    "fans": [{"id": "ventilatoren", "power": {"method": "nominal", "nominalPowerW": 100.0}}],
+                    "control": {"method": "flow_control", "control": "speed_control"},
+                    "sourceReference": "ISSO 54 v2.0 EP-U202b p. 45: toerenregeling, nominaal vermogen 100 W",
+                },
+            ),
+        ],
+    ),
+    # EP-U202c: the AHU outside the heated zone, supply ducts 20-40 m outside
+    # the thermal zone, insulated: table 11.19 situation 2 (2022 p. 489).
+    ("EPU202c", 45, U202 + [ahu(False, "situation2")]),
+    (
+        "EPU502c",
+        49,
+        U502A
+        + function("h")
+        + variant(sport_hall, REFERENCE_U)
+        + [setp(f"{HW}/circulation/sportHallAreaM2", 500.0)],
+    ),
+    # EP-U701d: on EP-U202a, a steam humidifier with a central gas-fired
+    # generator, heat recovery by a heat wheel (table 11.18 rotary; chapter 12
+    # with the wheel), other healthcare (p. 51).
+    (
+        "EPU701d",
+        51,
+        # function() sets the areas to 96 m2: it goes before the geometry.
+        function("e")
+        + U202
+        + [ahu(True)]
+        + [
+            setp(f"{UNIT}/heatRecovery/efficiency", {"method": "table", "exchanger": "rotary"}),
+            setp(
+                f"{NTA}/humidifiers",
+                [{"zoneId": "epw001-zone", "humidification": {"humidifier": {"kind": "steam", "carrier": "gas_or_oil"}, "rotaryWheel": True, "equipmentReference": "ISSO 54 v2.0 EP-U701d p. 51: stoombevochtiger met centrale gasgestookte opwekker, warmtewiel"}}],
+            ),
+        ],
+    ),
+]
+
 def case(test_id, page, patch):
     utility = test_id.startswith("EPU")
     metrics = UTILITY_METRICS if utility else RESIDENTIAL_METRICS

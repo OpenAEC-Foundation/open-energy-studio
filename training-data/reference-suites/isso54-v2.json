@@ -15063,6 +15063,333 @@
       }
     },
     {
+      "caseId": "isso54-v2-EPW303c",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/activeCooling",
+          "value": {
+            "system": "compression_table10_29",
+            "capacity": {
+              "method": "dynamic_cooling_load",
+              "sourceReference": "ISSO 54 v2.0: koelinstallatie volgens de deeltest"
+            },
+            "sourceReference": "ISSO 54 v2.0 EP-W301a p. 31: individuele elektrische compressiekoelmachine"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/cooling",
+          "value": {
+            "emission": {
+              "emitter": "floor_cooling",
+              "balancing": "none_or_unknown",
+              "control": "unknown_or_other",
+              "sourceReference": "ISSO 54 v2.0 EP-W301a p. 31: vloerkoeling, inregeling en regeling onbekend"
+            },
+            "distribution": {
+              "designTemperature": "t17_to21",
+              "pipe": {
+                "kind": "insulated_from1995"
+              },
+              "fittingsInsulated": true,
+              "pump": {
+                "hydraulicallyBalanced": false,
+                "floorCount": 2,
+                "heatMeter": false,
+                "individualDwellingInstallation": true,
+                "sourceReference": "pomp aanwezig, gegevens onbekend"
+              },
+              "unconditionedPipeLengthM": 0.0,
+              "sourceReference": "ISSO 54 v2.0 EP-W301a p. 31: ontwerp 12/16 volgens de test, tabel 10.8 opmerking 2 (2022 p. 361) schrijft voor uitsluitend vloerkoeling 17/21 voor; geen leidingen in ongeconditioneerde ruimte, leidingen, kleppen en beugels geisoleerd, pomp, geen warmtemeter"
+            },
+            "generators": [
+              {
+                "id": "koeling",
+                "generator": {
+                  "kind": "compression"
+                },
+                "equipmentReference": "ISSO 54 v2.0 EP-W301a p. 31: individuele elektrische compressiekoelmachine"
+              }
+            ]
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/cooling/generators",
+          "value": [
+            {
+              "id": "vrije-koeling",
+              "generator": {
+                "kind": "free_cooling",
+                "source": "aquifer_from2013",
+                "heatPumpSource": true
+              },
+              "capacityKw": 1.0,
+              "equipmentReference": "ISSO 54 v2.0 EP-W303c p. 33: vrije koeling met opslag, 1.0 kW, regeneratie via de warmtepomp"
+            },
+            {
+              "id": "koeling",
+              "generator": {
+                "kind": "compression"
+              },
+              "equipmentReference": "ISSO 54 v2.0 EP-W303c p. 33: compressiekoelmachine 9.0 kW",
+              "capacityKw": 9.0
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/generator",
+          "value": {
+            "kind": "heat_pump_forfait",
+            "forfait": {
+              "generatorId": "wp",
+              "classificationSourceReference": "ISSO 54 v2.0 EP-W303c: elektrische warmtepomp, bron groundwater_below15_c",
+              "scope": "residential_at_most25_kw",
+              "source": "groundwater_below15_c",
+              "sink": "hydronic",
+              "designSupplyTemperatureC": 45.0,
+              "sourceCorrectionFactor": 1.0,
+              "sourceCorrectionReference": "geen regeneratie genoemd in de deeltest"
+            },
+            "sourceSystem": "individual",
+            "sourceSystemReference": "ISSO 54 v2.0 EP-W303c: individuele warmtepomp"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/distributionSystem/designTemperatureClass",
+          "value": "45_40"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/heatPumpRenewable",
+          "value": {
+            "sourceBelow20C": true,
+            "exhaustAirSource": false,
+            "sourceReference": "ISSO 54 v2.0 EP-W303c: bron volgens de deeltest"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/generator/forfait/sourceCorrectionFactor",
+          "value": 1.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/generator/forfait/sourceCorrectionReference",
+          "value": "ISSO 54 v2.0 EP-W303c: bron aquifer, bronsysteem recirculatie (tabel V.3 c 1,00); geen regeneratiegraad R gegeven, tabel V.1 laagste rij c 1,00"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/generator",
+          "value": {
+            "kind": "heat_pump",
+            "exhaustAirSource": false,
+            "sourceCorrection": 1.0
+          }
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-303c, p. 33",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPW303d",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPW001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/activeCooling",
+          "value": {
+            "system": "compression_table10_29",
+            "capacity": {
+              "method": "dynamic_cooling_load",
+              "sourceReference": "ISSO 54 v2.0: koelinstallatie volgens de deeltest"
+            },
+            "sourceReference": "ISSO 54 v2.0 EP-W301a p. 31: individuele elektrische compressiekoelmachine"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/cooling",
+          "value": {
+            "emission": {
+              "emitter": "floor_cooling",
+              "balancing": "none_or_unknown",
+              "control": "unknown_or_other",
+              "sourceReference": "ISSO 54 v2.0 EP-W301a p. 31: vloerkoeling, inregeling en regeling onbekend"
+            },
+            "distribution": {
+              "designTemperature": "t17_to21",
+              "pipe": {
+                "kind": "insulated_from1995"
+              },
+              "fittingsInsulated": true,
+              "pump": {
+                "hydraulicallyBalanced": false,
+                "floorCount": 2,
+                "heatMeter": false,
+                "individualDwellingInstallation": true,
+                "sourceReference": "pomp aanwezig, gegevens onbekend"
+              },
+              "unconditionedPipeLengthM": 0.0,
+              "sourceReference": "ISSO 54 v2.0 EP-W301a p. 31: ontwerp 12/16 volgens de test, tabel 10.8 opmerking 2 (2022 p. 361) schrijft voor uitsluitend vloerkoeling 17/21 voor; geen leidingen in ongeconditioneerde ruimte, leidingen, kleppen en beugels geisoleerd, pomp, geen warmtemeter"
+            },
+            "generators": [
+              {
+                "id": "koeling",
+                "generator": {
+                  "kind": "compression"
+                },
+                "equipmentReference": "ISSO 54 v2.0 EP-W301a p. 31: individuele elektrische compressiekoelmachine"
+              }
+            ]
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/cooling/generators",
+          "value": [
+            {
+              "id": "vrije-koeling",
+              "generator": {
+                "kind": "free_cooling",
+                "source": "closed_ground_loop",
+                "heatPumpSource": true
+              },
+              "capacityKw": 2.0,
+              "equipmentReference": "ISSO 54 v2.0 EP-W303d p. 33: vrije koeling met opslag, 2.0 kW, regeneratie via de warmtepomp"
+            },
+            {
+              "id": "koeling",
+              "generator": {
+                "kind": "compression"
+              },
+              "equipmentReference": "ISSO 54 v2.0 EP-W303d p. 33: compressiekoelmachine 8.0 kW",
+              "capacityKw": 8.0
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/generator",
+          "value": {
+            "kind": "heat_pump_forfait",
+            "forfait": {
+              "generatorId": "wp",
+              "classificationSourceReference": "ISSO 54 v2.0 EP-W303d: elektrische warmtepomp, bron ground",
+              "scope": "residential_at_most25_kw",
+              "source": "ground",
+              "sink": "hydronic",
+              "designSupplyTemperatureC": 45.0,
+              "sourceCorrectionFactor": 1.0,
+              "sourceCorrectionReference": "geen regeneratie genoemd in de deeltest"
+            },
+            "sourceSystem": "individual",
+            "sourceSystemReference": "ISSO 54 v2.0 EP-W303d: individuele warmtepomp"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/distributionSystem/designTemperatureClass",
+          "value": "45_40"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/heatPumpRenewable",
+          "value": {
+            "sourceBelow20C": true,
+            "exhaustAirSource": false,
+            "sourceReference": "ISSO 54 v2.0 EP-W303d: bron volgens de deeltest"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/generator/forfait/sourceCorrectionFactor",
+          "value": 1.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/generator/forfait/sourceCorrectionReference",
+          "value": "ISSO 54 v2.0 EP-W303d: bron bodem, regeneratie via de warmtepomp; geen regeneratiegraad R gegeven, tabel V.1 laagste rij c 1,00"
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPW-303d, p. 33",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "tojuliMax",
+            "unit": "K",
+            "normReference": "TOjuli;max (5.7); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
       "caseId": "isso54-v2-EPU001",
       "normVersion": "2022",
       "projectFile": "../isso54/EPU001.json",
@@ -18827,6 +19154,1492 @@
       "source": {
         "publisher": "ISSO / InstallQ (CCvD)",
         "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPU-303g, p. 47",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPU202a",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPU001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/zones/0/floorArea",
+          "value": 384.0
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/volume",
+          "value": 1036.8
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/height",
+          "value": 21.6
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/2/area",
+          "value": 172.8
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/2/windows",
+          "value": [
+            {
+              "id": "raam-zuid-1",
+              "name": "Raam zuid 1",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-2",
+              "name": "Raam zuid 2",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-3",
+              "name": "Raam zuid 3",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-4",
+              "name": "Raam zuid 4",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-5",
+              "name": "Raam zuid 5",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-6",
+              "name": "Raam zuid 6",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-7",
+              "name": "Raam zuid 7",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-8",
+              "name": "Raam zuid 8",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-9",
+              "name": "Raam zuid 9",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-10",
+              "name": "Raam zuid 10",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-11",
+              "name": "Raam zuid 11",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-12",
+              "name": "Raam zuid 12",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-13",
+              "name": "Raam zuid 13",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-14",
+              "name": "Raam zuid 14",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-15",
+              "name": "Raam zuid 15",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-16",
+              "name": "Raam zuid 16",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/3/area",
+          "value": 172.8
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/4/area",
+          "value": 129.6
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/5/area",
+          "value": 129.6
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/areaSourceReference",
+          "value": "ISSO 54 v2.0: Ag 384.0 m2"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/distributionSystem/connectedStoreys",
+          "value": 8
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/usableFloorAreaM2",
+          "value": 384.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/functions/0/areaM2",
+          "value": 384.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/buildingHeightM",
+          "value": 21.6
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/need/areas/0/areaM2",
+          "value": 384.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/cooling/distribution/pump/floorCount",
+          "value": 8
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/lighting/0/functions/0/areaM2",
+          "value": 384.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/lighting/0/lightingZones/0/areaM2",
+          "value": 384.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/system/unit/airHandlingUnit",
+          "value": {
+            "insideThermalZone": true,
+            "supplyDuctsOutside": "none",
+            "heatingCoil": true,
+            "coolingCoil": true
+          }
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPU-202a, p. 45",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPU202b",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPU001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/zones/0/floorArea",
+          "value": 384.0
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/volume",
+          "value": 1036.8
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/height",
+          "value": 21.6
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/2/area",
+          "value": 172.8
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/2/windows",
+          "value": [
+            {
+              "id": "raam-zuid-1",
+              "name": "Raam zuid 1",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-2",
+              "name": "Raam zuid 2",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-3",
+              "name": "Raam zuid 3",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-4",
+              "name": "Raam zuid 4",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-5",
+              "name": "Raam zuid 5",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-6",
+              "name": "Raam zuid 6",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-7",
+              "name": "Raam zuid 7",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-8",
+              "name": "Raam zuid 8",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-9",
+              "name": "Raam zuid 9",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-10",
+              "name": "Raam zuid 10",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-11",
+              "name": "Raam zuid 11",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-12",
+              "name": "Raam zuid 12",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-13",
+              "name": "Raam zuid 13",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-14",
+              "name": "Raam zuid 14",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-15",
+              "name": "Raam zuid 15",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-16",
+              "name": "Raam zuid 16",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/3/area",
+          "value": 172.8
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/4/area",
+          "value": 129.6
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/5/area",
+          "value": 129.6
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/areaSourceReference",
+          "value": "ISSO 54 v2.0: Ag 384.0 m2"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/distributionSystem/connectedStoreys",
+          "value": 8
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/usableFloorAreaM2",
+          "value": 384.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/functions/0/areaM2",
+          "value": 384.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/buildingHeightM",
+          "value": 21.6
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/need/areas/0/areaM2",
+          "value": 384.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/cooling/distribution/pump/floorCount",
+          "value": 8
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/lighting/0/functions/0/areaM2",
+          "value": 384.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/lighting/0/lightingZones/0/areaM2",
+          "value": 384.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/system/unit/airHandlingUnit",
+          "value": {
+            "insideThermalZone": true,
+            "supplyDuctsOutside": "none",
+            "heatingCoil": true,
+            "coolingCoil": true
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/installedCapacity",
+          "value": {
+            "totalDm3PerS": 1500.0,
+            "sourceReference": "ISSO 54 v2.0 EP-U202b p. 45: ontwerpdebiet 1500 dm3/s"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/flowReduction",
+          "value": {
+            "collective": true,
+            "flowControlPercent": 60,
+            "evidenceReference": "ISSO 54 v2.0 EP-U202b p. 45: terugregeling tot 60 % van de maximale capaciteit"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/fans",
+          "value": {
+            "method": "declared",
+            "fans": [
+              {
+                "id": "ventilatoren",
+                "power": {
+                  "method": "nominal",
+                  "nominalPowerW": 100.0
+                }
+              }
+            ],
+            "control": {
+              "method": "flow_control",
+              "control": "speed_control"
+            },
+            "sourceReference": "ISSO 54 v2.0 EP-U202b p. 45: toerenregeling, nominaal vermogen 100 W"
+          }
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPU-202b, p. 45",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPU202c",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPU001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/zones/0/floorArea",
+          "value": 384.0
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/volume",
+          "value": 1036.8
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/height",
+          "value": 21.6
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/2/area",
+          "value": 172.8
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/2/windows",
+          "value": [
+            {
+              "id": "raam-zuid-1",
+              "name": "Raam zuid 1",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-2",
+              "name": "Raam zuid 2",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-3",
+              "name": "Raam zuid 3",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-4",
+              "name": "Raam zuid 4",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-5",
+              "name": "Raam zuid 5",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-6",
+              "name": "Raam zuid 6",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-7",
+              "name": "Raam zuid 7",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-8",
+              "name": "Raam zuid 8",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-9",
+              "name": "Raam zuid 9",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-10",
+              "name": "Raam zuid 10",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-11",
+              "name": "Raam zuid 11",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-12",
+              "name": "Raam zuid 12",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-13",
+              "name": "Raam zuid 13",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-14",
+              "name": "Raam zuid 14",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-15",
+              "name": "Raam zuid 15",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-16",
+              "name": "Raam zuid 16",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/3/area",
+          "value": 172.8
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/4/area",
+          "value": 129.6
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/5/area",
+          "value": 129.6
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/areaSourceReference",
+          "value": "ISSO 54 v2.0: Ag 384.0 m2"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/distributionSystem/connectedStoreys",
+          "value": 8
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/usableFloorAreaM2",
+          "value": 384.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/functions/0/areaM2",
+          "value": 384.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/buildingHeightM",
+          "value": 21.6
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/need/areas/0/areaM2",
+          "value": 384.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/cooling/distribution/pump/floorCount",
+          "value": 8
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/lighting/0/functions/0/areaM2",
+          "value": 384.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/lighting/0/lightingZones/0/areaM2",
+          "value": 384.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/system/unit/airHandlingUnit",
+          "value": {
+            "insideThermalZone": false,
+            "supplyDuctsOutside": "situation2",
+            "heatingCoil": true,
+            "coolingCoil": true
+          }
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPU-202c, p. 45",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPU502c",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPU001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/usageFunction",
+          "value": "healthcare_with_beds"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/bblFunction",
+          "value": "healthcare_with_beds"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/setpoints/heatingC",
+          "value": 22.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/heatingSetpointC",
+          "value": 22.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/functions",
+          "value": [
+            {
+              "function": "healthcare_bed_area",
+              "areaM2": 96.0
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/need/areas",
+          "value": [
+            {
+              "function": "healthcare_with_beds",
+              "areaM2": 96.0
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/lighting/0/functions",
+          "value": [
+            {
+              "function": "healthcare_with_beds",
+              "areaM2": 96.0
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/circulation",
+          "value": {
+            "outerDiameterMm": 35.0,
+            "insulation": "mm25",
+            "fittingsInsulated": true,
+            "unheatedLengthM": 0.0,
+            "floorCount": 2,
+            "pump": {
+              "control": "uncontrolled_or_unknown"
+            },
+            "sourceReference": "ISSO 54 v2.0 EP-U502a p. 49: circulatie, forfaitaire lengte, 35/32 mm, 25 mm isolatie, kleppen en beugels geisoleerd, pomp onbekend zonder regeling"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/storage",
+          "value": [
+            {
+              "id": "vat-1",
+              "volumeL": 200.0,
+              "loss": {
+                "method": "label",
+                "label": "c"
+              },
+              "connectionFactor": 3,
+              "inHeatedZone": false,
+              "sourceReference": "voorraadvat volgens de deeltest"
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/generator",
+          "value": {
+            "kind": "indirect_boiler",
+            "boiler": "hr107",
+            "oil": false,
+            "insideBoundary": false,
+            "alsoSpaceHeating": true
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/generator/boiler/location",
+          "value": "outside_thermal_boundary"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/usageFunction",
+          "value": "sport"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/bblFunction",
+          "value": "sport"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/setpoints/heatingC",
+          "value": 16.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/heatingSetpointC",
+          "value": 16.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/functions",
+          "value": [
+            {
+              "function": "sport",
+              "areaM2": 96.0
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/need/areas",
+          "value": [
+            {
+              "function": "sport",
+              "areaM2": 96.0
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/lighting/0/functions",
+          "value": [
+            {
+              "function": "sport",
+              "areaM2": 96.0
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/floorArea",
+          "value": 1536.0
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/volume",
+          "value": 4147.2
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/0/area",
+          "value": 768.0
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/1/area",
+          "value": 768.0
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/2/area",
+          "value": 172.8
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/3/area",
+          "value": 172.8
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/4/area",
+          "value": 129.6
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/5/area",
+          "value": 129.6
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/areaSourceReference",
+          "value": "ISSO 54 v2.0: Ag 1536.0 m2"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/groundFloors/0/exposedPerimeterM",
+          "value": 112.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/usableFloorAreaM2",
+          "value": 1536.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/functions/0/areaM2",
+          "value": 1536.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/need/areas/0/areaM2",
+          "value": 1536.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/lighting/0/functions/0/areaM2",
+          "value": 1536.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/lighting/0/lightingZones/0/areaM2",
+          "value": 1536.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/circulation/sportHallAreaM2",
+          "value": 500.0
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPU-502c, p. 49",
+        "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
+        "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
+        "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
+      },
+      "pending": {
+        "reason": "De verwachte uitkomsten staan in bijlage 2 van ISSO 54 (apart resultatendocument), niet in bezit; de deeltest wordt doorgerekend zonder oordeel.",
+        "metrics": [
+          {
+            "path": "beng1",
+            "unit": "kWh/m2.year",
+            "normReference": "EP1 / BENG 1, energiebehoefte (5.3); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng2",
+            "unit": "kWh/m2.year",
+            "normReference": "EP2 / BENG 2, primair fossiel energiegebruik (5.2); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          },
+          {
+            "path": "beng3",
+            "unit": "%",
+            "normReference": "EP3 / BENG 3, aandeel hernieuwbare energie (5.4); band: ISSO 54 v2.0 bijlage 2 (p. 67): afkeuring bij meer dan 1,0 % afwijking naar boven of beneden",
+            "relativeTolerance": 0.01
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "isso54-v2-EPU701d",
+      "normVersion": "2022",
+      "projectFile": "../isso54/EPU001.json",
+      "projectPatch": [
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/usageFunction",
+          "value": "other_healthcare"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/bblFunction",
+          "value": "other_healthcare"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/setpoints/heatingC",
+          "value": 21.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/heatingSetpointC",
+          "value": 21.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/functions",
+          "value": [
+            {
+              "function": "other_healthcare",
+              "areaM2": 96.0
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/need/areas",
+          "value": [
+            {
+              "function": "healthcare_without_beds",
+              "areaM2": 96.0
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/lighting/0/functions",
+          "value": [
+            {
+              "function": "healthcare_without_beds",
+              "areaM2": 96.0
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/floorArea",
+          "value": 384.0
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/volume",
+          "value": 1036.8
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/height",
+          "value": 21.6
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/2/area",
+          "value": 172.8
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/2/windows",
+          "value": [
+            {
+              "id": "raam-zuid-1",
+              "name": "Raam zuid 1",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-2",
+              "name": "Raam zuid 2",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-3",
+              "name": "Raam zuid 3",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-4",
+              "name": "Raam zuid 4",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-5",
+              "name": "Raam zuid 5",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-6",
+              "name": "Raam zuid 6",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-7",
+              "name": "Raam zuid 7",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-8",
+              "name": "Raam zuid 8",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-9",
+              "name": "Raam zuid 9",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-10",
+              "name": "Raam zuid 10",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-11",
+              "name": "Raam zuid 11",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-12",
+              "name": "Raam zuid 12",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-13",
+              "name": "Raam zuid 13",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-14",
+              "name": "Raam zuid 14",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-15",
+              "name": "Raam zuid 15",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            },
+            {
+              "id": "raam-zuid-16",
+              "name": "Raam zuid 16",
+              "area": 6.0,
+              "uValue": 1.8,
+              "gValue": 0.7,
+              "orientation": "S",
+              "surfaceId": "gevel-zuid"
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/3/area",
+          "value": 172.8
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/4/area",
+          "value": 129.6
+        },
+        {
+          "op": "set",
+          "pointer": "/zones/0/surfaces/5/area",
+          "value": 129.6
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/areaSourceReference",
+          "value": "ISSO 54 v2.0: Ag 384.0 m2"
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/distributionSystem/connectedStoreys",
+          "value": 8
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/usableFloorAreaM2",
+          "value": 384.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/functions/0/areaM2",
+          "value": 384.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/buildingHeightM",
+          "value": 21.6
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/hotWater/need/areas/0/areaM2",
+          "value": 384.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/cooling/distribution/pump/floorCount",
+          "value": 8
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/lighting/0/functions/0/areaM2",
+          "value": 384.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/lighting/0/lightingZones/0/areaM2",
+          "value": 384.0
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/system/unit/airHandlingUnit",
+          "value": {
+            "insideThermalZone": true,
+            "supplyDuctsOutside": "none",
+            "heatingCoil": true,
+            "coolingCoil": true
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/ventilation/system/unit/heatRecovery/efficiency",
+          "value": {
+            "method": "table",
+            "exchanger": "rotary"
+          }
+        },
+        {
+          "op": "set",
+          "pointer": "/ntaCalculation/humidifiers",
+          "value": [
+            {
+              "zoneId": "epw001-zone",
+              "humidification": {
+                "humidifier": {
+                  "kind": "steam",
+                  "carrier": "gas_or_oil"
+                },
+                "rotaryWheel": true,
+                "equipmentReference": "ISSO 54 v2.0 EP-U701d p. 51: stoombevochtiger met centrale gasgestookte opwekker, warmtewiel"
+              }
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "ISSO / InstallQ (CCvD)",
+        "documentId": "ISSO 54 versie 2.0, Energie Prestatie Rekenprogramma's, testen voor het deelgebied EDR attest energieprestatie (CCvD InstallQ, 12-05-2022), test EPU-701d, p. 51",
         "edition": "versie 2.0, 12-05-2022 (NTA 8800 januari 2022)",
         "usePermission": "openbaar document; alleen de invoer is in eigen woorden gecodeerd, geen tekst overgenomen",
         "independentReviewer": "geen: verwachte uitkomsten (bijlage 2) niet in bezit"
