@@ -36,7 +36,7 @@ describe('basisopname panel', () => {
     let survey = stored()!.survey;
     expect(survey.heating.generator).toEqual({ kind: 'chp', electricalPowerKw: 20, engine: 'diesel_engine' });
     expect(survey.heating.additionalGenerators).toEqual([
-      { generator: { kind: 'boiler', boilerType: 'hr107', insideThermalBoundary: true }, nominalPowerKw: 20 },
+      { id: 'opwekker-1', generator: { kind: 'boiler', boilerType: 'hr107', insideThermalBoundary: true }, nominalPowerKw: 20 },
     ]);
 
     // Hot water: collective, solar water heater and PV with a roof edge.
