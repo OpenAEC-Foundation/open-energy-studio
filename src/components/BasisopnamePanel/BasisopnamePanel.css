@@ -106,3 +106,18 @@
 /* F10: headings one level up for a correct outline; same look as before. */
 .opname-panel > h2 { margin: 0; font: 700 15px 'Space Grotesk', system-ui, sans-serif; }
 .opname-panel h3.opname-result-heading { font-weight: 500; letter-spacing: -0.01em; }
+
+/* Outcome after "Opname doorrekenen", shown in the section the user is on. */
+.opname-panel .opname-section-outcome {
+  margin: 12px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-inline-start: 3px solid var(--accent);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+}
+
+.opname-panel .opname-section-outcome p,
+.opname-panel .opname-section-outcome .opname-issues {
+  margin: 0 0 8px;
+}

@@ -13,7 +13,10 @@ Dit bestand is de wijzigingsregistratie van de rekenkern (BRL 9501 §5.2, §6.2 
 
 ## Onuitgebracht
 
-Nog geen items.
+### 9 oktober 2026 — uitkomst van de opname in het onderdeel; snellere interfacetests (geen rekenwijziging)
+
+- **Opname doorrekenen** geeft nu terugkoppeling in het onderdeel waar je staat: status, indicatief label en EP₂, de fouten van dat onderdeel met **Ga naar het veld**, het aantal fouten elders en **Volledige uitkomst**. Eerder verscheen na doorrekenen vanuit Algemeen niets op de pagina zelf; de uitkomst stond alleen onder Uitkomst & forfaitair. De kaart *Uitkomst opname* heeft nu ook **Overnemen in projectmodel**, zoals het ontwerp vraagt.
+- Interfacetests zoeken formuliervelden op hun label (`getByLabelText`) in plaats van op rol en naam. `getByRole` met een naam berekent voor elk kandidaat-element de toegankelijke naam via de stijlcascade van jsdom; in de traagste opnametest was dat 20,8 van 37 s rekentijd, nu 5,7 s. Keuzerondjes en tests die op de rol zelf toetsen houden `getByRole`.
 
 ## Rekenkern 0.2.0 — 8 oktober 2026
 <!-- kernel-version: 0.2.0 -->
