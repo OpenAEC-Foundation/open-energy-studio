@@ -23,6 +23,15 @@ export function ZoneEditorDialog({ editId, onClose }: ZoneEditorDialogProps) {
   const [volume, setVolume] = useState(existingZone?.volume ?? 0);
   const [height, setHeight] = useState(existingZone?.height ?? 2.6);
 
+  // Area, volume and height cannot be negative: a typed minus sign is ignored,
+  // as in the inspector.
+  const nonNegative = (apply: (value: number) => void) => (text: string) => {
+    const value = parseFloat(text);
+    if (text.trim() === '' || Number.isNaN(value)) { apply(0); return; }
+    if (!Number.isFinite(value) || value < 0) return;
+    apply(value);
+  };
+
   const handleSave = () => {
     if (existingZone) {
       dispatch({
@@ -71,7 +80,7 @@ export function ZoneEditorDialog({ editId, onClose }: ZoneEditorDialogProps) {
             min={0}
             step={0.1}
             value={floorArea}
-            onChange={(e) => setFloorArea(parseFloat(e.target.value) || 0)}
+            onChange={(e) => nonNegative(setFloorArea)(e.target.value)}
           />
         </div>
 
@@ -82,7 +91,7 @@ export function ZoneEditorDialog({ editId, onClose }: ZoneEditorDialogProps) {
             min={0}
             step={0.1}
             value={volume}
-            onChange={(e) => setVolume(parseFloat(e.target.value) || 0)}
+            onChange={(e) => nonNegative(setVolume)(e.target.value)}
           />
         </div>
 
@@ -93,7 +102,7 @@ export function ZoneEditorDialog({ editId, onClose }: ZoneEditorDialogProps) {
             min={0}
             step={0.01}
             value={height}
-            onChange={(e) => setHeight(parseFloat(e.target.value) || 0)}
+            onChange={(e) => nonNegative(setHeight)(e.target.value)}
           />
         </div>
     </DialogShell>

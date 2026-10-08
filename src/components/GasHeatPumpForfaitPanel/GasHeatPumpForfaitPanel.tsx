@@ -55,7 +55,9 @@ export function GasHeatPumpForfaitPanel({ pump, buildingFunction, onSave }: {
       || (application === 'over25_kw' && thermalCapacityKw <= 25)
       || (application === 'utility' && buildingFunction === 'residential')
       || (correctionRequired && (sourceCorrectionFactor === null || !Number.isFinite(sourceCorrectionFactor)
-        || sourceCorrectionFactor <= 0 || !correctionReference.trim()))) {
+        // Annex V table V.1 (2025+C1 p. 1114) gives only 1,00, 1,02 and 1,04.
+        || ![1, 1.02, 1.04].some((allowed) => Math.abs(sourceCorrectionFactor - allowed) < 1e-9)
+        || !correctionReference.trim()))) {
       setError(t('kernel.gasForfait.invalid')); setResult(null); return;
     }
     const input: GasHeatPumpForfaitDraftInput = {
