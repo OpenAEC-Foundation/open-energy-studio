@@ -141,3 +141,8 @@
 .opname-panel .opname-section-outcome .opname-issues {
   margin: 0 0 8px;
 }
+
+/* One insulation answer for all surfaces of an element (feedback 8 Oct 2026). */
+.opname-panel .opname-element-insulation { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px 16px; align-items: end;
+  padding: 10px 14px; border: 1px solid var(--line, var(--border)); border-left: 3px solid var(--accent, var(--amber-500)); border-radius: var(--radius-lg, 10px); }
+.opname-panel .opname-element-insulation > p { grid-column: 1 / -1; margin: 0; }

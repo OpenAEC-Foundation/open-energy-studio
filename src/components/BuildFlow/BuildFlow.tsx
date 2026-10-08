@@ -16,6 +16,7 @@ import { useEnergy } from '../../context/EnergyContext';
 import { useKernel } from '../../context/KernelProvider';
 import { useNtaDraft } from '../../context/NtaDraftProvider';
 import { useShellActions } from '../shell/ShellActions';
+import { useInvalidFields } from '../SurveyWizard/SurveyWizard';
 import { IssueList } from '../ui';
 import { routeForPath } from '../../core/nta/gapRoutes';
 import { kernelIssues, type StepIssue, type StepStatus } from '../../core/nta/stepStatus';
@@ -138,6 +139,8 @@ export function BuildFlowFrame({ route, lead, toolbar, children }: {
   const { steps, progress, mark } = useFlow();
   const shared = useNtaDraft();
   const navigate = useShellActions()?.navigate ?? (() => undefined);
+  // Fields the kernel names as missing or wrong are outlined in red (feedback 8 Oct 2026).
+  useInvalidFields('.build-flow', (useKernel()?.settled?.gaps ?? []).map((gap) => gap.path));
   const question = buildQuestionOf(route, steps);
   const stepIndex = steps.findIndex((step) => step.id === route.step);
   const step = steps[stepIndex];

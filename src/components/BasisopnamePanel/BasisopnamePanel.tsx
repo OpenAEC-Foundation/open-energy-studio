@@ -20,6 +20,7 @@ import { freshItemId, jsonPointer, linksAfterRemoval } from '../../core/nta/Evid
 import { formatNumber } from '../../i18n/format';
 import { dutchDefaultValue, dutchSource, snakeCase } from '../../core/nta/OpnameValueText';
 import type { SurveyPart } from '../../core/survey/surveyFlow';
+import { currentResult, useSurveyAssessment } from '../../core/survey/surveyAssessment';
 import '../NtaPerformancePanel/NtaPerformancePanel.css';
 import './BasisopnamePanel.css';
 import '../shell/pages/existing/existing.css';
@@ -753,6 +754,52 @@ function RemoveButton({ label, onRemove }: { label: string; onRemove: () => void
   return <button type="button" className="btn opname-remove" onClick={onRemove}>{label}</button>;
 }
 
+const INSULATION_KINDS = ['none_or_unknown', 'present_unknown_thickness', 'cavity_filled_unknown_width', 'thickness'];
+
+/**
+ * One insulation answer for all surfaces of an element (feedback 8 Oct 2026:
+ * "isolatie per gevel niet relevant, geef het totaal in het begin"). ISSO 82.1
+ * asks kind and thickness, not an Rc; the kernel derives the Rc per surface.
+ * Party walls (adjacent heated) are left alone; each surface can still differ.
+ */
+export function ElementInsulation({ draft, element, replace, t }: {
+  draft: Draft; element: 'facade' | 'roof' | 'floor'; replace: (next: Draft) => void; t: T;
+}) {
+  const surfaces = list(draft, ['envelope', 'surfaces']).map((surface, index) => ({ surface, index }))
+    .filter(({ surface }) => surface.element === element && (surface.boundary as { kind?: string } | undefined)?.kind !== 'adjacent_heated');
+  if (surfaces.length < 2) return null;
+  const answers = surfaces.map(({ surface }) => JSON.stringify(surface.insulation ?? null));
+  const same = answers.every((answer) => answer === answers[0]);
+  const current = same ? surfaces[0].surface.insulation as { kind?: string; thicknessMm?: number } | undefined : undefined;
+  const apply = (insulation: Record<string, unknown>) => {
+    let next = draft;
+    for (const { index } of surfaces) next = write(next, ['envelope', 'surfaces', index, 'insulation'], insulation);
+    replace(next);
+  };
+  return <div className="opname-element-insulation">
+    <label>{t(`survey.allSurfaces.${element}`)}
+      <select value={current?.kind ?? ''} onChange={(event) => apply(event.target.value === 'thickness'
+        ? { kind: 'thickness', thicknessMm: current?.thicknessMm ?? 50 } : { kind: event.target.value })}>
+        {!same && <option value="">{t('survey.allSurfaces.mixed')}</option>}
+        {INSULATION_KINDS.map((key) => <option key={key} value={key}>{t(`opname.surface.insulationKind.${key}`)}</option>)}
+      </select>
+    </label>
+    {current?.kind === 'thickness' && <label>{t('opname.surface.thicknessMm')}
+      <input type="number" step="10" min="0" value={current.thicknessMm ?? ''}
+        onChange={(event) => apply({ kind: 'thickness', thicknessMm: Number(event.target.value) || 0 })} />
+    </label>}
+    <p className="nta-form-note nta-form-hint">{t('survey.allSurfaces.hint', { count: surfaces.length })}</p>
+  </div>;
+}
+
+/** The Rc the kernel derived for a surface (from its source note, "R_c 1.25"), or null. */
+export function derivedRc(result: OpnameAssessment | null, surfaceId: string): number | null {
+  const elements = ((result?.derivedInput as { opaqueElements?: Array<{ id?: string; sourceReference?: string }> } | null)?.opaqueElements) ?? [];
+  const note = elements.find((item) => item.id === surfaceId)?.sourceReference ?? '';
+  const match = /R_c (-?\d+(?:\.\d+)?)/.exec(note);
+  return match ? Number(match[1]) : null;
+}
+
 function list(draft: Draft, path: Path): Array<Record<string, unknown>> {
   const value = read(draft, path);
   return Array.isArray(value) ? value as Array<Record<string, unknown>> : [];
@@ -850,6 +897,8 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
   const [busy, setBusy] = useState(false);
   const [json, setJson] = useState<string | null>(null);
   const requestId = useRef(0);
+  // The shared survey outcome of the question flow, for the derived Rc per surface.
+  const surveyResult = currentResult(useSurveyAssessment(), stored);
 
   const save = (next: StoredSurvey | undefined, keepResult = false) => {
     // The question-flow progress lives beside the survey; an edit here must not drop it.
@@ -1051,6 +1100,8 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
       </label>}
       {buildingKind === 'floating' && part !== 'roofFloor' &&
         <CheckField {...field} path={['envelope', 'buildingKind', 'newBerthSince2018']} label={t('opname.buildingKind.newBerth')} />}
+      {(['facade', 'roof', 'floor'] as const).filter((element) => showSurface(element)).map((element) =>
+        <ElementInsulation key={element} draft={draft} element={element} replace={(next) => save({ kind, survey: next })} t={t} />)}
       {(() => {
         // Feedback 8 Oct 2026: every surface is a card with its windows, doors and rooflights
         // right below it, so "In vlak" no longer has to be picked to see what belongs where.
@@ -1151,6 +1202,7 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
               {oriented && typeof orientation === 'string' &&
                 <span className="opname-tag">{t(`opname.orientationKind.${orientation}`)}</span>}
               {element === 'roof' && <span className="opname-tag">{formatNumber(Number(read(draft, [...base, 'tiltDeg']) ?? 0), locale, 0)}°</span>}
+              {derivedRc(surveyResult, id) != null && <span className="opname-tag" title={t('survey.derivedRcHint')}>R_c {formatNumber(derivedRc(surveyResult, id), locale, 2)}</span>}
               {typeof insulation === 'string' && <span className="opname-tag">{insulation === 'thickness' && typeof thickness === 'number'
                 ? `${formatNumber(thickness, locale, 0)} mm` : t(`opname.surface.insulationKind.${insulation}`)}</span>}
               {ownWindows.length > 0 && <span className="opname-tag">{t('survey.windowsCount', { count: ownWindows.length })}</span>}

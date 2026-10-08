@@ -19,6 +19,7 @@ import { formatNumber } from '../../../i18n/format';
 import type { DialogType, IConstruction, IProject, ISurface, IWindow, IZone, Orientation, SurfaceType } from '../../../core/energy/types';
 import { Banner, Button, Card, DataTable, IssueList, NumberInput, Pill, Segmented, type Column } from '../../ui';
 import { ItemActions } from '../../ItemActions/ItemActions';
+import { ELEMENT_KINDS, elementRcActions, sharedConstruction, sharedWindowU, surfacesOf } from '../../../core/energy/elementRc';
 import { useShellActions } from '../ShellActions';
 import { routeLabel } from '../PageHeader';
 
@@ -339,6 +340,56 @@ export function ZonesPage() {
 
 // ── Constructies ─────────────────────────────────────────────────────
 
+/** A number field that commits on leaving it or Enter, so typing does not make a construction per keystroke. */
+function CommitNumber({ label, value, placeholder, onCommit }: {
+  label: string; value: number | null; placeholder?: string; onCommit: (value: number) => void;
+}) {
+  const shown = value == null ? '' : String(Number(value.toFixed(3)));
+  const [text, setText] = useState(shown);
+  const [editing, setEditing] = useState(false);
+  const commit = () => {
+    setEditing(false);
+    const number = Number(text.replace(',', '.'));
+    if (text.trim() !== '' && Number.isFinite(number) && number >= 0 && text !== shown) onCommit(number);
+  };
+  return <label>{label}
+    <input type="text" inputMode="decimal" value={editing ? text : shown} placeholder={placeholder}
+      onFocus={() => { setText(shown); setEditing(true); }} onChange={(event) => setText(event.target.value)} onBlur={commit}
+      onKeyDown={(event) => { if (event.key === 'Enter') (event.target as HTMLInputElement).blur(); }} />
+  </label>;
+}
+
+/** One Rc per kind of surface and one U for all windows, before the per-surface constructions (feedback 8 Oct 2026). */
+function ElementRcFields() {
+  const { t, locale } = useI18n();
+  const { state, dispatch } = useEnergy();
+  const { project } = state;
+  const windows = project.zones.flatMap((zone) => zone.surfaces.flatMap((surface) => surface.windows.map((window) => ({ zoneId: zone.id, surfaceId: surface.id, window }))));
+  const windowU = sharedWindowU(project);
+  return <Card level={2} title={t('constructions.elementRc.title')} subtitle={t('constructions.elementRc.lead')}>
+    <div className="nta-form"><div className="nta-form-grid">
+      {ELEMENT_KINDS.map((kind) => {
+        const count = surfacesOf(project, kind).length;
+        const shared = sharedConstruction(project, kind);
+        return <div key={kind} className="element-rc">
+          <CommitNumber label={t(`constructions.elementRc.${kind}`)} value={shared?.rcValue ?? null}
+            placeholder={count === 0 ? t('constructions.elementRc.none') : t('constructions.elementRc.mixed')}
+            onCommit={(rc) => elementRcActions(project, kind, rc, t(`constructions.elementRc.name.${kind}`)).forEach((action) => dispatch(action))} />
+          <small className="envelope-meta">{count === 0 ? t('constructions.elementRc.none')
+            : shared ? `U ${formatNumber(shared.uValue, locale, 3)} W/m²K · ${t('constructions.elementRc.surfaces', { count })}`
+              : t('constructions.elementRc.mixedHint', { count })}</small>
+        </div>;
+      })}
+      <div className="element-rc">
+        <CommitNumber label={t('constructions.elementRc.windows')} value={windowU}
+          placeholder={windows.length === 0 ? t('constructions.elementRc.none') : t('constructions.elementRc.mixed')}
+          onCommit={(u) => { if (u > 0) windows.forEach(({ zoneId, surfaceId, window }) => dispatch({ type: 'UPDATE_WINDOW', payload: { zoneId, surfaceId, windowId: window.id, data: { uValue: u } } })); }} />
+        <small className="envelope-meta">{t('constructions.elementRc.windowCount', { count: windows.length })}</small>
+      </div>
+    </div></div>
+  </Card>;
+}
+
 export function ConstructionsPage() {
   const { t, locale } = useI18n();
   const { state } = useEnergy();
@@ -355,7 +406,8 @@ export function ConstructionsPage() {
     { key: 'used', header: t('constructions.usedBy'), numeric: true, render: ({ construction }) => String(used(construction)) },
     { key: 'actions', header: <span className="visually-hidden">{t('envelope.actions')}</span>, width: 84, render: ({ construction }) => <ItemActions compact itemType="construction" id={construction.id} name={construction.name} /> },
   ];
-  return (
+  return (<>
+    <ElementRcFields />
     <Card level={2} title={t('browser.constructions')} flush actions={actions
       ? <Button size="sm" variant="ghost" onClick={() => actions.navigate({ step: 'tool', sub: 'uvalue' })}>{t('constructions.openCalculator')}</Button>
       : undefined}>
@@ -371,7 +423,7 @@ export function ConstructionsPage() {
         empty={t('constructions.empty')}
       />
     </Card>
-  );
+  </>);
 }
 
 // ── Koudebruggen ─────────────────────────────────────────────────────

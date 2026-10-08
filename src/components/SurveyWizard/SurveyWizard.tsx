@@ -451,6 +451,59 @@ export function projectAddress(project: { address?: string; city?: string; regis
   return text || null;
 }
 
+/**
+ * Feedback 8 Oct 2026: empty or wrong answers are marked red, and the label and
+ * report stay closed until the kernel calculates without findings.
+ */
+export function surveyBlocked(result: OpnameAssessment | null): boolean {
+  return !result?.performance || result.issues.length > 0;
+}
+
+/** True when a field path (`basisopname.envelope.surfaces[0].grossAreaM2`) is an issue path or lies within one. */
+export function pathHasIssue(fieldPath: string, issuePaths: string[]): boolean {
+  const field = fieldPath.replace(/^basisopname\./, '');
+  return issuePaths.some((path) => {
+    const issue = path.replace(/^basisopname\./, '');
+    return field === issue || field.startsWith(`${issue}.`) || field.startsWith(`${issue}[`);
+  });
+}
+
+/** Marks the fields of the open page whose path the kernel names in a finding. */
+export function useInvalidFields(selector: string, issuePaths: string[]) {
+  const key = issuePaths.join('|');
+  useEffect(() => {
+    for (const element of Array.from(document.querySelectorAll<HTMLElement>(`${selector} [data-path]`))) {
+      element.classList.toggle('field-invalid', pathHasIssue(element.dataset.path ?? '', issuePaths));
+    }
+  });
+  return key;
+}
+
+/** The kernel findings in words with a way to each, and why the label and report are closed. */
+export function SurveyBlocked({ result, busy, stored, onGoToPath, t }: {
+  result: OpnameAssessment | null; busy: boolean; stored: Stored; onGoToPath: (path: string) => void; t: T;
+}) {
+  const draft = stored.survey as Draft;
+  if (!result) return <section className="survey-card survey-blocked" role="status">
+    <p>{t(busy ? 'survey.result.busy' : 'survey.blocked.notCalculated')}</p></section>;
+  return <section className="survey-card survey-blocked" role="alert" aria-label={t('survey.blocked.title')}>
+    <h2>{t('survey.blocked.title')}</h2>
+    <p>{t(result.issues.length > 0 ? 'survey.blocked.lead' : 'survey.blocked.noResult', { count: result.issues.length })}</p>
+    {result.issues.length > 0 && <ul className="survey-notices">
+      {result.issues.map((item, index) => {
+        const target = questionForPath(item.path, stored);
+        return <li key={index}>
+          <span><span className="survey-blocked-x" aria-hidden="true">✗ </span>
+            <KernelCode code={item.code} prefixes={['opname.issue.', 'nta.gap.', 'kernel.issue.']} hideCode />
+            {issueSubject(item.path, draft, t) && <span className="survey-muted"> · {issueSubject(item.path, draft, t)}</span>}</span>
+          <button type="button" className="btn btn-sm" onClick={() => onGoToPath(item.path)}>
+            {t('survey.check.goTo', { step: t(`survey.step.${target.step}`) })}</button>
+        </li>;
+      })}
+    </ul>}
+  </section>;
+}
+
 function CheckPage({ stored, steps, result, onEdit, onGoToPath, onReason, t, locale }: {
   stored: Stored; steps: SurveyFlowStep[]; result: OpnameAssessment | null;
   onEdit: (step: SurveyStepId) => void; onGoToPath: (path: string) => void;
@@ -567,6 +620,8 @@ export function SurveyWizard({ route, navigate }: SurveyWizardProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visitedKey]);
 
+  useInvalidFields('.survey-main', currentResult(assessment, stored)?.issues.map((item) => item.path) ?? []);
+
   const setQuestionIndex = (index: number) =>
     navigate({ step: 'survey', sub: step.id, question: step.questions[index]?.id });
 
@@ -644,7 +699,15 @@ export function SurveyWizard({ route, navigate }: SurveyWizardProps) {
           }} />
       </>}
 
-      {step.special === 'label' && <>
+      {step.special === 'label' && surveyBlocked(result) && <>
+        <h1>{t('survey.label.title')}</h1>
+        <SurveyBlocked result={result} busy={assessment.busy} stored={stored} onGoToPath={goToPath} t={t} />
+        <div className="survey-next-actions">
+          <button type="button" className="btn" onClick={() => goToStep('controle')}>{t('survey.blocked.toCheck')}</button>
+        </div>
+      </>}
+
+      {step.special === 'label' && !surveyBlocked(result) && <>
         <h1>{t('survey.label.title')}</h1>
         <p className="survey-lead">{t('survey.label.lead')}</p>
         <section className="survey-card survey-final">
@@ -684,6 +747,16 @@ export function SurveyWizard({ route, navigate }: SurveyWizardProps) {
       {!step.special && question && <>
         <h1>{t(question.titleKey)}</h1>
         <p className="survey-lead">{t(question.helpKey)}</p>
+        {(() => {
+          const own = (result?.issues ?? []).filter((item) => {
+            const target = questionForPath(item.path, stored);
+            return target.step === step.id && (target.question ?? step.questions[0]?.id) === question.id;
+          });
+          return own.length > 0 && <ul className="survey-question-issues" role="alert">
+            {own.map((item, index) => <li key={index}>✗ <KernelCode code={item.code} prefixes={['opname.issue.', 'nta.gap.', 'kernel.issue.']} hideCode />
+              {issueSubject(item.path, draft, t) && <span> · {issueSubject(item.path, draft, t)}</span>}</li>)}
+          </ul>;
+        })()}
         <div className="survey-question" key={`${step.id}.${question.id}`}>
           <QuestionBody part={question.part} stored={stored} draft={draft} change={change} t={t} />
         </div>

@@ -18,7 +18,7 @@ import type { Draft } from '../NtaPerformancePanel/NtaFormFields';
 import { labelColor } from '../shell/pages/results/resultsData';
 import { DossierPage, ExportsPage, InputDossierPage } from '../shell/pages/DeliveryPages';
 import type { ShellActions } from '../shell/ShellActions';
-import { defaultStep, projectAddress, stepFacts, StepDefaults } from './SurveyWizard';
+import { defaultStep, projectAddress, stepFacts, StepDefaults, SurveyBlocked, surveyBlocked } from './SurveyWizard';
 import { questionForPath } from '../../core/survey/surveyFlow';
 import { useKernel } from '../../context/KernelProvider';
 import { elementToPdf, fileNamePart, savePdf } from '../../core/report/pdf';
@@ -76,6 +76,14 @@ export function SurveyReport({ actions }: { actions: ShellActions }) {
 
   if (!stored) return null;
   const result = currentResult(assessment, stored);
+  if (surveyBlocked(result)) {
+    const goToPath = (path: string) => actions.navigate({ step: 'survey', sub: questionForPath(path, stored).step,
+      focusPath: `basisopname.${path.replace(/^basisopname\./, '')}` });
+    return <div className="survey-report">
+      <h1 id="page-title" tabIndex={-1}>{t('survey.report.title')}</h1>
+      <SurveyBlocked result={result} busy={assessment.busy} stored={stored} onGoToPath={goToPath} t={t} />
+    </div>;
+  }
   const performance = result?.performance;
   const draft = stored.survey as Draft;
   const steps = surveySteps(stored.kind).filter((step) => !step.special);
