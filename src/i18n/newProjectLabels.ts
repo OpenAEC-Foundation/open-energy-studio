@@ -33,6 +33,9 @@ export const newProjectLabelsNl: Record<string, string> = {
   'newProject.no': 'Nee',
   'newProject.examples': 'Of open een voorbeeld:',
   'newProject.cancel': 'Annuleren',
+  'newProject.adviserName': 'Naam',
+  'newProject.adviserNumber': 'Vakbekwaamheidsnr.',
+  'newProject.certificate': 'Certificaatnr. BRL 9500',
   'newProject.create': 'Project aanmaken',
 };
 
@@ -70,5 +73,8 @@ export const newProjectLabelsEn: Record<string, string> = {
   'newProject.no': 'No',
   'newProject.examples': 'Or open an example:',
   'newProject.cancel': 'Cancel',
+  'newProject.adviserName': 'Name',
+  'newProject.adviserNumber': 'Competence no.',
+  'newProject.certificate': 'BRL 9500 certificate no.',
   'newProject.create': 'Create project',
 };

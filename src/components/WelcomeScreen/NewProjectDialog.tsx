@@ -193,10 +193,10 @@ export function NewProjectDialog({ onCreate, onOpenExample, onClose }: {
 
     <section className="new-project__section">
       <h3>{t('survey.address.adviser')}</h3>
-      <div className="new-project__address">
-        <label className="new-project__wide">{t('survey.address.adviserName')}<input value={adviser.name} onChange={(event) => setAdviser({ ...adviser, name: event.target.value })} /></label>
-        <label>{t('survey.address.adviserNumber')}<input value={adviser.competenceNumber} onChange={(event) => setAdviser({ ...adviser, competenceNumber: event.target.value })} /></label>
-        <label>{t('survey.address.certificate')}<input value={adviser.certificateNumber} onChange={(event) => setAdviser({ ...adviser, certificateNumber: event.target.value })} /></label>
+      <div className="new-project__adviser">
+        <label>{t('newProject.adviserName')}<input value={adviser.name} onChange={(event) => setAdviser({ ...adviser, name: event.target.value })} /></label>
+        <label>{t('newProject.adviserNumber')}<input value={adviser.competenceNumber} onChange={(event) => setAdviser({ ...adviser, competenceNumber: event.target.value })} /></label>
+        <label title={t('survey.address.certificate')}>{t('newProject.certificate')}<input value={adviser.certificateNumber} onChange={(event) => setAdviser({ ...adviser, certificateNumber: event.target.value })} /></label>
       </div>
     </section>
   </Dialog>;

@@ -104,7 +104,7 @@ describe('new-project window', () => {
     expect(types.getByRole('button', { name: /Houseboat, berth before/ })).toBeInTheDocument();
     await user.click(types.getByRole('button', { name: /Houseboat, berth from/ }));
     await user.click(within(screen.getByRole('group', { name: 'Solar panels' })).getByRole('button', { name: 'No' }));
-    await user.type(screen.getByRole('textbox', { name: /adviser|Naam/i }), 'A. Adviseur');
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'A. Adviseur');
     await user.click(screen.getByRole('button', { name: 'Create project' }));
     expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({
       kind: 'existing_residential', dwelling: 'houseboat_2018', pv: false,
