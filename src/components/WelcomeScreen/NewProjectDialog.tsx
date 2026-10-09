@@ -133,9 +133,9 @@ export function NewProjectDialog({ onCreate, onOpenExample, onClose }: {
       <h3>{t('newProject.address')}</h3>
       <p className="new-project__hint">{t('newProject.addressHint')}</p>
       <form className="new-project__address" onSubmit={(event) => { event.preventDefault(); void search(); }}>
-        <label>{t('survey.address.postcode')}<input value={postcode} onChange={(event) => setPostcode(event.target.value)} placeholder="2807 CB" autoComplete="postal-code" /></label>
-        <label>{t('surveyReg.field.houseNumber')}<input value={number} onChange={(event) => setNumber(event.target.value)} inputMode="numeric" placeholder="85" /></label>
-        <label>{t('surveyReg.field.houseNumberAddition')}<input value={addition} onChange={(event) => setAddition(event.target.value)} placeholder="a" /></label>
+        <label>{t('survey.address.postcode')}<input value={postcode} onChange={(event) => setPostcode(event.target.value)} autoComplete="postal-code" /></label>
+        <label>{t('surveyReg.field.houseNumber')}<input value={number} onChange={(event) => setNumber(event.target.value)} inputMode="numeric" /></label>
+        <label>{t('surveyReg.field.houseNumberAddition')}<input value={addition} onChange={(event) => setAddition(event.target.value)} /></label>
         <Button type="submit" icon={<Search aria-hidden="true" />} loading={lookup.state === 'busy'}>{t('newProject.lookup')}</Button>
       </form>
       {address && <p className="new-project__found" role="status">
