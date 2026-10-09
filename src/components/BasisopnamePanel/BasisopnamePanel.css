@@ -155,3 +155,8 @@
 .survey-component:hover { border-color: var(--line-strong); }
 .survey-component[aria-pressed='true'] { border: 2px solid var(--amber-600); padding: 4px 9px; background: var(--surface-selected); }
 .survey-component[aria-pressed='true']::before { content: '✓'; color: var(--amber-500); }
+
+/* Standard value or a declaration (feedback 9 Oct 2026). */
+.survey-declaration { display: grid; gap: 6px; grid-column: 1 / -1; }
+.survey-declaration__label { font-size: var(--fs-sm); color: var(--fg-2); }
+.survey-declaration__body { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--amber-600); border-radius: 8px; }

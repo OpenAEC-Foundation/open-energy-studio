@@ -97,6 +97,31 @@ function KindSelect({ draft, path, label, kinds, prefix, template, change, t }: 
   </label>;
 }
 
+/**
+ * A declaration (kwaliteitsverklaring, project document) or the standard value
+ * (feedback 9 Oct 2026): "Met verklaring" asks its number and links the file
+ * into the dossier; "Standaardwaarde" leaves it empty, so the kernel applies
+ * the forfait value.
+ */
+export function DeclarationField({ draft, change, path, label, t }: { draft: Draft; change: Change; path: Path; label: string; t: T }) {
+  const value = read(draft, path);
+  const filled = typeof value === 'string' && value.trim() !== '';
+  const [chosen, setChosen] = useState(filled);
+  const declared = filled || chosen;
+  return <div className="survey-declaration">
+    <span className="survey-declaration__label">{label}</span>
+    <span className="survey-components__chips" role="group" aria-label={label}>
+      <button type="button" className="survey-component" aria-pressed={!declared}
+        onClick={() => { setChosen(false); if (filled) change(path, ''); }}>{t('survey.declaration.standard')}</button>
+      <button type="button" className="survey-component" aria-pressed={declared} onClick={() => setChosen(true)}>{t('survey.declaration.with')}</button>
+    </span>
+    {declared && <div className="survey-declaration__body">
+      <TextField draft={draft} onChange={change} path={path} label={t('survey.declaration.number')} />
+      <EvidenceAttach pointer={surveyPointer(path)} title={t('survey.declaration.file')} />
+    </div>}
+  </div>;
+}
+
 /** Photos of one survey item (BRL 9500 Bijlage 3), linked by JSON pointer into the stored survey. */
 export function SurveyPhotos({ path }: { path: Path }) {
   return <EvidenceAttach photo pointer={surveyPointer(path)} />;
@@ -207,7 +232,7 @@ export function PassiveCoolingFields({ draft, change, t, toggles = true }: {
       {t('opname.passiveCooling.present')}
     </label>}
     {present && <>
-      <TextField {...field} path={['ventilation', 'passiveCooling', 'evidenceReference']} label={t('opname.passiveCooling.evidence')} />
+      <DeclarationField draft={draft} change={change} path={['ventilation', 'passiveCooling', 'evidenceReference']} label={t('opname.passiveCooling.evidence')} t={t} />
       <NumberField {...field} path={['ventilation', 'passiveCooling', 'installedCapacityDm3PerS']} label={t('opname.passiveCooling.installed')} />
     </>}
     <p className="nta-form-note">{t('opname.passiveCooling.note')}</p>
@@ -295,7 +320,7 @@ export function VentilationSurveyFields({ draft, change, t, withControls = true,
       <TriStateField {...field} {...yesNo} path={['ventilation', 'controls', 'zoning']} label={t('opname.ventilation.zoning')} />
       <TriStateField {...field} {...yesNo} path={['ventilation', 'controls', 'extractPerHabitableRoom']}
         label={t('opname.ventilation.extractPerRoom')} />
-      <TextField {...field} path={['ventilation', 'controls', 'evidenceReference']} label={t('opname.ventilation.controlsEvidence')} />
+      <DeclarationField draft={draft} change={change} path={['ventilation', 'controls', 'evidenceReference']} label={t('opname.ventilation.controlsEvidence')} t={t} />
     </>}
     {toggle(['ventilation', 'combined'], t('opname.ventilation.combined'), combined,
       { decentralAreaM2: 0, totalResidenceAreaM2: 0 })}
@@ -696,8 +721,8 @@ export function HeatingGeneratorFields({ draft, path, change, t, hideKind = fals
         <NumberField {...field} path={[...path, 'sourceTemperatureC']} label={t('opname.heating.sourceTemperature')} />
         <TextField {...field} path={[...path, 'sourceTemperatureReference']} label={t('opname.heating.sourceTemperatureReference')} />
       </>}
-      {source === 'high_temperature' && <TextField {...field} path={[...path, 'sourceQualityDeclarationReference']}
-        label={t('opname.heating.sourceQualityDeclaration')} />}
+      {source === 'high_temperature' && <DeclarationField draft={draft} change={change} path={[...path, 'sourceQualityDeclarationReference']}
+        label={t('opname.heating.sourceQualityDeclaration')} t={t} />}
       {showTable928 && <>
         <label className="nta-form-check">
           <input type="checkbox" checked={hasEvidence} onChange={(event) => changeTable928(event.target.checked)} />
@@ -1214,7 +1239,7 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
               <NumberField {...field} path={[...base, 'areaM2']} label={t('opname.rooflight.area')} />
               <NumberField {...field} path={[...base, 'uValue']} label={t('opname.rooflight.uValue')} />
               <SelectField {...field} path={[...base, 'glass']} label={t('opname.window.glass')} options={glassOptions} />
-              <TextField {...field} path={[...base, 'qualityDeclarationReference']} label={t('opname.rooflight.declaration')} />
+              <DeclarationField draft={draft} change={change} path={[...base, 'qualityDeclarationReference']} label={t('opname.rooflight.declaration')} t={t} />
               <SurveyPhotos path={base} />
               <RemoveButton label={t('opname.remove')} onRemove={() => removeAt(['envelope', 'rooflights'], index)} />
             </div>
@@ -1354,7 +1379,7 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
       <SelectField {...field} path={['heating', 'designClass']} label={t('opname.heating.designClass')}
         options={opts(t, 'opname.heating.designClassKind', DESIGN_CLASSES)} />
       {DESIGN_CLASSES_ABOVE_70.includes(String(read(draft, ['heating', 'designClass']))) &&
-        <TextField {...field} path={['heating', 'heatPumpAbove70Declaration']} label={t('opname.heating.above70Declaration')} />}
+        <DeclarationField draft={draft} change={change} path={['heating', 'heatPumpAbove70Declaration']} label={t('opname.heating.above70Declaration')} t={t} />}
       <DistributionFields draft={draft} change={change} t={t} />
       <TriStateField {...field} yes={t('opname.yes')} no={t('opname.no')} path={['heating', 'balanced']} label={t('survey.heating.balanced')} />
       <SelectField {...field} path={['heating', 'control']} label={t('survey.heating.control')}
@@ -1540,7 +1565,7 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
           options={[['none', t('opname.cooling.balanced.none')], ['static', t('opname.cooling.balanced.static')],
             ['dynamic', t('opname.cooling.balanced.dynamic')]]} />
         {['static', 'dynamic', true].includes(read(draft, ['cooling', 'balanced']) as string | boolean) &&
-          <TextField {...field} path={['cooling', 'balancingEvidenceReference']} label={t('opname.cooling.balancingEvidence')} />}
+          <DeclarationField draft={draft} change={change} path={['cooling', 'balancingEvidenceReference']} label={t('opname.cooling.balancingEvidence')} t={t} />}
         <CheckField {...field} path={['cooling', 'heatPumpSource']} label={t('opname.cooling.heatPumpSource')} />
         <CheckField {...field} path={['cooling', 'groundAboveZeroDemonstrated']} label={t('opname.cooling.groundAboveZero')} />
         {kind === 'residential' &&

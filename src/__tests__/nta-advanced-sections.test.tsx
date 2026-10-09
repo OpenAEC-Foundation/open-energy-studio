@@ -12,7 +12,7 @@ import {
   airHeatersTemplate, bacsTemplate, hotWaterGeneratorTemplate, microChpTemplate, regenerationTemplate, spaceGeneratorTemplate,
 } from '../core/nta/NtaSystemTemplates';
 import { en } from '../i18n/en';
-import { renderWithProviders, userEvent } from './test-utils';
+import { renderWithProviders, userEvent, declare } from './test-utils';
 
 const project = {
   id: 'p', name: 'p', description: '', buildingFunction: 'residential', address: '', city: '',
@@ -234,7 +234,7 @@ describe('basisopname air heating and passive cooling', () => {
     renderWithProviders(<Harness initial={{ ventilation: { principle: 'balanced', sourceReference: '' } }}
       body={(draft, change) => <PassiveCoolingFields draft={draft} change={change} t={t} />} />);
     await user.click(screen.getByLabelText(/Passive cooling proven/));
-    await user.type(screen.getByLabelText(/Project document/), 'PD-12');
+    await declare(user, /Project document/, 'PD-12');
     await user.type(screen.getByLabelText(/Installed capacity/), '150');
     expect(current().ventilation).toEqual({ principle: 'balanced', sourceReference: '',
       passiveCooling: { evidenceReference: 'PD-12', installedCapacityDm3PerS: 150 } });

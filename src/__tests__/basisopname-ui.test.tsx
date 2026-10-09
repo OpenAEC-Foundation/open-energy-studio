@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, screen, waitFor } from '@testing-library/react';
 import { useEnergy } from '../context/EnergyContext';
 import { BasisopnamePanel } from '../components/BasisopnamePanel/BasisopnamePanel';
-import { renderWithProviders, userEvent } from './test-utils';
+import { renderWithProviders, userEvent, declare } from './test-utils';
 import { useEffect } from 'react';
 import { surveyExample } from '../core/nta/SurveyTemplates';
 
@@ -86,7 +86,7 @@ describe('basisopname panel', () => {
     // ISSO 54 EDR forms use 75/65; above 70 °C the heat-pump declaration is asked.
     await user.selectOptions(screen.getByRole('combobox', { name: 'Design temperature class (table 9.9)' }), 'c75_65');
     expect(stored()!.survey.heating.designClass).toBe('c75_65');
-    expect(screen.getByRole('textbox', { name: 'Controlled declaration for a heat pump above 70 °C' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Controlled declaration for a heat pump above 70 °C' })).toBeInTheDocument();
   }, 60000);
 
   it('edits ventilation controls, system E, heating strips, solar-control glass and the 90/70 declaration', async () => {
@@ -99,7 +99,7 @@ describe('basisopname panel', () => {
     await user.selectOptions(screen.getByLabelText('CO₂ measurement'), 'living_room_and_main_bedroom');
     await user.selectOptions(screen.getByLabelText('CO₂ control'), 'extract');
     await user.selectOptions(screen.getByLabelText('Zoning'), 'true');
-    await user.type(screen.getByLabelText('Evidence for the controls'), 'datasheet');
+    await declare(user, 'Evidence for the controls', 'datasheet');
     // §11.3.6 and §11.3.7.
     await user.click(screen.getByLabelText('Combined system E (decentral heat recovery in part of the zone)'));
     await user.click(screen.getByLabelText('Grilles with electric heating strips (§11.3.7)'));
@@ -118,7 +118,7 @@ describe('basisopname panel', () => {
     await user.type(screen.getByRole('spinbutton', { name: 'g-value from the product data' }), '0.3');
     // Table 9.9 / erratum §4.
     await user.selectOptions(screen.getByLabelText('Design temperature class (table 9.9)'), 'c90_70');
-    await user.type(screen.getByLabelText('Controlled declaration for a heat pump above 70 °C'), 'BCRG 1');
+    await declare(user, 'Controlled declaration for a heat pump above 70 °C', 'BCRG 1');
     survey = stored()!.survey;
     expect(survey.envelope.windows[0].solarControl).toEqual({ gValue: 0.3, sourceReference: '' });
     expect(survey.heating.designClass).toBe('c90_70');
@@ -292,7 +292,7 @@ describe('basisopname panel', () => {
     expect(survey.cooling.directExpansion).toBeUndefined();
     expect(screen.queryByLabelText(/NEN-EN 14336/)).toBeNull();
     await user.selectOptions(screen.getByLabelText('Hydronic balancing (table 10.6)'), 'dynamic');
-    await user.type(screen.getByLabelText(/NEN-EN 14336/), 'inregelrapport');
+    await declare(user, /NEN-EN 14336/, 'inregelrapport');
     await user.type(screen.getByLabelText(/Maximum supply-pipe length L_max/), '80');
     survey = stored()!.survey;
     expect(survey.cooling).toMatchObject({

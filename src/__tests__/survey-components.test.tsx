@@ -6,7 +6,7 @@
 import { useEffect } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { screen, within } from '@testing-library/react';
-import { renderWithProviders, userEvent } from './test-utils';
+import { declare, renderWithProviders, userEvent } from './test-utils';
 import { useEnergy } from '../context/EnergyContext';
 import { BasisopnamePanel } from '../components/BasisopnamePanel/BasisopnamePanel';
 import { surveyTemplate } from '../core/nta/SurveyTemplates';
@@ -35,10 +35,10 @@ describe('survey components', () => {
 });
 
 describe('component bar in the question flow', () => {
-  function Harness() {
+  function Harness({ part = 'hotWaterRest' }: { part?: 'hotWaterRest' | 'ventilation' }) {
     const { state, dispatch } = useEnergy();
     useEffect(() => { dispatch({ type: 'SET_BASISOPNAME', payload: surveyTemplate('residential') }); }, [dispatch]);
-    return <>{state.project.basisopname && <BasisopnamePanel part="hotWaterRest" />}
+    return <>{state.project.basisopname && <BasisopnamePanel part={part} />}
       <output data-testid="survey">{JSON.stringify(state.project.basisopname ?? null)}</output></>;
   }
   const stored = () => JSON.parse(screen.getByTestId('survey').textContent ?? '{}');
@@ -65,5 +65,21 @@ describe('component bar in the question flow', () => {
     confirm.mockReturnValue(true);
     await user.click(bar.getByRole('button', { name: 'Solar water heater' }));
     expect(stored().survey.hotWater.solar).toEqual([]);
+  }, 60000);
+
+
+  it('asks a declaration only with Met verklaring and clears it with Standaardwaarde', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Harness part="ventilation" />);
+    const bar = within(await screen.findByRole('group', { name: 'What does it have?' }));
+    expect(screen.queryByRole('group', { name: 'Evidence for the controls' })).toBeNull();
+    await user.click(bar.getByRole('button', { name: /Controls/ }));
+    const group = within(screen.getByRole('group', { name: 'Evidence for the controls' }));
+    expect(group.getByRole('button', { name: 'Standard value' })).toHaveAttribute('aria-pressed', 'true');
+    await declare(user, 'Evidence for the controls', 'BCRG 77');
+    expect(stored().survey.ventilation.controls.evidenceReference).toBe('BCRG 77');
+    await user.click(group.getByRole('button', { name: 'Standard value' }));
+    expect(stored().survey.ventilation.controls.evidenceReference).toBe('');
+    expect(screen.queryByRole('textbox', { name: /Declaration number/ })).toBeNull();
   }, 60000);
 });
