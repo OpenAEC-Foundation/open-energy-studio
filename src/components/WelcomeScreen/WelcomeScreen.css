@@ -348,3 +348,9 @@
 .new-project .new-project__adviser label { overflow: visible; }
 .new-project .new-project__adviser label > input { margin-top: 0; }
 .new-project__inline select { width: 220px; }
+
+/* Logo with text on the projects page (feedback 9 Oct 2026). */
+.welcome-logo { display: inline-flex; align-items: center; flex: none; padding: 10px 16px; border-radius: 12px; background: #1c1d22; border: 1px solid var(--line); }
+.welcome-logo img { display: block; height: 64px; width: auto; }
+.welcome-hero > div { padding-left: var(--space-4); border-left: 1px solid var(--line); }
+@media (max-width: 640px) { .welcome-hero { flex-wrap: wrap; } .welcome-hero > div { border-left: 0; padding-left: 0; } }
