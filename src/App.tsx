@@ -418,13 +418,32 @@ function EmptyStatusBar() {
 
 // ── Main app shell ──
 
+/**
+ * What a refresh of this tab shows again: the open project or the library.
+ * Per tab (sessionStorage), so a new start of the app always opens the library.
+ */
+const START_VIEW_KEY = 'oes.view.v1';
+function readStartView(): 'project' | 'library' {
+  try { return sessionStorage.getItem(START_VIEW_KEY) === 'project' ? 'project' : 'library'; } catch { return 'library'; }
+}
+function writeStartView(view: 'project' | 'library') {
+  try { sessionStorage.setItem(START_VIEW_KEY, view); } catch { /* private mode: every start opens the library */ }
+}
+
 function AppContent() {
   const { docState, docDispatch } = useDocumentManager();
   const hasActiveDoc = useHasActiveDocument();
   // The project library over the open documents (feedback 8 Oct 2026: "hoe moet ik de bibliotheek vinden").
-  const [libraryOpen, setLibraryOpen] = useState(false);
+  // Starting the app opens the library; a refresh in the middle of a project stays in it (feedback 9 Oct 2026).
+  const [libraryOpen, setLibraryOpen] = useState(() => readStartView() !== 'project');
   const activeDocumentId = docState.activeDocumentId;
-  useEffect(() => { setLibraryOpen(false); }, [activeDocumentId]);
+  const shownDocumentId = useRef(activeDocumentId);
+  useEffect(() => {
+    if (shownDocumentId.current === activeDocumentId) return;
+    shownDocumentId.current = activeDocumentId;
+    setLibraryOpen(false);
+  }, [activeDocumentId]);
+  useEffect(() => { writeStartView(hasActiveDoc && !libraryOpen ? 'project' : 'library'); }, [hasActiveDoc, libraryOpen]);
   const { t } = useI18n();
   const toast = useToast();
   const confirmChoice = useConfirm();

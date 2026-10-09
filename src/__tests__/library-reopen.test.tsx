@@ -10,7 +10,7 @@ import { createDefaultProject } from '../context/EnergyContext';
 import { saveDocumentsToLibrary } from '../core/io/projectLibrary';
 import App from '../App';
 
-afterEach(() => localStorage.clear());
+afterEach(() => { localStorage.clear(); sessionStorage.clear(); });
 
 describe('project library', () => {
   it('opens the open project again after going to all projects', async () => {
@@ -26,5 +26,16 @@ describe('project library', () => {
     expect(screen.queryByRole('navigation', { name: 'Workflow steps' })).toBeNull();
     await user.click(openCard());
     expect(await screen.findByRole('navigation', { name: 'Workflow steps' })).toBeInTheDocument();
+  });
+
+
+  it('remembers per tab whether a refresh shows the project or the library', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.keyboard('{Control>}n{/Control}');
+    expect(await screen.findByRole('navigation', { name: 'Workflow steps' })).toBeInTheDocument();
+    expect(sessionStorage.getItem('oes.view.v1')).toBe('project');
+    await user.click(screen.getByRole('button', { name: 'To all projects' }));
+    expect(sessionStorage.getItem('oes.view.v1')).toBe('library');
   });
 });
