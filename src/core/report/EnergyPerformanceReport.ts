@@ -7,6 +7,7 @@ import { attestMark, type AttestMark } from '../nta/Attest';
 import { kernelVerdict } from '../nta/KernelVerdict';
 import { nl } from '../../i18n/nl';
 import { escapeHtml } from './HtmlEscaping';
+import { dutchDefaultValue, dutchSource } from '../nta/OpnameValueText';
 import { dutchCodeCell, dutchDetailHtml, dutchNumber, dutchTimeHtml, dutchTimestamp } from './DutchReportText';
 import { indicatorDecimals, kernelReportModel } from './KernelReportModel';
 import {
@@ -52,8 +53,19 @@ export const DETAIL_SECTION_TITLES: Record<DetailSection, string> = {
   beng1: 'BENG 1 met vast ventilatiesysteem C1',
 };
 
+/** A survey default the kernel applied (OpnameAssessment.appliedDefaults), for the basisopname appendix. */
+export interface ReportSurveyDefault {
+  rule: string;
+  path: string;
+  value: string;
+  source: string;
+  inklapReden?: string;
+}
+
 export interface ReportOptions {
   level: ReportLevel;
+  /** Basisopname: the defaults the kernel applied, with their norm reference (feedback 9 Oct 2026). */
+  surveyDefaults?: ReportSurveyDefault[];
   /** Detail chapters to include when `level` is `detailed`; all when omitted. */
   details?: Partial<Record<DetailSection, boolean>>;
   interpretations?: NtaInterpretationGroup[];
@@ -133,6 +145,52 @@ class ReportDocument {
   }
 }
 
+/** Label colours of the cover badge (as on the energy label). */
+const LABEL_COLOURS: Record<string, string> = {
+  'A++++': '#00843d', 'A+++': '#00843d', 'A++': '#00843d', 'A+': '#00a54f', A: '#4cb848', B: '#bfd730', C: '#fff200', D: '#fdb913', E: '#f37021', F: '#ed1c24', G: '#c1272d',
+};
+
+/** The cover: label class and the indicators when the kernel calculated (feedback 9 Oct 2026). */
+function coverResult(assessment: ProjectPerformanceAssessment): string {
+  const performance = assessment.performance;
+  if (kernelVerdict(assessment) !== 'calculated' || !performance) return '';
+  const label = performance.indicativeLabelClass;
+  const ep2 = performance.labelPrimaryFossilIndicatorKwhPerM2Year ?? performance.primaryFossilIndicatorKwhPerM2Year;
+  const ep3 = performance.labelPrimaryFossilIndicatorKwhPerM2Year != null ? performance.labelRenewableSharePercent : performance.renewableSharePercent;
+  const dark = label != null && ['B', 'C', 'D'].includes(label);
+  return `<div class="cover-result">${label ? `<span class="cover-label" style="background:${LABEL_COLOURS[label] ?? '#555'};color:${dark ? '#1a1a1a' : '#fff'}">${escapeHtml(label)}</span>` : ''}
+    <dl><dt>EP1 energiebehoefte</dt><dd>${n(performance.needIndicatorKwhPerM2Year, 1)} kWh/m²·jr</dd>
+    <dt>EP2 primair fossiel</dt><dd>${n(ep2, 1)} kWh/m²·jr</dd>
+    <dt>EP3 hernieuwbaar</dt><dd>${n(ep3, 1)} %</dd>
+    <dt>TOjuli</dt><dd>${n(performance.tojuliMaxK, 2)} K</dd></dl></div>`;
+}
+
+/** Basisopname: every default the kernel applied, with its value and norm reference. */
+function surveyDefaultsAppendix(doc: ReportDocument, defaults: ReportSurveyDefault[]): string {
+  const rows = defaults.map((item) => `<tr><td><code>${escapeHtml(item.path)}</code></td>
+    <td>${escapeHtml(dutchDefaultValue(item.value) ?? item.value)}</td><td class="src">${escapeHtml(dutchSource(item.source))}</td>
+    <td>${escapeHtml(item.inklapReden ?? '')}</td></tr>`).join('');
+  return doc.chapter('standaardwaarden', 'Bijlage: standaardwaarden van de basisopname', `<p>Waar de opname geen gemeten of gedocumenteerde waarde heeft,
+    past de rekenkern de standaardwaarde toe volgens de genoemde bron. De adviseur vervangt ze door gemeten of gedocumenteerde waarden
+    of legt de reden vast (BRL 9500).</p>`
+    + doc.table('Toegepaste standaardwaarden', '<tr><th>Gegeven</th><th>Waarde</th><th>Bron</th><th>Reden</th></tr>', rows));
+}
+
+const EVIDENCE_KIND: Record<string, string> = {
+  photo_overview: 'overzichtsfoto', photo_detail: 'detailfoto', invoice: 'factuur', drawing: 'tekening', datasheet: 'productblad',
+  declaration_of_performance: 'prestatieverklaring', quality_declaration: 'kwaliteitsverklaring', client_statement: 'verklaring opdrachtgever', other: 'overig',
+};
+
+/** The evidence of the project: file, kind, date and the answers it supports. */
+function evidenceAppendix(doc: ReportDocument, project: IProject): string {
+  const rows = (project.registration?.evidence ?? []).map((item) => `<tr><td>${escapeHtml(item.fileName)}</td>
+    <td>${escapeHtml(EVIDENCE_KIND[item.kind] ?? item.kind)}</td><td>${escapeHtml(item.date ?? '—')}</td>
+    <td>${(item.linkedPaths ?? []).map((path) => `<code>${escapeHtml(path)}</code>`).join('<br>') || '—'}</td>
+    <td><code>${escapeHtml(item.sha256.slice(0, 12))}…</code></td></tr>`).join('');
+  return doc.chapter('bewijsstukken', 'Bijlage: bewijsstukken', '<p>De bestanden in het dossier, met de gegevens waar ze bij horen en de SHA-256 waarmee ze herkenbaar zijn.</p>'
+    + doc.table('Bewijsstukken', '<tr><th>Bestand</th><th>Soort</th><th>Datum</th><th>Hoort bij</th><th>SHA-256</th></tr>', rows));
+}
+
 /** Monthly table: one row per month plus an annual total row where it makes sense. */
 function monthlyTable(doc: ReportDocument, caption: string, columns: Array<{ head: string; values: Array<number | null | undefined>; digits?: number; total?: boolean }>, note = ''): string {
   if (columns.length === 0) return '';
@@ -143,6 +201,19 @@ function monthlyTable(doc: ReportDocument, caption: string, columns: Array<{ hea
     ? `<tr class="total"><th>jaar</th>${columns.map((column) => column.total ? tdn(sum(column.values), column.digits ?? 0) : '<td></td>').join('')}</tr>`
     : '';
   return doc.table(caption, head, rows + totals, note);
+}
+
+/**
+ * The source of a U value in words: the project construction or window by name instead of the
+ * internal reference, and a decimal comma in the ΔU_for supplement (the NTA references keep their dot).
+ */
+function uSourceText(project: IProject, source: string): string {
+  const construction = new Map((project.constructions ?? []).map((item) => [item.id, item.name]));
+  const window = new Map(project.zones.flatMap((zone) => zone.surfaces.flatMap((surface) => (surface.windows ?? []).map((item) => [item.id, item.name] as const))));
+  return dutchSource(source)
+    .replace(/project:construction:([\w-]+)\.uValue/g, (_, id: string) => `constructie ${construction.get(id) ?? id}`)
+    .replace(/project:window:([\w-]+)\.uValue/g, (_, id: string) => `raam ${window.get(id) ?? id}`)
+    .replace(/ΔU_for (\d+)\.(\d+)/g, 'ΔU_for $1,$2 W/m²K');
 }
 
 /** Readable element name: project names behind the kernel ids (`surface:wall-N:opaque`, `window:win-S`). */
@@ -441,7 +512,9 @@ function transmissionDetail(doc: ReportDocument, project: IProject, assessment: 
     if (!t) continue;
     const direct = isObject((input?.transmission as Loose | undefined)?.direct) ? ((input!.transmission as Loose).direct as Loose) : null;
     const elements = Array.isArray(direct?.elements) ? direct!.elements as Loose[] : [];
-    const products = elements.map((element) => ({ id: String(element.id), area: Number(element.areaM2), u: Number(element.uValueWPerM2k) }));
+    const products = elements.map((element) => ({
+      id: String(element.id), area: Number(element.areaM2), u: Number(element.uValueWPerM2k), source: String(element.sourceReference ?? ''),
+    }));
     const hd = sum(products.map((item) => item.area * item.u));
     html += `<h3>${escapeHtml(id)}</h3>`;
     if (products.length) {
@@ -456,9 +529,9 @@ function transmissionDetail(doc: ReportDocument, project: IProject, assessment: 
       <tr><th>H<sub>g</sub> stationair</th>${tdn(t.groundSteadyConductanceWPerK, 2)}${td('8.3, bijlage D')}</tr>
       <tr><th>H<sub>H;g;adj</sub> / H<sub>C;g;adj</sub></th><td class="n">${n(t.groundHeatingAdjustedWPerK, 2)} / ${n(t.groundCoolingAdjustedWPerK, 2)}</td>${td('D.2/D.3')}</tr>`);
     if (products.length) {
-      html += doc.table(`H<sub>D</sub> per element, ${escapeHtml(id)}`, '<tr><th>Element</th><th>A [m²]</th><th>U [W/m²K]</th><th>A·U [W/K]</th></tr>',
-        products.map((item) => `<tr>${td(name(item.id))}${tdn(item.area, 2)}${tdn(item.u, 3)}${tdn(item.area * item.u, 2)}</tr>`).join('')
-        + `<tr class="total"><th>Σ</th><td></td><td></td>${tdn(hd, 2)}</tr>`);
+      html += doc.table(`H<sub>D</sub> per element, ${escapeHtml(id)}`, '<tr><th>Element</th><th>A [m²]</th><th>U [W/m²K]</th><th>A·U [W/K]</th><th>Bron van U</th></tr>',
+        products.map((item) => `<tr>${td(name(item.id))}${tdn(item.area, 2)}${tdn(item.u, 3)}${tdn(item.area * item.u, 2)}<td class="src">${escapeHtml(item.source ? uSourceText(project, item.source) : '—')}</td></tr>`).join('')
+        + `<tr class="total"><th>Σ</th><td></td><td></td>${tdn(hd, 2)}<td></td></tr>`);
     }
     html += monthlyTable(doc, `Grond per maand, ${escapeHtml(id)} (bijlage D.1)`, [
       { head: 'θ<sub>e</sub> [°C]', values: result.monthly.map((m) => m.outdoorTemperatureC), digits: 1 },
@@ -728,6 +801,11 @@ function beng1Detail(doc: ReportDocument, assessment: ProjectPerformanceAssessme
 /* ------------------------------------------------------------------ document */
 
 const STYLE = `
+  .cover-result { display: flex; align-items: center; gap: 18px; margin-top: 14px; }
+  .cover-label { display: inline-grid; place-items: center; min-width: 64px; height: 64px; padding: 0 10px; font-size: 32px; font-weight: 700; border-radius: 6px; }
+  .cover-result dl { display: grid; grid-template-columns: auto auto; gap: 2px 14px; margin: 0; }
+  .cover-result dt { color: #555; } .cover-result dd { margin: 0; font-weight: 600; }
+  td.src { font-size: 0.85em; color: #444; }
   :root{--ink:#1d2430;--muted:#5a6475;--line:#cfd6df;--head:#eef2f6;--accent:#1f4e79}
   *{box-sizing:border-box}
   body{font:10.5pt/1.45 "Segoe UI",system-ui,sans-serif;color:var(--ink);margin:0;background:#fff}
@@ -790,7 +868,7 @@ export function generateEnergyPerformanceReportHTML(project: IProject, assessmen
   const cover = `<header class="cover"><h1>Rapportage Energieprestatie</h1><p class="sub">NTA 8800:2025+C1:2026 — ${escapeHtml(project.name || 'Project')}</p>
     <dl><dt>Adres</dt><dd>${escapeHtml([project.address, project.city].filter(Boolean).join(', ') || '—')}</dd>
     <dt>Rapportniveau</dt><dd>${levelText}</dd><dt>Datum</dt><dd>${dutchTimeHtml(generatedAt)}</dd>
-    <dt>Rekenkern</dt><dd>Open Energy Studio ${escapeHtml(assessment.kernelVersion)} (${attest.attestNumber ? `BRL 9501-attest ${escapeHtml(attest.attestNumber)}` : 'niet geattesteerd'})</dd></dl>${attestMarkSlot(attest)}</header>`;
+    <dt>Rekenkern</dt><dd>Open Energy Studio ${escapeHtml(assessment.kernelVersion)} (${attest.attestNumber ? `BRL 9501-attest ${escapeHtml(attest.attestNumber)}` : 'niet geattesteerd'})</dd></dl>${coverResult(assessment)}${attestMarkSlot(attest)}</header>`;
   let chapters = introduction(doc, project, assessment, generatedAt, attest);
   const performance = assessment.performance;
   if (kernelVerdict(assessment) !== 'calculated' || !performance) {
@@ -836,6 +914,8 @@ export function generateEnergyPerformanceReportHTML(project: IProject, assessmen
       <tr><th>Rapport gegenereerd</th><td>${dutchTimeHtml(generatedAt)}</td></tr>`)
     + (performance ? `<ul class="note">${[...new Set([...performance.spaceHeating.demand.omittedCorrections, ...performance.spaceHeating.omittedTerms])]
       .map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : ''));
+  if (options.surveyDefaults?.length) chapters += surveyDefaultsAppendix(doc, options.surveyDefaults);
+  if (project.registration?.evidence?.length) chapters += evidenceAppendix(doc, project);
   if (options.interpretations?.length) {
     chapters += doc.chapter('interpretaties', 'Bijlage: interpretaties van de rekenkern',
       interpretationsSection(options.interpretations).replace(/<h2>[^<]*<\/h2>/, ''));

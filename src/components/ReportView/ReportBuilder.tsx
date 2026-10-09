@@ -8,6 +8,8 @@ import {
   type DetailSection, type ReportLevel, type ReportOptions,
 } from '../../core/report/EnergyPerformanceReport';
 import { downloadEnergyPerformanceReportHTML, printEnergyPerformanceReport } from '../../core/report/ReportGenerator';
+import { currentResult, useSurveyAssessment } from '../../core/survey/surveyAssessment';
+import type { StoredSurvey } from '../../core/nta/SurveyTemplates';
 
 const STORAGE_KEY = 'oes-energy-report-options';
 const LEVELS: ReportLevel[] = ['summary', 'standard', 'detailed'];
@@ -62,10 +64,13 @@ export function ReportBuilder({ project, assessment, pending }: {
     setChoice(next);
     storeReportChoice(next);
   };
-  const options: ReportOptions = { level: choice.level, details: choice.details, interpretations };
+  // A basisopname adds the defaults the kernel applied, with their norm reference.
+  const surveyResult = currentResult(useSurveyAssessment(), project.basisopname as StoredSurvey | undefined);
+  const surveyDefaults = surveyResult?.appliedDefaults;
+  const options: ReportOptions = { level: choice.level, details: choice.details, interpretations, surveyDefaults };
   const preview = useMemo(
-    () => (assessment ? generateEnergyPerformanceReportHTML(project, assessment, { level: choice.level, details: choice.details, interpretations }) : null),
-    [project, assessment, choice, interpretations],
+    () => (assessment ? generateEnergyPerformanceReportHTML(project, assessment, { level: choice.level, details: choice.details, interpretations, surveyDefaults }) : null),
+    [project, assessment, choice, interpretations, surveyDefaults],
   );
   const run = (action: () => Promise<void>) => {
     setError(null);

@@ -88,3 +88,29 @@ describe('Rapportage Energieprestatie (NTA 8800)', () => {
     expect(html).not.toContain('Berekening:');
   });
 });
+
+describe('Rapportage Energieprestatie: label op het voorblad, bron per vlak en bijlagen (feedback 9 Oct 2026)', () => {
+  it('shows the label and indicators on the cover, the source of every U and the survey and evidence appendices', () => {
+    const { project, assessment } = load('terraced-dwelling');
+    const performance = assessment.performance!;
+    const withEvidence: IProject = { ...project, registration: { ...(project.registration ?? {}), evidence: [{
+      id: 'ev-1', kind: 'quality_declaration', fileName: 'verklaring-wp.pdf', sha256: 'a'.repeat(64), date: '2026-10-01', linkedPaths: ['/basisopname/survey/heating/generator'],
+    }] } } as IProject;
+    const html = generateEnergyPerformanceReportHTML(withEvidence, assessment, {
+      level: 'detailed', generatedAt: at, interpretations: [],
+      surveyDefaults: [{ rule: 'thermal_bridges_forfait_delta_u', path: 'envelope.surfaces[0]', value: 'ΔU_for 0.100 W/(m²K)', source: 'NTA 8800 §8.2.1, formula 8.3 (table 8.1)' }],
+    });
+    const cover = html.slice(html.indexOf('<header class="cover">'), html.indexOf('</header>'));
+    expect(cover).toContain(`>${performance.indicativeLabelClass}<`);
+    expect(cover).toContain(dutchNumber(performance.needIndicatorKwhPerM2Year, 1));
+    expect(html).toContain('Bron van U');
+    const transmission = html.slice(html.indexOf('id="detail-transmission"'), html.indexOf('id="detail-ventilation"'));
+    expect(transmission).toContain('constructie ');
+    expect(transmission).not.toContain('project:construction:');
+    expect(html).toContain('Bijlage: standaardwaarden van de basisopname');
+    expect(html).toContain('envelope.surfaces[0]');
+    expect(html).toContain('Bijlage: bewijsstukken');
+    expect(html).toContain('verklaring-wp.pdf');
+    expect(html).toContain('kwaliteitsverklaring');
+  });
+});
