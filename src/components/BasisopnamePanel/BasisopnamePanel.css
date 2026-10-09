@@ -160,3 +160,7 @@
 .survey-declaration { display: grid; gap: 6px; grid-column: 1 / -1; }
 .survey-declaration__label { font-size: var(--fs-sm); color: var(--fg-2); }
 .survey-declaration__body { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--amber-600); border-radius: 8px; }
+
+/* An opaque part of a surface (feedback 9 Oct 2026). */
+.opname-part { border-left: 3px solid var(--amber-600); }
+.opname-part .opname-sub-kind { display: flex; align-items: center; gap: 8px; }

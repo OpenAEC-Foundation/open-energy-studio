@@ -20,6 +20,7 @@ import { freshItemId, jsonPointer, linksAfterRemoval } from '../../core/nta/Evid
 import { formatNumber } from '../../i18n/format';
 import { dutchDefaultValue, dutchSource, snakeCase } from '../../core/nta/OpnameValueText';
 import type { SurveyPart } from '../../core/survey/surveyFlow';
+import { addPart, parentOf, partsOf, removeSurface, syncParts } from '../../core/survey/surfaceParts';
 import {
   componentActive, componentFilledIn, componentsOf, toggleComponent, type SurveyComponentId,
 } from '../../core/survey/surveyComponents';
@@ -1171,12 +1172,41 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
         // right below it, so "In vlak" no longer has to be picked to see what belongs where.
         const counts: Record<string, number> = {};
         const names = new Map<string, string>();
+        const isPart = (surface: Record<string, unknown>) => parentOf(stored, String(surface.id ?? '')) != null;
         surfaces.forEach((surface) => {
+          if (isPart(surface)) return;
           const element = String(surface.element ?? 'facade');
           counts[element] = (counts[element] ?? 0) + 1;
           names.set(String(surface.id ?? ''), `${t(`survey.element.${element}`)} ${counts[element]}`);
         });
-        const surfaceOptions: Array<[string, string]> = surfaces.map((surface) => [String(surface.id), names.get(String(surface.id)) ?? String(surface.id)]);
+        surfaces.filter(isPart).forEach((surface) => {
+          const id = String(surface.id ?? '');
+          const parent = parentOf(stored, id)!;
+          names.set(id, `${names.get(parent) ?? parent} · ${t('survey.part')} ${partsOf(stored, parent).indexOf(id) + 2}`);
+        });
+        // Openings stay on the surface itself, not on one of its opaque parts.
+        const surfaceOptions: Array<[string, string]> = surfaces.filter((surface) => !isPart(surface))
+          .map((surface) => [String(surface.id), names.get(String(surface.id)) ?? String(surface.id)]);
+        // A surface's own answers that its parts take over follow at once.
+        const sharedField = { draft, onChange: (path: Path, value: unknown) => save(syncParts({ ...stored, kind, survey: write(draft, path, value) })) };
+        const insulationFields = (b: Path) => {
+          const kindOf = read(draft, [...b, 'insulation', 'kind']);
+          return <>
+            <label>{t('opname.surface.insulation')}
+              <select value={typeof kindOf === 'string' ? kindOf : ''}
+                onChange={(event) => change([...b, 'insulation'], event.target.value === 'thickness'
+                  ? { kind: 'thickness', thicknessMm: 50 } : { kind: event.target.value })}>
+                {['none_or_unknown', 'present_unknown_thickness', 'cavity_filled_unknown_width', 'thickness'].map((key) =>
+                  <option key={key} value={key}>{t(`opname.surface.insulationKind.${key}`)}</option>)}
+              </select>
+            </label>
+            {kindOf === 'thickness' && <NumberField {...field} path={[...b, 'insulation', 'thicknessMm']} label={t('opname.surface.thicknessMm')} />}
+            {kindOf === 'present_unknown_thickness' && <>
+              <NumberField {...field} path={[...b, 'renovation', 'year']} label={t('opname.surface.renovationYear')} step="1" />
+              <CheckField {...field} path={[...b, 'renovation', 'meetsRequirementsOfYear']} label={t('opname.surface.renovationEvidence')} />
+            </>}
+          </>;
+        };
         const area = (items: Array<Record<string, unknown>>, id: string) =>
           items.filter((item) => item.surfaceId === id).reduce((sum, item) => sum + (Number(item.areaM2) || 0), 0);
         const glassOptions = opts(t, 'opname.window.glassKind', ['triple_hr', 'hr_plus_plus', 'hr_plus', 'hr', 'double', 'single']);
@@ -1246,7 +1276,7 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
           </div>;
         };
         const cards = surfaces.map((surface, index) => {
-          if (!showSurface(surface.element)) return null;
+          if (!showSurface(surface.element) || isPart(surface)) return null;
           const base: Path = ['envelope', 'surfaces', index];
           const id = String(surface.id ?? '');
           const element = String(read(draft, [...base, 'element']) ?? 'facade');
@@ -1260,6 +1290,7 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
           const ownRooflights = rooflights.map((item, at) => [item, at] as const).filter(([item]) => item.surfaceId === id);
           const gross = Number(surface.grossAreaM2) || 0;
           const net = gross - area(windows, id) - area(doors, id) - area(rooflights, id);
+          const ownParts = partsOf(stored, id);
           return <details key={index} className="opname-card" open>
             <summary className="opname-card-head">
               <strong>{names.get(id) ?? id}</strong>
@@ -1271,47 +1302,51 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
                 ? `${formatNumber(thickness, locale, 0)} mm` : t(`opname.surface.insulationKind.${insulation}`)}</span>}
               {ownWindows.length > 0 && <span className="opname-tag">{t('survey.windowsCount', { count: ownWindows.length })}</span>}
               {ownDoors.length > 0 && <span className="opname-tag">{t('survey.doorsCount', { count: ownDoors.length })}</span>}
+              {ownParts.length > 0 && <span className="opname-tag">{t('survey.partsCount', { count: ownParts.length + 1 })}</span>}
               <span className={`opname-card-net${net < 0 ? ' opname-card-net--invalid' : ''}`}>
                 {t('survey.grossNet', { gross: formatNumber(gross, locale, 2), net: formatNumber(net, locale, 2) })}</span>
             </summary>
             <div className="nta-form-grid opname-card-body">
-              {!embedded && <SelectField {...field} path={[...base, 'element']} label={t('opname.surface.element')}
+              {!embedded && <SelectField {...sharedField} path={[...base, 'element']} label={t('opname.surface.element')}
                 options={opts(t, 'opname.surface.elementKind', ['facade', 'roof', 'floor'])} />}
-              {element === 'roof' && <NumberField {...field} path={[...base, 'tiltDeg']} label={t('opname.tilt')} />}
-              {oriented && <SelectField {...field} path={[...base, 'orientation']} label={t('opname.orientation')}
+              {element === 'roof' && <NumberField {...sharedField} path={[...base, 'tiltDeg']} label={t('opname.tilt')} />}
+              {oriented && <SelectField {...sharedField} path={[...base, 'orientation']} label={t('opname.orientation')}
                 options={opts(t, 'opname.orientationKind', ORIENTATIONS)} />}
               {element === 'roof' && !oriented && <p className="nta-form-note nta-form-hint">{t('survey.flatRoofNoOrientation')}</p>}
               {element === 'floor' && <NumberField {...field} path={[...base, 'exposedPerimeterM']} label={t('opname.surface.perimeter')} />}
               <label>{t('opname.surface.boundary')}
                 <select value={String(read(draft, [...base, 'boundary', 'kind']) ?? '')}
-                  onChange={(event) => change([...base, 'boundary'], { kind: event.target.value })}>
+                  onChange={(event) => sharedField.onChange([...base, 'boundary'], { kind: event.target.value })}>
                   {['outdoor', 'ground', 'crawlspace', 'adjacent_heated', 'unheated_cellar', 'strongly_ventilated', 'sunroom', 'water'].map((key) =>
                     <option key={key} value={key}>{t(`opname.surface.boundaryKind.${key}`)}</option>)}
                 </select>
               </label>
-              <NumberField {...field} path={[...base, 'grossAreaM2']} label={t('opname.surface.area')} />
+              <NumberField {...field} path={[...base, 'grossAreaM2']} label={t(ownParts.length > 0 ? 'survey.part.mainArea' : 'opname.surface.area')} />
               {kind === 'utility' && zoneIds.length > 1 &&
-                <ZoneSelect draft={draft} change={change} path={[...base, 'zoneId']} label={t('opname.surface.zone')}
+                <ZoneSelect draft={draft} change={sharedField.onChange} path={[...base, 'zoneId']} label={t('opname.surface.zone')}
                   ids={zoneIds} empty={t('opname.zones.splitByArea')} unknown={t('opname.zones.unknownZone')} />}
-              <label>{t('opname.surface.insulation')}
-                <select value={typeof insulation === 'string' ? insulation : ''}
-                  onChange={(event) => change([...base, 'insulation'], event.target.value === 'thickness'
-                    ? { kind: 'thickness', thicknessMm: 50 } : { kind: event.target.value })}>
-                  {['none_or_unknown', 'present_unknown_thickness', 'cavity_filled_unknown_width', 'thickness'].map((key) =>
-                    <option key={key} value={key}>{t(`opname.surface.insulationKind.${key}`)}</option>)}
-                </select>
-              </label>
-              {insulation === 'thickness' && <NumberField {...field} path={[...base, 'insulation', 'thicknessMm']} label={t('opname.surface.thicknessMm')} />}
-              {insulation === 'present_unknown_thickness' && <>
-                <NumberField {...field} path={[...base, 'renovation', 'year']} label={t('opname.surface.renovationYear')} step="1" />
-                <CheckField {...field} path={[...base, 'renovation', 'meetsRequirementsOfYear']} label={t('opname.surface.renovationEvidence')} />
-              </>}
+              {insulationFields(base)}
               <CheckField {...field} path={[...base, 'thermalCushions']} label={t('opname.surface.thermalCushions')} />
               <SurveyPhotos path={base} />
             </div>
             {ownWindows.map(([item, at]) => windowFields(item, at))}
             {ownDoors.map(([item, at]) => doorFields(item, at))}
             {ownRooflights.map(([item, at]) => rooflightFields(item, at))}
+            {ownParts.map((partId, n) => {
+              const at = surfaces.findIndex((item) => item.id === partId);
+              const partBase: Path = ['envelope', 'surfaces', at];
+              const rc = derivedRc(surveyResult, partId);
+              return <div key={partId} className="opname-sub opname-part">
+                <p className="opname-sub-kind">{t('survey.part')} {n + 2}
+                  {rc != null && <span className="opname-tag" title={t('survey.derivedRcHint')}>R_c {formatNumber(rc, locale, 2)}</span>}</p>
+                <div className="nta-form-grid">
+                  <NumberField {...field} path={[...partBase, 'grossAreaM2']} label={t('opname.surface.area')} />
+                  {insulationFields(partBase)}
+                  <SurveyPhotos path={partBase} />
+                  <RemoveButton label={t('survey.removePart')} onRemove={() => save(removeSurface(stored, partId).stored)} />
+                </div>
+              </div>;
+            })}
             <div className="opname-card-actions">
               {element !== 'floor' && <button type="button" className="btn btn-sm"
                 onClick={() => change(['envelope', 'windows'], [...windows, windowTemplate(windows.length, id)])}>
@@ -1321,6 +1356,8 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
                   id: `deur-${doors.length + 1}`, surfaceId: id, areaM2: 2, insulated: null, glassFraction: 0,
                   frame: 'wood_or_plastic', sourceReference: '',
                 }])}>{t('survey.addDoorHere')}</button>}
+              {element !== 'floor' && <button type="button" className="btn btn-sm" onClick={() => save(addPart(stored, id))}>
+                {t('survey.addPart')}</button>}
               {element === 'roof' && <button type="button" className="btn btn-sm"
                 onClick={() => change(['envelope', 'rooflights'], [...rooflights, {
                   id: `lichtkoepel-${rooflights.length + 1}`, surfaceId: id, areaM2: 1, uValue: 2.5, glass: 'double', qualityDeclarationReference: '',
@@ -1328,11 +1365,13 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
               <RemoveButton label={t('survey.removeSurface')} onRemove={() => {
                 // Openings on the removed surface go with it: the kernel rejects an opening without its surface.
                 const keep = (items: Array<Record<string, unknown>>) => items.filter((item) => item.surfaceId !== id);
-                let next = write(draft, ['envelope', 'surfaces'], surfaces.filter((_, item) => item !== index));
+                // Its opaque parts go with it.
+                const without = removeSurface(stored, id).stored;
+                let next = without.survey as Draft;
                 next = write(next, ['envelope', 'windows'], keep(windows));
                 next = write(next, ['envelope', 'rooflights'], keep(rooflights));
                 if (doors.length > 0) next = write(next, ['envelope', 'doors'], keep(doors));
-                save({ kind, survey: next });
+                save({ ...without, kind, survey: next });
               }} />
             </div>
           </details>;

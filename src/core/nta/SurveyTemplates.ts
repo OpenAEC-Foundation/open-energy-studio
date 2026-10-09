@@ -19,6 +19,8 @@ export interface StoredSurvey {
   surveyDate?: string;
   /** Optional parts ticked as present (src/core/survey/surveyComponents.ts); not sent to the kernel. */
   components?: string[];
+  /** Opaque parts of a surface: part surface id → surface id (src/core/survey/surfaceParts.ts); not sent to the kernel. */
+  surfaceParts?: Record<string, string>;
 }
 
 /** An empty dwelling survey: only the answers that are "unknown" by default (ISSO 82.1 defaults apply). */
