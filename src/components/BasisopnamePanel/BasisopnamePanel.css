@@ -181,3 +181,8 @@
 .survey-table__part th { padding-left: 18px; color: var(--fg-2); font-weight: 400; }
 .survey-table tfoot td { border-bottom: 0; padding-top: 8px; }
 .survey-table__title { margin: 16px 0 6px; font-size: var(--fs-md); }
+
+/* The table view and its toggle take the full width of the form grid. */
+.survey-table-view { grid-column: 1 / -1; min-width: 0; overflow-x: auto; }
+.survey-view-toggle { grid-column: 1 / -1; justify-self: start; }
+.survey-table td > label > *, .survey-table td > label input { width: 100%; }

@@ -1181,7 +1181,8 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
             onClick={() => chooseEnvelopeView(view)}>{t(`survey.view.${view}`)}</button>)}
         </span>}
       <p className="nta-form-note">{t('evidenceLink.photosHint')}</p>
-      {kind === 'residential' && part !== 'roofFloor' && <label>{t('opname.buildingKind')}
+      {/* The question flow asks woonboot and woonwagen at Soort woning (and in the new-project window). */}
+      {kind === 'residential' && !embedded && <label>{t('opname.buildingKind')}
         <select value={typeof buildingKind === 'string' ? buildingKind : 'regular'}
           onChange={(event) => change(['envelope', 'buildingKind'], event.target.value === 'regular' ? null
             : event.target.value === 'floating' ? { kind: 'floating', newBerthSince2018: false } : { kind: event.target.value })}>
@@ -1189,7 +1190,7 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
             <option key={key} value={key}>{t(`opname.buildingKind.${key}`)}</option>)}
         </select>
       </label>}
-      {buildingKind === 'floating' && part !== 'roofFloor' &&
+      {buildingKind === 'floating' && !embedded &&
         <CheckField {...field} path={['envelope', 'buildingKind', 'newBerthSince2018']} label={t('opname.buildingKind.newBerth')} />}
       {(['facade', 'roof', 'floor'] as const).filter((element) => showSurface(element)).map((element) =>
         <ElementInsulation key={element} draft={draft} element={element} replace={(next) => save({ kind, survey: next })} t={t} />)}
@@ -1311,8 +1312,14 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
           ].filter(({ item }) => shownIds.has(String(item.surfaceId ?? '')) || !surfaces.some((surface) => surface.id === item.surfaceId));
           const firstId = shown[0] ? String(shown[0][0].id ?? '') : null;
           const tableSurfaceOptions = surfaceOptions.filter(([id]) => shownIds.has(id));
-          return <>
+          return <div className="survey-table-view">
             <table className="survey-table" onKeyDown={tableEnter}>
+              <colgroup>
+                <col style={{ width: roofFloor ? '14%' : '16%' }} />
+                {roofFloor && <col style={{ width: '8%' }} />}
+                <col style={{ width: roofFloor ? '11%' : '12%' }} /><col style={{ width: '15%' }} /><col style={{ width: '9%' }} />
+                <col style={{ width: roofFloor ? '19%' : '21%' }} /><col style={{ width: '9%' }} /><col style={{ width: roofFloor ? '15%' : '18%' }} />
+              </colgroup>
               <thead><tr>
                 <th scope="col">{t('survey.table.surface')}</th>
                 {roofFloor && <th scope="col">{t('opname.tilt')}</th>}
@@ -1342,6 +1349,7 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
             </table>
             <h4 className="survey-table__title">{t(roofFloor ? 'survey.table.roofWindows' : 'survey.table.openings')}</h4>
             <table className="survey-table survey-table--openings" onKeyDown={tableEnter}>
+              <colgroup><col style={{ width: '14%' }} /><col style={{ width: '22%' }} /><col style={{ width: '10%' }} /><col style={{ width: '24%' }} /><col style={{ width: '30%' }} /></colgroup>
               <thead><tr>
                 <th scope="col">{t('survey.table.opening')}</th>
                 <th scope="col">{t('survey.moveTo')}</th>
@@ -1370,7 +1378,7 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
               </td></tr></tfoot>
             </table>
             <p className="nta-form-note">{t('survey.table.note')}</p>
-          </>;
+          </div>;
         }
         const windowFields = (_window: Record<string, unknown>, index: number) => {
           const base: Path = ['envelope', 'windows', index];
