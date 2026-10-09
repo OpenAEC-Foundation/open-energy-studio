@@ -212,6 +212,8 @@ describe('workflow end to end, default edition', () => {
     const preview = () => (main().getByTestId('report-builder-preview') as HTMLIFrameElement).getAttribute('srcdoc') ?? '';
     await waitFor(() => expect(preview()).toContain('Bouwkundige uitgangspunten'));
     const balance = main().getByLabelText(/Heat and cold balance/);
+    // The detailed level is the default; Standard leaves the calculation chapters out.
+    await user.click(main().getByRole('radio', { name: /^Standard/ }));
     expect(balance).toBeDisabled();
     expect(preview()).not.toContain('Berekening: Warmte- en koudebalans');
     await user.click(main().getByRole('radio', { name: /^Detailed/ }));

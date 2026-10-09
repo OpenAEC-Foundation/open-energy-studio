@@ -26,10 +26,14 @@ describe('report builder', () => {
   it('previews the chosen level, enables the detail chapters only for the detailed level and remembers the choice', async () => {
     const user = userEvent.setup();
     renderWithProviders(<ReportBuilder project={project} assessment={assessment} pending={false} />);
-    // Default: standard level with building data, no calculation chapters.
+    // Default: the detailed level with the calculation chapters (feedback 9 Oct 2026).
+    const balance = screen.getByLabelText(/Heat and cold balance|Warmte- en koudebalans/);
+    expect(screen.getByRole('radio', { name: /Detailed|Gedetailleerd/ })).toBeChecked();
+    expect(balance).toBeEnabled();
+    // Standard: building data, no calculation chapters.
+    await user.click(screen.getByRole('radio', { name: /Standard|Standaard/ }));
     expect(preview()).toContain('Bouwkundige uitgangspunten');
     expect(preview()).not.toContain('Berekening: Warmte- en koudebalans');
-    const balance = screen.getByLabelText(/Heat and cold balance|Warmte- en koudebalans/);
     expect(balance).toBeDisabled();
 
     await user.click(screen.getByRole('radio', { name: /Detailed|Gedetailleerd/ }));

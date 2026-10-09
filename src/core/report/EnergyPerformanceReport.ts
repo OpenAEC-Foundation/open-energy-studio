@@ -8,6 +8,7 @@ import { kernelVerdict } from '../nta/KernelVerdict';
 import { nl } from '../../i18n/nl';
 import { escapeHtml } from './HtmlEscaping';
 import { dutchDefaultValue, dutchSource } from '../nta/OpnameValueText';
+import { INPUT_KEY_LABELS } from './InputKeyLabels';
 import { dutchCodeCell, dutchDetailHtml, dutchNumber, dutchTimeHtml, dutchTimestamp } from './DutchReportText';
 import { indicatorDecimals, kernelReportModel } from './KernelReportModel';
 import {
@@ -416,6 +417,9 @@ const WORDS: Record<string, string> = {
 function readableKey(path: string): string {
   return path.split('.').map((segment) => {
     const index = segment.match(/\[(\d+)\]$/)?.[1];
+    // A Dutch name per field (feedback 9 Oct 2026); word by word only for a field without one.
+    const known = INPUT_KEY_LABELS[segment.replace(/\[\d+\]$/, '')];
+    if (known) return known + (index ? ` ${index}` : '');
     const words = segment.replace(/\[\d+\]$/, '').replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase().split(' ')
       .filter((word) => !['m2', 'c', 'kw', 'kwh', 'k', 'w', 'deg', 'm', 'mk'].includes(word))
       .map((word) => WORDS[word] ?? word);
@@ -729,11 +733,13 @@ function pvDetail(doc: ReportDocument, assessment: ProjectPerformanceAssessment,
       return `<tr>${td(system.id)}${tdn(Number(input?.azimuthDeg))}${tdn(Number(input?.tiltDeg))}${td(input?.mounting ?? '—')}${tdn(system.annualKwh)}</tr>`;
     }).join(''));
   html += monthlyTable(doc, 'Zonnestroom per maand [kWh] (16.2–16.4)', systems.map((system) => ({ head: escapeHtml(system.id), values: system.monthlyKwh, total: true })));
-  html += monthlyTable(doc, 'Elektriciteitsbalans per maand [kWh] (5.10–5.13)', [
-    { head: 'gebruik', values: performance.electricityBalance.map((row) => row.usedKwh), total: true },
-    { head: 'opwekking', values: performance.electricityBalance.map((row) => row.producedKwh), total: true },
-    { head: 'eigen gebruik', values: performance.electricityBalance.map((row) => row.selfUsedKwh), total: true },
-    { head: 'export', values: performance.electricityBalance.map((row) => row.exportedKwh), total: true },
+  // An answer without the balance (older kernel output) still gives the rest of the chapter.
+  const balance = performance.electricityBalance ?? [];
+  if (balance.length) html += monthlyTable(doc, 'Elektriciteitsbalans per maand [kWh] (5.10–5.13)', [
+    { head: 'gebruik', values: balance.map((row) => row.usedKwh), total: true },
+    { head: 'opwekking', values: balance.map((row) => row.producedKwh), total: true },
+    { head: 'eigen gebruik', values: balance.map((row) => row.selfUsedKwh), total: true },
+    { head: 'export', values: balance.map((row) => row.exportedKwh), total: true },
   ]);
   return html;
 }
@@ -902,7 +908,15 @@ export function generateEnergyPerformanceReportHTML(project: IProject, assessmen
       };
       for (const section of DETAIL_SECTIONS) {
         if (!detailEnabled(options, section)) continue;
-        chapters += doc.chapter(`detail-${section}`, `Berekening: ${DETAIL_SECTION_TITLES[section]}`, detail[section](), true);
+        // A chapter whose kernel values are missing (an older or partial answer) must not take the
+        // whole report down: it says so and the other chapters follow.
+        let body: string;
+        try {
+          body = detail[section]();
+        } catch {
+          body = '<p class="note">Voor dit onderdeel ontbreken waarden in de uitkomst van de rekenkern; reken opnieuw om het te vullen.</p>';
+        }
+        chapters += doc.chapter(`detail-${section}`, `Berekening: ${DETAIL_SECTION_TITLES[section]}`, body, true);
       }
     }
     if (options.level !== 'summary') chapters += inputOverviewChapter(doc, assessment);

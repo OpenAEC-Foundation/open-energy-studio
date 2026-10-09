@@ -29,7 +29,8 @@ export function loadReportChoice(): StoredChoice {
       return { level: parsed.level as ReportLevel, details: { ...allDetails(true), ...(parsed.details ?? {}) } };
     }
   } catch { /* fall back to the default */ }
-  return { level: 'standard', details: allDetails(true) };
+  // Gedetailleerd by default (feedback 9 Oct 2026); a stored choice wins.
+  return { level: 'detailed', details: allDetails(true) };
 }
 
 function storeReportChoice(choice: StoredChoice) {
