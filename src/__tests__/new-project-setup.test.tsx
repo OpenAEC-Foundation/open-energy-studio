@@ -101,8 +101,14 @@ describe('new-project window', () => {
     expect(await screen.findByText('Goejanverwelledijk 85, 2807CB Gouda')).toBeInTheDocument();
     expect(screen.getByText(/built 1932/)).toBeInTheDocument();
     const types = within(screen.getByRole('group', { name: 'Dwelling type' }));
-    expect(types.getByRole('button', { name: /Houseboat, berth before/ })).toBeInTheDocument();
-    await user.click(types.getByRole('button', { name: /Houseboat, berth from/ }));
+    expect(types.getAllByRole('button').map((button) => button.textContent)).toEqual(['Ground-bound dwelling', 'Apartment', 'Caravan', 'Houseboat']);
+    // A houseboat asks only for its berth; a ground-bound dwelling only for its position.
+    await user.click(types.getByRole('button', { name: 'Ground-bound dwelling' }));
+    expect(screen.getByRole('group', { name: 'Position' })).toBeInTheDocument();
+    await user.click(types.getByRole('button', { name: 'Houseboat' }));
+    expect(screen.queryByRole('group', { name: 'Position' })).toBeNull();
+    await user.click(within(screen.getByRole('group', { name: 'Berth' })).getByRole('button', { name: 'From 1 January 2018' }));
+    expect(types.getByRole('button', { name: 'Houseboat' })).toHaveAttribute('aria-pressed', 'true');
     await user.click(within(screen.getByRole('group', { name: 'Solar panels' })).getByRole('button', { name: 'No' }));
     await user.type(screen.getByRole('textbox', { name: 'Name' }), 'A. Adviseur');
     await user.click(screen.getByRole('button', { name: 'Create project' }));

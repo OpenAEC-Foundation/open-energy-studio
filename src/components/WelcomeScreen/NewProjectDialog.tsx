@@ -10,7 +10,7 @@ import { Button, Dialog } from '../ui';
 import { useI18n } from '../../i18n/i18n';
 import { lookupAddresses, normalizePostcode, withBuildingData, type BagAddress } from '../../core/io/bagLookup';
 import {
-  SETUP_DWELLINGS, SETUP_HEATING, SETUP_VENTILATION, isSurveyKind, nameFromAddress, rememberAdviser, rememberedAdviser,
+  SETUP_HEATING, SETUP_VENTILATION, isSurveyKind, nameFromAddress, rememberAdviser, rememberedAdviser,
   type NewProjectKind, type NewProjectSetup, type SetupAdviser, type SetupDwelling,
 } from '../../core/io/newProjectSetup';
 import { EXAMPLE_KINDS, type ExampleKind } from '../../core/nta/ExampleProjects';
@@ -21,9 +21,23 @@ const KINDS: Array<{ id: NewProjectKind; icon: ReactNode }> = [
   { id: 'residential', icon: <HousePlus /> },
   { id: 'utility', icon: <Building /> },
 ];
-const DWELLING_ICONS: Partial<Record<SetupDwelling, ReactNode>> = {
-  apartment: <Building2 aria-hidden="true" />, houseboat: <Ship aria-hidden="true" />, houseboat_2018: <Ship aria-hidden="true" />, caravan: <Caravan aria-hidden="true" />,
-};
+/**
+ * The dwelling type in two steps, as Uniec3's new-calculation menu (feedback
+ * 9 Oct 2026: "duidelijker onderscheid"): first the main kind as a tile, then
+ * only the follow-up question of that kind.
+ */
+type DwellingGroup = 'ground' | 'apartment' | 'caravan' | 'houseboat';
+const DWELLING_GROUPS: Array<{ id: DwellingGroup; icon: ReactNode }> = [
+  { id: 'ground', icon: <Home /> },
+  { id: 'apartment', icon: <Building2 /> },
+  { id: 'caravan', icon: <Caravan /> },
+  { id: 'houseboat', icon: <Ship /> },
+];
+const POSITIONS = ['terraced', 'end_or_corner', 'detached'] as const;
+const BERTHS = ['houseboat', 'houseboat_2018'] as const;
+const groupOf = (dwelling: SetupDwelling | null): DwellingGroup | null =>
+  dwelling == null ? null : dwelling === 'apartment' || dwelling === 'caravan' ? dwelling
+    : dwelling === 'houseboat' || dwelling === 'houseboat_2018' ? 'houseboat' : 'ground';
 
 type Lookup = { state: 'idle' } | { state: 'busy' } | { state: 'none' } | { state: 'error' } | { state: 'choose'; options: BagAddress[] };
 
@@ -60,7 +74,10 @@ export function NewProjectDialog({ onCreate, onOpenExample, onClose }: {
   const [address, setAddress] = useState<BagAddress | null>(null);
   const [manual, setManual] = useState({ street: '', city: '' });
   const [lookup, setLookup] = useState<Lookup>({ state: 'idle' });
-  const [dwelling, setDwelling] = useState<SetupDwelling | null>(null);
+  const [dwelling, setDwellingValue] = useState<SetupDwelling | null>(null);
+  // A main kind with a follow-up question (ground-bound, houseboat) is chosen before the follow-up is.
+  const [pendingGroup, setPendingGroup] = useState<DwellingGroup | null>(null);
+  const setDwelling = (value: SetupDwelling | null) => { setDwellingValue(value); if (value != null) setPendingGroup(null); };
   const [roofType, setRoofType] = useState<NonNullable<NewProjectSetup['roofType']>>('pitched');
   const [apartmentFloor, setApartmentFloor] = useState<NonNullable<NewProjectSetup['apartmentFloor']>>('ground_or_intermediate');
   const [heating, setHeating] = useState<string | null>(null);
@@ -162,8 +179,29 @@ export function NewProjectDialog({ onCreate, onOpenExample, onClose }: {
 
     {dwellingKind && <section className="new-project__section">
       <h3>{t('newProject.dwelling')}</h3>
-      <Chips label={t('newProject.dwelling')} options={SETUP_DWELLINGS} value={dwelling} onChange={setDwelling}
-        text={(id) => <>{DWELLING_ICONS[id]}{t(`newProject.dwelling.${id}`)}</>} />
+      <div className="new-project__kinds" role="group" aria-label={t('newProject.dwelling')}>
+        {DWELLING_GROUPS.map((item) => {
+          const active = (groupOf(dwelling) ?? pendingGroup) === item.id;
+          const pick = () => {
+            if (active) { setDwellingValue(null); setPendingGroup(null); return; }
+            if (item.id === 'apartment' || item.id === 'caravan') setDwelling(item.id);
+            else { setDwellingValue(null); setPendingGroup(item.id); }
+          };
+          return <button key={item.id} type="button" className="new-project__kind" aria-pressed={active} onClick={pick}>
+          <span aria-hidden="true">{item.icon}</span>{t(`newProject.group.${item.id}`)}
+        </button>;
+        })}
+      </div>
+      {(groupOf(dwelling) === 'ground' || pendingGroup === 'ground') && <div className="new-project__presence">
+        <span>{t('newProject.position')}</span>
+        <Chips label={t('newProject.position')} options={POSITIONS} value={POSITIONS.includes(dwelling as typeof POSITIONS[number]) ? dwelling as typeof POSITIONS[number] : null}
+          onChange={(value) => setDwelling(value)} text={(id) => t(`newProject.dwelling.${id}`)} />
+      </div>}
+      {(groupOf(dwelling) === 'houseboat' || pendingGroup === 'houseboat') && <div className="new-project__presence">
+        <span>{t('newProject.berth')}</span>
+        <Chips label={t('newProject.berth')} options={BERTHS} value={BERTHS.includes(dwelling as typeof BERTHS[number]) ? dwelling as typeof BERTHS[number] : null}
+          onChange={(value) => setDwelling(value)} text={(id) => t(`newProject.berth.${id}`)} />
+      </div>}
       {dwelling === 'apartment' && <label className="new-project__inline">{t('opname.dwelling.floor')}
         <select value={apartmentFloor} onChange={(event) => setApartmentFloor(event.target.value as typeof apartmentFloor)}>
           {(['ground_or_intermediate', 'top', 'roof_and_floor'] as const).map((key) => <option key={key} value={key}>{t(`opname.dwelling.floorKind.${key}`)}</option>)}
