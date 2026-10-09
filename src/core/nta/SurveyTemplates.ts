@@ -17,6 +17,8 @@ export interface StoredSurvey {
   progress?: { done?: string[]; skipped?: string[] };
   /** Date of the site visit (yyyy-mm-dd); app data beside the survey, not sent to the kernel. */
   surveyDate?: string;
+  /** Optional parts ticked as present (src/core/survey/surveyComponents.ts); not sent to the kernel. */
+  components?: string[];
 }
 
 /** An empty dwelling survey: only the answers that are "unknown" by default (ISSO 82.1 defaults apply). */

@@ -146,3 +146,12 @@
 .opname-panel .opname-element-insulation { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px 16px; align-items: end;
   padding: 10px 14px; border: 1px solid var(--line, var(--border)); border-left: 3px solid var(--accent, var(--amber-500)); border-radius: var(--radius-lg, 10px); }
 .opname-panel .opname-element-insulation > p { grid-column: 1 / -1; margin: 0; }
+
+/* "Wat zit erin?" above a question of the flow (feedback 9 Oct 2026). */
+.survey-components { display: grid; gap: 6px; margin: 0 0 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-card); }
+.survey-components__label { font-size: var(--fs-sm); color: var(--fg-3); }
+.survey-components__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.survey-component { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; font: inherit; font-size: var(--fs-sm); color: var(--fg-1); background: transparent; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
+.survey-component:hover { border-color: var(--line-strong); }
+.survey-component[aria-pressed='true'] { border: 2px solid var(--amber-600); padding: 4px 9px; background: var(--surface-selected); }
+.survey-component[aria-pressed='true']::before { content: '✓'; color: var(--amber-500); }

@@ -84,6 +84,8 @@ export function NewProjectDialog({ onCreate, onOpenExample, onClose }: {
   const [ventilation, setVentilation] = useState<string | null>(null);
   const [cooling, setCooling] = useState<boolean | null>(null);
   const [pv, setPv] = useState<boolean | null>(null);
+  const [solarWater, setSolarWater] = useState<boolean | null>(null);
+  const [showerWtw, setShowerWtw] = useState<boolean | null>(null);
   const [adviser, setAdviser] = useState<SetupAdviser>(() => rememberedAdviser() ?? { name: '', competenceNumber: '', certificateNumber: '' });
   const survey = isSurveyKind(kind);
   const dwellingKind = kind === 'existing_residential';
@@ -120,7 +122,9 @@ export function NewProjectDialog({ onCreate, onOpenExample, onClose }: {
     onCreate({
       kind, address: chosen,
       ...(dwellingKind ? { dwelling, roofType, apartmentFloor } : {}),
-      ...(survey ? { heating, ventilation, cooling, pv } : {}),
+      ...(survey ? { heating, ventilation, cooling, pv, components: [
+        ...(solarWater ? ['solarWater' as const] : []), ...(showerWtw && dwellingKind ? ['showerWtw' as const] : []),
+      ] } : {}),
       adviser: adviser.name.trim() ? adviser : null,
     });
   };
@@ -227,6 +231,8 @@ export function NewProjectDialog({ onCreate, onOpenExample, onClose }: {
       </div>
       <Presence label={t('newProject.cooling')} value={cooling} onChange={setCooling} />
       <Presence label={t('newProject.pv')} value={pv} onChange={setPv} />
+      <Presence label={t('survey.component.solarWater')} value={solarWater} onChange={setSolarWater} />
+      {dwellingKind && <Presence label={t('survey.component.showerWtw')} value={showerWtw} onChange={setShowerWtw} />}
     </section>}
 
     <section className="new-project__section">

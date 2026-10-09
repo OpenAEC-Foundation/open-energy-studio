@@ -7,9 +7,10 @@
  */
 import type { IProject } from '../energy/types';
 import type { NtaRegistration } from '../nta/KernelClient';
-import { heatingGeneratorTemplate, surveyTemplate } from '../nta/SurveyTemplates';
+import { heatingGeneratorTemplate, surveyTemplate, type StoredSurvey } from '../nta/SurveyTemplates';
 import { markProgress, questionKey, stepState, surveySteps, type SurveyProgress } from '../survey/surveyFlow';
 import type { BagAddress } from './bagLookup';
+import { toggleComponent, type SurveyComponentId } from '../survey/surveyComponents';
 
 export type NewProjectKind = 'residential' | 'utility' | 'existing_residential' | 'existing_utility';
 
@@ -42,6 +43,8 @@ export interface NewProjectSetup {
   /** false: not present, the question is settled; true or null: asked in the flow. */
   cooling?: boolean | null;
   pv?: boolean | null;
+  /** Optional parts present (surveyComponents), e.g. a solar water heater. */
+  components?: SurveyComponentId[];
   adviser?: SetupAdviser | null;
 }
 
@@ -122,7 +125,9 @@ export function applySetup(base: IProject, setup: NewProjectSetup): IProject {
   }
   if (setup.cooling === false) done('koeling', 'koeling');
   if (setup.pv === false) done('zonnepanelen', 'pv');
-  return { ...project, basisopname: { ...template, progress } } as IProject;
+  let stored: StoredSurvey = { ...template, survey, progress };
+  for (const id of setup.components ?? []) stored = toggleComponent(stored, id, true);
+  return { ...project, basisopname: stored } as IProject;
 }
 
 /** The first survey step with something still to answer, to open the flow at. */
