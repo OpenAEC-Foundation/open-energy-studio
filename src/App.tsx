@@ -531,6 +531,8 @@ function AppContent() {
   // Project library (start screen): open, duplicate, move, archive and delete a card.
   const openLibraryEntry = useCallback((id: string) => {
     const open = docState.documents.find((doc) => doc.state.project.id === id);
+    // The open project may be the one clicked: its id does not change, so close the library here.
+    setLibraryOpen(false);
     if (open) { docDispatch({ type: 'DOC_SET_ACTIVE', payload: open.id }); return; }
     const store = browserStore();
     const snapshot = store ? readLibraryProject(store, id) : null;
