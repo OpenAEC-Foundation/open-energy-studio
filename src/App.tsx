@@ -58,6 +58,7 @@ import { LibraryOutcomeRecorder } from './components/WelcomeScreen/LibraryOutcom
 import { EXAMPLE_KINDS, exampleProject, type ExampleKind } from './core/nta/ExampleProjects';
 import type { DialogType, IProject } from './core/energy/types';
 import './components/shell/shell.css';
+import { NewVersionBanner } from './components/shell/NewVersionBanner';
 
 /** Whether the relabel migration notice for this key was shown already (per browser profile). */
 function relabelNoticeShown(key: string): boolean {
@@ -849,6 +850,7 @@ function AppContent() {
     <div className={hasActiveDoc ? 'app-shell' : 'app-shell app-shell--empty'}>
       <a className="skip-link" href="#main-content"
         onClick={(event) => { event.preventDefault(); document.getElementById('main-content')?.focus(); }}>{t('nav.skip')}</a>
+      <NewVersionBanner />
       {hasActiveDoc && !libraryOpen ? (
         <ActiveDocumentContent files={files} paletteOpen={paletteOpen} setPaletteOpen={setPaletteOpen} onReport={setActiveReport} />
       ) : (
