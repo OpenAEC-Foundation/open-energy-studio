@@ -19,13 +19,18 @@ import {
 } from '../../core/io/projectLibrary';
 import { IconButton } from '../ui';
 import { labelClassName } from '../shell/labelClass';
+import { NewProjectDialog } from './NewProjectDialog';
+import type { NewProjectSetup } from '../../core/io/newProjectSetup';
 import './WelcomeScreen.css';
 
 /** New-build calculation, or a basisopname of an existing dwelling or utility building. */
-export type NewProjectKind = 'residential' | 'utility' | 'existing_residential' | 'existing_utility';
+export type { NewProjectKind } from '../../core/io/newProjectSetup';
+import type { NewProjectKind } from '../../core/io/newProjectSetup';
 
 interface WelcomeScreenProps {
   onNewProject: (kind: NewProjectKind) => void;
+  /** Sets up a new project in one window (kind, BAG address, what it has); without it New project is a menu. */
+  onCreateProject?: (setup: NewProjectSetup) => void;
   onOpenProject: () => void;
   onOpenExample: (kind: ExampleKind) => void;
   onImportUNIEC3?: () => void;
@@ -87,11 +92,13 @@ function Menu({ label, items }: { label: ReactNode; items: Array<{ key: string; 
 }
 
 export function WelcomeScreen({
-  onNewProject, onOpenProject, onOpenExample, onImportUNIEC3, onImportVABI, recent = [], onOpenRecent, onForgetRecent,
+  onNewProject, onCreateProject, onOpenProject, onOpenExample, onImportUNIEC3, onImportVABI, recent = [], onOpenRecent, onForgetRecent,
   onOpenEntry, onDuplicateEntry, onDeleteEntry, onMoveEntry, onArchiveEntry, onBack,
 }: WelcomeScreenProps) {
   const { t, locale } = useI18n();
   const entries = useLibrary();
+  const [setupOpen, setSetupOpen] = useState(false);
+  const startNew = () => { if (onCreateProject) setSetupOpen(true); else onNewProject('existing_residential'); };
   const [folder, setFolder] = useState(ALL);
   const [kind, setKind] = useState<LibraryKind | 'all'>('all');
   const [query, setQuery] = useState('');
@@ -194,13 +201,14 @@ export function WelcomeScreen({
               <label className="library-search"><Search aria-hidden="true" />
                 <input type="search" value={query} placeholder={t('library.search')} aria-label={t('library.search')} onChange={(event) => setQuery(event.target.value)} />
               </label>
-              <Menu label={<span><Plus aria-hidden="true" /> {t('library.new')}</span>} items={[
+              {onCreateProject ? <button type="button" className="btn btn-sm btn-primary" onClick={startNew}><Plus aria-hidden="true" /> {t('library.new')}</button>
+              : <Menu label={<span><Plus aria-hidden="true" /> {t('library.new')}</span>} items={[
                 { key: 'existing_residential', label: <><Home aria-hidden="true" /> {t('welcome.existingResidential')}</>, onClick: () => onNewProject('existing_residential') },
                 { key: 'existing_utility', label: <><Building2 aria-hidden="true" /> {t('welcome.existingUtility')}</>, onClick: () => onNewProject('existing_utility') },
                 { key: 'residential', label: <><HousePlus aria-hidden="true" /> {t('welcome.newResidential')}</>, onClick: () => onNewProject('residential') },
                 { key: 'utility', label: <><Building2 aria-hidden="true" /> {t('welcome.newUtility')}</>, onClick: () => onNewProject('utility') },
                 ...EXAMPLE_KINDS.map((example) => ({ key: example, label: t(`welcome.example.${example}`), onClick: () => onOpenExample(example) })),
-              ]} />
+              ]} />}
               <button type="button" className="btn btn-sm" onClick={onOpenProject}><FolderOpen aria-hidden="true" /> {t('ribbon.open')}</button>
               {(onImportUNIEC3 || onImportVABI) && <Menu label={<span><FileInput aria-hidden="true" /> {t('library.import')}</span>} items={[
                 ...(onImportUNIEC3 ? [{ key: 'uniec3', label: t('ribbon.importUNIEC3'), onClick: onImportUNIEC3 }] : []),
@@ -226,7 +234,7 @@ export function WelcomeScreen({
                 </button>
                 <span className="library-card__menu"><Menu label={<MoreHorizontal aria-hidden="true" />} items={menuItems(entry)} /></span>
               </article>)}
-              <button type="button" className="library-card library-card--new" onClick={() => onNewProject('existing_residential')}>
+              <button type="button" className="library-card library-card--new" onClick={startNew}>
                 <Plus aria-hidden="true" /><strong>{t('library.newCard')}</strong><span className="library-card__kind">{t('library.newCardHint')}</span>
               </button>
             </div>
@@ -261,6 +269,9 @@ export function WelcomeScreen({
           </section>
         </div>
       </div>
+      {setupOpen && onCreateProject && <NewProjectDialog onClose={() => setSetupOpen(false)}
+        onCreate={(setup) => { setSetupOpen(false); onCreateProject(setup); }}
+        onOpenExample={(example) => { setSetupOpen(false); onOpenExample(example); }} />}
     </div>
   );
 }

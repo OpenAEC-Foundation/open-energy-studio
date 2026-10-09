@@ -6,8 +6,9 @@
  */
 import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import {
-  Ban, Building2, CircleHelp, Factory, Fan, Flame, Home, Network, Plug, Thermometer, TreePine, Wind, Zap,
+  Ban, Building2, Caravan, CircleHelp, Factory, Fan, Flame, Home, Network, Plug, Ship, Thermometer, TreePine, Wind, Zap,
 } from 'lucide-react';
+import { SETUP_DWELLINGS } from '../../core/io/newProjectSetup';
 import { useI18n } from '../../i18n/i18n';
 import { formatNumber } from '../../i18n/format';
 import { useEnergy } from '../../context/EnergyContext';
@@ -50,10 +51,15 @@ const HOT_WATER_ICONS: Record<string, ReactNode> = {
 const VENTILATION_ICONS: Record<string, ReactNode> = {
   natural: <Wind />, mechanical_extract: <Fan />, balanced: <Fan />, mechanical_supply: <Fan />,
 };
-const DWELLINGS = ['terraced', 'end_or_corner', 'detached', 'apartment'] as const;
+/** As in the new-project window: caravan and houseboat (by berth date) are their own choice (feedback 9 Oct 2026). */
+const DWELLINGS = SETUP_DWELLINGS;
+const DWELLING_ICONS: Record<string, ReactNode> = { apartment: <Building2 />, caravan: <Caravan />, houseboat: <Ship />, houseboat_2018: <Ship /> };
 
 /** The dwelling type of the survey as one of the choice cards. */
 function dwellingChoice(draft: Draft): string | null {
+  const building = read(draft, ['envelope', 'buildingKind', 'kind']);
+  if (building === 'caravan') return 'caravan';
+  if (building === 'floating') return read(draft, ['envelope', 'buildingKind', 'newBerthSince2018']) === true ? 'houseboat_2018' : 'houseboat';
   const kind = read(draft, ['dwelling', 'kind']);
   if (kind === 'apartment') return 'apartment';
   const position = read(draft, ['dwelling', 'position']);
@@ -84,8 +90,10 @@ function AddressFields() {
   return <ProjectDataFields />;
 }
 
-function QuestionBody({ part, stored, draft, change, t }: {
-  part: SurveyPart; stored: Stored; draft: Draft; change: (path: Path, value: unknown) => void; t: T;
+function QuestionBody({ part, stored, draft, change, changeAll, t }: {
+  part: SurveyPart; stored: Stored; draft: Draft; change: (path: Path, value: unknown) => void;
+  /** Several answers in one save (two changes in a row would each start from the same draft). */
+  changeAll: (entries: Array<[Path, unknown]>) => void; t: T;
 }) {
   const field = { draft, onChange: change };
   switch (part) {
@@ -93,21 +101,27 @@ function QuestionBody({ part, stored, draft, change, t }: {
     case 'dwellingType': {
       const choice = dwellingChoice(draft);
       const pick = (id: string) => {
-        if (id === 'apartment') {
-          change(['dwelling'], {
+        const building = id === 'caravan' ? { kind: 'caravan' }
+          : id === 'houseboat' || id === 'houseboat_2018' ? { kind: 'floating', newBerthSince2018: id === 'houseboat_2018' } : null;
+        const current = read(draft, ['envelope', 'buildingKind', 'kind']);
+        const entries: Array<[Path, unknown]> = building || current === 'caravan' || current === 'floating' ? [[['envelope', 'buildingKind'], building]] : [];
+        if (building) {
+          changeAll([...entries, [['dwelling'], { kind: 'single_family', position: 'detached', roofType: read(draft, ['dwelling', 'roofType']) ?? 'flat' }]]);
+        } else if (id === 'apartment') {
+          changeAll([...entries, [['dwelling'], {
             kind: 'apartment',
             floor: read(draft, ['dwelling', 'floor']) ?? 'ground_or_intermediate',
             side: read(draft, ['dwelling', 'side']) ?? 'middle',
-          });
+          }]]);
         } else {
-          change(['dwelling'], { kind: 'single_family', position: id, roofType: read(draft, ['dwelling', 'roofType']) ?? 'pitched' });
+          changeAll([...entries, [['dwelling'], { kind: 'single_family', position: id, roofType: read(draft, ['dwelling', 'roofType']) ?? 'pitched' }]]);
         }
       };
       return <>
         <ChoiceCards label={t('survey.q.woning.soort')} selected={choice} onPick={pick}
           options={DWELLINGS.map((id) => ({
             id, title: t(`survey.dwelling.${id}`), hint: t(`survey.dwelling.${id}.hint`),
-            icon: id === 'apartment' ? <Building2 /> : <Home />,
+            icon: DWELLING_ICONS[id] ?? <Home />,
           }))} />
         <div className="nta-form survey-followup">
           {choice === 'apartment' ? <>
@@ -626,6 +640,7 @@ export function SurveyWizard({ route, navigate }: SurveyWizardProps) {
   const result = currentResult(assessment, stored);
   const save = (next: Partial<Stored>) => dispatch({ type: 'SET_BASISOPNAME', payload: { ...stored, ...next } });
   const change = (path: Path, value: unknown) => save({ survey: write(draft, path, value) });
+  const changeAll = (entries: Array<[Path, unknown]>) => save({ survey: entries.reduce((next, [path, value]) => write(next, path, value), draft) });
   const goToStep = (id: SurveyStepId) => navigate({ step: 'survey', sub: id });
   const goToPath = (path: string) => {
     const target = questionForPath(path, stored);
@@ -732,7 +747,7 @@ export function SurveyWizard({ route, navigate }: SurveyWizardProps) {
           </ul>;
         })()}
         <div className="survey-question" key={`${step.id}.${question.id}`}>
-          <QuestionBody part={question.part} stored={stored} draft={draft} change={change} t={t} />
+          <QuestionBody part={question.part} stored={stored} draft={draft} change={change} changeAll={changeAll} t={t} />
         </div>
         {questionState(stored.progress, questionKey(step.id, question.id)) === 'skipped' &&
           <p className="survey-skipped-note">{t('survey.skippedNote')}</p>}

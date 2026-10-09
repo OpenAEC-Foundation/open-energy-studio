@@ -59,6 +59,7 @@ import { EXAMPLE_KINDS, exampleProject, type ExampleKind } from './core/nta/Exam
 import type { DialogType, IProject } from './core/energy/types';
 import './components/shell/shell.css';
 import { NewVersionBanner } from './components/shell/NewVersionBanner';
+import { applySetup, firstOpenSurveyStep, type NewProjectSetup } from './core/io/newProjectSetup';
 
 /** Whether the relabel migration notice for this key was shown already (per browser profile). */
 function relabelNoticeShown(key: string): boolean {
@@ -520,6 +521,16 @@ function AppContent() {
     docDispatch({ type: 'DOC_NEW', payload: { id, project } });
   }, [docDispatch, createEmptyProject]);
 
+  // The new-project window: kind, BAG address, dwelling type and what the building has (feedback 9 Oct 2026).
+  const handleCreateProject = useCallback((setup: NewProjectSetup) => {
+    const utility = setup.kind === 'utility' || setup.kind === 'existing_utility';
+    const project = applySetup(createEmptyProject(utility ? 'office' : 'residential'), setup);
+    const id = crypto.randomUUID();
+    docDispatch({ type: 'DOC_NEW', payload: { id, project } });
+    const step = firstOpenSurveyStep(project);
+    if (step) docDispatch({ type: 'DOC_DISPATCH', payload: { id, action: { type: 'NAVIGATE', payload: { step: 'survey', sub: step } } } });
+  }, [docDispatch, createEmptyProject]);
+
   // Recently opened or saved project files (desktop only: browser documents have no path).
   const [recentProjects, setRecentProjects] = useState(readRecentProjects);
   const rememberRecent = useCallback((filePath: string, project: IProject) => {
@@ -859,6 +870,7 @@ function AppContent() {
           <main id="main-content" className="shell-main" tabIndex={-1}>
             <WelcomeScreen
               onNewProject={handleNewProjectOf}
+              onCreateProject={handleCreateProject}
               onOpenProject={handleOpenProject}
               onOpenExample={handleOpenExample}
               onImportUNIEC3={handleImportUNIEC3}
