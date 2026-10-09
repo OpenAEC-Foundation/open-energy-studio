@@ -335,3 +335,16 @@
 .new-project__adviser { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
 .new-project__adviser label { display: grid; gap: 4px; font-size: var(--fs-sm); color: var(--fg-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 640px) { .new-project__adviser { grid-template-columns: 1fr; } }
+
+/* New-project window fields (feedback 9 Oct 2026): same inputs as the forms, aligned in one grid. */
+.new-project input:not([type="checkbox"]), .new-project select {
+  box-sizing: border-box; width: 100%; min-width: 0; height: 36px; padding: 0 10px;
+  border: 1px solid var(--line-control); border-radius: 4px; background: var(--bg-primary); color: var(--fg-1, var(--text-primary)); font: inherit;
+}
+.new-project input::placeholder { color: var(--fg-3); }
+.new-project .new-project__address { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 1.2fr); align-items: end; }
+.new-project .new-project__address > .ui-btn { height: 36px; }
+.new-project .new-project__address label, .new-project .new-project__adviser label { min-width: 0; }
+.new-project .new-project__adviser label { overflow: visible; }
+.new-project .new-project__adviser label > input { margin-top: 0; }
+.new-project__inline select { width: 220px; }
