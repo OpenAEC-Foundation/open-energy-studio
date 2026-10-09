@@ -769,6 +769,9 @@ pub struct MonthResult {
     pub window_solar_by_window: Vec<WindowSolarMonth>,
     /// Annex D.1 `H_g;an;mi`, W/K.
     pub ground_conductance_w_per_k: f64,
+    /// `H_tr` of this month in 7.14/7.15: the summary's `H_tr` plus the
+    /// annex A dynamic-window correction of this month, W/K (calculation trace).
+    pub transmission_conductance_w_per_k: f64,
     pub heating: BalanceTerms,
     pub cooling: BalanceTerms,
 }
@@ -799,6 +802,8 @@ pub struct BalanceTerms {
     /// `a_H/C` (7.51/7.56).
     pub a: f64,
     pub transmission_kwh: f64,
+    /// The ground part of `transmission_kwh` (annex D), kWh (calculation trace).
+    pub ground_transmission_kwh: f64,
     pub ventilation_kwh: f64,
     pub heat_transfer_kwh: f64,
     pub gains_kwh: f64,
@@ -2699,10 +2704,10 @@ fn compute(
         let theta_heating = intermittency.calculation_temperature_c;
 
         // 7.14/7.15 and 7.18.
-        let transmission_heating = h_tr * (theta_heating - outdoor) * hours / 1000.0
-            + transmission.ground_kwh(month, theta_heating);
-        let transmission_cooling = h_tr * (cooling_setpoint - outdoor) * hours / 1000.0
-            + transmission.ground_kwh(month, cooling_setpoint);
+        let ground_heating = transmission.ground_kwh(month, theta_heating);
+        let ground_cooling = transmission.ground_kwh(month, cooling_setpoint);
+        let transmission_heating = h_tr * (theta_heating - outdoor) * hours / 1000.0 + ground_heating;
+        let transmission_cooling = h_tr * (cooling_setpoint - outdoor) * hours / 1000.0 + ground_cooling;
         let ventilation_heating = h_ve_heating * (theta_heating - outdoor) * hours / 1000.0;
         let ventilation_cooling = h_ve_cooling * (cooling_setpoint - outdoor) * hours / 1000.0;
 
@@ -2747,6 +2752,7 @@ fn compute(
             sunroom_cooling_gains_kwh: sunroom_cooling + 0.0,
             window_solar_by_window,
             ground_conductance_w_per_k: ground_monthly,
+            transmission_conductance_w_per_k: h_tr,
             heating: BalanceTerms {
                 setpoint_c: heating_setpoint,
                 reduction_factor: intermittency.reduction_factor,
@@ -2755,6 +2761,7 @@ fn compute(
                 time_constant_h: tau_heating,
                 a: a_heating,
                 transmission_kwh: transmission_heating,
+                ground_transmission_kwh: ground_heating,
                 ventilation_kwh: ventilation_heating,
                 heat_transfer_kwh: heat_transfer_heating,
                 gains_kwh: gains,
@@ -2771,6 +2778,7 @@ fn compute(
                 time_constant_h: tau_cooling,
                 a: a_cooling,
                 transmission_kwh: transmission_cooling,
+                ground_transmission_kwh: ground_cooling,
                 ventilation_kwh: ventilation_cooling,
                 heat_transfer_kwh: heat_transfer_cooling,
                 gains_kwh: gains_cooling,

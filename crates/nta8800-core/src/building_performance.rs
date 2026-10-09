@@ -961,6 +961,9 @@ pub struct PerformanceIssue {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BuildingPerformanceAssessment {
+    /// Calculation trace ("rekenspoor"), per zone; transmission first (src/trace.rs).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub trace: Vec<crate::trace::TraceStep>,
     pub status: &'static str,
     pub scope: &'static str,
     pub chapter_5_source: &'static str,
@@ -3841,7 +3844,19 @@ fn assess_in_edition(input: &BuildingPerformanceInput) -> BuildingPerformanceAss
         }
         _ => None,
     };
+    // The calculation trace of the zones, from the values just calculated.
+    let trace: Vec<crate::trace::TraceStep> = if valid {
+        input
+            .zone_inputs()
+            .into_iter()
+            .zip(std::iter::once(&heating.demand).chain(&heating.additional_zone_demands))
+            .filter_map(|(zone, result)| crate::trace::transmission_trace(zone, result))
+            .collect()
+    } else {
+        Vec::new()
+    };
     BuildingPerformanceAssessment {
+        trace,
         status: if valid {
             "calculated_unverified"
         } else {
