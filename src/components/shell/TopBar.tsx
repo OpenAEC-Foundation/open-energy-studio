@@ -133,11 +133,8 @@ export function TopBar(props: TopBarProps) {
       {/* Logo and name lead to the main menu, the project library (feedback 8 Oct 2026). */}
       <button type="button" className="top-bar-brand" onClick={props.onShowLibrary} disabled={!props.onShowLibrary}
         aria-label={t('shell.home')} title={t('shell.home')}>
-        <span className="top-bar-logo" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 10.5 12 3l9 7.5" /><path d="M5 9v11h14V9" /><path d="M13 10.5l-3 4h4l-3 4" />
-          </svg>
-        </span>
+        {/* The logo of the logo package (9 Oct 2026). */}
+        <img className="top-bar-logo" src="/logo-mark.png" alt="" aria-hidden="true" />
         <span className="top-bar-app-name">{t('app.title')}<small>{t('shell.brandTagline')} · v{version}</small></span>
       </button>
       <div className="top-bar-drag" data-tauri-drag-region />

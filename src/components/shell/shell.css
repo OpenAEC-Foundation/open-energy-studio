@@ -30,8 +30,7 @@
   user-select: none; overflow: hidden;
 }
 .top-bar-brand { display: flex; align-items: center; gap: 10px; width: calc(var(--nav-w) - var(--space-3)); flex: none; }
-.top-bar-logo { width: 26px; height: 26px; border-radius: 6px; background: var(--accent); display: grid; place-items: center; color: var(--forge-900); flex: none; }
-.top-bar-logo svg { width: 18px; height: 18px; }
+.top-bar-logo { width: 30px; height: 30px; flex: none; object-fit: contain; display: block; }
 .top-bar-app-name {
   font-family: var(--font-display); font-weight: 700; font-size: 14px; letter-spacing: .01em; color: var(--fg-1); line-height: 1.2;
 }
