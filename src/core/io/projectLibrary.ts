@@ -15,6 +15,8 @@ import { stepState, surveySteps } from '../survey/surveyFlow';
 export const LIBRARY_INDEX = 'oes.library.v1.index';
 const ENTRY = 'oes.library.v1.entry.';
 const PROJECT = 'oes.library.v1.project.';
+/** Folders the user made, also while empty (feedback 9 Oct 2026: "mappenstructuur zoals Uniec3"). */
+export const LIBRARY_FOLDERS = 'oes.library.v1.folders';
 
 export type LibraryKind = 'existing_residential' | 'existing_utility' | 'new_residential' | 'new_utility';
 export type LibraryDwelling = 'regular' | 'apartment' | 'floating' | 'caravan';
@@ -51,6 +53,8 @@ export interface LibraryEntry {
   /** Folder (client) chosen by the user; absent: no folder. */
   folder?: string;
   archived?: boolean;
+  /** In the trash since (ISO time); restored or deleted for good from there. */
+  trashed?: string;
   filePath?: string | null;
   updatedAt: string;
   outcome?: LibraryOutcome;
@@ -144,6 +148,7 @@ export function libraryEntryFrom(project: IProject, previous: LibraryEntry | nul
     ...(libraryDwellingOf(project) ? { dwelling: libraryDwellingOf(project) } : {}),
     ...(previous?.folder ? { folder: previous.folder } : {}),
     ...(previous?.archived ? { archived: true } : {}),
+    ...(previous?.trashed ? { trashed: previous.trashed } : {}),
     ...(filePath !== undefined ? { filePath } : previous?.filePath !== undefined ? { filePath: previous.filePath } : {}),
     updatedAt: now,
     ...(outcome ? { outcome, outcomeStale: outcome.sourceHash !== sourceHashOf(project) } : {}),
@@ -193,12 +198,13 @@ export function saveDocumentsToLibrary(
   return next;
 }
 
-export function updateLibraryEntry(store: Store, id: string, patch: Partial<Pick<LibraryEntry, 'folder' | 'archived' | 'name'>>): LibraryEntry | null {
+export function updateLibraryEntry(store: Store, id: string, patch: Partial<Pick<LibraryEntry, 'folder' | 'archived' | 'name' | 'trashed'>>): LibraryEntry | null {
   const entry = readLibraryEntry(store, id);
   if (!entry) return null;
   const next: LibraryEntry = { ...entry, ...patch };
   if (!next.folder) delete next.folder;
   if (!next.archived) delete next.archived;
+  if (!next.trashed) delete next.trashed;
   writeEntry(store, next);
   return next;
 }
@@ -218,9 +224,49 @@ export function removeFromLibrary(store: Store, id: string): void {
   notify();
 }
 
-/** The folders in use, sorted. */
-export function libraryFolders(entries: LibraryEntry[]): string[] {
-  return [...new Set(entries.map((entry) => entry.folder).filter((folder): folder is string => Boolean(folder)))].sort((a, b) => a.localeCompare(b));
+/** The folders: those the user made and those in use, sorted. */
+export function libraryFolders(entries: LibraryEntry[], store: Store | null = null): string[] {
+  const made = store ? madeFolders(store) : [];
+  const used = entries.map((entry) => entry.folder).filter((folder): folder is string => Boolean(folder));
+  return [...new Set([...made, ...used])].sort((a, b) => a.localeCompare(b, 'nl', { numeric: true }));
+}
+
+function madeFolders(store: Store): string[] {
+  const value = readJson<unknown>(store, LIBRARY_FOLDERS);
+  return Array.isArray(value) ? value.filter((name): name is string => typeof name === 'string' && name.trim() !== '') : [];
+}
+
+/** Makes an (empty) folder; false when the name is empty or taken. */
+export function createFolder(store: Store, name: string): boolean {
+  const clean = name.trim();
+  if (!clean || libraryFolders(readLibrary(store), store).includes(clean)) return false;
+  writeJson(store, LIBRARY_FOLDERS, [...madeFolders(store), clean]);
+  notify();
+  return true;
+}
+
+/** Renames a folder and moves its projects along; false when the new name is empty or taken. */
+export function renameFolder(store: Store, from: string, to: string): boolean {
+  const clean = to.trim();
+  if (!clean || clean === from || libraryFolders(readLibrary(store), store).includes(clean)) return false;
+  for (const entry of readLibrary(store)) if (entry.folder === from) writeEntry(store, { ...entry, folder: clean });
+  writeJson(store, LIBRARY_FOLDERS, [...madeFolders(store).filter((name) => name !== from), clean]);
+  notify();
+  return true;
+}
+
+/** Removes a folder; its projects stay, without a folder. */
+export function deleteFolder(store: Store, name: string): void {
+  for (const entry of readLibrary(store)) {
+    if (entry.folder === name) { const next = { ...entry }; delete next.folder; writeEntry(store, next); }
+  }
+  writeJson(store, LIBRARY_FOLDERS, madeFolders(store).filter((item) => item !== name));
+  notify();
+}
+
+/** Deletes every project in the trash for good. */
+export function emptyTrash(store: Store): void {
+  for (const entry of readLibrary(store)) if (entry.trashed) removeFromLibrary(store, entry.id);
 }
 
 // ── Change notification for the page ──

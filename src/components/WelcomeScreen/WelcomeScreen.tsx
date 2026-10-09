@@ -8,14 +8,15 @@
 import { useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import {
   Archive, Building, Building2, Caravan, Copy, FileInput, Folder, FolderOpen, FolderPlus, HousePlus, Home, LayoutGrid, List, MoreHorizontal,
-  Plus, Search, Ship, Trash2, X,
+  MoreVertical, Plus, RotateCcw, Search, Ship, Trash2, X,
 } from 'lucide-react';
 import { useI18n } from '../../i18n/i18n';
 import { formatNumber } from '../../i18n/format';
 import { EXAMPLE_KINDS, type ExampleKind } from '../../core/nta/ExampleProjects';
 import type { RecentProject } from '../../core/io/recentProjects';
 import {
-  browserStore, libraryFolders, libraryVersion, readLibrary, subscribeLibrary, type LibraryEntry, type LibraryKind,
+  browserStore, createFolder, deleteFolder, emptyTrash, libraryFolders, libraryVersion, readLibrary, renameFolder, subscribeLibrary,
+  type LibraryEntry, type LibraryKind,
 } from '../../core/io/projectLibrary';
 import { IconButton } from '../ui';
 import { labelClassName } from '../shell/labelClass';
@@ -43,6 +44,8 @@ interface WelcomeScreenProps {
   onDeleteEntry?: (id: string) => void;
   onMoveEntry?: (id: string, folder: string | null) => void;
   onArchiveEntry?: (id: string, archived: boolean) => void;
+  /** Moves a project to the trash, or back out of it; without it Delete removes at once. */
+  onTrashEntry?: (id: string, trashed: boolean) => void;
   /** Shown over open documents: a way back to the active project. */
   onBack?: () => void;
 }
@@ -50,6 +53,9 @@ interface WelcomeScreenProps {
 const ALL = '__all__';
 const ARCHIVE = '__archive__';
 const NONE = '__none__';
+const TRASH = '__trash__';
+/** Drag type of a project card dropped on a folder. */
+const DRAG_TYPE = 'application/x-oes-project';
 const KINDS: LibraryKind[] = ['existing_residential', 'existing_utility', 'new_residential', 'new_utility'];
 
 /** The library of this browser, re-read on every change. */
@@ -78,10 +84,13 @@ function fileName(path: string): string {
   return path.split(/[\\/]/).pop() ?? path;
 }
 
-function Menu({ label, items }: { label: ReactNode; items: Array<{ key: string; label: ReactNode; onClick: () => void; danger?: boolean }> }) {
+function Menu({ label, items, ariaLabel, className = 'btn btn-sm' }: {
+  label: ReactNode; items: Array<{ key: string; label: ReactNode; onClick: () => void; danger?: boolean }>; ariaLabel?: string; className?: string;
+}) {
   const [open, setOpen] = useState(false);
   return <span className="library-menu" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setOpen(false); }}>
-    <button type="button" className="btn btn-sm" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((value) => !value)}>{label}</button>
+    <button type="button" className={className} aria-haspopup="menu" aria-expanded={open} aria-label={ariaLabel} title={ariaLabel}
+      onClick={() => setOpen((value) => !value)}>{label}</button>
     {open && <ul className="library-menu__list" role="menu">
       {items.map((item) => <li key={item.key} role="none">
         <button type="button" role="menuitem" className={item.danger ? 'library-menu__item library-menu__item--danger' : 'library-menu__item'}
@@ -93,7 +102,7 @@ function Menu({ label, items }: { label: ReactNode; items: Array<{ key: string; 
 
 export function WelcomeScreen({
   onNewProject, onCreateProject, onOpenProject, onOpenExample, onImportUNIEC3, onImportVABI, recent = [], onOpenRecent, onForgetRecent,
-  onOpenEntry, onDuplicateEntry, onDeleteEntry, onMoveEntry, onArchiveEntry, onBack,
+  onOpenEntry, onDuplicateEntry, onDeleteEntry, onMoveEntry, onArchiveEntry, onTrashEntry, onBack,
 }: WelcomeScreenProps) {
   const { t, locale } = useI18n();
   const entries = useLibrary();
@@ -106,20 +115,65 @@ export function WelcomeScreen({
     try { return localStorage.getItem('oes.library.view') === 'list' ? 'list' : 'cards'; } catch { return 'cards'; }
   });
   const chooseView = (next: 'cards' | 'list') => { setView(next); try { localStorage.setItem('oes.library.view', next); } catch { /* per-viewer convenience */ } };
-  const folders = libraryFolders(entries);
+  const folders = libraryFolders(entries, browserStore());
+  const live = entries.filter((entry) => !entry.trashed);
+  // Folders (feedback 9 Oct 2026, as in Uniec3): make, rename and remove; a project is dragged onto one.
+  const newFolder = () => {
+    const store = browserStore();
+    const name = window.prompt(t('library.folderPrompt'))?.trim();
+    if (!store || !name) return;
+    if (createFolder(store, name)) setFolder(name); else window.alert(t('library.folderExists'));
+  };
+  const renameOne = (name: string) => {
+    const store = browserStore();
+    const next = window.prompt(t('library.renamePrompt'), name)?.trim();
+    if (!store || !next || next === name) return;
+    if (renameFolder(store, name, next)) { if (folder === name) setFolder(next); } else window.alert(t('library.folderExists'));
+  };
+  const deleteOne = (name: string) => {
+    const store = browserStore();
+    const n = live.filter((entry) => entry.folder === name).length;
+    if (!store || !window.confirm(t('library.deleteFolderConfirm', { name, count: n }))) return;
+    deleteFolder(store, name);
+    if (folder === name) setFolder(ALL);
+  };
+  const clearTrash = () => {
+    const store = browserStore();
+    if (store && window.confirm(t('library.emptyTrashConfirm', { count: entries.filter((entry) => entry.trashed).length }))) emptyTrash(store);
+  };
+  const dropOn = (target: string) => ({
+    onDragOver: (event: React.DragEvent<HTMLElement>) => {
+      if (event.dataTransfer.types.includes(DRAG_TYPE)) { event.preventDefault(); event.currentTarget.classList.add('library-folder--drop'); }
+    },
+    onDragLeave: (event: React.DragEvent<HTMLElement>) => event.currentTarget.classList.remove('library-folder--drop'),
+    onDrop: (event: React.DragEvent<HTMLElement>) => {
+      event.currentTarget.classList.remove('library-folder--drop');
+      const id = event.dataTransfer.getData(DRAG_TYPE);
+      if (!id) return;
+      event.preventDefault();
+      if (target === ARCHIVE) onArchiveEntry?.(id, true);
+      else if (target === TRASH) onTrashEntry?.(id, true);
+      else if (target !== ALL) onMoveEntry?.(id, target === NONE ? null : target);
+    },
+  });
+  const dragCard = (entry: LibraryEntry) => ({
+    draggable: !entry.trashed,
+    onDragStart: (event: React.DragEvent<HTMLElement>) => { event.dataTransfer.setData(DRAG_TYPE, entry.id); event.dataTransfer.effectAllowed = 'move'; },
+  });
   const date = (iso: string) => {
     const value = new Date(iso);
     return Number.isNaN(value.getTime()) ? '' : value.toLocaleString(locale, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   };
   const needle = query.trim().toLowerCase();
   const shown = entries
-    .filter((entry) => folder === ARCHIVE ? entry.archived : !entry.archived && (folder === ALL || (folder === NONE ? !entry.folder : entry.folder === folder)))
+    .filter((entry) => folder === TRASH ? Boolean(entry.trashed) : !entry.trashed && (folder === ARCHIVE ? entry.archived
+      : !entry.archived && (folder === ALL || (folder === NONE ? !entry.folder : entry.folder === folder))))
     .filter((entry) => kind === 'all' || entry.kind === kind)
     .filter((entry) => !needle || [entry.name, entry.address, entry.city, entry.folder ?? ''].some((text) => text.toLowerCase().includes(needle)))
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   const knownPaths = new Set(entries.map((entry) => entry.filePath).filter(Boolean));
   const files = recent.filter((entry) => !knownPaths.has(entry.path));
-  const count = (test: (entry: LibraryEntry) => boolean) => entries.filter(test).length;
+  const count = (test: (entry: LibraryEntry) => boolean) => live.filter(test).length;
 
   const statusChips = (entry: LibraryEntry): Array<{ text: string; tone?: 'ok' | 'warn' }> => {
     const chips: Array<{ text: string; tone?: 'ok' | 'warn' }> = [];
@@ -142,12 +196,17 @@ export function WelcomeScreen({
     { key: '__new', label: t('library.menu.newFolder'), onClick: () => { const name = window.prompt(t('library.folderPrompt'))?.trim(); if (name) onMoveEntry?.(entry.id, name); } },
     ...(entry.folder ? [{ key: '__none', label: t('library.menu.noFolder'), onClick: () => onMoveEntry?.(entry.id, null) }] : []),
   ];
-  const menuItems = (entry: LibraryEntry) => [
+  const menuItems = (entry: LibraryEntry) => entry.trashed ? [
+    { key: 'restore', label: <><RotateCcw aria-hidden="true" /> {t('library.menu.restoreTrash')}</>, onClick: () => onTrashEntry?.(entry.id, false) },
+    { key: 'delete', label: <><Trash2 aria-hidden="true" /> {t('library.menu.deleteForever')}</>, onClick: () => onDeleteEntry?.(entry.id), danger: true },
+  ] : [
     { key: 'open', label: t('library.menu.open'), onClick: () => onOpenEntry?.(entry.id) },
     { key: 'copy', label: <><Copy aria-hidden="true" /> {t('library.menu.duplicate')}</>, onClick: () => onDuplicateEntry?.(entry.id) },
     ...moveItems(entry).map((item) => ({ ...item, label: <><Folder aria-hidden="true" /> {item.label}</> })),
     { key: 'archive', label: <><Archive aria-hidden="true" /> {t(entry.archived ? 'library.menu.restore' : 'library.menu.archive')}</>, onClick: () => onArchiveEntry?.(entry.id, !entry.archived) },
-    { key: 'delete', label: <><Trash2 aria-hidden="true" /> {t('library.menu.delete')}</>, onClick: () => onDeleteEntry?.(entry.id), danger: true },
+    onTrashEntry
+      ? { key: 'trash', label: <><Trash2 aria-hidden="true" /> {t('library.menu.trash')}</>, onClick: () => onTrashEntry(entry.id, true), danger: true }
+      : { key: 'delete', label: <><Trash2 aria-hidden="true" /> {t('library.menu.delete')}</>, onClick: () => onDeleteEntry?.(entry.id), danger: true },
   ];
   const outcome = (entry: LibraryEntry) => entry.outcome
     ? <span className="library-outcome">
@@ -170,18 +229,30 @@ export function WelcomeScreen({
 
         <div className="library-layout">
           <aside className="library-side" aria-label={t('library.folders')}>
-            <h2 className="welcome-heading">{t('library.folders')}</h2>
+            <div className="library-side__head">
+              <h2 className="welcome-heading">{t('library.folders')}</h2>
+              <Menu className="library-folder__more" ariaLabel={t('library.foldersMenu')} label={<MoreVertical aria-hidden="true" />}
+                items={[{ key: 'new', label: <><FolderPlus aria-hidden="true" /> {t('library.newFolder')}</>, onClick: newFolder }]} />
+            </div>
             <ul className="library-folders">
               {[
                 { id: ALL, label: t('library.all'), n: count((entry) => !entry.archived) },
                 ...folders.map((name) => ({ id: name, label: name, n: count((entry) => !entry.archived && entry.folder === name) })),
                 ...(folders.length > 0 ? [{ id: NONE, label: t('library.noFolder'), n: count((entry) => !entry.archived && !entry.folder) }] : []),
                 { id: ARCHIVE, label: t('library.archive'), n: count((entry) => Boolean(entry.archived)) },
-              ].map((item) => <li key={item.id}>
-                <button type="button" className="library-folder" aria-current={folder === item.id ? 'true' : undefined} onClick={() => setFolder(item.id)}>
-                  {item.id === ARCHIVE ? <Archive aria-hidden="true" /> : item.id === ALL ? <LayoutGrid aria-hidden="true" /> : <Folder aria-hidden="true" />}
+                ...(onTrashEntry ? [{ id: TRASH, label: t('library.trash'), n: entries.filter((entry) => entry.trashed).length }] : []),
+              ].map((item) => <li key={item.id} className={folders.includes(item.id) ? 'library-folders__user' : undefined}>
+                <button type="button" className="library-folder" aria-current={folder === item.id ? 'true' : undefined} onClick={() => setFolder(item.id)}
+                  {...dropOn(item.id)}>
+                  {item.id === ARCHIVE ? <Archive aria-hidden="true" /> : item.id === TRASH ? <Trash2 aria-hidden="true" />
+                    : item.id === ALL ? <LayoutGrid aria-hidden="true" /> : folder === item.id ? <FolderOpen aria-hidden="true" /> : <Folder aria-hidden="true" />}
                   <span>{item.label}</span><small>{item.n}</small>
                 </button>
+                {folders.includes(item.id) && <Menu className="library-folder__more" ariaLabel={t('library.folderMenu', { name: item.label })}
+                  label={<MoreVertical aria-hidden="true" />} items={[
+                    { key: 'rename', label: t('library.renameFolder'), onClick: () => renameOne(item.id) },
+                    { key: 'delete', label: t('library.deleteFolder'), onClick: () => deleteOne(item.id), danger: true },
+                  ]} />}
               </li>)}
             </ul>
             <h2 className="welcome-heading">{t('library.kinds')}</h2>
@@ -220,10 +291,13 @@ export function WelcomeScreen({
               </span>
             </div>
 
-            {shown.length === 0 && files.length === 0 && <p className="welcome-empty">{entries.length === 0 ? t('library.empty') : t('library.noMatch')}</p>}
+            {folder === TRASH && shown.length > 0 && <p className="library-trash-bar">{t('library.trashNote')}
+              <button type="button" className="btn btn-sm" onClick={clearTrash}><Trash2 aria-hidden="true" /> {t('library.emptyTrash')}</button></p>}
+            {shown.length === 0 && files.length === 0 && <p className="welcome-empty">{folder === TRASH ? t('library.trashEmpty')
+              : folders.includes(folder) && !needle ? t('library.folderEmpty') : entries.length === 0 ? t('library.empty') : t('library.noMatch')}</p>}
 
             {view === 'cards' ? <div className="library-grid">
-              {shown.map((entry) => <article key={entry.id} className="library-card" data-kind={entry.kind}>
+              {shown.map((entry) => <article key={entry.id} className="library-card" data-kind={entry.kind} {...dragCard(entry)}>
                 <button type="button" className="library-card__open" onClick={() => onOpenEntry?.(entry.id)} aria-label={t('library.openNamed', { name: entry.name })}>
                   <span className="library-card__icon"><KindIcon entry={entry} /></span>
                   <strong>{entry.name || t('library.unnamed')}</strong>
@@ -241,7 +315,7 @@ export function WelcomeScreen({
             : <table className="library-table">
               <thead><tr><th scope="col">{t('properties.name')}</th><th scope="col">{t('library.kindColumn')}</th><th scope="col">{t('library.outcomeColumn')}</th>
                 <th scope="col">{t('library.statusColumn')}</th><th scope="col">{t('library.folderColumn')}</th><th scope="col">{t('library.updated')}</th><th scope="col"><span className="visually-hidden">{t('library.menu.open')}</span></th></tr></thead>
-              <tbody>{shown.map((entry) => <tr key={entry.id}>
+              <tbody>{shown.map((entry) => <tr key={entry.id} {...dragCard(entry)}>
                 <td><button type="button" className="library-link" onClick={() => onOpenEntry?.(entry.id)}><KindIcon entry={entry} /> {entry.name || t('library.unnamed')}</button></td>
                 <td>{kindText(entry)}</td><td>{outcome(entry)}</td>
                 <td>{statusChips(entry).map((chip) => chip.text).join(' · ')}</td><td>{entry.folder ?? ''}</td><td>{date(entry.updatedAt)}</td>

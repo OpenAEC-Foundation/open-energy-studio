@@ -573,6 +573,14 @@ function AppContent() {
     if (open) docDispatch({ type: 'DOC_CLOSE', payload: open.id });
     removeFromLibrary(store, id);
   }, [docState.documents, docDispatch, t]);
+  // Trash (feedback 9 Oct 2026): a trashed project that is open closes; the library keeps it until the trash is emptied.
+  const trashLibraryEntry = useCallback((id: string, trashed: boolean) => {
+    const store = browserStore();
+    if (!store) return;
+    const open = docState.documents.find((doc) => doc.state.project.id === id);
+    if (trashed && open) docDispatch({ type: 'DOC_CLOSE', payload: open.id });
+    updateLibraryEntry(store, id, { trashed: trashed ? new Date().toISOString() : undefined });
+  }, [docState.documents, docDispatch]);
   const moveLibraryEntry = useCallback((id: string, folder: string | null) => {
     const store = browserStore();
     if (store) updateLibraryEntry(store, id, { folder: folder ?? undefined });
@@ -871,6 +879,7 @@ function AppContent() {
             <WelcomeScreen
               onNewProject={handleNewProjectOf}
               onCreateProject={handleCreateProject}
+              onTrashEntry={trashLibraryEntry}
               onOpenProject={handleOpenProject}
               onOpenExample={handleOpenExample}
               onImportUNIEC3={handleImportUNIEC3}

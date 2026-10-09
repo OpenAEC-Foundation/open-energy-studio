@@ -318,3 +318,16 @@
   .new-project__kinds { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .new-project__address { grid-template-columns: 1fr 1fr; }
 }
+
+/* Folders as in Uniec3 (feedback 9 Oct 2026): menus, drop targets, trash. */
+.library-side__head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.library-folders li { position: relative; display: flex; align-items: center; }
+.library-folders li > .library-folder { flex: 1; min-width: 0; }
+.library-folder__more { display: inline-grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--fg-3); cursor: pointer; }
+.library-folder__more:hover, .library-folder__more[aria-expanded="true"] { background: var(--surface-card); color: var(--fg-1); }
+.library-folder__more svg { width: 16px; height: 16px; }
+.library-folders__user .library-folder__more { opacity: 0; }
+.library-folders__user:hover .library-folder__more, .library-folders__user:focus-within .library-folder__more { opacity: 1; }
+.library-folder--drop { outline: 2px dashed var(--amber-600); outline-offset: -2px; background: var(--surface-selected); }
+.library-card[draggable="true"] { cursor: grab; }
+.library-trash-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 12px; font-size: var(--fs-sm); color: var(--fg-3); }
