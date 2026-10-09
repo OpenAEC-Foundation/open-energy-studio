@@ -8,7 +8,6 @@
  * tilt and zone; it has its own area and construction. Openings stay on the
  * surface itself.
  */
-import { freshItemId } from '../nta/EvidenceLinks';
 import type { StoredSurvey } from '../nta/SurveyTemplates';
 
 /** What a part takes over from its surface. */
@@ -38,7 +37,11 @@ export function addPart(stored: StoredSurvey, surfaceId: string): StoredSurvey {
   const surfaces = surfacesOf(stored);
   const parent = surfaces.find((surface) => surface.id === surfaceId);
   if (!parent) return stored;
-  const id = freshItemId(surfaces, `${surfaceId}-deel`);
+  // Numbered per surface like its name (part 2, 3, …), unique among all surfaces.
+  const used = new Set(surfaces.map((surface) => String(surface.id ?? '')));
+  let n = partsOf(stored, surfaceId).length + 2;
+  while (used.has(`${surfaceId}-deel-${n}`)) n += 1;
+  const id = `${surfaceId}-deel-${n}`;
   const part: Surface = { id, grossAreaM2: 0, cavity: Boolean(parent.cavity), insulation: { kind: 'none_or_unknown' }, sourceReference: '' };
   for (const key of PART_SYNC_KEYS) if (parent[key] !== undefined) part[key] = parent[key];
   return { ...withSurfaces(stored, [...surfaces, part]), surfaceParts: { ...(stored.surfaceParts ?? {}), [id]: surfaceId } };

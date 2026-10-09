@@ -164,3 +164,20 @@
 /* An opaque part of a surface (feedback 9 Oct 2026). */
 .opname-part { border-left: 3px solid var(--amber-600); }
 .opname-part .opname-sub-kind { display: flex; align-items: center; gap: 8px; }
+
+/* Table view of the facades and roofs/floors (feedback 9 Oct 2026). */
+.survey-view-toggle { display: inline-flex; justify-self: end; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.survey-view-toggle button { padding: 4px 12px; font: inherit; font-size: var(--fs-sm); color: var(--fg-2); background: transparent; border: 0; cursor: pointer; }
+.survey-view-toggle button[aria-pressed='true'] { background: var(--surface-selected); color: var(--fg-1); font-weight: 600; }
+.survey-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); table-layout: fixed; }
+.survey-table th, .survey-table td { padding: 3px 4px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
+.survey-table thead th { font-weight: 600; color: var(--fg-2); border-bottom-color: var(--line-strong); }
+.survey-table tbody th { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.survey-table label { display: block; margin: 0; font-size: 0; }
+.survey-table label > * { font-size: var(--fs-sm); }
+.survey-table input:not([type="checkbox"]), .survey-table select { width: 100%; min-width: 0; height: 30px; box-sizing: border-box; }
+.survey-table__num { text-align: right !important; white-space: nowrap; }
+.survey-table__muted { color: var(--fg-3); }
+.survey-table__part th { padding-left: 18px; color: var(--fg-2); font-weight: 400; }
+.survey-table tfoot td { border-bottom: 0; padding-top: 8px; }
+.survey-table__title { margin: 16px 0 6px; font-size: var(--fs-md); }

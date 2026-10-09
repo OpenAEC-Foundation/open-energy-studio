@@ -941,6 +941,19 @@ const PART_SECTION: Record<SurveyPart, SurveySection | null> = {
 };
 
 /** A new survey surface of an element, for the question pages (facades on a wall question, roofs and floors on the other). */
+const ENVELOPE_VIEW_KEY = 'oes.survey.envelopeView';
+
+/** Enter moves to the same column in the next row, as in a spreadsheet. */
+function tableEnter(event: React.KeyboardEvent<HTMLTableElement>) {
+  if (event.key !== 'Enter' || !(event.target instanceof HTMLInputElement)) return;
+  const cell = event.target.closest('td');
+  const row = cell?.closest('tr');
+  if (!cell || !row) return;
+  const next = row.nextElementSibling as HTMLTableRowElement | null;
+  const target = next?.cells[cell.cellIndex]?.querySelector<HTMLElement>('input, select');
+  if (target) { event.preventDefault(); target.focus(); }
+}
+
 function surfaceTemplate(index: number, element: 'facade' | 'roof' | 'floor'): Record<string, unknown> {
   const base = { id: `${element === 'facade' ? 'gevel' : element === 'roof' ? 'dak' : 'vloer'}-${index + 1}`, element, cavity: false,
     insulation: { kind: 'none_or_unknown' }, grossAreaM2: 10, sourceReference: '' };
@@ -958,6 +971,14 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [json, setJson] = useState<string | null>(null);
+  // Cards or table for the facades and roofs/floors (feedback 9 Oct 2026); remembered per computer.
+  const [envelopeView, setEnvelopeView] = useState<'cards' | 'table'>(() => {
+    try { return localStorage.getItem(ENVELOPE_VIEW_KEY) === 'table' ? 'table' : 'cards'; } catch { return 'cards'; }
+  });
+  const chooseEnvelopeView = (next: 'cards' | 'table') => {
+    setEnvelopeView(next);
+    try { localStorage.setItem(ENVELOPE_VIEW_KEY, next); } catch { /* per-viewer convenience */ }
+  };
   const requestId = useRef(0);
   // The shared survey outcome of the question flow, for the derived Rc per surface.
   const surveyResult = currentResult(useSurveyAssessment(), stored);
@@ -1154,6 +1175,11 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
     </Section>}</>}
 
     {show('envelope') && <><Section title={part === 'walls' ? t('survey.section.walls') : part === 'roofFloor' ? t('survey.section.roofFloor') : t('opname.envelope')}>
+      {embedded && (part === 'walls' || part === 'roofFloor') &&
+        <span className="survey-view-toggle" role="group" aria-label={t('survey.view')}>
+          {(['cards', 'table'] as const).map((view) => <button key={view} type="button" aria-pressed={envelopeView === view}
+            onClick={() => chooseEnvelopeView(view)}>{t(`survey.view.${view}`)}</button>)}
+        </span>}
       <p className="nta-form-note">{t('evidenceLink.photosHint')}</p>
       {kind === 'residential' && part !== 'roofFloor' && <label>{t('opname.buildingKind')}
         <select value={typeof buildingKind === 'string' ? buildingKind : 'regular'}
@@ -1211,6 +1237,141 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
           items.filter((item) => item.surfaceId === id).reduce((sum, item) => sum + (Number(item.areaM2) || 0), 0);
         const glassOptions = opts(t, 'opname.window.glassKind', ['triple_hr', 'hr_plus_plus', 'hr_plus', 'hr', 'double', 'single']);
         const frameOptions = opts(t, 'opname.window.frameKind', ['wood_or_plastic', 'metal_with_thermal_break', 'metal', 'none']);
+        // Table view (feedback 9 Oct 2026): a row per surface with its opaque parts indented below,
+        // and the openings in a table of their own. Photos, shading and details stay in the cards.
+        if (embedded && envelopeView === 'table') {
+          const roofFloor = part === 'roofFloor';
+          const shown = surfaces.map((surface, at) => [surface, at] as const).filter(([surface]) => showSurface(surface.element) && !isPart(surface));
+          const boundaryKinds = ['outdoor', 'ground', 'crawlspace', 'adjacent_heated', 'unheated_cellar', 'strongly_ventilated', 'sunroom', 'water'];
+          const muted = (text: string) => <span className="survey-table__muted">{text}</span>;
+          const insulationCells = (b: Path) => {
+            const value = read(draft, [...b, 'insulation', 'kind']);
+            return <>
+              <td><label>{t('opname.surface.insulation')}
+                <select value={typeof value === 'string' ? value : ''} onChange={(event) => change([...b, 'insulation'], event.target.value === 'thickness'
+                  ? { kind: 'thickness', thicknessMm: 50 } : { kind: event.target.value })}>
+                  {['none_or_unknown', 'present_unknown_thickness', 'cavity_filled_unknown_width', 'thickness'].map((key) =>
+                    <option key={key} value={key}>{t(`opname.surface.insulationKind.${key}`)}</option>)}
+                </select></label></td>
+              <td>{value === 'thickness' ? <NumberField {...field} path={[...b, 'insulation', 'thicknessMm']} label={t('opname.surface.thicknessMm')} />
+                : value === 'present_unknown_thickness' ? muted(t('survey.table.inCard')) : null}</td>
+            </>;
+          };
+          const result = (id: string, net: number) => {
+            const rc = derivedRc(surveyResult, id);
+            return <td className="survey-table__num">{rc != null ? formatNumber(rc, locale, 2) : '—'} · {formatNumber(net, locale, 1)}</td>;
+          };
+          let grossTotal = 0;
+          let netTotal = 0;
+          const rows = shown.flatMap(([surface, at]) => {
+            const id = String(surface.id ?? '');
+            const b: Path = ['envelope', 'surfaces', at];
+            const element = String(surface.element ?? 'facade');
+            const oriented = element === 'facade' || (element === 'roof' && Number(surface.tiltDeg ?? 0) > 5);
+            const gross = Number(surface.grossAreaM2) || 0;
+            const net = gross - area(windows, id) - area(doors, id) - area(rooflights, id);
+            grossTotal += gross;
+            netTotal += net;
+            const orientationText = oriented && typeof surface.orientation === 'string' ? t(`opname.orientationKind.${surface.orientation}`) : '—';
+            const boundaryText = t(`opname.surface.boundaryKind.${String((surface.boundary as { kind?: string } | undefined)?.kind ?? 'outdoor')}`);
+            const own = <tr key={id}>
+              <th scope="row">{names.get(id) ?? id}</th>
+              {roofFloor && <td>{element === 'roof' ? <NumberField {...sharedField} path={[...b, 'tiltDeg']} label={t('opname.tilt')} /> : muted(t('survey.element.floor'))}</td>}
+              <td>{oriented ? <SelectField {...sharedField} path={[...b, 'orientation']} label={t('opname.orientation')} options={opts(t, 'opname.orientationKind', ORIENTATIONS)} /> : muted('—')}</td>
+              <td><label>{t('opname.surface.boundary')}
+                <select value={String(read(draft, [...b, 'boundary', 'kind']) ?? '')} onChange={(event) => sharedField.onChange([...b, 'boundary'], { kind: event.target.value })}>
+                  {boundaryKinds.map((key) => <option key={key} value={key}>{t(`opname.surface.boundaryKind.${key}`)}</option>)}
+                </select></label></td>
+              <td><NumberField {...field} path={[...b, 'grossAreaM2']} label={t('opname.surface.area')} /></td>
+              {insulationCells(b)}
+              {result(id, net)}
+            </tr>;
+            const parts = partsOf(stored, id).map((partId, n) => {
+              const partAt = surfaces.findIndex((item) => item.id === partId);
+              const pb: Path = ['envelope', 'surfaces', partAt];
+              const partGross = Number(surfaces[partAt]?.grossAreaM2) || 0;
+              grossTotal += partGross;
+              netTotal += partGross;
+              return <tr key={partId} className="survey-table__part">
+                <th scope="row">↳ {t('survey.part')} {n + 2}</th>
+                {roofFloor && <td>{muted('')}</td>}
+                <td>{muted(orientationText)}</td>
+                <td>{muted(boundaryText)}</td>
+                <td><NumberField {...field} path={[...pb, 'grossAreaM2']} label={t('opname.surface.area')} /></td>
+                {insulationCells(pb)}
+                {result(partId, partGross)}
+              </tr>;
+            });
+            return [own, ...parts];
+          });
+          const shownIds = new Set(shown.map(([surface]) => String(surface.id ?? '')));
+          const openings = [
+            ...windows.map((item, at) => ({ item, at, type: 'window' as const })),
+            ...(roofFloor ? [] : doors.map((item, at) => ({ item, at, type: 'door' as const }))),
+          ].filter(({ item }) => shownIds.has(String(item.surfaceId ?? '')) || !surfaces.some((surface) => surface.id === item.surfaceId));
+          const firstId = shown[0] ? String(shown[0][0].id ?? '') : null;
+          const tableSurfaceOptions = surfaceOptions.filter(([id]) => shownIds.has(id));
+          return <>
+            <table className="survey-table" onKeyDown={tableEnter}>
+              <thead><tr>
+                <th scope="col">{t('survey.table.surface')}</th>
+                {roofFloor && <th scope="col">{t('opname.tilt')}</th>}
+                <th scope="col">{t('opname.orientation')}</th>
+                <th scope="col">{t('opname.surface.boundary')}</th>
+                <th scope="col" className="survey-table__num">{t('survey.table.gross')}</th>
+                <th scope="col">{t('opname.surface.insulation')}</th>
+                <th scope="col" className="survey-table__num">{t('survey.table.thickness')}</th>
+                <th scope="col" className="survey-table__num">{t('survey.table.result')}</th>
+              </tr></thead>
+              <tbody>{rows}</tbody>
+              <tfoot><tr>
+                <td colSpan={roofFloor ? 4 : 3}>
+                  {!roofFloor && <button type="button" className="btn btn-sm"
+                    onClick={() => change(['envelope', 'surfaces'], [...surfaces, surfaceTemplate(surfaces.length, 'facade')])}>+ {t('survey.element.facade')}</button>}
+                  {roofFloor && <>
+                    <button type="button" className="btn btn-sm"
+                      onClick={() => change(['envelope', 'surfaces'], [...surfaces, surfaceTemplate(surfaces.length, 'roof')])}>+ {t('survey.element.roof')}</button>{' '}
+                    <button type="button" className="btn btn-sm"
+                      onClick={() => change(['envelope', 'surfaces'], [...surfaces, surfaceTemplate(surfaces.length, 'floor')])}>+ {t('survey.element.floor')}</button>
+                  </>}
+                </td>
+                <td className="survey-table__num"><strong>{formatNumber(grossTotal, locale, 1)}</strong></td>
+                <td colSpan={2} />
+                <td className="survey-table__num"><strong>{t('survey.table.netTotal', { net: formatNumber(netTotal, locale, 1) })}</strong></td>
+              </tr></tfoot>
+            </table>
+            <h4 className="survey-table__title">{t(roofFloor ? 'survey.table.roofWindows' : 'survey.table.openings')}</h4>
+            <table className="survey-table survey-table--openings" onKeyDown={tableEnter}>
+              <thead><tr>
+                <th scope="col">{t('survey.table.opening')}</th>
+                <th scope="col">{t('survey.moveTo')}</th>
+                <th scope="col" className="survey-table__num">m²</th>
+                <th scope="col">{t('opname.window.glass')}</th>
+                <th scope="col">{t('opname.window.frame')}</th>
+              </tr></thead>
+              <tbody>{openings.map(({ item, at, type }) => {
+                const b: Path = ['envelope', type === 'window' ? 'windows' : 'doors', at];
+                const glazed = type === 'window' || Number(item.glassFraction ?? 0) > 0;
+                return <tr key={`${type}${at}`}>
+                  <th scope="row">{t(type === 'window' ? 'survey.window' : 'survey.door')} {at + 1}</th>
+                  <td><SelectField {...field} path={[...b, 'surfaceId']} label={t('survey.moveTo')} options={tableSurfaceOptions} /></td>
+                  <td><NumberField {...field} path={[...b, 'areaM2']} label={t('opname.window.area')} /></td>
+                  <td>{glazed ? <SelectField {...field} path={[...b, 'glass']} label={t('opname.window.glass')} options={glassOptions} /> : muted('—')}</td>
+                  <td><SelectField {...field} path={[...b, 'frame']} label={t('opname.window.frame')} options={frameOptions} /></td>
+                </tr>;
+              })}</tbody>
+              <tfoot><tr><td colSpan={5}>
+                {firstId && <button type="button" className="btn btn-sm"
+                  onClick={() => change(['envelope', 'windows'], [...windows, windowTemplate(windows.length, firstId)])}>+ {t('survey.window')}</button>}{' '}
+                {firstId && !roofFloor && <button type="button" className="btn btn-sm"
+                  onClick={() => change(['envelope', 'doors'], [...doors, {
+                    id: `deur-${doors.length + 1}`, surfaceId: firstId, areaM2: 2, insulated: null, glassFraction: 0, frame: 'wood_or_plastic', sourceReference: '',
+                  }])}>+ {t('survey.door')}</button>}
+              </td></tr></tfoot>
+            </table>
+            <p className="nta-form-note">{t('survey.table.note')}</p>
+          </>;
+        }
         const windowFields = (_window: Record<string, unknown>, index: number) => {
           const base: Path = ['envelope', 'windows', index];
           const situation = read(draft, [...base, 'shading', 'situation']);
@@ -1390,7 +1551,7 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
           </div>}
         </>;
       })()}
-      <div className="opname-list-controls">
+      {!(embedded && envelopeView === 'table') && <div className="opname-list-controls">
         {part !== 'roofFloor' && <button type="button" className="btn"
           onClick={() => change(['envelope', 'surfaces'], [...surfaces, surfaceTemplate(surfaces.length, 'facade')])}>{t('survey.addFacade')}</button>}
         {part !== 'walls' && <>
@@ -1399,7 +1560,7 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
           <button type="button" className="btn"
             onClick={() => change(['envelope', 'surfaces'], [...surfaces, surfaceTemplate(surfaces.length, 'floor')])}>{t('survey.addFloor')}</button>
         </>}
-      </div>
+      </div>}
     </Section></>}
 
     {show('heating') && <><Section title={part === 'heatingRest' ? t('survey.section.heatingRest') : t('opname.heating')}>
