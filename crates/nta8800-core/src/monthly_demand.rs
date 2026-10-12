@@ -817,6 +817,10 @@ pub struct BalanceTerms {
     pub gamma: Option<f64>,
     pub utilization: f64,
     pub need_kwh: f64,
+    /// `Q_H;ls;rbl − Q_C;ls;rbl` of 7.5/7.9 that 7.3/7.7 used, kWh; 0 before
+    /// [`apply_recoverable_losses`] (calculation trace, not in the output).
+    #[serde(skip)]
+    pub recoverable_net_kwh: f64,
     /// `θ_int;op;H/C` (7.9.6), °C: for heating `θ_int;calc;H`; for cooling
     /// 7.80/7.81 as printed (with `+ Q_C;nd`). `None` when `H_C;ht` is
     /// undefined (setpoint equal to the outdoor temperature or no transfer).
@@ -2628,6 +2632,8 @@ pub fn apply_recoverable_losses(
     for (index, row) in adjusted.monthly.iter_mut().enumerate() {
         let net = heating_recoverable_kwh.get(index).copied().unwrap_or(0.0)
             - cooling_recoverable_kwh.get(index).copied().unwrap_or(0.0);
+        row.heating.recoverable_net_kwh = net;
+        row.cooling.recoverable_net_kwh = net;
         let heating = &mut row.heating;
         if let Some(gamma) = heating.gamma {
             let gated = (gamma <= 0.0 && heating.gains_kwh > 0.0) || gamma > GAMMA_H_MAX;
@@ -2839,6 +2845,7 @@ fn compute(
                 gamma: gamma_heating,
                 utilization: eta_heating,
                 need_kwh: need_heating,
+                recoverable_net_kwh: 0.0,
                 operative_temperature_c: Some(theta_heating),
             },
             cooling: BalanceTerms {
@@ -2856,6 +2863,7 @@ fn compute(
                 gamma: gamma_cooling,
                 utilization: eta_cooling,
                 need_kwh: need_cooling,
+                recoverable_net_kwh: 0.0,
                 operative_temperature_c: cooling_operative_temperature(
                     outdoor,
                     cooling_setpoint,

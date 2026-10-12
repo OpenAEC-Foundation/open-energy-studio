@@ -3882,6 +3882,8 @@ fn assess_in_edition(input: &BuildingPerformanceInput) -> BuildingPerformanceAss
                 [
                     crate::trace::transmission_trace(zone, result),
                     crate::trace::ventilation_trace(zone, result),
+                    crate::trace::balance_trace(zone, result, true),
+                    crate::trace::balance_trace(zone, result, false),
                 ]
             })
             .flatten()

@@ -4,7 +4,7 @@
  * formula with the values the kernel used, the result and the NTA 8800
  * formula number; the input lines show their source. Steps that a step uses
  * from elsewhere in the trace (the monthly Q_H;tr uses H_tr) open there.
- * Transmission and ventilation come first; the others follow.
+ * Transmission, ventilation and the heat and cold balance come first; the installations follow.
  */
 import { useMemo, useState } from 'react';
 import { useI18n } from '../../../../i18n/i18n';
