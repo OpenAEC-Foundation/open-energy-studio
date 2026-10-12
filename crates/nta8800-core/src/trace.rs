@@ -5,14 +5,20 @@
 //! calculation); the trace tests check that every sum equals the kernel's own
 //! result.
 //!
-//! First module: transmission (chapter 7/8): per zone `H_D` from the
-//! elements (8.1), `H_tr` (7.16) and `Q_H;tr` per month (7.14).
+//! Modules: transmission (chapter 7/8): per zone `H_D` from the elements
+//! (8.1), `H_tr` (7.16) and `Q_H;tr` per month (7.14); ventilation: per
+//! month `H_H;ve` from the air flows with their supply-temperature factor
+//! (7.19/7.20) and `Q_H;ve` (7.18).
 
 use serde::Serialize;
 
-use crate::monthly_demand::{MonthlyDemandAssessment, MonthlyDemandInput, Transmission};
+use crate::monthly_demand::{
+    supply_temperature_factor, MonthlyDemandAssessment, MonthlyDemandInput, Transmission,
+};
 
-const MONTHS: [&str; 12] = ["jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
+const MONTHS: [&str; 12] = [
+    "jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec",
+];
 
 /// One step of the calculation trace.
 #[derive(Debug, Clone, Serialize)]
@@ -45,16 +51,42 @@ pub struct TraceStep {
 pub fn number(value: f64) -> String {
     let text = format!("{value:.3}");
     let text = text.trim_end_matches('0').trim_end_matches('.');
-    if text == "-0" { "0".into() } else { text.to_string() }
+    if text == "-0" {
+        "0".into()
+    } else {
+        text.to_string()
+    }
 }
 
-fn leaf(key: String, quantity: String, formula: &str, values: String, result: f64, unit: &'static str, reference: &'static str) -> TraceStep {
-    TraceStep { key, quantity, formula: formula.into(), values, result, unit, reference, source: None, uses: Vec::new(), children: Vec::new() }
+fn leaf(
+    key: String,
+    quantity: String,
+    formula: &str,
+    values: String,
+    result: f64,
+    unit: &'static str,
+    reference: &'static str,
+) -> TraceStep {
+    TraceStep {
+        key,
+        quantity,
+        formula: formula.into(),
+        values,
+        result,
+        unit,
+        reference,
+        source: None,
+        uses: Vec::new(),
+        children: Vec::new(),
+    }
 }
 
 /// Transmission of one zone: `H_D` per element, `H_tr` and `Q_H;tr` per
 /// month. `None` without a transmission result (an invalid zone).
-pub fn transmission_trace(input: &MonthlyDemandInput, result: &MonthlyDemandAssessment) -> Option<TraceStep> {
+pub fn transmission_trace(
+    input: &MonthlyDemandInput,
+    result: &MonthlyDemandAssessment,
+) -> Option<TraceStep> {
     let summary = result.transmission.as_ref()?;
     let zone = &input.zone_id;
     let mut h_tr_children = Vec::new();
@@ -67,13 +99,21 @@ pub fn transmission_trace(input: &MonthlyDemandInput, result: &MonthlyDemandAsse
                 format!("{zone}.transmission.hd.{}", element.id),
                 element.id.clone(),
                 "A·U",
-                format!("{} × {}", number(element.area_m2), number(element.u_value_w_per_m2k)),
+                format!(
+                    "{} × {}",
+                    number(element.area_m2),
+                    number(element.u_value_w_per_m2k)
+                ),
                 element.area_m2 * element.u_value_w_per_m2k,
                 "W/K",
                 "8.1",
             );
             step.source = Some(element.source_reference.clone());
-            terms.push(format!("{} × {}", number(element.area_m2), number(element.u_value_w_per_m2k)));
+            terms.push(format!(
+                "{} × {}",
+                number(element.area_m2),
+                number(element.u_value_w_per_m2k)
+            ));
             parts.push(step);
         }
         for bridge in &direct.linear_bridges {
@@ -81,13 +121,21 @@ pub fn transmission_trace(input: &MonthlyDemandInput, result: &MonthlyDemandAsse
                 format!("{zone}.transmission.hd.{}", bridge.id),
                 bridge.id.clone(),
                 "L·ψ",
-                format!("{} × {}", number(bridge.length_m), number(bridge.psi_w_per_mk)),
+                format!(
+                    "{} × {}",
+                    number(bridge.length_m),
+                    number(bridge.psi_w_per_mk)
+                ),
                 bridge.length_m * bridge.psi_w_per_mk,
                 "W/K",
                 "8.1",
             );
             step.source = Some(bridge.source_reference.clone());
-            terms.push(format!("{} × {}", number(bridge.length_m), number(bridge.psi_w_per_mk)));
+            terms.push(format!(
+                "{} × {}",
+                number(bridge.length_m),
+                number(bridge.psi_w_per_mk)
+            ));
             parts.push(step);
         }
         for bridge in &direct.point_bridges {
@@ -124,11 +172,27 @@ pub fn transmission_trace(input: &MonthlyDemandInput, result: &MonthlyDemandAsse
     }
     if let Some(h_u) = summary.unheated_conductance_w_per_k {
         h_tr_terms.push(number(h_u));
-        h_tr_children.push(leaf(format!("{zone}.transmission.hu"), "H_U".into(), "Σ b_U · H_iu", number(h_u), h_u, "W/K", "8.4"));
+        h_tr_children.push(leaf(
+            format!("{zone}.transmission.hu"),
+            "H_U".into(),
+            "Σ b_U · H_iu",
+            number(h_u),
+            h_u,
+            "W/K",
+            "8.4",
+        ));
     }
     if let Some(h_p) = summary.vertical_pipe_conductance_w_per_k {
         h_tr_terms.push(number(h_p));
-        h_tr_children.push(leaf(format!("{zone}.transmission.hp"), "H_p".into(), "Σ H_p;j", number(h_p), h_p, "W/K", "7.17"));
+        h_tr_children.push(leaf(
+            format!("{zone}.transmission.hp"),
+            "H_p".into(),
+            "Σ H_p;j",
+            number(h_p),
+            h_p,
+            "W/K",
+            "7.17",
+        ));
     }
     let h_tr_key = format!("{zone}.transmission.htr");
     let mut h_tr = leaf(
@@ -167,17 +231,133 @@ pub fn transmission_trace(input: &MonthlyDemandInput, result: &MonthlyDemandAsse
             step
         })
         .collect();
-    let annual: f64 = result.monthly.iter().map(|month| month.heating.transmission_kwh).sum();
+    let annual: f64 = result
+        .monthly
+        .iter()
+        .map(|month| month.heating.transmission_kwh)
+        .sum();
     let mut root = leaf(
         format!("{zone}.transmission"),
         format!("Transmissie {zone}"),
         "Σ Q_H;tr over de maanden",
-        result.monthly.iter().map(|month| number(month.heating.transmission_kwh)).collect::<Vec<_>>().join(" + "),
+        result
+            .monthly
+            .iter()
+            .map(|month| number(month.heating.transmission_kwh))
+            .collect::<Vec<_>>()
+            .join(" + "),
         annual,
         "kWh",
         "7.14",
     );
     root.children = std::iter::once(h_tr).chain(months).collect();
+    Some(root)
+}
+
+/// Ventilation of one zone: per month `H_H;ve` as the sum of the air flows,
+/// each with its supply-temperature factor (7.19/7.20), and `Q_H;ve` (7.18).
+/// The flows of a chapter 11 ventilation are the ones the kernel derived for
+/// this result. `None` without a monthly result or without air flows.
+pub fn ventilation_trace(
+    input: &MonthlyDemandInput,
+    result: &MonthlyDemandAssessment,
+) -> Option<TraceStep> {
+    let resolved = crate::monthly_demand::with_resolved_ventilation(input, result);
+    let input = &resolved;
+    if result.monthly.is_empty() || input.ventilation_flows.is_empty() {
+        return None;
+    }
+    let zone = &input.zone_id;
+    let setpoint = input.setpoints.heating_c;
+    let months: Vec<TraceStep> = result
+        .monthly
+        .iter()
+        .map(|month| {
+            let name = MONTHS[usize::from(month.month - 1)];
+            let outdoor = month.outdoor_temperature_c;
+            let mut terms = Vec::new();
+            let flows: Vec<TraceStep> = input
+                .ventilation_flows
+                .iter()
+                .filter_map(|flow| {
+                    let row = flow.months.iter().find(|row| row.month == month.month)?;
+                    let supply = row.supply_temperature_c.unwrap_or(outdoor);
+                    let factor = supply_temperature_factor(setpoint, supply, outdoor);
+                    terms.push(format!(
+                        "{} × {}",
+                        number(row.conductance_w_per_k),
+                        number(factor)
+                    ));
+                    let mut step = leaf(
+                        format!("{zone}.ventilation.hve.{}.{}", month.month, flow.id),
+                        flow.id.clone(),
+                        "H_k · (θ_set − θ_sup) / (θ_set − θ_e)",
+                        format!(
+                            "{} × ({} − {}) / ({} − {})",
+                            number(row.conductance_w_per_k),
+                            number(setpoint),
+                            number(supply),
+                            number(setpoint),
+                            number(outdoor)
+                        ),
+                        row.conductance_w_per_k * factor,
+                        "W/K",
+                        "7.19/7.20",
+                    );
+                    step.source = Some(flow.source_reference.clone());
+                    Some(step)
+                })
+                .collect();
+            let terms_heating = &month.heating;
+            let mut h_ve = leaf(
+                format!("{zone}.ventilation.hve.{}", month.month),
+                format!("H_H;ve {name}"),
+                "Σ H_k · b_v;k",
+                terms.join(" + "),
+                terms_heating.ventilation_conductance_w_per_k,
+                "W/K",
+                "7.19",
+            );
+            h_ve.children = flows;
+            let mut step = leaf(
+                format!("{zone}.ventilation.qhve.{}", month.month),
+                format!("Q_H;ve {name}"),
+                "H_H;ve · (θ_int;calc;H − θ_e) · t / 1000",
+                format!(
+                    "{} × ({} − {}) × {} / 1000",
+                    number(terms_heating.ventilation_conductance_w_per_k),
+                    number(terms_heating.calculation_temperature_c),
+                    number(outdoor),
+                    number(month.hours),
+                ),
+                terms_heating.ventilation_kwh,
+                "kWh",
+                "7.18",
+            );
+            step.children = vec![h_ve];
+            step
+        })
+        .collect();
+    let annual: f64 = result
+        .monthly
+        .iter()
+        .map(|month| month.heating.ventilation_kwh)
+        .sum();
+    let mut root = leaf(
+        format!("{zone}.ventilation"),
+        format!("Ventilatie {zone}"),
+        "Σ Q_H;ve over de maanden",
+        result
+            .monthly
+            .iter()
+            .map(|month| number(month.heating.ventilation_kwh))
+            .collect::<Vec<_>>()
+            .join(" + "),
+        annual,
+        "kWh",
+        "7.18",
+    );
+    root.children = months;
     Some(root)
 }
 
@@ -200,19 +380,37 @@ mod tests {
 
     #[test]
     fn transmission_trace_matches_the_kernel_results() {
-        let project: serde_json::Value = serde_json::from_str(include_str!("../../../training-data/nta8800-example-terraced-dwelling.json")).unwrap();
+        let project: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-example-terraced-dwelling.json"
+        ))
+        .unwrap();
         let assessment = crate::project_performance::assess_project_performance(&project);
         let input = assessment.derived_input.as_ref().expect("derived input");
         let performance = assessment.performance.as_ref().expect("performance");
-        for (zone, result) in input.zone_inputs().into_iter().zip(std::iter::once(&performance.space_heating.demand).chain(&performance.space_heating.additional_zone_demands)) {
+        for (zone, result) in input.zone_inputs().into_iter().zip(
+            std::iter::once(&performance.space_heating.demand)
+                .chain(&performance.space_heating.additional_zone_demands),
+        ) {
             let trace = transmission_trace(zone, result).expect("trace");
             let summary = result.transmission.as_ref().unwrap();
             let h_tr = &trace.children[0];
             assert_eq!(h_tr.result, summary.conductance_w_per_k);
             // H_D is the sum of its elements, bridges and points.
-            let h_d = h_tr.children.iter().find(|step| step.quantity == "H_D").expect("H_D");
-            assert!((children_sum(h_d) - h_d.result).abs() < 1e-9, "H_D {} vs Σ {}", h_d.result, children_sum(h_d));
-            assert!(h_d.children.iter().all(|step| step.source.as_deref().is_some_and(|source| !source.is_empty())));
+            let h_d = h_tr
+                .children
+                .iter()
+                .find(|step| step.quantity == "H_D")
+                .expect("H_D");
+            assert!(
+                (children_sum(h_d) - h_d.result).abs() < 1e-9,
+                "H_D {} vs Σ {}",
+                h_d.result,
+                children_sum(h_d)
+            );
+            assert!(h_d.children.iter().all(|step| step
+                .source
+                .as_deref()
+                .is_some_and(|source| !source.is_empty())));
             // Every month: the recorded H_tr, temperatures and ground part give the kernel's Q_H;tr.
             for (step, month) in trace.children[1..].iter().zip(&result.monthly) {
                 let rebuilt = month.transmission_conductance_w_per_k
@@ -220,9 +418,48 @@ mod tests {
                     * month.hours
                     / 1000.0
                     + month.heating.ground_transmission_kwh;
-                assert!((rebuilt - step.result).abs() < 1e-9, "month {} {} vs {}", month.month, rebuilt, step.result);
+                assert!(
+                    (rebuilt - step.result).abs() < 1e-9,
+                    "month {} {} vs {}",
+                    month.month,
+                    rebuilt,
+                    step.result
+                );
             }
-            assert!((trace.result - trace.children[1..].iter().map(|step| step.result).sum::<f64>()).abs() < 1e-9);
+            assert!(
+                (trace.result
+                    - trace.children[1..]
+                        .iter()
+                        .map(|step| step.result)
+                        .sum::<f64>())
+                .abs()
+                    < 1e-9
+            );
+
+            // Ventilation: H_H;ve is the sum of its flows, and Q_H;ve follows from it.
+            let ventilation = ventilation_trace(zone, result).expect("ventilation trace");
+            for (step, month) in ventilation.children.iter().zip(&result.monthly) {
+                let h_ve = &step.children[0];
+                assert!(
+                    (children_sum(h_ve) - h_ve.result).abs() < 1e-9,
+                    "H_ve month {} {} vs Σ {}",
+                    month.month,
+                    h_ve.result,
+                    children_sum(h_ve)
+                );
+                let rebuilt = h_ve.result
+                    * (month.heating.calculation_temperature_c - month.outdoor_temperature_c)
+                    * month.hours
+                    / 1000.0;
+                assert!(
+                    (rebuilt - step.result).abs() < 1e-9,
+                    "Q_ve month {} {} vs {}",
+                    month.month,
+                    rebuilt,
+                    step.result
+                );
+            }
+            assert!((ventilation.result - children_sum(&ventilation)).abs() < 1e-9);
         }
     }
 }

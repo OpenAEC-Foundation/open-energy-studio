@@ -3878,7 +3878,13 @@ fn assess_in_edition(input: &BuildingPerformanceInput) -> BuildingPerformanceAss
             .zone_inputs()
             .into_iter()
             .zip(std::iter::once(&heating.demand).chain(&heating.additional_zone_demands))
-            .filter_map(|(zone, result)| crate::trace::transmission_trace(zone, result))
+            .flat_map(|(zone, result)| {
+                [
+                    crate::trace::transmission_trace(zone, result),
+                    crate::trace::ventilation_trace(zone, result),
+                ]
+            })
+            .flatten()
             .collect()
     } else {
         Vec::new()

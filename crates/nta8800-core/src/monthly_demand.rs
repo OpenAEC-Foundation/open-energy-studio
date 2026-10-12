@@ -2775,8 +2775,10 @@ fn compute(
         // 7.14/7.15 and 7.18.
         let ground_heating = transmission.ground_kwh(month, theta_heating);
         let ground_cooling = transmission.ground_kwh(month, cooling_setpoint);
-        let transmission_heating = h_tr * (theta_heating - outdoor) * hours / 1000.0 + ground_heating;
-        let transmission_cooling = h_tr * (cooling_setpoint - outdoor) * hours / 1000.0 + ground_cooling;
+        let transmission_heating =
+            h_tr * (theta_heating - outdoor) * hours / 1000.0 + ground_heating;
+        let transmission_cooling =
+            h_tr * (cooling_setpoint - outdoor) * hours / 1000.0 + ground_cooling;
         let ventilation_heating = h_ve_heating * (theta_heating - outdoor) * hours / 1000.0;
         let ventilation_cooling = h_ve_cooling * (cooling_setpoint - outdoor) * hours / 1000.0;
 

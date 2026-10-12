@@ -206,13 +206,6 @@
                 "sharedZones": 1,
                 "sourceReference": "synthetic fixture, not a real dwelling; basisopname §7.2.4",
                 "storeys": 2
-              },
-              {
-                "id": "leiding-2",
-                "insulated": false,
-                "sharedZones": 1,
-                "sourceReference": "synthetic fixture, not a real dwelling; basisopname §7.2.4",
-                "storeys": 2
               }
             ]
           },
@@ -951,13 +944,6 @@
             "verticalPipes": [
               {
                 "id": "leiding-1",
-                "insulated": false,
-                "sharedZones": 1,
-                "sourceReference": "synthetic fixture, not a real dwelling; basisopname §7.2.4",
-                "storeys": 2
-              },
-              {
-                "id": "leiding-2",
                 "insulated": false,
                 "sharedZones": 1,
                 "sourceReference": "synthetic fixture, not a real dwelling; basisopname §7.2.4",
