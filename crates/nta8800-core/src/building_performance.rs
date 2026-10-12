@@ -3891,7 +3891,7 @@ fn assess_in_edition(input: &BuildingPerformanceInput) -> BuildingPerformanceAss
     } else {
         Vec::new()
     };
-    BuildingPerformanceAssessment {
+    let mut assessment = BuildingPerformanceAssessment {
         trace,
         status: if valid {
             "calculated_unverified"
@@ -4003,7 +4003,14 @@ fn assess_in_edition(input: &BuildingPerformanceInput) -> BuildingPerformanceAss
         external_supply: valid.then_some(external),
         issues,
         warnings,
+    };
+    // The installations follow from the totals just assembled.
+    if valid {
+        assessment
+            .trace
+            .extend(crate::trace::installations_trace(&assessment));
     }
+    assessment
 }
 
 #[derive(Debug, Clone, Copy)]

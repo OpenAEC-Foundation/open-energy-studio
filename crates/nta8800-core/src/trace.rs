@@ -10,7 +10,9 @@
 //! month `H_H;ve` from the air flows with their supply-temperature factor
 //! (7.19/7.20) and `Q_H;ve` (7.18); heat and cold balance: per month
 //! `Q_H;nd` (7.1–7.5) and `Q_C;nd` (7.6–7.9) from the heat transfer, the
-//! gains and the utilisation factor with its time constant (7.45–7.58).
+//! gains and the utilisation factor with its time constant (7.45–7.58);
+//! installations: the energy use per energy function and carrier (5.20)
+//! and the heating chain of chapter 9 per month (9.1–9.24).
 
 use serde::Serialize;
 
@@ -842,6 +844,264 @@ fn delta_step(
     )
 }
 
+/// The energy functions of 5.20 with their names in the trace.
+const FUNCTION_NAMES: [(&str, &str); 8] = [
+    ("heating", "Verwarming"),
+    ("humidification", "Bevochtiging"),
+    ("ventilation", "Ventilatoren"),
+    ("lighting", "Verlichting"),
+    ("cooling", "Koeling"),
+    ("hotWater", "Warm tapwater"),
+    ("auxiliary", "Hulpenergie"),
+    ("heatPumpSource", "Warmtepompbron"),
+];
+
+/// Installations of the building: the energy use per energy function and
+/// carrier (`E_EPus;ci`, 5.20, from the §5.5.3 breakdown) with the months
+/// behind every carrier, and under heating the chain of chapter 9 per month:
+/// need, emission and distribution losses, the node and the generator output
+/// (9.4/9.5/9.24) with the carriers the generators took in (9.1) and the
+/// auxiliary energy (9.6). `None` without a breakdown.
+pub fn installations_trace(
+    performance: &crate::building_performance::BuildingPerformanceAssessment,
+) -> Option<TraceStep> {
+    let breakdown = &performance.energy_by_service;
+    if breakdown.annual.is_empty() {
+        return None;
+    }
+    let mut functions = Vec::new();
+    for (service, name) in FUNCTION_NAMES {
+        let carriers: Vec<TraceStep> = breakdown
+            .annual
+            .iter()
+            .filter(|row| row.service == service && row.used_kwh != 0.0)
+            .map(|row| {
+                let months: Vec<String> = breakdown
+                    .months
+                    .iter()
+                    .filter(|month| month.service == service && month.carrier == row.carrier)
+                    .map(|month| number(month.used_kwh))
+                    .collect();
+                leaf(
+                    format!("installations.{service}.{}", row.carrier),
+                    format!("E_EPus;{}", row.carrier),
+                    "Σ E_EPus;ci over de maanden",
+                    months.join(" + "),
+                    row.used_kwh,
+                    "kWh",
+                    "5.20",
+                )
+            })
+            .collect();
+        if carriers.is_empty() {
+            continue;
+        }
+        let mut step = leaf(
+            format!("installations.{service}"),
+            name.into(),
+            "Σ E_EPus;ci over de energiedragers",
+            carriers
+                .iter()
+                .map(|carrier| number(carrier.result))
+                .collect::<Vec<_>>()
+                .join(" + "),
+            carriers.iter().map(|carrier| carrier.result).sum(),
+            "kWh",
+            "5.20",
+        );
+        step.children = carriers;
+        if service == "heating" {
+            step.children.extend(heating_chain_trace(performance));
+        }
+        functions.push(step);
+    }
+    let mut root = leaf(
+        "installations".into(),
+        "Installaties".into(),
+        "Σ E_EPus over de energiefuncties",
+        functions
+            .iter()
+            .map(|step| number(step.result))
+            .collect::<Vec<_>>()
+            .join(" + "),
+        functions.iter().map(|step| step.result).sum(),
+        "kWh",
+        "5.20",
+    );
+    root.children = functions;
+    Some(root)
+}
+
+/// Chapter 9 per month: from the heating need over the emission and
+/// distribution losses and the node to the generator output (9.4/9.5,
+/// 9.24 per zone), and the carriers the generators took in (9.1) with the
+/// auxiliary energy (9.6). The need links to the heat balance of each zone.
+fn heating_chain_trace(
+    performance: &crate::building_performance::BuildingPerformanceAssessment,
+) -> Option<TraceStep> {
+    let chain = &performance.space_heating;
+    if chain.monthly.is_empty() {
+        return None;
+    }
+    // The zones' heat balances in this trace (`{zone}.heating`).
+    let zones: Vec<&str> = performance
+        .trace
+        .iter()
+        .filter_map(|step| step.key.strip_suffix(".heating"))
+        .collect();
+    let months: Vec<TraceStep> = chain
+        .monthly
+        .iter()
+        .map(|month| {
+            let m = month.month;
+            let name = MONTHS[usize::from(m - 1)];
+            let key = |part: &str| format!("installations.heating.chain.{part}.{m}");
+            let mut need = leaf(
+                key("qnd"),
+                format!("Q_H;nd {name}"),
+                "Σ Q_H;nd;zi",
+                number(month.heating_need_kwh),
+                month.heating_need_kwh,
+                "kWh",
+                "9.10",
+            );
+            need.uses = zones
+                .iter()
+                .map(|zone| format!("{zone}.heating.qnd.{m}"))
+                .collect();
+            let terms: [(&str, &str, f64, &'static str); 6] = [
+                ("emls", "Q_H;em;ls", month.emission_loss_kwh, "9.9"),
+                ("disls", "Q_H;dis;ls", month.distribution_loss_kwh, "9.24"),
+                (
+                    "disaux",
+                    "Q_H;dis;aux;rvd",
+                    -month.distribution_auxiliary_to_medium_kwh,
+                    "9.24",
+                ),
+                ("nodls", "Q_H;nod;ls", month.node_loss_kwh, "9.5"),
+                (
+                    "other",
+                    "Q_H;AHU + Q_H;HUM + Q_W;H",
+                    month.ahu_heating_load_kwh
+                        + month.humidification_load_kwh
+                        + month.hot_water_load_kwh,
+                    "9.4",
+                ),
+                ("solar", "Q_H;nod;gns", -month.solar_gain_kwh, "9.5"),
+            ];
+            let mut parts = vec![need];
+            let mut values = vec![number(month.heating_need_kwh)];
+            for (part, quantity, value, reference) in terms {
+                if value == 0.0 && part != "emls" && part != "disls" {
+                    continue;
+                }
+                values.push(if value < 0.0 {
+                    format!("− {}", number(-value))
+                } else {
+                    format!("+ {}", number(value))
+                });
+                parts.push(leaf(
+                    key(part),
+                    format!("{quantity} {name}"),
+                    quantity,
+                    number(value),
+                    value,
+                    "kWh",
+                    reference,
+                ));
+            }
+            let carriers: Vec<(&str, f64)> = [
+                ("gas", month.natural_gas_kwh),
+                ("el", month.generator_electricity_kwh),
+                ("dh", month.district_heat_kwh),
+                ("bm", month.biomass_kwh),
+                ("oil", month.oil_kwh),
+            ]
+            .into_iter()
+            .filter(|(_, value)| *value != 0.0)
+            .collect();
+            let mut input = leaf(
+                key("genin"),
+                format!("E_H;gen;in {name}"),
+                "Σ E_H;gen;in;ci van de opwekkers",
+                carriers
+                    .iter()
+                    .map(|(carrier, value)| format!("{carrier} {}", number(*value)))
+                    .collect::<Vec<_>>()
+                    .join(" + "),
+                carriers.iter().map(|(_, value)| value).sum(),
+                "kWh",
+                "9.1",
+            );
+            input.children = carriers
+                .iter()
+                .map(|(carrier, value)| {
+                    leaf(
+                        format!("{}.{carrier}", key("genin")),
+                        format!("E_H;gen;in;{carrier} {name}"),
+                        "opwekker",
+                        number(*value),
+                        *value,
+                        "kWh",
+                        "9.1",
+                    )
+                })
+                .collect();
+            let mut output = leaf(
+                key("genout"),
+                format!("Q_H;gen;out {name}"),
+                "Q_H;nd + Q_H;em;ls + Q_H;dis;ls − Q_H;dis;aux;rvd + Q_H;nod;ls + Q_H;AHU + Q_H;HUM + Q_W;H − Q_H;nod;gns",
+                values.join(" "),
+                month.generator_output_kwh,
+                "kWh",
+                "9.4/9.5",
+            );
+            output.children = parts;
+            let mut step = leaf(
+                key("month"),
+                format!("Verwarmingsketen {name}"),
+                "Q_H;gen;out → E_H;gen;in",
+                format!(
+                    "{} kWh warmte uit {} kWh energie",
+                    number(month.generator_output_kwh),
+                    number(input.result)
+                ),
+                input.result,
+                "kWh",
+                "9.1",
+            );
+            step.children = vec![output, input];
+            if let Some(aux) = month.auxiliary_electricity_kwh {
+                step.children.push(leaf(
+                    key("aux"),
+                    format!("W_H;aux {name}"),
+                    "W_H;em;aux + W_H;dis;aux + W_H;sto;aux + W_H;gen;aux",
+                    number(aux),
+                    aux,
+                    "kWh",
+                    "9.6",
+                ));
+            }
+            step
+        })
+        .collect();
+    let mut root = leaf(
+        "installations.heating.chain".into(),
+        "Verwarmingsketen".into(),
+        "Σ E_H;gen;in over de maanden",
+        months
+            .iter()
+            .map(|step| number(step.result))
+            .collect::<Vec<_>>()
+            .join(" + "),
+        months.iter().map(|step| step.result).sum(),
+        "kWh",
+        "9.1",
+    );
+    root.children = months;
+    Some(root)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1016,6 +1276,85 @@ mod tests {
             }
             // The example applies the recoverable losses: the full 7.3/7.7 was checked.
             assert!(!result.recoverable_losses_applied || checked_with_losses > 0);
+        }
+    }
+
+    #[test]
+    fn installations_trace_matches_the_kernel_results() {
+        let project: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-example-terraced-dwelling.json"
+        ))
+        .unwrap();
+        let assessment = crate::project_performance::assess_project_performance(&project);
+        let performance = assessment.performance.as_ref().expect("performance");
+        let trace = installations_trace(performance).expect("installations trace");
+        // Σ functions = Σ E_EPus of the breakdown; every function is the sum of its carriers,
+        // every carrier the sum of its months.
+        let used: f64 = performance
+            .energy_by_service
+            .annual
+            .iter()
+            .map(|row| row.used_kwh)
+            .sum();
+        assert!(
+            (trace.result - used).abs() < 1e-6,
+            "{} vs {used}",
+            trace.result
+        );
+        for function in &trace.children {
+            let carriers: Vec<&TraceStep> = function
+                .children
+                .iter()
+                .filter(|child| child.quantity.starts_with("E_EPus;"))
+                .collect();
+            let sum: f64 = carriers.iter().map(|carrier| carrier.result).sum();
+            assert!(
+                (function.result - sum).abs() < 1e-6,
+                "{}",
+                function.quantity
+            );
+            for carrier in carriers {
+                let months: f64 = carrier
+                    .values
+                    .split(" + ")
+                    .map(|value| value.parse::<f64>().unwrap())
+                    .sum();
+                assert!((months - carrier.result).abs() < 0.01, "{}", carrier.key);
+            }
+        }
+        // The heating chain: the generator output is the sum of its terms (9.4/9.5) and the
+        // input the sum of the carriers (9.1), each month.
+        let heating = trace
+            .children
+            .iter()
+            .find(|step| step.key == "installations.heating")
+            .expect("heating");
+        let chain = heating
+            .children
+            .iter()
+            .find(|step| step.key == "installations.heating.chain")
+            .expect("chain");
+        assert_eq!(chain.children.len(), 12);
+        for (month, row) in chain
+            .children
+            .iter()
+            .zip(&performance.space_heating.monthly)
+        {
+            let output = &month.children[0];
+            assert!(
+                (children_sum(output) - row.generator_output_kwh).abs() < 1e-6,
+                "month {}: Σ {} vs {}",
+                row.month,
+                children_sum(output),
+                row.generator_output_kwh
+            );
+            let input = &month.children[1];
+            assert!((children_sum(input) - input.result).abs() < 1e-9);
+            // The need links to the zones' heat balance in the performance trace.
+            assert!(output.children[0].uses.iter().all(|key| performance
+                .trace
+                .iter()
+                .any(|step| key.starts_with(&step.key))));
         }
     }
 }
