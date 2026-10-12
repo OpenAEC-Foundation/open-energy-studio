@@ -12,7 +12,9 @@
 //! `Q_H;nd` (7.1–7.5) and `Q_C;nd` (7.6–7.9) from the heat transfer, the
 //! gains and the utilisation factor with its time constant (7.45–7.58);
 //! installations: the energy use per energy function and carrier (5.20)
-//! and the heating chain of chapter 9 per month (9.1–9.24).
+//! and the heating chain of chapter 9 per month (9.1–9.24); primary energy
+//! and label: E_P;Tot per carrier (5.9–5.14a), EP2 (5.2), RER (5.3) and the
+//! indicative label class.
 
 use serde::Serialize;
 
@@ -1102,6 +1104,241 @@ fn heating_chain_trace(
     Some(root)
 }
 
+/// Primary energy and label: `E_P;Tot` from the delivered energy per carrier
+/// and energy function times `f_P;del` (5.9–5.11) minus the export credit
+/// (5.13) and the battery correction (5.14a), EP2 (5.2), RER (5.3) with
+/// `E_Pren;Tot` (5.28) and the indicative label class (Omgevingsregeling
+/// annex IX/X). `None` without indicators.
+pub fn primary_energy_trace(
+    performance: &crate::building_performance::BuildingPerformanceAssessment,
+    area_m2: f64,
+    residential: bool,
+) -> Option<TraceStep> {
+    let fossil = performance.annual_primary_fossil_kwh?;
+    let ep2 = performance.primary_fossil_indicator_kwh_per_m2_year?;
+    let breakdown = &performance.energy_by_service;
+    let names: std::collections::HashMap<&str, &str> = FUNCTION_NAMES.into_iter().collect();
+
+    // E_P;del;ci per carrier, with the energy functions behind it (5.11).
+    let mut carriers = Vec::new();
+    for carrier in crate::building_performance::BREAKDOWN_CARRIERS {
+        let functions: Vec<TraceStep> = breakdown
+            .annual
+            .iter()
+            .filter(|row| {
+                row.carrier == carrier
+                    && (row.delivered_kwh != 0.0 || row.primary_fossil_kwh != 0.0)
+            })
+            .map(|row| {
+                let mut step = leaf(
+                    format!("primary.del.{carrier}.{}", row.service),
+                    names
+                        .get(row.service)
+                        .copied()
+                        .unwrap_or(row.service)
+                        .into(),
+                    "E_del;ci · f_P;del;ci",
+                    if row.delivered_kwh != 0.0 {
+                        format!(
+                            "{} × {}",
+                            number(row.delivered_kwh),
+                            number(row.primary_fossil_kwh / row.delivered_kwh)
+                        )
+                    } else {
+                        number(row.primary_fossil_kwh)
+                    },
+                    row.primary_fossil_kwh,
+                    "kWh",
+                    "5.11",
+                );
+                step.uses = vec![format!("installations.{}.{carrier}", row.service)];
+                step
+            })
+            .collect();
+        if functions.is_empty() {
+            continue;
+        }
+        let mut step = leaf(
+            format!("primary.del.{carrier}"),
+            format!("E_P;del;{carrier}"),
+            "Σ E_P;del over de energiefuncties",
+            functions
+                .iter()
+                .map(|function| number(function.result))
+                .collect::<Vec<_>>()
+                .join(" + "),
+            functions.iter().map(|function| function.result).sum(),
+            "kWh",
+            "5.11",
+        );
+        step.children = functions;
+        carriers.push(step);
+    }
+    let credit: f64 = breakdown
+        .adjustments
+        .iter()
+        .map(|month| month.exported_electricity_credit_kwh)
+        .sum();
+    let storage: f64 = breakdown
+        .adjustments
+        .iter()
+        .map(|month| month.storage_correction_kwh)
+        .sum();
+    let delivered: f64 = carriers.iter().map(|step| step.result).sum();
+    let mut parts = carriers;
+    if credit != 0.0 {
+        parts.push(leaf(
+            "primary.exp.el".into(),
+            "E_P;exp;el".into(),
+            "E_exp;el · f_P;exp;el",
+            number(credit),
+            credit,
+            "kWh",
+            "5.13",
+        ));
+    }
+    if storage != 0.0 {
+        parts.push(leaf(
+            "primary.bat".into(),
+            "E_P;BAT,out;tot".into(),
+            "batterijcorrectie",
+            number(storage),
+            storage,
+            "kWh",
+            "5.14a",
+        ));
+    }
+    let mut ep_tot = leaf(
+        "primary.eptot".into(),
+        "E_P;Tot".into(),
+        "Σ E_P;del;ci − E_P;exp;el − E_P;BAT,out;tot",
+        format!(
+            "{} − {} − {}",
+            number(delivered),
+            number(credit),
+            number(storage)
+        ),
+        fossil,
+        "kWh",
+        "5.9/5.10",
+    );
+    ep_tot.children = parts;
+    let mut ep2_step = leaf(
+        "primary.ep2".into(),
+        "EP2 (E_wePTot)".into(),
+        "E_P;Tot / A_g, naar boven afgerond op 0,01",
+        format!("{} / {}", number(fossil), number(area_m2)),
+        ep2,
+        "kWh/m²",
+        "5.2",
+    );
+    ep2_step.children = vec![
+        ep_tot,
+        leaf(
+            "primary.ag".into(),
+            "A_g".into(),
+            "gebruiksoppervlakte",
+            number(area_m2),
+            area_m2,
+            "m²",
+            "5.2",
+        ),
+    ];
+    let mut children = vec![ep2_step];
+
+    // RER (5.3) with E_Pren;Tot (5.28).
+    if let (Some(rer), Some(renewable)) = (
+        performance.renewable_share_percent,
+        performance.annual_renewable_primary_kwh,
+    ) {
+        let mut step = leaf(
+            "primary.rer".into(),
+            "RER (BENG 3)".into(),
+            "E_Pren;Tot / (E_P;Tot + E_Pren;Tot) × 100, naar beneden afgerond op 0,1",
+            format!("{0} / ({1} + {0}) × 100", number(renewable), number(fossil)),
+            rer,
+            "%",
+            "5.3",
+        );
+        step.children = vec![leaf(
+            "primary.epren".into(),
+            "E_Pren;Tot".into(),
+            "Σ E_Pren;H + E_Pren;C + E_Pren;W + E_Pren;el",
+            number(renewable),
+            renewable,
+            "kWh",
+            "5.28/5.29",
+        )];
+        step.uses = vec!["primary.eptot".into()];
+        children.push(step);
+    }
+
+    // Indicative label class from the EP2 of the label scenario.
+    if let Some(class) = performance.indicative_label_class {
+        let label_ep2 = performance
+            .label_primary_fossil_indicator_kwh_per_m2_year
+            .unwrap_or(ep2);
+        let function = crate::label_class::LabelFunction::Residential;
+        let values = if residential {
+            match crate::label_class::class_upper_bound(function, class) {
+                Some(bound) => format!("{} ≤ {}", number(label_ep2), number(bound)),
+                None => crate::label_class::class_upper_bound(function, "F")
+                    .map_or(number(label_ep2), |bound| {
+                        format!("{} > {}", number(label_ep2), number(bound))
+                    }),
+            }
+        } else {
+            number(label_ep2)
+        };
+        let mut step = leaf(
+            "primary.label".into(),
+            format!("Energielabel {class} (indicatief)"),
+            "klassegrens bij EP2",
+            values,
+            label_ep2,
+            "kWh/m²",
+            if residential {
+                "Omgevingsregeling bijlage IX"
+            } else {
+                "Omgevingsregeling bijlage X"
+            },
+        );
+        if (label_ep2 - ep2).abs() > 1e-9 {
+            step.children = vec![leaf(
+                "primary.label.emgforf".into(),
+                "EP2 label (EMGforf)".into(),
+                "EP2 met forfaitaire waarden voor gebiedsmaatregelen",
+                number(label_ep2),
+                label_ep2,
+                "kWh/m²",
+                "Omgevingsregeling art. 5.11 lid 4",
+            )];
+        } else {
+            step.uses = vec!["primary.ep2".into()];
+        }
+        children.push(step);
+    }
+
+    let mut root = leaf(
+        "primary".into(),
+        "Primaire energie en label".into(),
+        "EP2 → energielabel",
+        format!(
+            "{} kWh/m²{}",
+            number(ep2),
+            performance
+                .indicative_label_class
+                .map(|class| format!(" → {class}"))
+                .unwrap_or_default()
+        ),
+        ep2,
+        "kWh/m²",
+        "5.2",
+    );
+    root.children = children;
+    Some(root)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1355,6 +1592,77 @@ mod tests {
                 .trace
                 .iter()
                 .any(|step| key.starts_with(&step.key))));
+        }
+    }
+
+    #[test]
+    fn primary_energy_trace_matches_the_kernel_results() {
+        let project: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-example-terraced-dwelling.json"
+        ))
+        .unwrap();
+        let assessment = crate::project_performance::assess_project_performance(&project);
+        let input = assessment.derived_input.as_ref().expect("derived input");
+        let performance = assessment.performance.as_ref().expect("performance");
+        let area = input.total_usable_floor_area_m2;
+        let trace = primary_energy_trace(performance, area, true).expect("primary trace");
+        let ep2 = &trace.children[0];
+        let ep_tot = &ep2.children[0];
+        // E_P;Tot: the carriers minus the export credit and the battery correction (5.10).
+        let rebuilt: f64 = ep_tot
+            .children
+            .iter()
+            .map(|step| {
+                if step.key.starts_with("primary.del.") {
+                    step.result
+                } else {
+                    -step.result
+                }
+            })
+            .sum();
+        assert!(
+            (rebuilt - ep_tot.result).abs() < 1e-6,
+            "{rebuilt} vs {}",
+            ep_tot.result
+        );
+        for carrier in &ep_tot.children {
+            if carrier.key.starts_with("primary.del.") {
+                assert!((children_sum(carrier) - carrier.result).abs() < 1e-9);
+            }
+        }
+        // EP2 = E_P;Tot / A_g rounded up to 0,01 (5.2).
+        let expected = (ep_tot.result / area * 100.0 - 1e-9).ceil() / 100.0;
+        assert!(
+            (ep2.result - expected).abs() < 1e-9,
+            "{} vs {expected}",
+            ep2.result
+        );
+        // The label shown is the kernel's indicative class.
+        let class = performance.indicative_label_class.expect("class");
+        assert!(trace
+            .children
+            .iter()
+            .any(|step| step.quantity == format!("Energielabel {class} (indicatief)")));
+        // The links go to the installations steps.
+        let installations = installations_trace(performance).expect("installations");
+        let mut keys = std::collections::HashSet::new();
+        fn collect(step: &TraceStep, keys: &mut std::collections::HashSet<String>) {
+            keys.insert(step.key.clone());
+            step.children.iter().for_each(|child| collect(child, keys));
+        }
+        collect(&installations, &mut keys);
+        for carrier in ep_tot
+            .children
+            .iter()
+            .filter(|step| step.key.starts_with("primary.del."))
+        {
+            for function in &carrier.children {
+                assert!(
+                    function.uses.iter().all(|key| keys.contains(key)),
+                    "{:?}",
+                    function.uses
+                );
+            }
         }
     }
 }

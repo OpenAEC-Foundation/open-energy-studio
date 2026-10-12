@@ -4009,6 +4009,11 @@ fn assess_in_edition(input: &BuildingPerformanceInput) -> BuildingPerformanceAss
         assessment
             .trace
             .extend(crate::trace::installations_trace(&assessment));
+        assessment.trace.extend(crate::trace::primary_energy_trace(
+            &assessment,
+            input.total_usable_floor_area_m2,
+            matches!(input.calculation_scope, CalculationScope::Residential),
+        ));
     }
     assessment
 }
