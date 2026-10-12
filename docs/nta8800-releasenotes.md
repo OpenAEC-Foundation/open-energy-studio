@@ -13,6 +13,15 @@ Dit bestand is de wijzigingsregistratie van de rekenkern (BRL 9501 §5.2, §6.2 
 
 ## Onuitgebracht
 
+### 12 oktober 2026 — Review 64: hoofdstuk 11 onafhankelijk nagerekend (geen rekenwijziging)
+- **Herberekening:** hoofdstuk 11 is voor de tussenwoning (C1) en het kantoor (D2 met wtw) in 2025+C1 opnieuw afgeleid vanaf de normpagina's, vanaf de afgeleide invoer van de kern. Vergeleken zijn de benodigde buitenluchtvolumestroom (11.22, 11.56, tabellen 11.5, 11.8, 11.9), infiltratie en spuien (11.68, 11.84, 11.85), het luchtstroommodel met de routine voor de interne referentiedruk (11.1–11.21), de toevoertemperatuur met wtw en bypass (11.99–11.108), H_ve met b_v (7.19, 7.20) en het ventilatorgebruik (11.132, 11.142), plus de run met vast systeem C1 (§5.4.2, §5.4.3) door hoofdstuk 7.
+- **Uitkomst:** 1 041 grootheden vergeleken tegen 10⁻⁶ relatief; alle gelijk, ook BENG 1 van het kantoor (74,55) uit de eigen C1-run. Geen kernfout, geen gewijzigde uitkomst. Zie de [verificatiestatus](nta8800-verificatiestatus.md), stand 12 oktober.
+
+### 12 oktober 2026 — Review 63: voorbeeldprojecten onafhankelijk nagerekend (geen rekenwijziging)
+- **Herberekening:** de tussenwoning en het kantoor uit `training-data/` zijn in 2025+C1 opnieuw nagerekend met een eigen implementatie vanaf de normpagina's, vanaf de afgeleide invoer van de kern. Vergeleken zijn transmissie en grond (8.2, 8.3, bijlage D), interne en zonnewinst (7.5, 7.6), de maandbalans met nivellering en onderbreking (7.1–7.79), afgifte, opwekking en hulpenergie (9.9–9.12a, 9.61, 9.85), tapwater met voorraadvat (13.15–13.26, 13.59), verlichting (14.7–14.14), PV (16.2–16.4b), primair fossiel en hernieuwbaar (§5.3) en TOjuli per oriëntatie (5.40–5.41).
+- **Uitkomst:** 782 grootheden vergeleken tegen 10⁻⁶ relatief; alle gelijk. BENG 1 van het kantoor komt volgens §5.4 uit de run met vast systeem C1, zoals de kern rekent. Geen kernfout, geen gewijzigde uitkomst.
+- **Niet opnieuw afgeleid:** hoofdstuk 11 (luchtstromen, H_ve, ventilatoren); die waarden komen van de kern. Zie de [verificatiestatus](nta8800-verificatiestatus.md), stand 12 oktober.
+
 ### 12 oktober 2026 — Review 62: de zes open ISSO 54-deeltesten opnieuw nagegaan (geen rekenwijziging)
 - **EP-W204d en EP-W406l** (biomassa die niet aan bijlage R voldoet): ook in 2025+C1 geeft tabel 9.30 (p. 341) alleen rendementen voor toestellen die aan bijlage R voldoen, en methode 1 vraagt meetgegevens die de deeltest niet geeft. Geen route; de kern weigert terecht.
 - **EP-W406j** (booster met één COP): 13.8.4.4 en bijlage W (2025+C1 p. 631–632, 1118–1120) vragen nog steeds meetgegevens bij twee brontemperaturen of het forfait zonder opgegeven COP. Geen route.
