@@ -7,6 +7,7 @@ import {
 } from '../../core/nta/KernelClient';
 import { useI18n } from '../../i18n/i18n';
 import './HeatPumpForfaitMonthlyPanel.css';
+import { DecimalInput } from '../ui';
 
 type SourceSystem = ForfaitHeatPumpMonthlyDraftInput['sourceSystem'];
 const months = Array.from({ length: 12 }, (_, index) => index + 1);
@@ -130,7 +131,7 @@ export function HybridHeatPumpMonthlyPanel({ pump }: { pump: INtaHeatPumpInput }
       <label>{t('kernel.forfaitMonthly.systemReference')}<input value={sourceReference} onChange={(event) => { invalidate(); setSourceReference(event.target.value); }} /></label>
       <label>{t('kernel.hybridDraft.backupId')}<input value={backupId} onChange={(event) => { invalidate(); setBackupId(event.target.value); }} /></label>
       <label>{t('kernel.hybridDraft.backupClassReference')}<input value={backupClassReference} onChange={(event) => { invalidate(); setBackupClassReference(event.target.value); }} /></label>
-      <label>{t('kernel.hybridDraft.backupPower')}<input type="number" min="0" step="any" value={backupPower} onChange={(event) => { invalidate(); setBackupPower(event.target.value); }} /></label>
+      <label>{t('kernel.hybridDraft.backupPower')}<DecimalInput min="0" step="any" value={backupPower} onChange={(event) => { invalidate(); setBackupPower(event.target.value); }} /></label>
       <label>{t('kernel.hybridDraft.backupPowerReference')}<input value={backupPowerReference} onChange={(event) => { invalidate(); setBackupPowerReference(event.target.value); }} /></label>
       <label>{t('kernel.hybridDraft.boilerKind')}<select value={boilerKind} onChange={(event) => { invalidate(); setBoilerKind(event.target.value as BoilerForfaitDraftInput['kind']); }}>
         {(['conventional', 'vr', 'hr100', 'hr104', 'hr107'] as const).map((kind) => <option key={kind} value={kind}>{t(`kernel.hybridDraft.boilerKind.${kind}`)}</option>)}
@@ -139,17 +140,17 @@ export function HybridHeatPumpMonthlyPanel({ pump }: { pump: INtaHeatPumpInput }
         {(['inside_thermal_boundary', 'outside_thermal_boundary'] as const).map((location) => <option key={location} value={location}>{t(`kernel.hybridDraft.boilerLocation.${location}`)}</option>)}
       </select></label>
       <label>{t('kernel.hybridDraft.locationReference')}<input value={locationReference} onChange={(event) => { invalidate(); setLocationReference(event.target.value); }} /></label>
-      <label>{t('kernel.hybridDraft.emissionTemperature')}<input type="number" step="any" value={emissionTemperature} onChange={(event) => { invalidate(); setEmissionTemperature(event.target.value); }} /></label>
+      <label>{t('kernel.hybridDraft.emissionTemperature')}<DecimalInput step="any" value={emissionTemperature} onChange={(event) => { invalidate(); setEmissionTemperature(event.target.value); }} /></label>
       <label>{t('kernel.hybridDraft.emissionCircuit')}<select value={emissionCircuit} onChange={(event) => { invalidate(); setEmissionCircuit(event.target.value as BoilerForfaitDraftInput['emissionCircuit']); }}>
         {(['direct', 'mixing_with_return_limit', 'mixing_without_return_limit'] as const).map((circuit) => <option key={circuit} value={circuit}>{t(`kernel.hybridDraft.emissionCircuit.${circuit}`)}</option>)}
       </select></label>
       <label>{t('kernel.hybridDraft.emissionReference')}<input value={emissionReference} onChange={(event) => { invalidate(); setEmissionReference(event.target.value); }} /></label>
-      <label>{t('kernel.hybridDraft.boilerYear')}<input type="number" min="1900" max="2026" step="1" value={boilerYear} onChange={(event) => { invalidate(); setBoilerYear(event.target.value); }} /></label>
+      <label>{t('kernel.hybridDraft.boilerYear')}<DecimalInput min="1900" max="2026" step="1" value={boilerYear} onChange={(event) => { invalidate(); setBoilerYear(event.target.value); }} /></label>
       <label>{t('kernel.hybridDraft.boilerYearReference')}<input value={boilerYearReference} onChange={(event) => { invalidate(); setBoilerYearReference(event.target.value); }} /></label>
       <label><input type="checkbox" checked={pilotFlamePresent} onChange={(event) => { invalidate(); setPilotFlamePresent(event.target.checked); }} />{t('kernel.hybridDraft.pilotFlame')}</label>
     </div>
     <div className="heat-pump-forfait-monthly-table-wrap"><table><thead><tr><th>{t('kernel.forfaitMonthly.month')}</th><th>{t('kernel.hybridDraft.nodeInput')}</th></tr></thead>
-      <tbody>{months.map((month, index) => <tr key={month}><th scope="row">{month}</th><td><input type="number" min="0" step="any"
+      <tbody>{months.map((month, index) => <tr key={month}><th scope="row">{month}</th><td><DecimalInput min="0" step="any"
         aria-label={`${t('kernel.hybridDraft.nodeInput')} ${month}`} value={nodeValues[index]}
         onChange={(event) => updateMonth(index, event.target.value)} /></td></tr>)}</tbody></table></div>
     <button type="button" disabled={loading} onClick={() => void diagnose()}>{loading ? t('kernel.loading') : t('kernel.hybridDraft.calculate')}</button>

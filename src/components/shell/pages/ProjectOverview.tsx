@@ -13,6 +13,7 @@ import { routeForPath } from '../../../core/nta/gapRoutes';
 import { kernelIssues, type StepStatus } from '../../../core/nta/stepStatus';
 import { summarizeForPreview } from '../../../core/nta/PreviewSummary';
 import { useKernel } from '../../../context/KernelProvider';
+import { openPointsEmptyText } from '../openPointsEmpty';
 import type { IProject } from '../../../core/energy/types';
 import type { ShellActions } from '../ShellActions';
 import { PageHeader, routeLabel } from '../PageHeader';
@@ -106,8 +107,8 @@ export function ProjectOverview({ project, statuses, actions }: {
         <Card className="overview-progress" title={t('overview.progress')} level={2}
           subtitle={kernel?.phase === 'stale' ? t('status.kernel.stale') : t('overview.fromKernel')}
           actions={<>
-            {warnings > 0 && <Pill tone="warn" icon={<AlertTriangle aria-hidden="true" />}>{t('nav.state.warnings', { count: String(warnings) })}</Pill>}
-            <Pill tone={errors > 0 ? 'err' : 'neutral'}>{t('nav.state.errors', { count: String(errors) })}</Pill>
+            {warnings > 0 && <Pill tone="warn" icon={<AlertTriangle aria-hidden="true" />}>{t('nav.state.warnings', { count: warnings })}</Pill>}
+            <Pill tone={errors > 0 ? 'err' : 'neutral'}>{t('nav.state.errors', { count: errors })}</Pill>
           </>} flush>
           <table className="overview-table">
             <tbody>
@@ -143,7 +144,7 @@ export function ProjectOverview({ project, statuses, actions }: {
             </tbody>
           </table>
           <div className="overview-sub"><h3>{t('overview.openPoints')}</h3><span>{t('overview.openPointsHint')}</span></div>
-          <IssueList issues={issueItems} empty={t('overview.noIssues')}
+          <IssueList issues={issueItems} empty={openPointsEmptyText(t, kernel)}
             onGoTo={(issue) => actions.navigate(routeForPath(issue.path))} />
           {issues.length > MAX_ISSUES && (
             <div className="overview-sub">

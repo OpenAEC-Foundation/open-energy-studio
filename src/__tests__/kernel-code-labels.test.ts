@@ -20,6 +20,11 @@ describe('kernel code labels', () => {
       'zone_multiple_heating_systems', 'residential_capacity_above25']) {
       expect(codes.has(code), code).toBe(true);
     }
+    // The service's own error codes (HTTP envelope, MCP) are found too.
+    for (const code of ['invalid_json', 'payload_too_large', 'unsupported_media_type', 'host_not_allowed',
+      'serialization_failed', 'unknown_tool', 'invalid_request_shape', 'server_busy', 'calculation_timeout']) {
+      expect(codes.has(code), code).toBe(true);
+    }
     // Internal survey rule ids (`recorder.record("rule", …)`) and JSON enum values are not codes.
     for (const notCode of ['bypass_table_11_12', 'gas_boiler', 'table16_1', 'electric_resistance']) {
       expect(codes.has(notCode), notCode).toBe(false);

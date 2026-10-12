@@ -12,6 +12,7 @@ import { CalculationNotice } from '../CalculationNotice/CalculationNotice';
 import { formatNumber } from '../../i18n/format';
 import { PanelRightClose } from 'lucide-react';
 import './PreviewPanel.css';
+import { TechnicalDetails } from '../ui/Display';
 
 /** Delay before a project change triggers a kernel run, ms. */
 const KERNEL_DEBOUNCE_MS = 400;
@@ -132,7 +133,7 @@ export function PreviewPanel({ embedded = false }: { embedded?: boolean } = {}) 
             )}
             {hasNtaBlock && visibleKernel.kind === 'loading' && <p role="status" className="preview-kernel-status">{t('preview.kernelLoading')}</p>}
             {hasNtaBlock && visibleKernel.kind === 'error' && (
-              <div className="preview-empty" role="alert">{t('kernel.unavailable')} <small>{visibleKernel.message}</small></div>
+              <div className="preview-empty" role="alert">{t('kernel.unavailable')}<TechnicalDetails>{visibleKernel.message}</TechnicalDetails></div>
             )}
             {summary && !calculated && (
               <div className="preview-empty preview-kernel-empty" role="status">

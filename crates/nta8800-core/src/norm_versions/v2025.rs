@@ -73,8 +73,11 @@ pub(super) const PROFILE: NormProfile = NormProfile {
     reference_power_divisor: crate::annex_p::REFERENCE_POWER_DIVISOR,
     // P.6.5.4.8 (2024 p. 958) with the temperature-difference correction.
     geothermal_efficiency_fixed: false,
-    // Annex AA (2024 p. 1115–1127).
-    annex_aa_route: true,
+    // 5.7.1 methods 1–3 (p. 114–115) with annex AA (p. 1136–1147).
+    cooling_capacity_methods_route: true,
+    // 5.7.1 method 3: fixed louvres of tables 7.4a/7.4b, not the movable
+    // shading of tables 7.5/7.6 (p. 114).
+    solar_limitation_movable_shading: false,
     // Table 5.7 (2024 p. 74).
     renovation_standard: true,
     // Table 14.3 (2024 p. 646).

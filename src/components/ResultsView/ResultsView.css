@@ -149,3 +149,11 @@
   background: var(--bg-secondary);
 }
 .results-withheld p { margin: 4px 0 0; font-size: 13px; color: var(--text-secondary); }
+
+.results-empty__actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}

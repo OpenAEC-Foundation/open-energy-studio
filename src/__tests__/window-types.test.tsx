@@ -66,7 +66,7 @@ describe('window types', () => {
     expect(screen.getByLabelText('Uw-value (W/m²K)')).toBeDisabled();
     // A controlled number input: set the value in one change (typing after clear would append to the 1).
     fireEvent.change(screen.getByLabelText('Count'), { target: { value: '2' } });
-    expect(screen.getByLabelText('Area (m²)')).toHaveValue(2.1);
+    expect(screen.getByLabelText('Area (m²)')).toHaveDisplayValue(/^2[.,]1$/);
     await user.selectOptions(screen.getByLabelText('Zone'), screen.getAllByRole('option').find((option) => option.textContent === 'Woonfunctie')!.getAttribute('value')!);
     const surfaceSelect = screen.getByLabelText('Surface (parent)') as HTMLSelectElement;
     await user.selectOptions(surfaceSelect, surfaceSelect.options[1].value);

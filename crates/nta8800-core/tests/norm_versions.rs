@@ -153,6 +153,7 @@ fn example_projects_differ_only_where_the_editions_differ() {
                     key.as_str(),
                     "inputFingerprint"
                         | "targetNormVersion"
+                        | "chapter5Source"
                         | "normVersion"
                         | "registrationEligible"
                 ) && (value.is_number() || value.is_string() || value.is_boolean())
@@ -233,7 +234,7 @@ fn changed_keys(a: &ProjectPerformanceAssessment, b: &ProjectPerformanceAssessme
         .filter(|(key, value)| {
             !matches!(
                 key.as_str(),
-                "inputFingerprint" | "targetNormVersion" | "normVersion"
+                "inputFingerprint" | "targetNormVersion" | "chapter5Source" | "normVersion"
             ) && (value.is_number() || value.is_string() || value.is_boolean())
                 && b.get(key.as_str()) != Some(value)
         })
@@ -442,6 +443,67 @@ fn example_projects_2020a1_differ_from_2022_only_where_the_editions_differ() {
             "{changed:?}"
         );
     }
+}
+
+/// §5.5.8 f_BACS is new in 2025+C1: the warning that f_BACS 1,0 lacks the
+/// 290 kW evidence belongs to that edition only (edition-delta audit,
+/// 10 October 2026).
+#[test]
+fn bacs_evidence_warning_is_2025_only() {
+    const SPORTS_HALL: &str =
+        include_str!("../../../training-data/nta8800-public-comparison-k.json");
+    let warned = |edition: &str| {
+        let mut value: Value = serde_json::from_str(SPORTS_HALL).unwrap();
+        value["ntaCalculation"]["normVersion"] = json!(edition);
+        let result = assess_project_performance(&value);
+        result
+            .warnings
+            .iter()
+            .any(|warning| warning.code == "bacs_factor_without_capacity_evidence")
+    };
+    assert!(warned("2025+C1"));
+    for edition in ["2024", "2023", "2022", "2020+A1"] {
+        assert!(!warned(edition), "{edition}");
+    }
+}
+
+/// A forfait heat pump that an edition switch makes invalid names the
+/// field, not only `forfait_lookup_invalid`: public case D (2020+A1,
+/// grondwater) needs a source temperature below 15 °C from 2023 (table 9.27
+/// source rows, 2023 p. 322), and a table 9.28 test report dated as the
+/// edition names it (edition-delta audit, 10 October 2026).
+#[test]
+fn edition_switch_names_the_forfait_field_it_invalidates() {
+    const HOLIDAY_HOME: &str =
+        include_str!("../../../training-data/nta8800-public-comparison-d.json");
+    let mut value: Value = serde_json::from_str(HOLIDAY_HOME).unwrap();
+    value["ntaCalculation"]["normVersion"] = json!("2023");
+    // Routes 2023 does not have (table 7.10 by kg/m², 13.6.3 f 1,5).
+    value["ntaCalculation"]["thermalMass"]
+        .as_object_mut()
+        .unwrap()
+        .remove("massKgPerM2");
+    value["ntaCalculation"]["hotWater"]["storage"][0]["electricBoilerInsulatedPipe"] = json!(false);
+    let result = assess_project_performance(&value);
+    let paths: Vec<(&str, &str)> = result
+        .gaps
+        .iter()
+        .map(|gap| (gap.code, gap.path.as_str()))
+        .collect();
+    assert!(
+        paths.contains(&(
+            "source_temperature_class_mismatch",
+            "ntaCalculation.generator.forfait.sourceTemperatureC"
+        )),
+        "{paths:?}"
+    );
+    assert!(
+        paths.contains(&(
+            "high_test_standard_invalid",
+            "ntaCalculation.generator.forfait.highEfficiencyEvidence.testStandardEdition"
+        )),
+        "{paths:?}"
+    );
 }
 
 /// The 16.4b panel route is not in NTA 8800:2020+A1 (p. 651): the example

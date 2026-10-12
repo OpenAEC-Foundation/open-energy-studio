@@ -1,28 +1,47 @@
 import { readFileSync, writeFileSync } from 'fs';
+import { fileURLToPath } from 'url';
 
-const version = process.argv[2];
-if (!version || !/^\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$/.test(version)) {
-  console.error('Usage: node scripts/bump-version.js <version>');
-  console.error('Example: node scripts/bump-version.js 0.1.7-alpha');
-  process.exit(1);
+/**
+ * Every file that carries the program version. The desktop package takes its
+ * version from tauri.conf.json and Cargo.toml, the reports and the
+ * leveringsdocument from package.json; the gate builds with `--locked`, so the
+ * lockfile entry of the app crate must follow too.
+ */
+export const VERSION_FILES = [
+  'package.json',
+  'src-tauri/tauri.conf.json',
+  'src-tauri/Cargo.toml',
+  'src-tauri/Cargo.lock',
+];
+
+/** Returns the files with the program version set to `version`. */
+export function setVersion(files, version) {
+  const pkg = JSON.parse(files['package.json']);
+  pkg.version = version;
+  const tauriConf = JSON.parse(files['src-tauri/tauri.conf.json']);
+  tauriConf.version = version;
+  return {
+    'package.json': JSON.stringify(pkg, null, 2) + '\n',
+    'src-tauri/tauri.conf.json': JSON.stringify(tauriConf, null, 2) + '\n',
+    'src-tauri/Cargo.toml': files['src-tauri/Cargo.toml'].replace(/^version = ".*"/m, `version = "${version}"`),
+    'src-tauri/Cargo.lock': files['src-tauri/Cargo.lock'].replace(
+      /(name = "open-energy-studio"\nversion = )"[^"]*"/,
+      `$1"${version}"`,
+    ),
+  };
 }
 
-// package.json
-const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
-pkg.version = version;
-writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
-console.log(`package.json -> ${version}`);
-
-// tauri.conf.json
-const tauriConf = JSON.parse(readFileSync('src-tauri/tauri.conf.json', 'utf8'));
-tauriConf.version = version;
-writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(tauriConf, null, 2) + '\n');
-console.log(`tauri.conf.json -> ${version}`);
-
-// Cargo.toml
-let cargo = readFileSync('src-tauri/Cargo.toml', 'utf8');
-cargo = cargo.replace(/^version = ".*"/m, `version = "${version}"`);
-writeFileSync('src-tauri/Cargo.toml', cargo);
-console.log(`Cargo.toml -> ${version}`);
-
-console.log(`\nVersion bumped to ${version}`);
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  const version = process.argv[2];
+  if (!version || !/^\d+\.\d+\.\d+$/.test(version)) {
+    console.error('Usage: node scripts/bump-version.js <version>');
+    console.error('Example: node scripts/bump-version.js 0.3.0');
+    process.exit(1);
+  }
+  const files = Object.fromEntries(VERSION_FILES.map((path) => [path, readFileSync(path, 'utf8')]));
+  for (const [path, text] of Object.entries(setVersion(files, version))) {
+    writeFileSync(path, text);
+    console.log(`${path} -> ${version}`);
+  }
+  console.log(`\nVersion bumped to ${version}`);
+}

@@ -164,7 +164,9 @@ impl LabelElements {
         let produced: f64 = result
             .electricity_balance
             .iter()
-            .map(|month| month.produced_kwh)
+            // Art. 5.13a lid 1 onder h: renewable production only; CHP
+            // electricity is own production but not renewable (5.14b).
+            .map(|month| month.produced_renewable_kwh)
             .sum();
         Self {
             operational_co2_kg_per_m2: result.co2_kg_per_m2,
@@ -384,10 +386,20 @@ pub fn general_data(
             .map(str::to_owned)
             .filter(|value| !value.trim().is_empty())
     };
-    let residential = matches!(
-        project.building_function,
-        crate::BuildingFunction::Residential
-    );
+    // Art. 5.11 lid 1 and 5.13 onder a/d: a woonfunctie, woongebouw or
+    // logiesfunctie niet in een logiesgebouw is labelled as a dwelling. The
+    // kernel's calculation scope decides that; the building function is the
+    // fallback when there is no derived input.
+    let residential = match derived {
+        Some(input) => matches!(
+            input.calculation_scope,
+            crate::indicators_draft::CalculationScope::Residential
+        ),
+        None => matches!(
+            project.building_function,
+            crate::BuildingFunction::Residential
+        ),
+    };
     let zone_area: f64 = project.zones.iter().map(|zone| zone.floor_area).sum();
     GeneralData {
         use_function: derived

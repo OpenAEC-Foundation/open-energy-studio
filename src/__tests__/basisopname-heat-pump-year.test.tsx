@@ -7,6 +7,7 @@ import { screen } from '@testing-library/react';
 import { useEnergy } from '../context/EnergyContext';
 import { BasisopnamePanel } from '../components/BasisopnamePanel/BasisopnamePanel';
 import { renderWithProviders, userEvent } from './test-utils';
+import { SLOW_UI_TEST_MS } from './timeouts';
 
 function Editor() {
   const { state } = useEnergy();
@@ -37,5 +38,5 @@ describe('survey heat-pump years', () => {
     // Another generator kind drops the heat-pump fields.
     await user.selectOptions(screen.getAllByLabelText('Generator')[0], 'gas_air_heater');
     expect(generatorOf()).not.toHaveProperty('installationYear');
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 });

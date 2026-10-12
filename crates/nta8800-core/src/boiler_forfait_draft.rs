@@ -226,7 +226,7 @@ pub fn assess_boiler_forfait_draft(
     if input.installation_year.is_none() && input.installation_year_reference.is_some() {
         issues.push(issue(
             "installation_year_reference_without_year",
-            "installationYearReference",
+            "installationYear",
         ));
     }
     let lt = input.average_design_emission_temperature_c <= 50.0
@@ -238,7 +238,7 @@ pub fn assess_boiler_forfait_draft(
             "invalid"
         },
         scope: "public_chapter_9_draft_gas_water_boiler_table_9_25_only",
-        consultation_source: DRAFT_SOURCE,
+        consultation_source: crate::norm_versions::cite(DRAFT_SOURCE),
         target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint: input_fingerprint(&json!(input)),
@@ -418,7 +418,7 @@ pub fn assess_boiler_forfait_monthly_draft(
             "invalid"
         },
         scope: "public_chapter_9_draft_gas_water_boiler_9_61_and_individual_forfait_aux_9_85",
-        consultation_source: DRAFT_SOURCE,
+        consultation_source: crate::norm_versions::cite(DRAFT_SOURCE),
         target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint: input_fingerprint(&json!(input)),

@@ -1,0 +1,1121 @@
+{
+  "id": "public-comparison-n",
+  "name": "Vergelijking openbaar rapport N (supermarkt met parkeerkelder)",
+  "description": "Fictieve herbouw van een openbaar BENG-rapport (Uniec 3.0.7.1, NTA 8800:2020+A1); niet het echte gebouw. Een rekenzone met winkelfunctie over drie bouwlagen boven een sterk geventileerde parkeerkelder, VRF-luchtwarmtepomp met luchtverwarming, balansventilatie met WTW en CO2-sturing, compressiekoeling in de luchtbehandelingskast, 698 PV-panelen.",
+  "buildingFunction": "retail",
+  "address": "Fictief adres",
+  "city": "Fictief",
+  "zones": [
+    {
+      "id": "z1",
+      "name": "St-Bg-V1 hele winkel",
+      "floorArea": 2064.26,
+      "volume": 12650.0,
+      "height": 6.1,
+      "surfaces": [
+        {
+          "id": "sout-vloer",
+          "name": "Sout. vloer winkelentree",
+          "type": "floor",
+          "thermalBoundary": "ground",
+          "area": 204.37,
+          "orientation": "horizontal",
+          "constructionId": "c-sout-vloer",
+          "zoneId": "z1",
+          "windows": []
+        },
+        {
+          "id": "sout-parking",
+          "name": "Sout. wanden naar parkeerkelder (sterk geventileerd)",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 139.43,
+          "orientation": "N",
+          "constructionId": "c-gevel",
+          "zoneId": "z1",
+          "windows": [
+            {
+              "id": "sout-pui-parking",
+              "name": "Puien naar parking",
+              "area": 52.64,
+              "uValue": 1.2,
+              "gValue": 0.0,
+              "orientation": "N",
+              "surfaceId": "sout-parking"
+            },
+            {
+              "id": "sout-schuifdeur-parking",
+              "name": "Schuifdeuren naar parking",
+              "area": 5.88,
+              "uValue": 2.2,
+              "gValue": 0.0,
+              "orientation": "N",
+              "surfaceId": "sout-parking"
+            },
+            {
+              "id": "sout-deuren-opslag",
+              "name": "Deuren opslag",
+              "area": 4.44,
+              "uValue": 2.0,
+              "gValue": 0.0,
+              "orientation": "N",
+              "surfaceId": "sout-parking"
+            }
+          ]
+        },
+        {
+          "id": "bg-vloer-parking",
+          "name": "Bg vloer boven parkeerkelder (sterk geventileerd)",
+          "type": "floor",
+          "thermalBoundary": "outdoor",
+          "area": 1747.45,
+          "orientation": "horizontal",
+          "constructionId": "c-vloer-parking",
+          "zoneId": "z1",
+          "windows": []
+        },
+        {
+          "id": "bg-laaddock",
+          "name": "Bg wanden naar laaddock (sterk geventileerd)",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 158.68,
+          "orientation": "N",
+          "constructionId": "c-gevel",
+          "zoneId": "z1",
+          "windows": [
+            {
+              "id": "bg-overheaddeur",
+              "name": "Overheaddeur magazijn",
+              "area": 7.29,
+              "uValue": 1.5,
+              "gValue": 0.0,
+              "orientation": "N",
+              "surfaceId": "bg-laaddock"
+            }
+          ]
+        },
+        {
+          "id": "bg-vluchttrap",
+          "name": "Bg wanden naar vluchttrap (sterk geventileerd)",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 36.25,
+          "orientation": "N",
+          "constructionId": "c-gevel",
+          "zoneId": "z1",
+          "windows": []
+        },
+        {
+          "id": "bg-schacht",
+          "name": "Bg wand naar ventilatieschacht (sterk geventileerd)",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 34.0,
+          "orientation": "N",
+          "constructionId": "c-gevel",
+          "zoneId": "z1",
+          "windows": []
+        },
+        {
+          "id": "v1-vloer-dock",
+          "name": "V1 vloerdeel boven laaddock (sterk geventileerd)",
+          "type": "floor",
+          "thermalBoundary": "outdoor",
+          "area": 53.28,
+          "orientation": "horizontal",
+          "constructionId": "c-vloer-parking",
+          "zoneId": "z1",
+          "windows": []
+        },
+        {
+          "id": "v1-dock",
+          "name": "V1 wanddeel naar laaddock (sterk geventileerd)",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 12.38,
+          "orientation": "N",
+          "constructionId": "c-gevel",
+          "zoneId": "z1",
+          "windows": []
+        },
+        {
+          "id": "bg-zw",
+          "name": "Bg langsgeveldelen ZW",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 326.53,
+          "orientation": "SW",
+          "constructionId": "c-gevel",
+          "zoneId": "z1",
+          "windows": [
+            {
+              "id": "bg-pui-roltrap",
+              "name": "Pui roltrap",
+              "area": 130.56,
+              "uValue": 1.2,
+              "gValue": 0.25,
+              "orientation": "SW",
+              "surfaceId": "bg-zw"
+            },
+            {
+              "id": "bg-pui-entreekoffer-zw",
+              "name": "Pui entreekoffer",
+              "area": 36.14,
+              "uValue": 1.2,
+              "gValue": 0.25,
+              "orientation": "SW",
+              "surfaceId": "bg-zw"
+            }
+          ]
+        },
+        {
+          "id": "bg-zo",
+          "name": "Bg voorgeveldeel kassa's ZO",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 260.63,
+          "orientation": "SE",
+          "constructionId": "c-gevel",
+          "zoneId": "z1",
+          "windows": [
+            {
+              "id": "bg-pui-entreekoffer-zo",
+              "name": "Pui entreekoffer",
+              "area": 34.01,
+              "uValue": 1.2,
+              "gValue": 0.25,
+              "orientation": "SE",
+              "surfaceId": "bg-zo"
+            },
+            {
+              "id": "bg-entreeschuifdeuren",
+              "name": "Entreeschuifdeuren",
+              "area": 5.04,
+              "uValue": 2.2,
+              "gValue": 0.25,
+              "orientation": "SE",
+              "surfaceId": "bg-zo"
+            },
+            {
+              "id": "bg-pui-kassas",
+              "name": "Pui kassa's",
+              "area": 202.71,
+              "uValue": 1.2,
+              "gValue": 0.25,
+              "orientation": "SE",
+              "surfaceId": "bg-zo"
+            }
+          ]
+        },
+        {
+          "id": "bg-no",
+          "name": "Bg langsgeveldelen NO",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 167.32,
+          "orientation": "NE",
+          "constructionId": "c-gevel",
+          "zoneId": "z1",
+          "windows": []
+        },
+        {
+          "id": "bg-nw",
+          "name": "Bg achtergeveldelen NW",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 162.25,
+          "orientation": "NW",
+          "constructionId": "c-gevel",
+          "zoneId": "z1",
+          "windows": [
+            {
+              "id": "bg-vluchtdeuren",
+              "name": "3x vluchtdeur",
+              "area": 8.25,
+              "uValue": 2.0,
+              "gValue": 0.0,
+              "orientation": "NW",
+              "surfaceId": "bg-nw"
+            }
+          ]
+        },
+        {
+          "id": "bg-dak",
+          "name": "Bg dak verkoopruimte",
+          "type": "roof",
+          "thermalBoundary": "outdoor",
+          "area": 1945.16,
+          "orientation": "horizontal",
+          "constructionId": "c-dak",
+          "zoneId": "z1",
+          "windows": []
+        },
+        {
+          "id": "v1-zw",
+          "name": "V1 dakgeveldeel ZW",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 21.6,
+          "orientation": "SW",
+          "constructionId": "c-gevel",
+          "zoneId": "z1",
+          "windows": []
+        },
+        {
+          "id": "v1-zo",
+          "name": "V1 voorgeveldeel ZO",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 32.18,
+          "orientation": "SE",
+          "constructionId": "c-gevel",
+          "zoneId": "z1",
+          "windows": [
+            {
+              "id": "v1-raam-zo",
+              "name": "Raamkozijn achter lamellen",
+              "area": 1.56,
+              "uValue": 1.65,
+              "gValue": 0.05,
+              "orientation": "SE",
+              "surfaceId": "v1-zo"
+            }
+          ]
+        },
+        {
+          "id": "v1-no",
+          "name": "V1 langsgeveldeel NO",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 36.96,
+          "orientation": "NE",
+          "constructionId": "c-gevel",
+          "zoneId": "z1",
+          "windows": []
+        },
+        {
+          "id": "v1-nw",
+          "name": "V1 achtergeveldeel NW",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 19.8,
+          "orientation": "NW",
+          "constructionId": "c-gevel",
+          "zoneId": "z1",
+          "windows": [
+            {
+              "id": "v1-raam-nw",
+              "name": "Raamkozijn achter lamellen",
+              "area": 0.78,
+              "uValue": 1.65,
+              "gValue": 0.05,
+              "orientation": "NW",
+              "surfaceId": "v1-nw"
+            },
+            {
+              "id": "v1-daktoegangsdeur",
+              "name": "Daktoegangsdeur",
+              "area": 2.4,
+              "uValue": 2.0,
+              "gValue": 0.0,
+              "orientation": "NW",
+              "surfaceId": "v1-nw"
+            }
+          ]
+        },
+        {
+          "id": "v1-dak",
+          "name": "V1 dak personeelsruimten",
+          "type": "roof",
+          "thermalBoundary": "outdoor",
+          "area": 79.2,
+          "orientation": "horizontal",
+          "constructionId": "c-dak",
+          "zoneId": "z1",
+          "windows": []
+        }
+      ],
+      "thermalBridges": [
+        {
+          "id": "tb-01-sout-parking",
+          "name": "aansl koz/gevel psi 0.1",
+          "psiValue": 0.1,
+          "length": 33.15,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "N"
+          ]
+        },
+        {
+          "id": "tb-02-sout-parking",
+          "name": "aansl koz/koz hoek psi 0.2",
+          "psiValue": 0.2,
+          "length": 5.6,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "N"
+          ]
+        },
+        {
+          "id": "tb-03-sout-parking",
+          "name": "uitw hoek gevel psi 0.15",
+          "psiValue": 0.15,
+          "length": 5.35,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "N"
+          ]
+        },
+        {
+          "id": "tb-04-sout-parking",
+          "name": "sout aansl wand/muur naar grond psi 0.2",
+          "psiValue": 0.2,
+          "length": 7.3,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "N"
+          ]
+        },
+        {
+          "id": "tb-05-bg-vloer-parking",
+          "name": "uitw rand vloer psi 0.3",
+          "psiValue": 0.3,
+          "length": 158.4,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "horizontal"
+          ]
+        },
+        {
+          "id": "tb-06-bg-vloer-parking",
+          "name": "aansl warme wand of gevel/vloer psi 0.15",
+          "psiValue": 0.15,
+          "length": 37.2,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "horizontal"
+          ]
+        },
+        {
+          "id": "tb-07-bg-zw",
+          "name": "aansl koz/gevel psi 0.1",
+          "psiValue": 0.1,
+          "length": 58.2,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "SW"
+          ]
+        },
+        {
+          "id": "tb-08-bg-zw",
+          "name": "aansl koz/koz hoek psi 0.2",
+          "psiValue": 0.2,
+          "length": 7.1,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "SW"
+          ]
+        },
+        {
+          "id": "tb-09-bg-zw",
+          "name": "inw hoek gevel psi 0.05",
+          "psiValue": 0.05,
+          "length": 6.0,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "SW"
+          ]
+        },
+        {
+          "id": "tb-10-bg-zw",
+          "name": "uitw hoek gevel psi 0.15",
+          "psiValue": 0.15,
+          "length": 0.15,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "SW"
+          ]
+        },
+        {
+          "id": "tb-11-bg-zo",
+          "name": "aansl koz/gevel psi 0.1",
+          "psiValue": 0.1,
+          "length": 43.7,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "SE"
+          ]
+        },
+        {
+          "id": "tb-12-bg-zo",
+          "name": "uitw hoek gevel psi 0.15",
+          "psiValue": 0.15,
+          "length": 5.5,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "SE"
+          ]
+        },
+        {
+          "id": "tb-13-bg-laaddock",
+          "name": "aansl koz/gevel psi 0.1",
+          "psiValue": 0.1,
+          "length": 8.1,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "N"
+          ]
+        },
+        {
+          "id": "tb-14-bg-laaddock",
+          "name": "uitw hoek gevel psi 0.15",
+          "psiValue": 0.15,
+          "length": 5.5,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "N"
+          ]
+        },
+        {
+          "id": "tb-15-bg-laaddock",
+          "name": "inw hoek gevel psi 0.05",
+          "psiValue": 0.05,
+          "length": 5.5,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "N"
+          ]
+        },
+        {
+          "id": "tb-16-bg-no",
+          "name": "uitw hoek gevel psi 0.15",
+          "psiValue": 0.15,
+          "length": 5.0,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NE"
+          ]
+        },
+        {
+          "id": "tb-17-bg-vluchttrap",
+          "name": "inw hoek gevel psi 0.05",
+          "psiValue": 0.05,
+          "length": 5.0,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "N"
+          ]
+        },
+        {
+          "id": "tb-18-bg-vluchttrap",
+          "name": "uitw hoek gevel psi 0.15",
+          "psiValue": 0.15,
+          "length": 5.0,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "N"
+          ]
+        },
+        {
+          "id": "tb-19-bg-nw",
+          "name": "aansl koz/gevel psi 0.1",
+          "psiValue": 0.1,
+          "length": 18.3,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NW"
+          ]
+        },
+        {
+          "id": "tb-20-bg-nw",
+          "name": "uitw hoek gevel psi 0.15",
+          "psiValue": 0.15,
+          "length": 11.0,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NW"
+          ]
+        },
+        {
+          "id": "tb-21-bg-schacht",
+          "name": "uitw hoek gevel psi 0.15",
+          "psiValue": 0.15,
+          "length": 5.0,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "N"
+          ]
+        },
+        {
+          "id": "tb-22-bg-schacht",
+          "name": "inw hoek gevel psi 0.05",
+          "psiValue": 0.05,
+          "length": 5.0,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "N"
+          ]
+        },
+        {
+          "id": "tb-23-bg-dak",
+          "name": "I.1 nr 68 plat dak - langsgevel (dakrand) psi 0.16",
+          "psiValue": 0.16,
+          "length": 178.25,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "horizontal"
+          ]
+        },
+        {
+          "id": "tb-24-bg-dak",
+          "name": "I.1 nr 60 dakvloer - opgaande langsgevel psi 0.16",
+          "psiValue": 0.16,
+          "length": 11.95,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "horizontal"
+          ]
+        },
+        {
+          "id": "tb-25-v1-vloer-dock",
+          "name": "uitw rand vloer psi 0.3",
+          "psiValue": 0.3,
+          "length": 20.7,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "horizontal"
+          ]
+        },
+        {
+          "id": "tb-26-v1-vloer-dock",
+          "name": "aansl warme wand of gevel/vloer psi 0.15",
+          "psiValue": 0.15,
+          "length": 15.0,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "horizontal"
+          ]
+        },
+        {
+          "id": "tb-27-v1-zw",
+          "name": "uitw hoek gevel psi 0.15",
+          "psiValue": 0.15,
+          "length": 2.15,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "SW"
+          ]
+        },
+        {
+          "id": "tb-28-v1-zo",
+          "name": "aansl koz/gevel psi 0.1",
+          "psiValue": 0.1,
+          "length": 6.4,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "SE"
+          ]
+        },
+        {
+          "id": "tb-29-v1-zo",
+          "name": "uitw hoek gevel psi 0.15",
+          "psiValue": 0.15,
+          "length": 3.9,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "SE"
+          ]
+        },
+        {
+          "id": "tb-30-v1-no",
+          "name": "uitw hoek gevel psi 0.15",
+          "psiValue": 0.15,
+          "length": 3.75,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NE"
+          ]
+        },
+        {
+          "id": "tb-31-v1-nw",
+          "name": "aansl koz/gevel psi 0.1",
+          "psiValue": 0.1,
+          "length": 10.6,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NW"
+          ]
+        },
+        {
+          "id": "tb-32-v1-nw",
+          "name": "uitw hoek gevel psi 0.15",
+          "psiValue": 0.15,
+          "length": 2.4,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NW"
+          ]
+        },
+        {
+          "id": "tb-33-v1-dock",
+          "name": "inw hoek gevel psi 0.05",
+          "psiValue": 0.05,
+          "length": 1.5,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "N"
+          ]
+        },
+        {
+          "id": "tb-34-v1-dak",
+          "name": "I.1 nr 68 plat dak - langsgevel (dakrand) psi 0.16",
+          "psiValue": 0.16,
+          "length": 35.7,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "horizontal"
+          ]
+        }
+      ],
+      "airTightness": {
+        "qv10": 0.42
+      },
+      "pointThermalBridges": [],
+      "pointBridgeInventoryComplete": true
+    }
+  ],
+  "heatingSystems": [],
+  "ventilationSystems": [],
+  "coolingSystems": [],
+  "hotWaterSystems": [],
+  "solarPV": [],
+  "solarThermal": [],
+  "unheatedSpaces": [],
+  "constructions": [
+    {
+      "id": "c-gevel",
+      "name": "Bg-V1 dichte gevel of muur Rc 4,70",
+      "layers": [],
+      "rcValue": 4.7,
+      "uValue": 0.2053
+    },
+    {
+      "id": "c-dak",
+      "name": "Dak Rc 6,30",
+      "layers": [],
+      "rcValue": 6.3,
+      "uValue": 0.1553
+    },
+    {
+      "id": "c-vloer-parking",
+      "name": "Vloer boven parkeerkelder en laaddock Rc 3,70",
+      "layers": [],
+      "rcValue": 3.7,
+      "uValue": 0.2558
+    },
+    {
+      "id": "c-sout-vloer",
+      "name": "Souterrainvloer Rc 3,70",
+      "layers": [],
+      "rcValue": 3.7,
+      "uValue": 0.2558
+    }
+  ],
+  "ntaCalculation": {
+    "calculationScope": "utility",
+    "constructionYear": 2021,
+    "areaSourceReference": "openbare bron Uniec 3.0.7.1 printout (Lidl-supermarkt met parkeerkelder 2064,26 m2, 02-02-2021): Ag 2064,26 m2 winkelfunctie, een rekenzone over souterrain, begane grond en verdieping (90 %-regel; magazijn en bakvoorbereiding als nevenfunctie meegerekend)",
+    "usageFunction": "retail",
+    "setpoints": {
+      "heatingC": 21.0,
+      "coolingC": 24.0,
+      "sourceReference": "tabel 7.13 winkelfunctie"
+    },
+    "thermalMass": {
+      "floor": "heavy",
+      "wall": "light",
+      "ceiling": "open_or_none",
+      "sourceReference": "openbare bron Uniec 3.0.7.1 printout (Lidl-supermarkt met parkeerkelder 2064,26 m2, 02-02-2021): hsb, sfb of staalskeletbouw met staalbeton of niet-massieve betonnen vloeren, geen of open plafond, 3 bouwlagen; tabel 7.10 rij 250 tot 500 kg/m2, 180 kJ/m2K (2020+A1 p. 179-180)"
+    },
+    "internalGains": {
+      "method": "utility",
+      "lighting": {
+        "method": "chapter14"
+      },
+      "sourceReference": "tabellen 7.2/7.3 winkelfunctie; verlichting uit hoofdstuk 14"
+    },
+    "windowSolar": {
+      "frameFraction": 0.25,
+      "obstruction": {
+        "method": "minimal"
+      },
+      "sourceReference": "default F_F; openbare bron Uniec 3.0.7.1 printout (Lidl-supermarkt met parkeerkelder 2064,26 m2, 02-02-2021): minimale belemmering; vlakken naar de parkeerkelder, het laaddock, de vluchttrap en de schacht zijn sterk geventileerd en als buiten beschouwd (6.3, 2020+A1 p. 136); de uitdraai geeft ze geen orientatie, dus zonder zoninstraling: ramen en deuren daarin g 0 (uitdraai 0,60 bij de puien en schuifdeuren naar de parking), wanden op noord"
+    },
+    "windowShadings": [
+      {
+        "windowId": "bg-pui-roltrap",
+        "movableShading": {
+          "device": {
+            "kind": "external_screen",
+            "colour": "dark"
+          },
+          "control": "manual_utility_without_glare_protection",
+          "sourceReference": "screens (buiten), zwart, antraciet, donkerbruin, handbediend zonder lichtwering (tabel 7.5, 7.8)"
+        },
+        "sourceReference": "openbare bron Uniec 3.0.7.1 printout (Lidl-supermarkt met parkeerkelder 2064,26 m2, 02-02-2021): zonwering per raam"
+      },
+      {
+        "windowId": "bg-pui-kassas",
+        "movableShading": {
+          "device": {
+            "kind": "external_screen",
+            "colour": "dark"
+          },
+          "control": "manual_utility_without_glare_protection",
+          "sourceReference": "screens (buiten), zwart, antraciet, donkerbruin, handbediend zonder lichtwering (tabel 7.5, 7.8)"
+        },
+        "sourceReference": "openbare bron Uniec 3.0.7.1 printout (Lidl-supermarkt met parkeerkelder 2064,26 m2, 02-02-2021): zonwering per raam"
+      }
+    ],
+    "groundFloors": [
+      {
+        "surfaceId": "sout-vloer",
+        "exposedPerimeterM": 70.0,
+        "constructionResistanceM2kPerW": 3.87,
+        "edgeThermalBridges": {
+          "method": "detailed",
+          "bridges": [
+            {
+              "lengthM": 70.0,
+              "psiWPerMk": 0.5,
+              "sourceReference": "openbare bron Uniec 3.0.7.1 printout (Lidl-supermarkt met parkeerkelder 2064,26 m2, 02-02-2021): vloerranden/perimeter psi 0,500 (vrije invoer), 70,00 m"
+            }
+          ]
+        },
+        "heatedBasement": {
+          "wallDepths": [
+            {
+              "lengthM": 31.8,
+              "depthM": 3.65
+            },
+            {
+              "lengthM": 38.2,
+              "depthM": 0.0
+            }
+          ],
+          "wallResistanceM2kPerW": 3.7
+        },
+        "sourceReference": "openbare bron Uniec 3.0.7.1 printout (Lidl-supermarkt met parkeerkelder 2064,26 m2, 02-02-2021): souterrainvloer 204,37 m2 onder mv, Rc 3,70 + R_si 0,17, P 70,00 m; kelderwanden (ondergrondse muurdelen) 116,07 m2 Rc 3,70 bij z 3,65 m, dus 31,80 m van de omtrek op 3,65 m en de rest (wanden naar de parkeerkelder) op 0 m (8.42, z.P = 116,07 m2)"
+      }
+    ],
+    "ventilationFlows": [],
+    "emission": {
+      "system": "air_heating",
+      "balancing": "not_applicable",
+      "control": "individual_room_thermostats",
+      "sourceReference": "openbare bron Uniec 3.0.7.1 printout (Lidl-supermarkt met parkeerkelder 2064,26 m2, 02-02-2021): luchtverwarming, naverwarming van ingaande lucht, vertrekhoogte 6 < h <= 8 m, autom. temperatuurregeling per ruimte (dT type regeling 2,5 K, automatische regeling -0,5 K); vertrekhoogte > 4 m dus 9.3.3.7 (2020+A1 p. 277-280): h_R 7 m (midden van de klasse), toevoerpositie onbekend dus hoogste gradient 1,0 K/m van tabel 9.8, dT_ctr,1 2,5 K van tabel 9.10 (gelijk aan de uitdraai)",
+      "airHeaters": {
+        "kind": {
+          "kind": "indirect",
+          "roomHeightAbove8M": false,
+          "warmAirReturn": true,
+          "ecMotor": false
+        },
+        "sourceReference": "openbare bron Uniec 3.0.7.1 printout (Lidl-supermarkt met parkeerkelder 2064,26 m2, 02-02-2021): AC-ventilator met terugkeer warme lucht (tabel 9.13), forfaitair 591,6 W"
+      },
+      "edition2023": {
+        "kind": {
+          "type": "high_room",
+          "heightM": 7.0,
+          "emitter": "warm_air_horizontal",
+          "control": "controlled"
+        },
+        "roomAutomation": "individual_per_room",
+        "pipeSystem": "not_hydronic"
+      }
+    },
+    "distribution": {
+      "method": "heated_zone_only_space_heating",
+      "sourceReference": "openbare bron Uniec 3.0.7.1 printout (Lidl-supermarkt met parkeerkelder 2064,26 m2, 02-02-2021): geen watergedragen distributiesysteem; geen leidingen buiten de verwarmde zone"
+    },
+    "generator": {
+      "kind": "heat_pump_forfait",
+      "forfait": {
+        "generatorId": "wp",
+        "classificationSourceReference": "openbare bron Uniec 3.0.7.1 printout (Lidl-supermarkt met parkeerkelder 2064,26 m2, 02-02-2021): elektrische warmtepomp (VRF) forfaitair, buitenlucht, afgifte binnenlucht, COP 2,80",
+        "scope": "utility_collective_or_over25_kw",
+        "source": "outdoor_air",
+        "sink": "indoor_air",
+        "installationYear": 2021,
+        "installationYearReference": "openbare bron Uniec 3.0.7.1 printout (Lidl-supermarkt met parkeerkelder 2064,26 m2, 02-02-2021): nieuwbouw, bouwjaar 2021"
+      },
+      "sourceSystem": "individual",
+      "sourceSystemReference": "buitenlucht"
+    },
+    "bacsFactor": 1.0,
+    "bacsSourceReference": "openbare bron Uniec 3.0.7.1 printout (Lidl-supermarkt met parkeerkelder 2064,26 m2, 02-02-2021): geen GBS in de uitdraai",
+    "useInventoryComplete": true,
+    "declaredUses": [],
+    "productionInventoryComplete": true,
+    "pvSystems": [
+      {
+        "id": "pv-zw",
+        "peakPower": {
+          "method": "declared_specific",
+          "peakPowerWPerM2": 171.78,
+          "panelAreaM2": 568.87
+        },
+        "azimuthDeg": 225.0,
+        "tiltDeg": 12.0,
+        "mounting": "strongly_ventilated",
+        "obstructionFactors": [
+          1.0
+        ],
+        "sourceReference": "openbare bron Uniec 3.0.7.1 printout (Lidl-supermarkt met parkeerkelder 2064,26 m2, 02-02-2021): Eurener PEPV 280 Polycrystalline, productspecifiek 280 Wp/paneel, 349 panelen, zuidwest 12 graden, sterk geventileerd, minimale belemmering; 2020+A1 kent alleen 16.4a met K_pk = Wp / paneeloppervlak (afgerond op 5 W/m2, p. 651); het paneeloppervlak staat niet in de uitdraai, aangenomen 1,63 m2 (teruggerekend uit de opbrengst op de meter, 146 257 kWh)"
+      },
+      {
+        "id": "pv-no",
+        "peakPower": {
+          "method": "declared_specific",
+          "peakPowerWPerM2": 171.78,
+          "panelAreaM2": 568.87
+        },
+        "azimuthDeg": 45.0,
+        "tiltDeg": 12.0,
+        "mounting": "strongly_ventilated",
+        "obstructionFactors": [
+          1.0
+        ],
+        "sourceReference": "openbare bron Uniec 3.0.7.1 printout (Lidl-supermarkt met parkeerkelder 2064,26 m2, 02-02-2021): Eurener PEPV 280 Polycrystalline, productspecifiek 280 Wp/paneel, 349 panelen, noordoost 12 graden, sterk geventileerd, minimale belemmering; 2020+A1 kent alleen 16.4a met K_pk = Wp / paneeloppervlak (afgerond op 5 W/m2, p. 651); het paneeloppervlak staat niet in de uitdraai, aangenomen 1,63 m2 (teruggerekend uit de opbrengst op de meter, 146 257 kWh)"
+      }
+    ],
+    "lighting": [
+      {
+        "zoneId": "z1",
+        "functions": [
+          {
+            "function": "retail",
+            "areaM2": 2064.26
+          }
+        ],
+        "lightingZones": [
+          {
+            "id": "vz1",
+            "areaM2": 2064.26,
+            "power": {
+              "method": "installed",
+              "luminaires": [
+                {
+                  "count": 1,
+                  "power": {
+                    "method": "system",
+                    "powerW": 17546.21
+                  }
+                }
+              ],
+              "sourceReference": "openbare bron Uniec 3.0.7.1 printout (Lidl-supermarkt met parkeerkelder 2064,26 m2, 02-02-2021): eigen waarde 8,50 W/m2 over 2064,26 m2"
+            },
+            "parasitic": {
+              "method": "forfait"
+            },
+            "occupancy": {
+              "control": "manual_or_unknown",
+              "centralOnControl": true,
+              "largeOfficeGroup": false
+            },
+            "daylight": {
+              "method": "none"
+            },
+            "extractedLuminaires": true
+          }
+        ],
+        "sourceReference": "openbare bron Uniec 3.0.7.1 printout (Lidl-supermarkt met parkeerkelder 2064,26 m2, 02-02-2021): eigen verlichtingsvermogen 8,50 W/m2, parasitair forfaitair, centraal aan, geen daglichtregeling, f_afzuiging 0,50 (7.28), geen nieuwwaardecompensatie"
+      }
+    ],
+    "labelFunction": "retail",
+    "demandUsesFixedC1Ventilation": false,
+    "batteryStoragePresent": false,
+    "bblFunction": "retail",
+    "verticalPipes": [
+      {
+        "id": "leiding-1",
+        "buildingHeightM": 9.4,
+        "insulated": true,
+        "sourceReference": "openbare bron Uniec 3.0.7.1 printout (Lidl-supermarkt met parkeerkelder 2064,26 m2, 02-02-2021): verticale leidingen door de thermische schil bekend, 2 leidingen, geisoleerd, 1 aangrenzende rekenzone"
+      },
+      {
+        "id": "leiding-2",
+        "buildingHeightM": 9.4,
+        "insulated": true,
+        "sourceReference": "openbare bron Uniec 3.0.7.1 printout (Lidl-supermarkt met parkeerkelder 2064,26 m2, 02-02-2021): verticale leidingen door de thermische schil bekend, 2 leidingen, geisoleerd, 1 aangrenzende rekenzone"
+      }
+    ],
+    "ventilation": {
+      "zoneId": "z1",
+      "usableFloorAreaM2": 2064.26,
+      "category": "utility",
+      "functions": [
+        {
+          "function": "retail",
+          "areaM2": 2064.26,
+          "swimmingPool": false
+        }
+      ],
+      "dwellingCount": 0,
+      "apartmentBuilding": false,
+      "buildingHeightM": 9.4,
+      "constructionYear": 2021,
+      "floorAboveCrawlspace": false,
+      "heatingSetpointC": 21.0,
+      "coolingSetpointC": 24.0,
+      "system": {
+        "kind": "single",
+        "unit": {
+          "variant": "d3",
+          "ducts": "luka_a_b_c",
+          "heatRecovery": {
+            "efficiency": {
+              "method": "table",
+              "exchanger": "rotary"
+            },
+            "bypass": {
+              "kind": "full"
+            },
+            "layout": "central",
+            "constantVolumeControl": true,
+            "supplyDuctInsulation": {
+              "kind": "insulated"
+            },
+            "equipmentReference": "openbare bron Uniec 3.0.7.1 printout (Lidl-supermarkt met parkeerkelder 2064,26 m2, 02-02-2021): langzaam roterende of intermitterende warmtewisselaar 0,700, 100 % bypass, toevoerkanaal geisoleerd (type en lengte onbekend), constant-volumeregeling"
+          },
+          "airHandlingUnit": {
+            "insideThermalZone": false,
+            "supplyDuctsOutside": "situation1",
+            "heatingCoil": true,
+            "coolingCoil": true
+          },
+          "equipmentReference": "openbare bron Uniec 3.0.7.1 printout (Lidl-supermarkt met parkeerkelder 2064,26 m2, 02-02-2021): Dc mechanische toe- en afvoer centraal, D.3 centrale WTW met CO2-sturing op toe- of afvoer, LBK buiten de thermische zone met verwarmings- en koelbatterij, kanalen <= 20 m en geisoleerd (tabel 11.19 situatie 1)"
+        }
+      },
+      "maximumCapacityForCooling": "openbare bron Uniec 3.0.7.1 printout (Lidl-supermarkt met parkeerkelder 2064,26 m2, 02-02-2021): automatische passieve koelregeling",
+      "installedCapacity": {
+        "totalDm3PerS": 1400.0,
+        "sourceReference": "openbare bron Uniec 3.0.7.1 printout (Lidl-supermarkt met parkeerkelder 2064,26 m2, 02-02-2021): werkelijk geinstalleerde ventilatiecapaciteit 1400,0 dm3/s mechanische toevoer"
+      },
+      "flowReduction": {
+        "collective": true,
+        "flowControlPercent": 40,
+        "evidenceReference": "openbare bron Uniec 3.0.7.1 printout (Lidl-supermarkt met parkeerkelder 2064,26 m2, 02-02-2021): terugregeling tot 40 % van het ventilatiedebiet (frequentieregeling op CO2), geen recirculatie"
+      },
+      "infiltration": {
+        "method": "reference",
+        "buildingType": "multi_storey_whole_building"
+      },
+      "combustionAppliances": [],
+      "fans": {
+        "method": "forfait",
+        "current": "dc",
+        "manufactureYear": 2021
+      },
+      "sourceReference": "openbare bron Uniec 3.0.7.1 printout (Lidl-supermarkt met parkeerkelder 2064,26 m2, 02-02-2021): balansventilatie met WTW, forfaitaire gelijkstroomventilatoren; infiltratie zonder meetwaarde, q_v10;lea;ref 0,42 = meerlaags gebouw als geheel 0,5 x 1,2 x f_y 0,7 (11.86, tabellen 11.13/11.14)"
+    },
+    "hotWater": {
+      "need": {
+        "method": "utility",
+        "areas": [
+          {
+            "function": "retail",
+            "areaM2": 2064.26
+          }
+        ],
+        "sourceReference": "openbare bron Uniec 3.0.7.1 printout (Lidl-supermarkt met parkeerkelder 2064,26 m2, 02-02-2021): tabel 13.1 winkelfunctie"
+      },
+      "emission": {
+        "method": "utility",
+        "meanLengthM": 2.0,
+        "sourceReference": "openbare bron Uniec 3.0.7.1 printout (Lidl-supermarkt met parkeerkelder 2064,26 m2, 02-02-2021): uittapleidingen <= 3 m"
+      },
+      "storage": [
+        {
+          "id": "vat",
+          "volumeL": 10.0,
+          "loss": {
+            "method": "label",
+            "label": "a"
+          },
+          "connectionFactor": 2,
+          "inHeatedZone": true,
+          "sourceReference": "openbare bron Uniec 3.0.7.1 printout (Lidl-supermarkt met parkeerkelder 2064,26 m2, 02-02-2021): 1 vat van 10 l, vanaf 2018, label A, warme aansluiting ongeisoleerd (elektroboiler zonder geisoleerde leidingen)"
+        }
+      ],
+      "generator": {
+        "kind": "electric_boiler"
+      },
+      "equipmentReference": "openbare bron Uniec 3.0.7.1 printout (Lidl-supermarkt met parkeerkelder 2064,26 m2, 02-02-2021): elektrische boiler forfaitair, COP 1,00, geen circulatieleiding"
+    },
+    "normVersion": "2020+A1",
+    "heatPumpRenewable": {
+      "sourceBelow20C": true,
+      "exhaustAirSource": false,
+      "sourceReference": "outdoor air"
+    },
+    "cooling": {
+      "emission": {
+        "emitter": "fan_coil_or_rac_on_ceiling",
+        "balancing": "not_applicable",
+        "control": "standalone_per_room",
+        "fanCoilCount": 10,
+        "sourceReference": "openbare bron Uniec 3.0.7.1 printout (Lidl-supermarkt met parkeerkelder 2064,26 m2, 02-02-2021): luchtkoeling, autom. temperatuurregeling per ruimte (dT type regeling -2,5 K, automatische regeling 0,5 K), ventilatoren forfaitair 10 x 10 W",
+        "edition2023": {
+          "control": "room",
+          "balancing": "dynamic_or_direct_expansion",
+          "roomAutomation": "standalone"
+        }
+      },
+      "generators": [
+        {
+          "id": "koel",
+          "generator": {
+            "kind": "compression"
+          },
+          "equipmentReference": "openbare bron Uniec 3.0.7.1 printout (Lidl-supermarkt met parkeerkelder 2064,26 m2, 02-02-2021): compressiekoeling forfaitair, EER 3,00, directe expansie in de luchtbehandelingskast"
+        }
+      ]
+    }
+  }
+}

@@ -247,6 +247,10 @@ pub struct ForfaitOpaque {
     /// determinable; only with `PresentUnknownThickness`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub renovation: Option<Renovation>,
+    /// Set by the basisopname route (ISSO 82.1/75.1): ISSO table 8.10
+    /// governs where it differs from NTA tables I.5–I.7. Not an input.
+    #[serde(skip)]
+    pub survey_table_8_10: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
@@ -343,12 +347,39 @@ fn year_bounds(element: ElementType, building: BuildingKind) -> Option<&'static 
     }
 }
 
+/// Year classes of ISSO table 8.10 for §8.7.2.1. They equal NTA tables
+/// I.5/I.6 except for regular façades, where ISSO has one class "van 1975
+/// tot 1988" (82.1 p. 90, 75.1 p. 89).
+fn isso_renovation_bounds(
+    element: ElementType,
+    building: BuildingKind,
+) -> Option<&'static [(i32, f64)]> {
+    const ISSO_REGULAR_FACADE: &[(i32, f64)] = &[
+        (1965, 0.43),
+        (1975, 1.3),
+        (1988, 2.0),
+        (1992, 2.5),
+        (2014, 3.5),
+        (2015, 4.5),
+        (2021, 4.7),
+    ];
+    match (building, element.table_row()) {
+        (BuildingKind::Regular, ElementType::Facade) => Some(ISSO_REGULAR_FACADE),
+        _ => year_bounds(element, building),
+    }
+}
+
 /// Index of the year class containing `year`; `None` before 1965.
 fn year_class(bounds: &[(i32, f64)], year: i32) -> Option<usize> {
     bounds.iter().rposition(|(from, _)| year >= *from)
 }
 
-fn year_table(element: ElementType, building: BuildingKind, year: i32) -> Option<f64> {
+fn year_table(
+    element: ElementType,
+    building: BuildingKind,
+    year: i32,
+    survey_table_8_10: bool,
+) -> Option<f64> {
     let element = element.table_row();
     let pick = |bounds: &[(i32, f64)]| {
         bounds
@@ -386,13 +417,27 @@ fn year_table(element: ElementType, building: BuildingKind, year: i32) -> Option
                     if new {
                         return Some(if year >= 2021 { 3.7 } else { 3.5 });
                     }
-                    pick(&[
-                        (1965, 0.17),
-                        (1992, 2.5),
-                        (2015, 3.5),
-                        (2018, 2.5),
-                        (2021, 2.6),
-                    ])
+                    // NTA table I.7 (2025+C1 p. 831): 2014 tot 2015 2,5 and
+                    // 2015 tot 2018 3,5. ISSO 82.1 table 8.10 (p. 89) has one
+                    // class "van 2014 tot 2018" at 3,50; the basisopname
+                    // follows ISSO (BRL 9500).
+                    if survey_table_8_10 {
+                        pick(&[
+                            (1965, 0.17),
+                            (1992, 2.5),
+                            (2014, 3.5),
+                            (2018, 2.5),
+                            (2021, 2.6),
+                        ])
+                    } else {
+                        pick(&[
+                            (1965, 0.17),
+                            (1992, 2.5),
+                            (2015, 3.5),
+                            (2018, 2.5),
+                            (2021, 2.6),
+                        ])
+                    }
                 }
                 ElementType::Roof => {
                     if new {
@@ -524,11 +569,16 @@ impl ForfaitOpaque {
             // the first class of table I.7 (interpretation).
             table_i4(self.element, self.cavity, insulated).or_else(|| {
                 (self.element == ElementType::FloatingHull)
-                    .then(|| year_table(self.element, self.building, 1965))
+                    .then(|| year_table(self.element, self.building, 1965, self.survey_table_8_10))
                     .flatten()
             })
         } else {
-            year_table(self.element, self.building, self.construction_year)
+            year_table(
+                self.element,
+                self.building,
+                self.construction_year,
+                self.survey_table_8_10,
+            )
         }
     }
 
@@ -538,8 +588,13 @@ impl ForfaitOpaque {
     ///   2014" (R_c 2,5);
     /// - year unknown: the class after the original one; before 1965 the
     ///   "(na)geïsoleerd" column of table I.4.
+    ///
+    /// The classes are those of ISSO table 8.10 (82.1 p. 89–90, 75.1 p. 89):
+    /// for regular façades one class "van 1975 tot 1988", where NTA table
+    /// I.5 splits it at 1983. §8.7.2.1 is an ISSO rule, so its "class
+    /// before" and "class after" count on the ISSO classes.
     fn renovated_rc(&self, renovation: &Renovation) -> Option<f64> {
-        let bounds = year_bounds(self.element, self.building)?;
+        let bounds = isso_renovation_bounds(self.element, self.building)?;
         let insulated_pre_1965 = || table_i4(self.element, self.cavity, true);
         match renovation.year {
             Some(year) if renovation.meets_requirements_of_year => match year_class(bounds, year) {
@@ -577,7 +632,9 @@ impl ForfaitOpaque {
                 let base = crate::norm_versions::profile().lambda_equi_ntr;
                 let lambda = known_lambda_equivalent.unwrap_or(base).max(base);
                 let mut r = d_mm / 1000.0 / lambda + self.element.additional_resistance();
-                if self.cavity && d_mm <= 30.0 {
+                // Thermal cushions replace the rest of I.2.1.4 ("in afwijking
+                // van het voorgaande", 2025+C1 p. 833): R_ad + 1,8, no cavity.
+                if self.cavity && d_mm <= 30.0 && !*thermal_cushions {
                     r += self.element.cavity_resistance();
                 }
                 if let Some(reed) = reed_thickness_m {
@@ -875,6 +932,7 @@ mod tests {
             r_si_override: None,
             towards_unheated_space: false,
             renovation: None,
+            survey_table_8_10: false,
         }
     }
 
@@ -892,9 +950,9 @@ mod tests {
         // Without renovation the 1975–1983 class: 1,3.
         let plain = element(1978, InsulationState::PresentUnknownThickness).calculate();
         assert_eq!(plain.r_c, 1.3);
-        // Year unknown: the class after 1975–1983 (1983–1988): 1,3;
-        // from 1983 the next class is 1988–1992: 2,0.
-        assert_eq!(renovated(None, false).r_c, 1.3);
+        // Year unknown: the class after the ISSO class "1975 tot 1988"
+        // (ISSO 82.1 table 8.10 p. 90, §8.7.2.1 p. 84–85): 1988–1992, 2,0.
+        assert_eq!(renovated(None, false).r_c, 2.0);
         let mut later = element(1985, InsulationState::PresentUnknownThickness);
         later.renovation = Some(Renovation {
             year: None,
@@ -925,6 +983,58 @@ mod tests {
         let codes: Vec<_> = wrong.validate("f").iter().map(|i| i.code).collect();
         assert!(codes.contains(&"renovation_requires_present_unknown_thickness"));
         assert!(codes.contains(&"renovation_year_invalid"));
+    }
+
+    /// §8.7.2.1 counts year classes on ISSO table 8.10 (82.1 p. 84–85 and
+    /// p. 90, 75.1 p. 88–89): regular façades have one class "van 1975 tot
+    /// 1988", not the NTA I.5 split at 1983.
+    #[test]
+    fn renovation_counts_on_isso_table_8_10_classes() {
+        let renovated = |built: i32, year: Option<i32>| {
+            let mut facade = element(built, InsulationState::PresentUnknownThickness);
+            facade.renovation = Some(Renovation {
+                year,
+                meets_requirements_of_year: false,
+            });
+            assert!(facade.validate("f").is_empty());
+            facade.calculate().r_c
+        };
+        // Renovated 1985 without evidence: the class before "1975 tot
+        // 1988" is "1965 tot 1975", 0,43 (not 1,3 from the 1983 split).
+        assert_eq!(renovated(1970, Some(1985)), 0.43);
+        // Built 1978, renovation year unknown: the class after "1975 tot
+        // 1988" is "1988 tot 1992", 2,0.
+        assert_eq!(renovated(1978, None), 2.0);
+        // Floors keep the 1983 split, which ISSO table 8.10 has too.
+        let mut floor = element(1978, InsulationState::PresentUnknownThickness);
+        floor.element = ElementType::Floor;
+        floor.cavity = false;
+        floor.renovation = Some(Renovation {
+            year: None,
+            meets_requirements_of_year: false,
+        });
+        assert_eq!(floor.calculate().r_c, 1.3);
+    }
+
+    /// Floating hull built in 2014: NTA table I.7 (2025+C1 p. 831) gives
+    /// 2,5 ("2014 tot 2015"), ISSO 82.1 table 8.10 (p. 89) gives 3,50
+    /// ("van 2014 tot 2018"). The basisopname follows ISSO.
+    #[test]
+    fn floating_hull_2014_follows_the_route() {
+        let mut hull = element(2014, InsulationState::PresentUnknownThickness);
+        hull.element = ElementType::FloatingHull;
+        hull.building = BuildingKind::Floating {
+            new_berth_since_2018: false,
+        };
+        hull.cavity = false;
+        assert_eq!(hull.calculate().r_c, 2.5);
+        hull.survey_table_8_10 = true;
+        assert_eq!(hull.calculate().r_c, 3.5);
+        // Outside 2014 both sources agree.
+        hull.construction_year = 2016;
+        assert_eq!(hull.calculate().r_c, 3.5);
+        hull.survey_table_8_10 = false;
+        assert_eq!(hull.calculate().r_c, 3.5);
     }
 
     #[test]
@@ -970,6 +1080,11 @@ mod tests {
             thermal_cushions: true,
         };
         assert!(floor.validate("f").is_empty());
+        assert!((floor.calculate().r_c - (0.15 + 1.8)).abs() < 1e-12);
+        // A crawlspace floor marked with a cavity still gets R_ad + 1,8 only:
+        // the 0,18 cavity value belongs to the thin-insulation rule that the
+        // cushions rule replaces (I.2.1.4, p. 833).
+        floor.cavity = true;
         assert!((floor.calculate().r_c - (0.15 + 1.8)).abs() < 1e-12);
     }
 
@@ -1220,5 +1335,34 @@ mod tests {
         assert_eq!(forfait_psi(58, 1, PsiColumn::A), Some(0.13));
         assert_eq!(forfait_psi(30, 0, PsiColumn::A), None);
         assert_eq!(basic_survey_unheated_transfer(12.0), 60.0);
+    }
+
+    /// Review 52, independent recalculation of I.2.1.4 (2025+C1 p. 832–833):
+    /// thermal cushions give R_ad 0,15 + 1,8 whether or not a cavity is
+    /// marked; without cushions a floor with ≤ 30 mm insulation adds the
+    /// 0,18 cavity value, a façade with 40 mm adds none.
+    #[test]
+    fn review52_known_thickness_rules_of_i_2_1_4() {
+        let known = |thickness: f64, cushions: bool| InsulationState::KnownThickness {
+            thickness_mm: thickness,
+            thickness_proven: false,
+            known_lambda_equivalent: None,
+            reed_thickness_m: None,
+            thermal_cushions: cushions,
+        };
+        let mut floor = element(2000, known(0.0, true));
+        floor.element = ElementType::Floor;
+        for cavity in [true, false] {
+            floor.cavity = cavity;
+            assert!(
+                (floor.calculate().r_c - 1.95).abs() < 1e-9,
+                "cavity {cavity}"
+            );
+        }
+        let mut thin = element(2000, known(30.0, false));
+        thin.element = ElementType::Floor;
+        assert!((thin.calculate().r_c - (0.03 / 0.045 + 0.15 + 0.18)).abs() < 1e-9);
+        let facade = element(2000, known(40.0, false));
+        assert!((facade.calculate().r_c - (0.04 / 0.045 + 0.36)).abs() < 1e-9);
     }
 }

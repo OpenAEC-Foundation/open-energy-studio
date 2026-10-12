@@ -10,6 +10,7 @@ import { createDefaultProject } from '../context/EnergyContext';
 import { en } from '../i18n/en';
 import { adjacentStep } from '../core/navigation/routes';
 import App from '../App';
+import { SLOW_UI_TEST_MS } from './timeouts';
 
 const t = (key: string) => en[key] ?? key;
 
@@ -125,5 +126,5 @@ describe('keyboard navigation of the shell', () => {
     expect(screen.queryByRole('dialog', { name: 'Command palette' })).toBeNull();
     expect(within(nav).getByRole('button', { name: /^Tailored advice/ })).toHaveAttribute('aria-current', 'page');
     window.history.replaceState(null, '', '/');
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 });

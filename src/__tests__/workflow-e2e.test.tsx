@@ -15,6 +15,7 @@ import userEvent from '@testing-library/user-event';
 import { strFromU8, unzipSync } from 'fflate';
 import App from '../App';
 import { clearSessionEvidence } from '../core/nta/Evidence';
+import { SLOW_UI_TEST_MS } from './timeouts';
 
 const root = resolve(__dirname, '../..');
 const json = (file: string) => JSON.parse(readFileSync(resolve(root, 'training-data', file), 'utf8')) as Record<string, unknown>;
@@ -136,7 +137,16 @@ const nextButton = () => {
 };
 
 /** Applies the NTA draft the way the question flow does: by moving on to the next question. */
-async function applyDraft(user: User) {
+/** Confirms the edition-switch review with "Change the edition only" once the comparison has loaded. */
+async function switchEditionOnly(user: User) {
+  const button = await screen.findByRole('button', { name: 'Change the edition only' });
+  await waitFor(() => expect(button).toBeEnabled());
+  await user.click(button);
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Change the NTA 8800 edition' })).toBeNull());
+}
+
+/** `changes`: what the draft region named in the bar flow; the question flow applies on Next. */
+async function applyDraft(user: User, _changes?: RegExp) {
   const runs = projectBodies().length;
   await user.click(nextButton());
   await kernelRuns(runs + 1);
@@ -159,7 +169,10 @@ describe('workflow end to end, default edition', () => {
     await user.click(main().getByRole('button', { name: 'Start NTA input' }));
     const edition = await main().findByLabelText('NTA 8800 edition');
     expect(edition).toHaveValue('2025+C1');
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
+
+  // The kernel branch tests the survey takeover through the draft bar here; in main the survey has its own
+  // question flow and the takeover lives in the full survey form (test to be ported, 12 Oct 2026).
 
   it('sets an obstruction for one window and applies it with the bar', async () => {
     const user = userEvent.setup();
@@ -175,7 +188,7 @@ describe('workflow end to end, default edition', () => {
     expect(lastNta()!.windowObstructions).toEqual([
       { windowId: 'win-N', obstruction: { method: 'overhang', relativeHeight: 0.5 }, sourceReference: 'gevelaanzicht' },
     ]);
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 
   it('enters annex AA rooms with the project windows on the cooling page', async () => {
     const user = userEvent.setup();
@@ -197,7 +210,7 @@ describe('workflow end to end, default edition', () => {
     const capacity = (lastNta()!.activeCooling as { capacity: { method: string; calculation: { rooms: Array<{ areaM2: number; windows: unknown[] }> } } }).capacity;
     expect(capacity.method).toBe('annex_aa');
     expect(capacity.calculation.rooms[0]).toMatchObject({ areaM2: 28, windows: [expect.objectContaining({ windowId: window.value })] });
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 
   it('shows the kernel results and composes the report at each level', async () => {
     const user = userEvent.setup();
@@ -222,7 +235,7 @@ describe('workflow end to end, default edition', () => {
     await user.click(main().getByRole('radio', { name: /^Summary/ }));
     expect(balance).toBeDisabled();
     expect(preview()).not.toContain('Bouwkundige uitgangspunten');
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 
   it('links an evidence file to a source field and lists it in the checklist and the dossier ZIP', async () => {
     const user = userEvent.setup();
@@ -235,7 +248,7 @@ describe('workflow end to end, default edition', () => {
     await applyDraft(user);
     // The file is added to the source text; the description that was there stays.
     expect((lastNta()!.windowSolar as { sourceReference: string }).sourceReference)
-      .toMatch(/^synthetic: minimal obstruction .*; evidence:ev-\d+$/);
+      .toMatch(/^voorbeeld: minimale belemmering .*; evidence:ev-\d+$/);
 
     await openStep(user, 'Report & dossier', 'BRL 9500 checklist');
     expect(main().getByText('gevel-noord.jpg', { exact: false })).toBeInTheDocument();
@@ -255,7 +268,7 @@ describe('workflow end to end, default edition', () => {
     expect(entry).toBeDefined();
     expect(entry!.supports.join(' ')).toMatch(/windowSolar/);
     expect(strFromU8(archive[entry!.archivePath])).toBe('gevelfoto');
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 });
 
 describe('inspector', () => {
@@ -284,7 +297,7 @@ describe('inspector', () => {
     const register = main().getByText('raam-zuid.jpg', { exact: false }).closest('tr')!;
     expect(register).toHaveTextContent(/win-S/);
     expect(register).not.toHaveTextContent(/not in the project|no longer/i);
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 });
 
 describe('workflow end to end, NTA 8800:2022', () => {
@@ -295,6 +308,8 @@ describe('workflow end to end, NTA 8800:2022', () => {
     await openStep(user, 'Project');
     const edition = await main().findByLabelText('NTA 8800 edition');
     await user.selectOptions(edition, '2022');
+    // The edition-switch review comes first; here only the edition changes.
+    await switchEditionOnly(user);
     expect(main().getByText('Older edition: the result is for comparison only and cannot be registered.')).toBeInTheDocument();
     await applyDraft(user);
     expect(lastNta()!.normVersion).toBe('2022');
@@ -320,6 +335,7 @@ describe('workflow end to end, NTA 8800:2022', () => {
     // Back to the default edition: the 2022 values are flagged with a remove action.
     await openStep(user, 'Project');
     await user.selectOptions(await main().findByLabelText('NTA 8800 edition'), '2025+C1');
+    await switchEditionOnly(user);
     await openStep(user, 'Building', 'Calculation zones');
     expect(main().queryByLabelText(/Mass per m² usable floor area/)).toBeNull();
     const stale = main().getAllByRole('alert').find((alert) => /2022/.test(alert.textContent ?? ''));
@@ -344,5 +360,5 @@ describe('open points', () => {
     await user.click(goTo);
     expect(within(nav()).getByRole('button', { name: /^Building/ })).toHaveAttribute('aria-current', 'page');
     await waitFor(() => expect(document.activeElement).toBe(main().getByLabelText('Heating setpoint °C')));
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 });

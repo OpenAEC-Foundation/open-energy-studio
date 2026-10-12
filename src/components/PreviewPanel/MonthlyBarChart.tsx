@@ -1,4 +1,5 @@
 import { useI18n } from '../../i18n/i18n';
+import { formatNumber } from '../../i18n/format';
 
 interface MonthlyBarChartProps {
   /** Monthly heating need Q_H;nd, kWh (January first). */
@@ -10,7 +11,7 @@ interface MonthlyBarChartProps {
 const MONTH_LABELS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
 export function MonthlyBarChart({ heating, cooling }: MonthlyBarChartProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const maxVal = Math.max(...heating, ...cooling, 1);
 
   return (
@@ -24,11 +25,11 @@ export function MonthlyBarChart({ heating, cooling }: MonthlyBarChartProps) {
               <div className="preview-chart-bar-container">
                 {heat > 0 && (
                   <div className="preview-chart-bar heat" style={{ height: `${(heat / maxVal) * 100}%` }}
-                    title={`${heat.toFixed(0)} kWh`} />
+                    title={`${formatNumber(heat, locale, 0)} kWh`} />
                 )}
                 {cool > 0 && (
                   <div className="preview-chart-bar cool" style={{ height: `${(cool / maxVal) * 100}%` }}
-                    title={`${cool.toFixed(0)} kWh`} />
+                    title={`${formatNumber(cool, locale, 0)} kWh`} />
                 )}
               </div>
               <span className="preview-chart-label">{label}</span>

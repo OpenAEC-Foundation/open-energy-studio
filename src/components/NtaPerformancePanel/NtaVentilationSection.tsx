@@ -1,4 +1,5 @@
 import { useI18n } from '../../i18n/i18n';
+import { SwimmingPoolFields } from './NtaZoneData';
 import {
   heatRecoveryTemplate, VENTILATION_VARIANTS, ventilationOp, ventilationUnit,
 } from '../../core/nta/NtaFormModels';
@@ -38,6 +39,9 @@ export function VentilationUnitFields(props: SectionProps & { path: Path }) {
   return <UnitFields {...props} />;
 }
 
+/** Variants of table 11.5 with an f_ctrl for dwellings only. */
+const RESIDENTIAL_ONLY_VARIANTS = new Set<string>(['c4a', 'c5a', 'c5b', 'd5c']);
+
 function UnitFields({ draft, change, path }: SectionProps & { path: Path }) {
   const { t } = useI18n();
   const field = { draft, onChange: change };
@@ -51,7 +55,10 @@ function UnitFields({ draft, change, path }: SectionProps & { path: Path }) {
   const insulation = read(draft, [...path, 'heatRecovery', 'supplyDuctInsulation', 'kind']);
   return <>
     <SelectField {...field} path={[...path, 'variant']} label={t('nta.vent.variant')}
-      options={VENTILATION_VARIANTS.map(({ variant }) => [variant, t(`nta.vent.variant.${variant}`)])}
+      // Table 11.5 has no f_ctrl for C4a, C5a, C5b and D5c in utility buildings (variant_not_applicable_to_category).
+      options={VENTILATION_VARIANTS
+        .filter(({ variant }) => read(draft, ['calculationScope']) !== 'utility' || !RESIDENTIAL_ONLY_VARIANTS.has(variant))
+        .map(({ variant }) => [variant, t(`nta.vent.variant.${variant}`)])}
       onChange={(_, value) => change(path, ventilationUnit((value as VentilationSystemVariant | null) ?? null, unit))} />
     {op && op !== 'natural' && <SelectField {...field} path={[...path, 'ducts']} label={t('nta.vent.ducts')} options={[
       ['unknown', t('nta.vent.ducts.unknown')], ['luka_a_b_c', t('nta.vent.ducts.abc')], ['luka_d', t('nta.vent.ducts.d')],
@@ -76,7 +83,7 @@ function UnitFields({ draft, change, path }: SectionProps & { path: Path }) {
       {t('nta.vent.heatRecovery')}
     </label>}
     {op === 'balanced' && recovery != null && <>
-      <SelectField {...field} path={[...path, 'heatRecovery', 'efficiency', 'method']} label={t('nta.vent.hrMethod')}
+      <SelectField required {...field} path={[...path, 'heatRecovery', 'efficiency', 'method']} label={t('nta.vent.hrMethod')}
         options={[['declared', t('nta.vent.hrDeclared')], ['table', t('nta.vent.hrTable')]]}
         onChange={(_, value) => change([...path, 'heatRecovery', 'efficiency'], value === 'table'
           ? { method: 'table', exchanger: null }
@@ -90,7 +97,7 @@ function UnitFields({ draft, change, path }: SectionProps & { path: Path }) {
             options={[['en13141_7', 'NEN-EN 13141-7'], ['en13141_8', 'NEN-EN 13141-8'], ['en13142', 'NEN-EN 13142'], ['en13053', 'NEN-EN 13053']]} />
           <TextField {...field} path={[...path, 'heatRecovery', 'efficiency', 'sourceReference']} label={t('nta.form.source')} />
         </>}
-      <SelectField {...field} path={[...path, 'heatRecovery', 'bypass', 'kind']} label={t('nta.vent.bypass')} options={[
+      <SelectField required {...field} path={[...path, 'heatRecovery', 'bypass', 'kind']} label={t('nta.vent.bypass')} options={[
         ['none', t('nta.vent.bypass.none')], ['full', t('nta.vent.bypass.full')], ['partial', t('nta.vent.bypass.partial')],
         ['unknown', t('nta.vent.bypass.unknown')]]}
         onChange={(_, value) => change([...path, 'heatRecovery', 'bypass'], value === 'partial'
@@ -105,7 +112,7 @@ function UnitFields({ draft, change, path }: SectionProps & { path: Path }) {
         options={[['central', t('nta.vent.layout.central')], ['decentral', t('nta.vent.layout.decentral')]]} />
       <CheckField {...field} path={[...path, 'heatRecovery', 'constantVolumeControl']} label={t('nta.vent.constantVolume')} />
       <NumberField {...field} path={[...path, 'heatRecovery', 'supplyDuctLengthM']} label={t('nta.vent.supplyDuctLength')} />
-      <SelectField {...field} path={[...path, 'heatRecovery', 'supplyDuctInsulation', 'kind']} label={t('nta.vent.supplyDuctInsulation')}
+      <SelectField required {...field} path={[...path, 'heatRecovery', 'supplyDuctInsulation', 'kind']} label={t('nta.vent.supplyDuctInsulation')}
         options={[['unknown', t('nta.form.unknown')], ['insulated', t('nta.vent.insulated')], ['uninsulated', t('nta.vent.uninsulated')],
           ['specified', t('nta.vent.specified')]]}
         onChange={(_, value) => change([...path, 'heatRecovery', 'supplyDuctInsulation'], value === 'specified'
@@ -115,7 +122,7 @@ function UnitFields({ draft, change, path }: SectionProps & { path: Path }) {
         <NumberField {...field} path={[...path, 'heatRecovery', 'supplyDuctInsulation', 'conductivityWPerMK']} label="λ W/(m·K)" />
       </>}
       <NumberField {...field} path={[...path, 'heatRecovery', 'manufactureYear']} label={t('nta.vent.manufactureYear')} step="1" />
-      <TextField {...field} path={[...path, 'heatRecovery', 'equipmentReference']} label={t('nta.form.boilerEquipmentSource')} />
+      <TextField {...field} path={[...path, 'heatRecovery', 'equipmentReference']} label={t('nta.vent.hrEquipmentSource')} />
     </>}
     {(op === 'balanced' || op === 'supply') && <label className="nta-form-check">
       <input type="checkbox" checked={ahu != null}
@@ -162,10 +169,12 @@ export function NtaVentilationSection({ draft, change }: SectionProps) {
       <NumberField {...field} path={[...base, 'buildingHeightM']} label={t('nta.vent.height')} />
       <NumberField {...field} path={[...base, 'constructionYear']} label={t('nta.vent.constructionYear')} step="1" />
       <CheckField {...field} path={[...base, 'floorAboveCrawlspace']} label={t('nta.vent.crawlspace')} />
+      {!utility && <NumberField {...field} path={[...base, 'wholeDwellingAreaM2']} label={t('nta.vent.wholeDwellingArea')} optional unit="m²" />}
+      <SwimmingPoolFields draft={draft} change={change} base={base} />
       <TextField {...field} path={[...base, 'sourceReference']} label={t('nta.form.source')} />
     </Section>
     <Section title={t('nta.vent.system')}>
-      <SelectField {...field} path={[...base, 'system', 'kind']} label={t('nta.vent.systemKind')}
+      <SelectField required {...field} path={[...base, 'system', 'kind']} label={t('nta.vent.systemKind')}
         options={[['single', t('nta.vent.single')], ['combined', t('nta.vent.combined')]]}
         onChange={(_, value) => change([...base, 'system'], value === 'combined'
           ? { kind: 'combined', decentralAreaM2: null, totalResidenceAreaM2: null,
@@ -174,10 +183,14 @@ export function NtaVentilationSection({ draft, change }: SectionProps) {
       {systemKind === 'combined' ? <>
         <NumberField {...field} path={[...base, 'system', 'decentralAreaM2']} label={t('nta.vent.decentralArea')} />
         <NumberField {...field} path={[...base, 'system', 'totalResidenceAreaM2']} label={t('nta.vent.totalResidenceArea')} />
-        <p className="nta-form-note">{t('nta.vent.decentralPart')}</p>
-        <UnitFields draft={draft} change={change} path={[...base, 'system', 'decentral']} />
-        <p className="nta-form-note">{t('nta.vent.otherPart')}</p>
-        <UnitFields draft={draft} change={change} path={[...base, 'system', 'other']} />
+        <div role="group" aria-label={t('nta.vent.decentralPart').replace(/:$/, '')}>
+          <p className="nta-form-note">{t('nta.vent.decentralPart')}</p>
+          <UnitFields draft={draft} change={change} path={[...base, 'system', 'decentral']} />
+        </div>
+        <div role="group" aria-label={t('nta.vent.otherPart').replace(/:$/, '')}>
+          <p className="nta-form-note">{t('nta.vent.otherPart')}</p>
+          <UnitFields draft={draft} change={change} path={[...base, 'system', 'other']} />
+        </div>
       </> : <UnitFields draft={draft} change={change} path={[...base, 'system', 'unit']} />}
       <OptionalText draft={draft} change={change} path={[...base, 'maximumCapacityForCooling']} label={t('nta.vent.maxCapacity')} />
       <label className="nta-form-check">
@@ -187,7 +200,7 @@ export function NtaVentilationSection({ draft, change }: SectionProps) {
       </label>
       {installed != null && <>
         <NumberField {...field} path={[...base, 'installedCapacity', 'totalDm3PerS']} label={t('nta.vent.installedTotal')} />
-        <NumberField {...field} path={[...base, 'installedCapacity', 'naturalSupplyDm3PerS']} label={t('nta.vent.installedNatural')} />
+        <NumberField {...field} path={[...base, 'installedCapacity', 'naturalSupplyDm3PerS']} label={t('nta.vent.installedNatural')} optional />
         <TextField {...field} path={[...base, 'installedCapacity', 'sourceReference']} label={t('nta.form.source')} />
       </>}
       {utility && <>
@@ -198,7 +211,7 @@ export function NtaVentilationSection({ draft, change }: SectionProps) {
       </>}
     </Section>
     <Section title={t('nta.vent.infiltration')}>
-      <SelectField {...field} path={[...base, 'infiltration', 'method']} label={t('nta.vent.infiltrationMethod')}
+      <SelectField required {...field} path={[...base, 'infiltration', 'method']} label={t('nta.vent.infiltrationMethod')}
         options={[['measured', t('nta.vent.measured')], ['reference', t('nta.vent.reference')]]}
         onChange={(_, value) => change([...base, 'infiltration'], value === 'measured'
           ? { method: 'measured', qv10DmPerSM2: null, sourceReference: '' } : { method: 'reference', buildingType: null })} />
@@ -258,7 +271,7 @@ export function NtaVentilationSection({ draft, change }: SectionProps) {
         {t('nta.vent.preheatingPresent')}
       </label>
       {preheating != null && <>
-        <SelectField {...field} path={[...base, 'grillePreheating', 'control', 'method']} label={t('nta.vent.preheatingControl')}
+        <SelectField required {...field} path={[...base, 'grillePreheating', 'control', 'method']} label={t('nta.vent.preheatingControl')}
           options={[['fallback', t('nta.vent.preheating.fallback')], ['specified', t('nta.vent.preheating.specified')]]}
           onChange={(_, value) => change([...base, 'grillePreheating', 'control'], value === 'specified'
             ? { method: 'specified', maxPowerWPerDm3PerS: null, maxTemperatureRiseK: null, switchOnBelowC: null, maxSupplyTemperatureC: null }
@@ -274,7 +287,7 @@ export function NtaVentilationSection({ draft, change }: SectionProps) {
       </>}
     </Section>
     <Section title={t('nta.vent.fans')}>
-      <SelectField {...field} path={[...base, 'fans', 'method']} label={t('nta.vent.fansMethod')}
+      <SelectField required {...field} path={[...base, 'fans', 'method']} label={t('nta.vent.fansMethod')}
         options={[['forfait', t('nta.vent.fans.forfait')], ['declared', t('nta.vent.fans.declared')]]}
         onChange={(_, value) => change([...base, 'fans'], value === 'declared'
           ? { method: 'declared', fans: [{ id: 'fan-1', power: { method: 'nominal', nominalPowerW: null } }],
@@ -283,12 +296,21 @@ export function NtaVentilationSection({ draft, change }: SectionProps) {
           : { method: 'forfait', current: 'dc', manufactureYear: null })} />
       {fansMethod === 'declared' ? <>
         {fans.map((item, index) => <div key={String(item.id)} className="nta-form-row">
-          <NumberField {...field} path={[...base, 'fans', 'fans', index, 'power', 'nominalPowerW']} label={`${String(item.id)} — ${t('nta.vent.fanPower')}`} />
+          <SelectField required {...field} path={[...base, 'fans', 'fans', index, 'power', 'method']} label={`${String(item.id)} — ${t('nta.vent.fanPowerMethod')}`}
+            options={[['nominal', t('nta.vent.fanPowerMethod.nominal')], ['motor', t('nta.vent.fanPowerMethod.motor')]]}
+            onChange={(_, value) => change([...base, 'fans', 'fans', index, 'power'], value === 'motor'
+              ? { method: 'motor', motorPowerW: null, manufactureYear: null }
+              : { method: 'nominal', nominalPowerW: null })} />
+          {read(draft, [...base, 'fans', 'fans', index, 'power', 'method']) === 'motor' ? <>
+            <NumberField {...field} path={[...base, 'fans', 'fans', index, 'power', 'motorPowerW']} label={t('nta.vent.motorPower')} unit="W" />
+            <NumberField {...field} path={[...base, 'fans', 'fans', index, 'power', 'manufactureYear']} label={t('nta.vent.motorYear')} optional step="1" />
+            <NumberField {...field} path={[...base, 'fans', 'fans', index, 'power', 'electricalInputW']} label={t('nta.vent.motorInput')} optional unit="W" />
+          </> : <NumberField {...field} path={[...base, 'fans', 'fans', index, 'power', 'nominalPowerW']} label={`${String(item.id)} — ${t('nta.vent.fanPower')}`} />}
           <button type="button" onClick={() => change([...base, 'fans', 'fans'], fans.filter((_, i) => i !== index))}>{t('nta.vent.remove')}</button>
         </div>)}
         <button type="button" onClick={() => change([...base, 'fans', 'fans'], [...fans, {
           id: `fan-${fans.length + 1}`, power: { method: 'nominal', nominalPowerW: null } }])}>{t('nta.vent.addFan')}</button>
-        <SelectField {...field} path={[...base, 'fans', 'control', 'method']} label={t('nta.vent.fanControl')}
+        <SelectField required {...field} path={[...base, 'fans', 'control', 'method']} label={t('nta.vent.fanControl')}
           options={[['residential_table', t('nta.vent.fanControl.table')], ['flow_control', t('nta.vent.fanControl.flow')]]}
           onChange={(_, value) => change([...base, 'fans', 'control'], value === 'flow_control'
             ? { method: 'flow_control', control: 'other' } : { method: 'residential_table' })} />
@@ -296,7 +318,7 @@ export function NtaVentilationSection({ draft, change }: SectionProps) {
           <SelectField {...field} path={[...base, 'fans', 'control', 'control']} label={t('nta.vent.flowControlMethod')} options={[
             ['throttle', t('nta.vent.flowControl.throttle')], ['inlet_vane_or_blade_pitch', t('nta.vent.flowControl.vane')],
             ['speed_control', t('nta.vent.flowControl.speed')], ['other', t('nta.vent.flowControl.other')]]} />}
-        <NumberField {...field} path={[...base, 'fans', 'buildingShare']} label={t('nta.vent.buildingShare')} />
+        <NumberField {...field} path={[...base, 'fans', 'buildingShare']} label={t('nta.vent.buildingShare')} optional />
         <TextField {...field} path={[...base, 'fans', 'sourceReference']} label={t('nta.form.source')} />
       </> : <>
         <SelectField {...field} path={[...base, 'fans', 'current']} label={t('nta.vent.fanCurrent')}

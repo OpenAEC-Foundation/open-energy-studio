@@ -11,7 +11,8 @@ import { NtaPerformancePanel } from '../NtaPerformancePanel/NtaPerformancePanel'
 import { MaatwerkadviesPanel } from '../MaatwerkadviesPanel/MaatwerkadviesPanel';
 import { RelabelPanel } from '../MaatwerkadviesPanel/RelabelPanel';
 import { calculatedAssessment } from '../../core/nta/useProjectPerformance';
-import { useKernelQuery } from '../../context/KernelProvider';
+import { useKernel, useKernelQuery } from '../../context/KernelProvider';
+import { useShellActions } from '../shell/ShellActions';
 import { kernelEnergyBreakdown } from '../../core/nta/KernelBreakdown';
 import { kernelVerdict, type KernelVerdict } from '../../core/nta/KernelVerdict';
 import type { IBENGResult, IBENGResultMonthly } from '../../core/energy/types';
@@ -37,6 +38,11 @@ export function ResultsView({ workflowPanels = true }: { workflowPanels?: boolea
 
   // One kernel run feeds both the NTA panel and the cards, so they cannot disagree.
   const kernelQuery = useKernelQuery(project);
+  const kernelState = useKernel();
+  const shellActions = useShellActions();
+  // The kernel answered with open points: "Ga naar Controle" next to Herberekenen (UX finding 2).
+  const kernelRefused = kernelQuery?.kind === 'done'
+    && (kernelQuery.assessment.status === 'incomplete' || kernelQuery.assessment.status === 'invalid');
   const kernel = calculatedAssessment(kernelQuery);
   const performance = kernel?.performance ?? null;
   const kernelPending = kernelQuery == null || kernelQuery.kind === 'loading';
@@ -96,6 +102,13 @@ export function ResultsView({ workflowPanels = true }: { workflowPanels?: boolea
 
       {!shown && !performance && <div className="results-empty">
         <p>{t('results.noResults')}</p>
+        <div className="results-empty__actions">
+          <button type="button" className="btn btn-primary" onClick={() => (shellActions ? shellActions.calculate() : kernelState?.refresh())}>
+            {t('shell.recalculate')}</button>
+          {kernelRefused && <button type="button" className="btn"
+            onClick={() => dispatch({ type: 'NAVIGATE', payload: { step: 'check', sub: 'overview' } })}>
+            {t('results.goToCheck')}</button>}
+        </div>
       </div>}
 
       <CalculationNotice />

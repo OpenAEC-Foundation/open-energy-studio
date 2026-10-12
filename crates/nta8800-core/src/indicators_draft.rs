@@ -255,7 +255,7 @@ pub fn assess_indicators_draft(input: &IndicatorsDraftInput) -> IndicatorsDraftA
             "invalid"
         },
         scope: "public_chapter_5_draft_indicators_from_supplied_annual_totals_only",
-        draft_source: DRAFT_SOURCE,
+        draft_source: crate::norm_versions::cite(DRAFT_SOURCE),
         target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint: input_fingerprint(&json!(input)),

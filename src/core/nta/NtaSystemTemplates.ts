@@ -197,6 +197,8 @@ export function preferredGeneratorTemplate(parts: Block[], project?: IProject): 
 
 /** A hot-water generator of `kind` in the kernel's `HotWaterGenerator` shape. */
 export function hotWaterGeneratorTemplate(kind: string): Block {
+  // "—": a blank the kernel names at `…generator.kind` (an empty string is no generator kind).
+  if (kind === '') return { kind: null };
   if (kind === 'gas_appliance') return { kind, appliance: null, measuredClass: 'class4', kitchenOnly: false };
   if (kind === 'heat_pump') return { kind, exhaustAirSource: false, measuredClass: 'class4' };
   if (kind === 'indirect_boiler') return { kind, boiler: null, oil: false, insideBoundary: true, alsoSpaceHeating: true };
@@ -205,7 +207,29 @@ export function hotWaterGeneratorTemplate(kind: string): Block {
     exhaustAirSource: false, storageWithoutLegionellaCycle: false, outdoorAirFraction: null, smartControlFactor: null,
     maxTestTemperatureC: null, designSetTemperatureC: null, sourceReference: '' };
   if (kind === 'chp') return { kind, chp: chpClassTemplate(), alsoSpaceHeating: false, equipmentReference: '' };
+  if (kind === 'booster_heat_pump_forfait') return { kind, designSupplyTemperatureC: null,
+    heatSource: boosterHeatSourceTemplate('external_heat'), sourceReference: '' };
+  // §13.8.4.5.4 other directly heated storage (gas above 150 kW).
+  if (kind === 'large_direct_storage') return { kind, gasFired: true };
+  if (kind === 'gas_storage_heater') return { kind, volumeL: null, before1985: false, inHeatedZone: true };
+  // §13.8.4.6 table 13.22 solid-biomass combi appliance.
+  if (kind === 'biomass_combi') return { kind, insulation: 'at_least20_mm', insideBoundary: true };
+  // §13.8.4.10 heat pumps in series: the source of the last one.
+  if (kind === 'heat_pump_series') return { kind, lastSource: 'outdoor_air' };
+  // §13.8.4.7.4 heat pump with an indirectly heated vessel.
+  if (kind === 'indirect_heat_pump') return { kind, alsoSpaceHeating: true };
+  // Annex W booster heat pump with the tests at 24 (or 16) and 40 °C.
+  if (kind === 'booster_heat_pump') return { kind,
+    lowTest: { sourceTemperatureC: 24, cop: null }, highTest: { sourceTemperatureC: 40, cop: null },
+    measuredClass: 'class4', standingLossKw: null, sourceTemperaturesC: [null],
+    heatSource: boosterHeatSourceTemplate('heating_system'), testReportReference: '' };
   return { kind };
+}
+
+/** Figure W.1: where a booster heat pump takes its source heat from. */
+export function boosterHeatSourceTemplate(kind: string): Block {
+  if (kind === 'collective_generator') return { kind, generationEfficiency: null, carrier: 'gas', sourceReference: '' };
+  return { kind: kind === 'heating_system' ? 'heating_system' : 'external_heat' };
 }
 
 /** §13.8.4.2: appliance tested at two tapping profiles (i1 = M, i2 = L). */
@@ -388,19 +412,22 @@ export function heatPumpRenewableTemplate(): Block {
   return { sourceBelow20C: false, exhaustAirSource: false, combinedOutdoorAndExhaustAir: false, sourceReference: '' };
 }
 
+/** Twelve blank months: the kernel names each one still empty (an empty list is only "invalid"). */
+const blankMonths = (): null[] => Array.from({ length: 12 }, () => null);
+
 /** §5.5 use determined outside the calculation, per month. */
 export function declaredUseTemplate(index = 0): Block {
-  return { id: `gebruik-${index + 1}`, service: null, carrier: 'el', monthlyKwh: [], sourceReference: '' };
+  return { id: `gebruik-${index + 1}`, service: null, carrier: 'el', monthlyKwh: blankMonths(), sourceReference: '' };
 }
 
 /** 5.35/5.36 ambient heat of a hot-water heat pump determined elsewhere. */
 export function declaredRenewableHeatTemplate(index = 0): Block {
-  return { id: `warmte-${index + 1}`, monthlyKwh: [], sourceReference: '' };
+  return { id: `warmte-${index + 1}`, monthlyKwh: blankMonths(), sourceReference: '' };
 }
 
 /** Chapter 16 electricity produced on site per month. */
 export function onSiteProductionTemplate(index = 0): Block {
-  return { id: `opwekking-${index + 1}`, kind: 'pv', monthlyKwh: [], sourceReference: '' };
+  return { id: `opwekking-${index + 1}`, kind: 'pv', monthlyKwh: blankMonths(), sourceReference: '' };
 }
 
 /** An annex P route (§5.8) of `method` for `fn` (heating, hot_water or cooling). */

@@ -12,6 +12,7 @@ import { WORKFLOW_STEPS, normalizeRoute } from '../core/navigation/routes';
 import { SURVEY_STEP_IDS } from '../core/survey/surveyFlow';
 import type { MaatwerkadviesAssessment, MwaVariantResult } from '../core/nta/KernelClient';
 import { renderWithProviders, userEvent } from './test-utils';
+import { SLOW_UI_TEST_MS } from './timeouts';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -84,7 +85,7 @@ describe('survey wizard (F8)', () => {
     await user.click(within(card).getByRole('button', { name: 'Calculate survey' }));
     expect(await within(card).findByText('C')).toBeInTheDocument();
     expect(within(card).getByText('Indicative')).toBeInTheDocument();
-    expect(within(card).getByText('1 default value(s)')).toBeInTheDocument();
+    expect(within(card).getByText('1 default value')).toBeInTheDocument();
     expect(within(progress).getByRole('button', { name: /Thermal envelope.*1 error/ })).toBeInTheDocument();
 
     await user.click(within(card).getByRole('button', { name: 'Details and default values' }));
@@ -92,7 +93,7 @@ describe('survey wizard (F8)', () => {
     expect(calls[calls.length - 1]).toEqual(['envelope', 'basisopname.envelope.surfaces[0].areaM2']);
     // The kernel result is kept while moving between sections.
     expect(within(card).getByText('C')).toBeInTheDocument();
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 });
 
 describe('maatwerkadvies tabs (F8)', () => {
@@ -148,7 +149,7 @@ describe('maatwerkadvies tabs (F8)', () => {
     const inspector = screen.getByRole('region', { name: 'Chosen package Schil + WP' });
     expect(within(inspector).getByLabelText('Label from E to A')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Advice report (pdf)' })).toBeInTheDocument();
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 });
 
 describe('relabel stepper (F8)', () => {
@@ -204,5 +205,5 @@ describe('relabel stepper (F8)', () => {
     const evidence = screen.getByRole('region', { name: /4 · Evidence roles/ });
     expect(within(evidence).getByText('Photo of PV or solar thermal with shading').parentElement).toHaveTextContent('1');
     expect(screen.getByText('No registration check from the calculation core yet. Choose Recalculate.')).toBeInTheDocument();
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 });

@@ -1,6 +1,7 @@
 /**
  * Status bar of the app shell (ontwerp §3.1, mockup 01): kernel state
- * (actueel / verouderd / bezig / achtergehouden), kernel version, BENG 1–3,
+ * (actueel / verouderd / bezig / achtergehouden), kernel version and NTA 8800
+ * edition (at every width), BENG 1–3,
  * TOjuli and the indicative label from the shared kernel run, the
  * "onverifieerd · geen attest" status and the save state. A click on a figure
  * opens Resultaten. Without a kernel answer the indicative engine's status
@@ -45,6 +46,12 @@ export function StatusBar() {
   // An older NTA 8800 edition: shown until the kernel answers, then from its result.
   const edition = assessment?.normVersion ?? state.project.ntaCalculation?.normVersion;
   const legacy = assessment ? legacyEdition(assessment) : edition != null && edition !== DEFAULT_NORM_VERSION;
+  // Kernel version and edition stay visible at every width (BRL 9501 §5.2: the output names its rekenkern).
+  const shownEdition = edition ?? DEFAULT_NORM_VERSION;
+  const editionText = assessment?.targetNormVersion ?? t(`nta.edition.${shownEdition}`);
+  const versionTitle = assessment
+    ? t('status.versionTitle', { kernel: assessment.kernelVersion, edition: editionText })
+    : t('status.editionTitle', { edition: editionText });
   const bbl = assessment?.performance?.bblCheck ?? null;
   const phase = kernel?.phase ?? 'idle';
   const phaseKey = phase === 'current' && kernel?.verdict === 'withheld' ? 'withheld' : phase;
@@ -62,9 +69,11 @@ export function StatusBar() {
           ? <Pill tone={phaseTone}>{t(`status.kernel.${phaseKey}`)}</Pill>
           : <span className="status-hint">{result ? t('status.calculated') : t('status.ready')}</span>}
       </div>
-      {assessment && (
-        <span className="status-chip status-optional">{t('status.kernelName')} <b>{assessment.kernelVersion}</b> · {assessment.targetNormVersion}</span>
-      )}
+      <span className="status-chip status-version" title={versionTitle} aria-label={versionTitle}>
+        {assessment && <>{t('status.kernelShort')} <b>{assessment.kernelVersion}</b> · </>}
+        <span className="status-version-long">{assessment?.targetNormVersion ?? t(`nta.edition.${shownEdition}`)}</span>
+        <span className="status-version-short">NTA 8800 {shownEdition}</span>
+      </span>
       {legacy && edition && (
         <Pill tone="warn"><span className="status-legacy-edition" title={t('nta.edition.legacyTitle')}>
           {t('status.legacyEdition', { edition: t(`nta.edition.${edition}`) })}

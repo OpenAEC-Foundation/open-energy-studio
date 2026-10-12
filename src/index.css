@@ -328,7 +328,15 @@ body {
   box-shadow: var(--focus-ring);
 }
 
-.dialog-field input[type="number"] {
+/* A NumberInput draws its own box (.ui-input); its inner control must not get a
+   second border from the rules above. */
+.dialog-field .ui-input .ui-input__control,
+.dialog-field .ui-input .ui-input__control:focus {
+  padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none;
+}
+
+.dialog-field input[type="number"],
+.dialog-field input.decimal-input {
   font-family: 'JetBrains Mono', monospace;
 }
 
@@ -425,7 +433,8 @@ h4, h5, h6 {
 
 /* ── Code / monospace ── */
 code, pre, .monospace,
-input[type="number"] {
+input[type="number"],
+input.decimal-input {
   font-family: 'JetBrains Mono', monospace;
 }
 

@@ -15,9 +15,16 @@
  *     summary.json      - Empty until a verified calculation is available
  */
 
-import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
+import { zipSync, strToU8, strFromU8 } from 'fflate';
+import { safeUnzip } from './safeUnzip';
 import { importUniec3Export, isUniec3Export } from './UNIEC3Import';
-import { withImportRecord } from './importLog';
+import {
+  ImportFormatError, ImportIssues, droppedOnExport, lookup, ntaInputNotInFormat, sourceVersionNotCarried, unreadData, unusableRatio,
+  withoutBom, type ImportResult, type ReadResult,
+} from './importIssues';
+import { downloadBytes, importFile, pickFile } from './importFile';
+import { ASSUMED_QV10 } from '../energy/normalizeProject';
+import { SURFACE_RESISTANCE } from '../energy/Constants';
 import type {
   IProject,
   Orientation, SurfaceType, HeatingSystemType,
@@ -201,13 +208,13 @@ const PROP = {
 // Value mapping helpers
 // ============================================================
 
-/** Format number as Dutch locale string (comma decimal separator) */
-function nlNum(n: number, decimals = 2): string {
-  return n.toFixed(decimals).replace('.', ',');
-}
-
-function parseNlNum(s: string): number {
-  return parseFloat(s.replace(',', '.'));
+/**
+ * A number as Uniec 3 writes it (decimal comma), at full precision: a
+ * rounded qv10, kWp, tilt or Rc would change the calculation input of a
+ * round trip.
+ */
+function nlNum(n: number): string {
+  return Number.isFinite(n) ? String(n).replace('.', ',') : '';
 }
 
 // Orientation mapping: our codes → UNIEC3 orientation codes
@@ -364,7 +371,7 @@ export function exportToUNIEC3(project: IProject): Uint8Array {
     [PROP.GEB_NAAM]: project.name || 'Naamloos',
     [PROP.GEB_ADRES]: project.address || '',
     [PROP.GEB_PLAATS]: project.city || '',
-    [PROP.GEB_FUNCTIE]: FUNC_TO_UNIEC3[project.buildingFunction] || 'GVL_FUNC_WOON',
+    [PROP.GEB_FUNCTIE]: lookup(FUNC_TO_UNIEC3, project.buildingFunction) ?? 'GVL_FUNC_WOON',
     [PROP.GEB_OMSCHR]: project.description || '',
   });
   entities.push(gebEntity);
@@ -396,9 +403,9 @@ export function exportToUNIEC3(project: IProject): Uint8Array {
 
       const begrEntity = makeEntity(ENT.BEGR, {
         [PROP.BEGR_NAAM]: surface.name,
-        [PROP.BEGR_TYPE]: SURFACE_TO_UNIEC3[surface.type] || 'GVL_BEGR_GEVEL',
+        [PROP.BEGR_TYPE]: lookup(SURFACE_TO_UNIEC3, surface.type) ?? 'GVL_BEGR_GEVEL',
         [PROP.BEGR_OPP]: nlNum(surface.area),
-        [PROP.BEGR_ORIENT]: ORIENT_TO_UNIEC3[surface.orientation] || 'GVL_BTNL_Z',
+        [PROP.BEGR_ORIENT]: lookup(ORIENT_TO_UNIEC3, surface.orientation) ?? 'GVL_BTNL_Z',
       });
       entities.push(begrEntity);
       relations.push(makeRelation(rzEntity.NTAEntityDataId, begrEntity.NTAEntityDataId, 'RZ_BEGR'));
@@ -408,7 +415,7 @@ export function exportToUNIEC3(project: IProject): Uint8Array {
         const constrdEntity = makeEntity(ENT.CONSTRD, {
           [PROP.CONSTRD_NAAM]: construction.name,
           [PROP.CONSTRD_RC]: nlNum(construction.rcValue),
-          [PROP.CONSTRD_U]: nlNum(construction.uValue, 3),
+          [PROP.CONSTRD_U]: nlNum(construction.uValue),
         });
         entities.push(constrdEntity);
         relations.push(makeRelation(begrEntity.NTAEntityDataId, constrdEntity.NTAEntityDataId, 'BEGR_CONSTRD'));
@@ -417,7 +424,7 @@ export function exportToUNIEC3(project: IProject): Uint8Array {
         const libEntity = makeEntity(ENT.LIBCONSTRD, {
           [PROP.CONSTRD_NAAM]: construction.name,
           [PROP.CONSTRD_RC]: nlNum(construction.rcValue),
-          [PROP.CONSTRD_U]: nlNum(construction.uValue, 3),
+          [PROP.CONSTRD_U]: nlNum(construction.uValue),
         });
         entities.push(libEntity);
         relations.push(makeRelation(constrdEntity.NTAEntityDataId, libEntity.NTAEntityDataId, 'CONSTRD_LIB'));
@@ -428,9 +435,9 @@ export function exportToUNIEC3(project: IProject): Uint8Array {
         const constrtEntity = makeEntity(ENT.CONSTRT, {
           [PROP.CONSTRT_NAAM]: win.name,
           [PROP.CONSTRT_OPP]: nlNum(win.area),
-          [PROP.CONSTRT_UW]: nlNum(win.uValue, 3),
-          [PROP.CONSTRT_GWAARDE]: nlNum(win.gValue, 2),
-          [PROP.CONSTRT_ORIENT]: ORIENT_TO_UNIEC3[win.orientation] || 'GVL_BTNL_Z',
+          [PROP.CONSTRT_UW]: nlNum(win.uValue),
+          [PROP.CONSTRT_GWAARDE]: nlNum(win.gValue),
+          [PROP.CONSTRT_ORIENT]: lookup(ORIENT_TO_UNIEC3, win.orientation) ?? 'GVL_BTNL_Z',
         });
         entities.push(constrtEntity);
         relations.push(makeRelation(begrEntity.NTAEntityDataId, constrtEntity.NTAEntityDataId, 'BEGR_CONSTRT'));
@@ -438,8 +445,8 @@ export function exportToUNIEC3(project: IProject): Uint8Array {
         // Library ref
         const libTEntity = makeEntity(ENT.LIBCONSTRT, {
           [PROP.CONSTRT_NAAM]: win.name,
-          [PROP.CONSTRT_UW]: nlNum(win.uValue, 3),
-          [PROP.CONSTRT_GWAARDE]: nlNum(win.gValue, 2),
+          [PROP.CONSTRT_UW]: nlNum(win.uValue),
+          [PROP.CONSTRT_GWAARDE]: nlNum(win.gValue),
         });
         entities.push(libTEntity);
         relations.push(makeRelation(constrtEntity.NTAEntityDataId, libTEntity.NTAEntityDataId, 'CONSTRT_LIB'));
@@ -450,7 +457,7 @@ export function exportToUNIEC3(project: IProject): Uint8Array {
     for (const tb of zone.thermalBridges) {
       const kbEntity = makeEntity(ENT.KOUDEBRUG, {
         [PROP.KB_NAAM]: tb.name,
-        [PROP.KB_PSI]: nlNum(tb.psiValue, 3),
+        [PROP.KB_PSI]: nlNum(tb.psiValue),
         [PROP.KB_LENGTE]: nlNum(tb.length),
       });
       entities.push(kbEntity);
@@ -459,7 +466,7 @@ export function exportToUNIEC3(project: IProject): Uint8Array {
 
     // Air tightness
     const luchtEntity = makeEntity(ENT.LUCHTDH, {
-      [PROP.LUCHTDH_QV10]: nlNum(zone.airTightness.qv10, 1),
+      [PROP.LUCHTDH_QV10]: nlNum(zone.airTightness.qv10),
     });
     entities.push(luchtEntity);
     relations.push(makeRelation(rzEntity.NTAEntityDataId, luchtEntity.NTAEntityDataId, 'RZ_LUCHTDH'));
@@ -474,9 +481,9 @@ export function exportToUNIEC3(project: IProject): Uint8Array {
     for (const hs of project.heatingSystems) {
       const verwOpwek = makeEntity(ENT['VERW-OPWEK'], {
         [PROP.VERW_NAAM]: hs.name,
-        [PROP.VERW_TYPE]: HEATING_TO_UNIEC3[hs.type] || 'GVL_VERW_HR107',
-        [PROP.VERW_COP]: nlNum(hs.cop),
-        [PROP.VERW_DEKKING]: nlNum(hs.coverageFraction, 2),
+        [PROP.VERW_TYPE]: lookup(HEATING_TO_UNIEC3, hs.type) ?? 'GVL_VERW_HR107',
+        ...(unusableRatio(hs.cop) ? {} : { [PROP.VERW_COP]: nlNum(hs.cop) }),
+        [PROP.VERW_DEKKING]: nlNum(hs.coverageFraction),
       });
       entities.push(verwOpwek);
       relations.push(makeRelation(verwGroup.NTAEntityDataId, verwOpwek.NTAEntityDataId, 'VERW_OPWEK'));
@@ -487,8 +494,8 @@ export function exportToUNIEC3(project: IProject): Uint8Array {
   for (const vs of project.ventilationSystems) {
     const ventEntity = makeEntity(ENT.VENT, {
       [PROP.VENT_NAAM]: vs.name,
-      [PROP.VENT_TYPE]: VENT_TO_UNIEC3[vs.type] || 'GVL_VENT_NAT',
-      [PROP.VENT_WTW]: nlNum(vs.heatRecoveryEfficiency, 2),
+      [PROP.VENT_TYPE]: lookup(VENT_TO_UNIEC3, vs.type) ?? 'GVL_VENT_NAT',
+      [PROP.VENT_WTW]: nlNum(vs.heatRecoveryEfficiency),
       [PROP.VENT_SFP]: nlNum(vs.sfp),
     });
     entities.push(ventEntity);
@@ -504,8 +511,8 @@ export function exportToUNIEC3(project: IProject): Uint8Array {
     for (const cs of project.coolingSystems) {
       const koelOpwek = makeEntity(ENT['KOEL-OPWEK'], {
         [PROP.KOEL_NAAM]: cs.name,
-        [PROP.KOEL_TYPE]: COOL_TO_UNIEC3[cs.type] || 'GVL_KOEL_GEEN',
-        [PROP.KOEL_EER]: nlNum(cs.eer),
+        [PROP.KOEL_TYPE]: lookup(COOL_TO_UNIEC3, cs.type) ?? 'GVL_KOEL_GEEN',
+        ...(unusableRatio(cs.eer, cs.type === 'none') ? {} : { [PROP.KOEL_EER]: nlNum(cs.eer) }),
       });
       entities.push(koelOpwek);
       relations.push(makeRelation(koelGroup.NTAEntityDataId, koelOpwek.NTAEntityDataId, 'KOEL_OPWEK'));
@@ -521,10 +528,10 @@ export function exportToUNIEC3(project: IProject): Uint8Array {
     for (const hw of project.hotWaterSystems) {
       const tapwOpwek = makeEntity(ENT['TAPW-OPWEK'], {
         [PROP.TAPW_NAAM]: hw.name,
-        [PROP.TAPW_TYPE]: HW_TO_UNIEC3[hw.type] || 'GVL_TAPW_HRCOMBI',
-        [PROP.TAPW_REND]: nlNum(hw.efficiency, 2),
+        [PROP.TAPW_TYPE]: lookup(HW_TO_UNIEC3, hw.type) ?? 'GVL_TAPW_HRCOMBI',
+        ...(unusableRatio(hw.efficiency) ? {} : { [PROP.TAPW_REND]: nlNum(hw.efficiency) }),
         [PROP.TAPW_ZONTHERM]: hw.hasSolarBoiler ? 'True' : 'False',
-        [PROP.TAPW_ZONTHERM_FRAC]: nlNum(hw.solarBoilerFraction, 2),
+        [PROP.TAPW_ZONTHERM_FRAC]: nlNum(hw.solarBoilerFraction),
       });
       entities.push(tapwOpwek);
       relations.push(makeRelation(tapwGroup.NTAEntityDataId, tapwOpwek.NTAEntityDataId, 'TAPW_OPWEK'));
@@ -542,9 +549,9 @@ export function exportToUNIEC3(project: IProject): Uint8Array {
     for (const pv of project.solarPV) {
       const pvVeld = makeEntity(ENT['PV-VELD'], {
         [PROP.PV_NAAM]: pv.name,
-        [PROP.PV_WP]: nlNum(pv.peakPower, 1),
-        [PROP.PV_ORIENT]: ORIENT_TO_UNIEC3[pv.orientation] || 'GVL_BTNL_Z',
-        [PROP.PV_HELLING]: nlNum(pv.tilt, 0),
+        [PROP.PV_WP]: nlNum(pv.peakPower),
+        [PROP.PV_ORIENT]: lookup(ORIENT_TO_UNIEC3, pv.orientation) ?? 'GVL_BTNL_Z',
+        [PROP.PV_HELLING]: nlNum(pv.tilt),
         [PROP.PV_OPP]: nlNum(pv.area),
       });
       entities.push(pvVeld);
@@ -557,9 +564,9 @@ export function exportToUNIEC3(project: IProject): Uint8Array {
     const ztEntity = makeEntity(ENT.ZONTHERM, {
       [PROP.ZT_NAAM]: st.name,
       [PROP.ZT_OPP]: nlNum(st.collectorArea),
-      [PROP.ZT_TYPE]: ST_TO_UNIEC3[st.type] || 'GVL_ZT_VLAK',
-      [PROP.ZT_ORIENT]: ORIENT_TO_UNIEC3[st.orientation] || 'GVL_BTNL_Z',
-      [PROP.ZT_HELLING]: nlNum(st.tilt, 0),
+      [PROP.ZT_TYPE]: lookup(ST_TO_UNIEC3, st.type) ?? 'GVL_ZT_VLAK',
+      [PROP.ZT_ORIENT]: lookup(ORIENT_TO_UNIEC3, st.orientation) ?? 'GVL_BTNL_Z',
+      [PROP.ZT_HELLING]: nlNum(st.tilt),
     });
     entities.push(ztEntity);
     relations.push(makeRelation(installEntity.NTAEntityDataId, ztEntity.NTAEntityDataId, 'INST_ZONTHERM'));
@@ -622,202 +629,335 @@ export function exportToUNIEC3(project: IProject): Uint8Array {
 // IMPORT: UNIEC3 ZIP → IProject
 // ============================================================
 
-export function importFromUNIEC3(zipData: Uint8Array, fileName?: string): IProject {
-  const files = unzipSync(zipData);
-  // A ZIP written by Uniec3 itself (meta.json without the draft marker, relations with ParentId/ChildId).
-  if (isUniec3Export(files)) return importUniec3Export(files, fileName);
-  const project = importDraftUNIEC3(files);
-  return withImportRecord(project, 'UNIEC3', fileName);
+function parseJsonList(bytes: Uint8Array, file: string): unknown[] {
+  let data: unknown;
+  try {
+    data = JSON.parse(withoutBom(strFromU8(bytes)));
+  } catch {
+    throw new ImportFormatError('uniec3_json_invalid', `${file} is geen geldige JSON.`, { file });
+  }
+  if (!Array.isArray(data)) {
+    throw new ImportFormatError('uniec3_shape_invalid', `${file} moet een lijst zijn.`, { file });
+  }
+  return data;
 }
 
-/** The app's own `.input-draft.uniec3` (exportToUNIEC3), not the format Uniec3 writes. */
-function importDraftUNIEC3(files: Record<string, Uint8Array>): IProject {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value != null && typeof value === 'object' && !Array.isArray(value);
+}
 
-  // Find the building directory
-  let buildingId = '';
-  for (const path of Object.keys(files)) {
-    const match = path.match(/^buildings\/(\d+)\/entities\.json$/);
-    if (match) {
-      buildingId = match[1];
-      break;
+/** Checks the shape of entities.json; a missing property list counts as empty. */
+function readEntities(list: unknown[], file: string): UNIEC3Entity[] {
+  return list.map((item, index) => {
+    if (!isRecord(item) || typeof item.NTAEntityDataId !== 'string' || typeof item.NTAEntityId !== 'string') {
+      throw new ImportFormatError('uniec3_shape_invalid',
+        `${file}: element ${index} heeft geen geldige NTAEntityDataId en NTAEntityId.`, { file });
     }
+    const raw = item.NTAPropertyDatas ?? [];
+    if (!Array.isArray(raw)) {
+      throw new ImportFormatError('uniec3_shape_invalid',
+        `${file}: NTAPropertyDatas van element ${index} moet een lijst zijn.`, { file });
+    }
+    const properties: UNIEC3Property[] = [];
+    for (const property of raw) {
+      if (!isRecord(property) || typeof property.NTAPropertyId !== 'string') continue;
+      const value = property.Value;
+      if (typeof value === 'string') properties.push({ NTAPropertyId: property.NTAPropertyId, Value: value });
+      else if (typeof value === 'number' && Number.isFinite(value)) {
+        properties.push({ NTAPropertyId: property.NTAPropertyId, Value: String(value) });
+      }
+    }
+    return { NTAEntityDataId: item.NTAEntityDataId, NTAEntityId: item.NTAEntityId, NTAPropertyDatas: properties };
+  });
+}
+
+function readRelations(list: unknown[], file: string): UNIEC3Relation[] {
+  return list.map((item, index) => {
+    if (!isRecord(item) || typeof item.NTAEntityRelationId !== 'string'
+      || typeof item.ParentNTAEntityDataId !== 'string' || typeof item.ChildNTAEntityDataId !== 'string') {
+      throw new ImportFormatError('uniec3_shape_invalid',
+        `${file}: relatie ${index} heeft geen geldige ouder, kind en relatiesoort.`, { file });
+    }
+    return {
+      NTAEntityDataId: typeof item.NTAEntityDataId === 'string' ? item.NTAEntityDataId : '',
+      NTAEntityRelationId: item.NTAEntityRelationId,
+      ParentNTAEntityDataId: item.ParentNTAEntityDataId,
+      ChildNTAEntityDataId: item.ChildNTAEntityDataId,
+    };
+  });
+}
+
+/** A Uniec 3 code through its table; a missing or unknown code gives the fallback and an issue. */
+function codeOf<T>(
+  issues: ImportIssues, path: string, code: string | undefined, table: Record<string, T>, fallback: T, what: string,
+): T {
+  if (!code) {
+    issues.add('defaulted', path, `${what} ontbreekt; ${String(fallback)} aangenomen.`, String(fallback));
+    return fallback;
+  }
+  const value = lookup(table, code);
+  if (value === undefined) {
+    issues.add('invalid', path, `Onbekende code "${code.slice(0, 40)}" voor ${what.toLowerCase()}; ${String(fallback)} aangenomen.`, code.slice(0, 40));
+    return fallback;
+  }
+  return value;
+}
+
+/** Property ids this importer reads; any other property of an entity it reads is reported. */
+const READ_PROPERTIES = new Set<string>(Object.values(PROP));
+
+/**
+ * Entities the importer passes over on purpose: our own export writes a
+ * library copy of every construction (the values are read from the
+ * construction itself) and an empty settings entity.
+ */
+const LIBRARY_ENTITIES = new Set<string>([ENT.LIBCONSTRD, ENT.LIBCONSTRT]);
+
+/**
+ * The program and NTA 8800 version meta.json names ("NTA8800 v3.4.0.3,
+ * VersionId 311, …"); undefined when the file has no readable meta.json.
+ */
+function metaVersion(bytes: Uint8Array | undefined): string | undefined {
+  if (!bytes) return undefined;
+  let meta: unknown;
+  try {
+    meta = JSON.parse(withoutBom(strFromU8(bytes)));
+  } catch {
+    return undefined;
+  }
+  if (!isRecord(meta)) return undefined;
+  const parts = [
+    typeof meta.NTAVersion === 'string' ? meta.NTAVersion.trim() : '',
+    typeof meta.VersionId === 'number' || typeof meta.VersionId === 'string' ? `VersionId ${String(meta.VersionId).trim()}` : '',
+    typeof meta.Generator === 'string' ? meta.Generator.trim() : '',
+  ].filter((part) => part !== '').map((part) => part.slice(0, 80));
+  return parts.length > 0 ? parts.join(', ') : undefined;
+}
+
+/** Imports a Uniec 3 archive, with the list of what the program filled in or left out. */
+export function readUNIEC3(zipData: Uint8Array): ReadResult {
+  // Only the building entities and relations and meta.json are read, with a
+  // size cap, so a crafted archive cannot unpack gigabytes into memory.
+  const files = safeUnzip(zipData, (name) => name === 'meta.json' || /^buildings\/\d+\/(entities|relations)\.json$/.test(name));
+  // A ZIP written by Uniec3 itself (relations with ParentId/ChildId, library constructions): the
+  // real-format importer of UNIEC3Import.ts; the rest is the app's own input-draft format.
+  if (isUniec3Export(files)) {
+    return { project: importUniec3Export(files), issues: new ImportIssues(), sourceVersion: metaVersion(files['meta.json']) };
+  }
+  const issues = new ImportIssues();
+  const sourceVersion = metaVersion(files['meta.json']);
+
+  const buildingIds = [...new Set(Object.keys(files)
+    .map((path) => path.match(/^buildings\/(\d+)\/entities\.json$/)?.[1])
+    .filter((id): id is string => !!id))]
+    .sort((a, b) => Number(a) - Number(b));
+  if (buildingIds.length === 0) {
+    throw new ImportFormatError('uniec3_no_building', 'Geen gebouw gevonden in het UNIEC3-bestand.');
+  }
+  const buildingId = buildingIds[0];
+  if (buildingIds.length > 1) {
+    issues.add('multiple', 'buildings',
+      `Het bestand bevat ${buildingIds.length} gebouwen (${buildingIds.join(', ')}); alleen gebouw ${buildingId} is ingelezen.`,
+      buildingIds.length);
   }
 
-  if (!buildingId) {
-    throw new Error('Geen gebouw gevonden in UNIEC3 bestand');
-  }
-
-  const entitiesData = files[`buildings/${buildingId}/entities.json`];
-  const relationsData = files[`buildings/${buildingId}/relations.json`];
-
+  const entitiesFile = `buildings/${buildingId}/entities.json`;
+  const relationsFile = `buildings/${buildingId}/relations.json`;
+  const entitiesData = files[entitiesFile];
+  const relationsData = files[relationsFile];
   if (!entitiesData || !relationsData) {
-    throw new Error('Ongeldig UNIEC3 bestand: entities.json of relations.json ontbreekt');
+    throw new ImportFormatError('uniec3_files_missing', 'Ongeldig UNIEC3-bestand: entities.json of relations.json ontbreekt.');
   }
+  const entities = readEntities(parseJsonList(entitiesData, entitiesFile), entitiesFile);
+  const relations = readRelations(parseJsonList(relationsData, relationsFile), relationsFile);
 
-  const entities: UNIEC3Entity[] = JSON.parse(strFromU8(entitiesData));
-  const relations: UNIEC3Relation[] = JSON.parse(strFromU8(relationsData));
-
-  // Build lookup maps
+  // Lookup by id; a repeated id keeps its first entity.
   const entityById = new Map<string, UNIEC3Entity>();
-  for (const e of entities) {
-    entityById.set(e.NTAEntityDataId, e);
+  let duplicates = 0;
+  for (const entity of entities) {
+    if (entityById.has(entity.NTAEntityDataId)) {
+      duplicates += 1;
+      continue;
+    }
+    entityById.set(entity.NTAEntityDataId, entity);
+  }
+  if (duplicates > 0) {
+    issues.add('duplicate', 'entities',
+      `${duplicates} entiteit(en) met een id dat al voorkwam; telkens de eerste is ingelezen.`, duplicates);
   }
 
-  // Build parent→children map
+  // Parent → children; relations to ids that are not in the file are reported.
   const childrenOf = new Map<string, { childId: string; relationId: string }[]>();
-  for (const r of relations) {
-    const children = childrenOf.get(r.ParentNTAEntityDataId) || [];
-    children.push({ childId: r.ChildNTAEntityDataId, relationId: r.NTAEntityRelationId });
-    childrenOf.set(r.ParentNTAEntityDataId, children);
+  let unknownReferences = 0;
+  for (const relation of relations) {
+    if (!entityById.has(relation.ParentNTAEntityDataId) || !entityById.has(relation.ChildNTAEntityDataId)) {
+      unknownReferences += 1;
+      continue;
+    }
+    const children = childrenOf.get(relation.ParentNTAEntityDataId) || [];
+    children.push({ childId: relation.ChildNTAEntityDataId, relationId: relation.NTAEntityRelationId });
+    childrenOf.set(relation.ParentNTAEntityDataId, children);
+  }
+  if (unknownReferences > 0) {
+    issues.add('unknown_reference', 'relations',
+      `${unknownReferences} relatie(s) verwijzen naar een entiteit die niet in het bestand staat en zijn overgeslagen.`,
+      unknownReferences);
   }
 
-  // Find entities by type
-  const findByType = (type: string) => entities.filter(e => e.NTAEntityId === type);
-  const getChildren = (parentId: string, relId?: string) => {
-    const children = childrenOf.get(parentId) || [];
-    return (relId ? children.filter(c => c.relationId === relId) : children)
-      .map(c => entityById.get(c.childId))
-      .filter((e): e is UNIEC3Entity => !!e);
+  const unique = [...entityById.values()];
+  // Every entity the importer reads is marked, so what it passes over can be reported.
+  const read = new Set<UNIEC3Entity>();
+  const mark = (entities: UNIEC3Entity[]) => {
+    for (const entity of entities) read.add(entity);
+    return entities;
   };
+  const findByType = (type: string) => mark(unique.filter(e => e.NTAEntityId === type));
+  const childrenBy = (parentId: string, relId: string) => (childrenOf.get(parentId) || [])
+    .filter(c => c.relationId === relId)
+    .map(c => entityById.get(c.childId))
+    .filter((e): e is UNIEC3Entity => !!e);
+  const getChildren = (parentId: string, relId: string) => mark(childrenBy(parentId, relId));
+  /** The one child the importer reads; any further ones stay unread and are reported. */
+  const firstChild = (parentId: string, relId: string): UNIEC3Entity | undefined => mark(childrenBy(parentId, relId).slice(0, 1))[0];
 
-  // Find GEB (building) entity
+  // Building (GEB); further buildings and units are reported as 'multiple', not as unread.
   const gebEntities = findByType(ENT.GEB);
   const geb = gebEntities[0];
   if (!geb) {
-    throw new Error('Geen GEB (gebouw) entiteit gevonden');
+    throw new ImportFormatError('uniec3_no_geb', 'Geen GEB-entiteit (gebouw) gevonden.');
+  }
+  if (gebEntities.length > 1) {
+    issues.add('multiple', 'GEB',
+      `Het bestand bevat ${gebEntities.length} gebouwentiteiten; alleen de eerste is ingelezen.`, gebEntities.length);
   }
 
-  // Extract project info
   const projectName = getEntityProp(geb, PROP.GEB_NAAM) || 'Geïmporteerd project';
   const address = getEntityProp(geb, PROP.GEB_ADRES) || '';
   const city = getEntityProp(geb, PROP.GEB_PLAATS) || '';
-  const funcCode = getEntityProp(geb, PROP.GEB_FUNCTIE) || '';
   const description = getEntityProp(geb, PROP.GEB_OMSCHR) || '';
-  const buildingFunction = FUNC_FROM_UNIEC3[funcCode] || 'residential';
+  const buildingFunction = codeOf<BuildingFunction>(issues, 'buildingFunction', getEntityProp(geb, PROP.GEB_FUNCTIE),
+    FUNC_FROM_UNIEC3, 'residential', 'Gebruiksfunctie');
 
-  // Find UNIT → zones, installations
+  // Unit → zones and installations
   const unitEntities = findByType(ENT.UNIT);
+  if (unitEntities.length > 1) {
+    issues.add('multiple', 'UNIT',
+      `Het bestand bevat ${unitEntities.length} units; alleen de eerste is ingelezen.`, unitEntities.length);
+  }
   const unit = unitEntities[0] || geb; // fallback to geb if no unit
 
-  // Parse zones
   const zones: IZone[] = [];
   const constructions: IConstruction[] = [];
   const rzEntities = getChildren(unit.NTAEntityDataId, 'UNIT_RZ');
-  if (rzEntities.length === 0) {
-    // Try direct RZ entities
-    rzEntities.push(...findByType(ENT.RZ));
-  }
+  if (rzEntities.length === 0) rzEntities.push(...findByType(ENT.RZ));
 
-  for (const rz of rzEntities) {
+  rzEntities.forEach((rz, zoneIndex) => {
+    const zp = `zones[${zoneIndex}]`;
     const zoneName = getEntityProp(rz, PROP.RZ_NAAM) || 'Zone';
-    const floorArea = parseNlNum(getEntityProp(rz, PROP.RZ_AG) || '0');
-    const volume = parseNlNum(getEntityProp(rz, PROP.RZ_VOLUME) || '0');
-    const height = parseNlNum(getEntityProp(rz, PROP.RZ_HOOGTE) || '2,6');
+    const floorArea = issues.number(`${zp}.floorArea`, getEntityProp(rz, PROP.RZ_AG), { fallback: 0, min: 0 });
+    const volume = issues.number(`${zp}.volume`, getEntityProp(rz, PROP.RZ_VOLUME), { fallback: 0, min: 0 });
+    const height = issues.number(`${zp}.height`, getEntityProp(rz, PROP.RZ_HOOGTE), { fallback: 2.6, min: 0 });
 
     const surfaces: ISurface[] = [];
     const thermalBridges: IThermalBridge[] = [];
-    let qv10 = 0.4;
 
-    // Parse surfaces (BEGR)
-    const begrEntities = getChildren(rz.NTAEntityDataId, 'RZ_BEGR');
-    for (const begr of begrEntities) {
+    getChildren(rz.NTAEntityDataId, 'RZ_BEGR').forEach((begr, surfaceIndex) => {
+      const sp = `${zp}.surfaces[${surfaceIndex}]`;
       const surfaceName = getEntityProp(begr, PROP.BEGR_NAAM) || 'Vlak';
-      const surfaceTypeCode = getEntityProp(begr, PROP.BEGR_TYPE) || '';
-      const area = parseNlNum(getEntityProp(begr, PROP.BEGR_OPP) || '0');
-      const orientCode = getEntityProp(begr, PROP.BEGR_ORIENT) || '';
+      const area = issues.number(`${sp}.area`, getEntityProp(begr, PROP.BEGR_OPP), { fallback: 0, min: 0 });
+      const surfaceType = codeOf<SurfaceType>(issues, `${sp}.type`, getEntityProp(begr, PROP.BEGR_TYPE),
+        SURFACE_FROM_UNIEC3, 'wall', 'Vlaksoort');
+      const orientation = codeOf<Orientation>(issues, `${sp}.orientation`, getEntityProp(begr, PROP.BEGR_ORIENT),
+        ORIENT_FROM_UNIEC3, 'S', 'Oriëntatie');
 
-      const surfaceType = SURFACE_FROM_UNIEC3[surfaceTypeCode] || 'wall';
-      const orientation = ORIENT_FROM_UNIEC3[orientCode] || 'S';
-
-      // Find opaque construction
+      // Opaque construction: the U from the file, else from Rc with the R_si of the element type
+      // (NTA 8800 table C.2); never a U of 0.
       let constructionId = '';
-      const constrdEntities = getChildren(begr.NTAEntityDataId, 'BEGR_CONSTRD');
-      if (constrdEntities.length > 0) {
-        const constrd = constrdEntities[0];
+      const constrd = firstChild(begr.NTAEntityDataId, 'BEGR_CONSTRD');
+      if (constrd) {
         const cName = getEntityProp(constrd, PROP.CONSTRD_NAAM) || surfaceName;
-        const rc = parseNlNum(getEntityProp(constrd, PROP.CONSTRD_RC) || '0');
-        const u = parseNlNum(getEntityProp(constrd, PROP.CONSTRD_U) || '0');
-
-        // Check if construction already exists
-        let existing = constructions.find(c => c.name === cName && Math.abs(c.rcValue - rc) < 0.01);
-        if (!existing) {
-          existing = {
-            id: crypto.randomUUID(),
-            name: cName,
-            layers: [],
-            rcValue: rc,
-            uValue: u || (rc > 0 ? 1 / (rc + 0.17 + 0.04) : 0),
-          };
-          constructions.push(existing);
+        const rc = issues.number(`${sp}.construction.rcValue`, getEntityProp(constrd, PROP.CONSTRD_RC),
+          { fallback: 0, min: 0, silentWhenMissing: true });
+        let u = issues.number(`${sp}.construction.uValue`, getEntityProp(constrd, PROP.CONSTRD_U),
+          { fallback: 0, min: 0, minExclusive: true, silentWhenMissing: true });
+        if (!(u > 0) && rc > 0) {
+          const { rsi, rse } = SURFACE_RESISTANCE[surfaceType];
+          u = 1 / (rc + rsi + rse);
+          issues.add('defaulted', `${sp}.construction.uValue`,
+            `U ontbreekt; berekend uit Rc ${rc} met R_si ${rsi} en R_se ${rse}.`, u);
         }
-        constructionId = existing.id;
+        if (u > 0) {
+          let existing = constructions.find(c => c.name === cName && Math.abs(c.rcValue - rc) < 0.01
+            && Math.abs(c.uValue - u) < 1e-9);
+          if (!existing) {
+            existing = { id: crypto.randomUUID(), name: cName, layers: [], rcValue: rc, uValue: u };
+            constructions.push(existing);
+          }
+          constructionId = existing.id;
+        } else {
+          issues.add('dropped', `${sp}.constructionId`,
+            `Constructie "${cName}" heeft geen Rc en geen U; niet gekoppeld, vul de constructie aan.`);
+        }
       }
 
-      // Find windows (transparent constructions)
-      const windows: IWindow[] = [];
-      const constrtEntities = getChildren(begr.NTAEntityDataId, 'BEGR_CONSTRT');
-      for (const constrt of constrtEntities) {
-        windows.push({
+      const windows: IWindow[] = getChildren(begr.NTAEntityDataId, 'BEGR_CONSTRT').map((constrt, windowIndex) => {
+        const wp = `${sp}.windows[${windowIndex}]`;
+        const orientCode = getEntityProp(constrt, PROP.CONSTRT_ORIENT);
+        return {
           id: crypto.randomUUID(),
           name: getEntityProp(constrt, PROP.CONSTRT_NAAM) || 'Raam',
-          area: parseNlNum(getEntityProp(constrt, PROP.CONSTRT_OPP) || '0'),
-          uValue: parseNlNum(getEntityProp(constrt, PROP.CONSTRT_UW) || '1,5'),
-          gValue: parseNlNum(getEntityProp(constrt, PROP.CONSTRT_GWAARDE) || '0,5'),
-          orientation: ORIENT_FROM_UNIEC3[getEntityProp(constrt, PROP.CONSTRT_ORIENT) || ''] || orientation,
-          surfaceId: '', // will be set below
-        });
-      }
+          area: issues.number(`${wp}.area`, getEntityProp(constrt, PROP.CONSTRT_OPP), { fallback: 0, min: 0 }),
+          uValue: issues.number(`${wp}.uValue`, getEntityProp(constrt, PROP.CONSTRT_UW),
+            { fallback: 1.5, min: 0, minExclusive: true }),
+          gValue: issues.number(`${wp}.gValue`, getEntityProp(constrt, PROP.CONSTRT_GWAARDE),
+            { fallback: 0.5, min: 0, max: 1, clamp: true }),
+          // A window without its own orientation faces the way its surface does.
+          orientation: orientCode
+            ? codeOf<Orientation>(issues, `${wp}.orientation`, orientCode, ORIENT_FROM_UNIEC3, orientation, 'Oriëntatie')
+            : orientation,
+          surfaceId: '', // set below
+        };
+      });
 
       const surfaceId = crypto.randomUUID();
       for (const w of windows) w.surfaceId = surfaceId;
+      surfaces.push({ id: surfaceId, name: surfaceName, type: surfaceType, area, orientation, constructionId, zoneId: '', windows });
+      // A UNIEC3 begrenzing has no tilt here: a pitched roof needs it in the NTA input, as on a VABI import.
+      if (surfaceType === 'roof' && orientation !== 'horizontal') {
+        issues.add('dropped', `${sp}.tilt`, `Hellingshoek van dak "${surfaceName}" ontbreekt; vul die in bij de NTA-invoer.`);
+      }
+    });
 
-      surfaces.push({
-        id: surfaceId,
-        name: surfaceName,
-        type: surfaceType,
-        area,
-        orientation,
-        constructionId,
-        zoneId: '', // will be set below
-        windows,
-      });
-    }
-
-    // Parse thermal bridges
-    const kbEntities = getChildren(rz.NTAEntityDataId, 'RZ_KOUDEBRUG');
-    for (const kb of kbEntities) {
+    getChildren(rz.NTAEntityDataId, 'RZ_KOUDEBRUG').forEach((kb, bridgeIndex) => {
+      const bp = `${zp}.thermalBridges[${bridgeIndex}]`;
       thermalBridges.push({
         id: crypto.randomUUID(),
         name: getEntityProp(kb, PROP.KB_NAAM) || 'Koudebrug',
-        psiValue: parseNlNum(getEntityProp(kb, PROP.KB_PSI) || '0'),
-        length: parseNlNum(getEntityProp(kb, PROP.KB_LENGTE) || '0'),
-        zoneId: '', // will be set below
+        // ψ may be negative (NTA 8800 §8.2.3); only its absence is reported.
+        psiValue: issues.number(`${bp}.psiValue`, getEntityProp(kb, PROP.KB_PSI), { fallback: 0 }),
+        length: issues.number(`${bp}.length`, getEntityProp(kb, PROP.KB_LENGTE), { fallback: 0, min: 0 }),
+        zoneId: '',
       });
-    }
+    });
 
-    // Parse air tightness
-    const luchtEntities = getChildren(rz.NTAEntityDataId, 'RZ_LUCHTDH');
-    if (luchtEntities.length > 0) {
-      qv10 = parseNlNum(getEntityProp(luchtEntities[0], PROP.LUCHTDH_QV10) || '0,4');
-    }
+    // Air tightness: a missing, zero or unreadable qv10 gets the importer default, marked assumed
+    // (as normalizeProject does), so the envelope view asks the adviser to check it.
+    const lucht = firstChild(rz.NTAEntityDataId, 'RZ_LUCHTDH');
+    const before = issues.list.length;
+    const qv10 = issues.number(`${zp}.airTightness.qv10`, lucht ? getEntityProp(lucht, PROP.LUCHTDH_QV10) : undefined, {
+      fallback: ASSUMED_QV10, min: 0, minExclusive: true, fallbackReason: 'aangenomen waarde, te controleren',
+    });
+    const assumed = issues.list.length > before;
 
     const zoneId = crypto.randomUUID();
-    for (const s of surfaces) s.zoneId = zoneId;
-    for (const tb of thermalBridges) tb.zoneId = zoneId;
-
+    for (const surface of surfaces) surface.zoneId = zoneId;
+    for (const bridge of thermalBridges) bridge.zoneId = zoneId;
     zones.push({
-      id: zoneId,
-      name: zoneName,
-      floorArea,
-      volume,
-      height,
-      surfaces,
-      thermalBridges,
-      airTightness: { qv10 },
+      id: zoneId, name: zoneName, floorArea, volume, height, surfaces, thermalBridges,
+      airTightness: assumed ? { qv10, assumed: true } : { qv10 },
     });
-  }
+  });
 
-  // Parse installations from INSTALLATIE group
   const heatingSystems: IHeatingSystem[] = [];
   const ventilationSystems: IVentilationSystem[] = [];
   const coolingSystems: ICoolingSystem[] = [];
@@ -825,199 +965,182 @@ function importDraftUNIEC3(files: Record<string, Uint8Array>): IProject {
   const solarPV: ISolarPV[] = [];
   const solarThermal: ISolarThermal[] = [];
 
-  const installEntities = getChildren(unit.NTAEntityDataId, 'UNIT_INSTALLATIE');
-  const installParent = installEntities[0] || unit;
+  const installParent = firstChild(unit.NTAEntityDataId, 'UNIT_INSTALLATIE') || unit;
 
-  // Heating
-  const verwEntities = getChildren(installParent.NTAEntityDataId, 'INST_VERW');
-  for (const verw of verwEntities) {
-    const opwekEntities = getChildren(verw.NTAEntityDataId, 'VERW_OPWEK');
-    for (const opwek of opwekEntities) {
-      const typeCode = getEntityProp(opwek, PROP.VERW_TYPE) || '';
-      heatingSystems.push({
-        id: crypto.randomUUID(),
-        name: getEntityProp(opwek, PROP.VERW_NAAM) || 'Verwarming',
-        type: HEATING_FROM_UNIEC3[typeCode] || 'hr107',
-        cop: parseNlNum(getEntityProp(opwek, PROP.VERW_COP) || '1'),
-        coverageFraction: parseNlNum(getEntityProp(opwek, PROP.VERW_DEKKING) || '1'),
-      });
-    }
+  const heating = (opwek: UNIEC3Entity) => {
+    const hp = `heatingSystems[${heatingSystems.length}]`;
+    heatingSystems.push({
+      id: crypto.randomUUID(),
+      name: getEntityProp(opwek, PROP.VERW_NAAM) || 'Verwarming',
+      type: codeOf<HeatingSystemType>(issues, `${hp}.type`, getEntityProp(opwek, PROP.VERW_TYPE),
+        HEATING_FROM_UNIEC3, 'hr107', 'Verwarmingssoort'),
+      cop: issues.number(`${hp}.cop`, getEntityProp(opwek, PROP.VERW_COP), { fallback: 1, min: 0, minExclusive: true }),
+      coverageFraction: issues.number(`${hp}.coverageFraction`, getEntityProp(opwek, PROP.VERW_DEKKING),
+        { fallback: 1, min: 0, max: 1, clamp: true }),
+    });
+  };
+  for (const verw of getChildren(installParent.NTAEntityDataId, 'INST_VERW')) {
+    getChildren(verw.NTAEntityDataId, 'VERW_OPWEK').forEach(heating);
   }
+  if (heatingSystems.length === 0) findByType(ENT['VERW-OPWEK']).forEach(heating);
 
-  // Also check for VERW-OPWEK directly under install
-  if (heatingSystems.length === 0) {
-    for (const opwek of findByType(ENT['VERW-OPWEK'])) {
-      const typeCode = getEntityProp(opwek, PROP.VERW_TYPE) || '';
-      heatingSystems.push({
-        id: crypto.randomUUID(),
-        name: getEntityProp(opwek, PROP.VERW_NAAM) || 'Verwarming',
-        type: HEATING_FROM_UNIEC3[typeCode] || 'hr107',
-        cop: parseNlNum(getEntityProp(opwek, PROP.VERW_COP) || '1'),
-        coverageFraction: parseNlNum(getEntityProp(opwek, PROP.VERW_DEKKING) || '1'),
-      });
-    }
-  }
-
-  // Ventilation
-  const ventEntities = getChildren(installParent.NTAEntityDataId, 'INST_VENT');
-  for (const vent of ventEntities) {
-    const typeCode = getEntityProp(vent, PROP.VENT_TYPE) || '';
+  const ventilation = (vent: UNIEC3Entity) => {
+    const vp = `ventilationSystems[${ventilationSystems.length}]`;
     ventilationSystems.push({
       id: crypto.randomUUID(),
       name: getEntityProp(vent, PROP.VENT_NAAM) || 'Ventilatie',
-      type: VENT_FROM_UNIEC3[typeCode] || 'natural',
-      heatRecoveryEfficiency: parseNlNum(getEntityProp(vent, PROP.VENT_WTW) || '0'),
-      sfp: parseNlNum(getEntityProp(vent, PROP.VENT_SFP) || '0'),
+      type: codeOf<VentilationType>(issues, `${vp}.type`, getEntityProp(vent, PROP.VENT_TYPE),
+        VENT_FROM_UNIEC3, 'natural', 'Ventilatiesoort'),
+      heatRecoveryEfficiency: issues.number(`${vp}.heatRecoveryEfficiency`, getEntityProp(vent, PROP.VENT_WTW),
+        { fallback: 0, min: 0, max: 1, clamp: true, silentWhenMissing: true }),
+      sfp: issues.number(`${vp}.sfp`, getEntityProp(vent, PROP.VENT_SFP), { fallback: 0, min: 0, silentWhenMissing: true }),
     });
-  }
+  };
+  getChildren(installParent.NTAEntityDataId, 'INST_VENT').forEach(ventilation);
+  if (ventilationSystems.length === 0) findByType(ENT.VENT).forEach(ventilation);
 
-  // Also check VENT directly
-  if (ventilationSystems.length === 0) {
-    for (const vent of findByType(ENT.VENT)) {
-      const typeCode = getEntityProp(vent, PROP.VENT_TYPE) || '';
-      ventilationSystems.push({
-        id: crypto.randomUUID(),
-        name: getEntityProp(vent, PROP.VENT_NAAM) || 'Ventilatie',
-        type: VENT_FROM_UNIEC3[typeCode] || 'natural',
-        heatRecoveryEfficiency: parseNlNum(getEntityProp(vent, PROP.VENT_WTW) || '0'),
-        sfp: parseNlNum(getEntityProp(vent, PROP.VENT_SFP) || '0'),
-      });
-    }
-  }
-
-  // Cooling
-  const koelEntities = getChildren(installParent.NTAEntityDataId, 'INST_KOEL');
-  for (const koel of koelEntities) {
-    const opwekEntities = getChildren(koel.NTAEntityDataId, 'KOEL_OPWEK');
-    for (const opwek of opwekEntities) {
-      const typeCode = getEntityProp(opwek, PROP.KOEL_TYPE) || '';
+  for (const koel of getChildren(installParent.NTAEntityDataId, 'INST_KOEL')) {
+    for (const opwek of getChildren(koel.NTAEntityDataId, 'KOEL_OPWEK')) {
+      const cp = `coolingSystems[${coolingSystems.length}]`;
+      const type = codeOf<CoolingSystemType>(issues, `${cp}.type`, getEntityProp(opwek, PROP.KOEL_TYPE),
+        COOL_FROM_UNIEC3, 'none', 'Koelsoort');
       coolingSystems.push({
         id: crypto.randomUUID(),
         name: getEntityProp(opwek, PROP.KOEL_NAAM) || 'Koeling',
-        type: COOL_FROM_UNIEC3[typeCode] || 'none',
-        eer: parseNlNum(getEntityProp(opwek, PROP.KOEL_EER) || '3'),
+        type,
+        // Without cooling the EER is not used, so 0 is kept as it is.
+        eer: issues.number(`${cp}.eer`, getEntityProp(opwek, PROP.KOEL_EER),
+          { fallback: 3, min: 0, minExclusive: type !== 'none' }),
       });
     }
   }
 
-  // Hot water
-  const tapwEntities = getChildren(installParent.NTAEntityDataId, 'INST_TAPW');
-  for (const tapw of tapwEntities) {
-    const opwekEntities = getChildren(tapw.NTAEntityDataId, 'TAPW_OPWEK');
-    for (const opwek of opwekEntities) {
-      const typeCode = getEntityProp(opwek, PROP.TAPW_TYPE) || '';
+  for (const tapw of getChildren(installParent.NTAEntityDataId, 'INST_TAPW')) {
+    for (const opwek of getChildren(tapw.NTAEntityDataId, 'TAPW_OPWEK')) {
+      const wp = `hotWaterSystems[${hotWaterSystems.length}]`;
       hotWaterSystems.push({
         id: crypto.randomUUID(),
         name: getEntityProp(opwek, PROP.TAPW_NAAM) || 'Tapwater',
-        type: HW_FROM_UNIEC3[typeCode] || 'hr_combi',
-        efficiency: parseNlNum(getEntityProp(opwek, PROP.TAPW_REND) || '1'),
+        type: codeOf<HotWaterSystemType>(issues, `${wp}.type`, getEntityProp(opwek, PROP.TAPW_TYPE),
+          HW_FROM_UNIEC3, 'hr_combi', 'Tapwatersoort'),
+        efficiency: issues.number(`${wp}.efficiency`, getEntityProp(opwek, PROP.TAPW_REND),
+          { fallback: 1, min: 0, minExclusive: true }),
         hasSolarBoiler: getEntityProp(opwek, PROP.TAPW_ZONTHERM) === 'True',
-        solarBoilerFraction: parseNlNum(getEntityProp(opwek, PROP.TAPW_ZONTHERM_FRAC) || '0'),
+        solarBoilerFraction: issues.number(`${wp}.solarBoilerFraction`, getEntityProp(opwek, PROP.TAPW_ZONTHERM_FRAC),
+          { fallback: 0, min: 0, max: 1, clamp: true, silentWhenMissing: true }),
       });
     }
   }
 
-  // Solar PV
-  const pvGroupEntities = getChildren(installParent.NTAEntityDataId, 'INST_PV');
-  for (const pvGroup of pvGroupEntities) {
-    const pvVeldEntities = getChildren(pvGroup.NTAEntityDataId, 'PV_VELD');
-    for (const pvVeld of pvVeldEntities) {
-      solarPV.push({
-        id: crypto.randomUUID(),
-        name: getEntityProp(pvVeld, PROP.PV_NAAM) || 'PV-veld',
-        peakPower: parseNlNum(getEntityProp(pvVeld, PROP.PV_WP) || '0'),
-        orientation: ORIENT_FROM_UNIEC3[getEntityProp(pvVeld, PROP.PV_ORIENT) || ''] || 'S',
-        tilt: parseNlNum(getEntityProp(pvVeld, PROP.PV_HELLING) || '30'),
-        area: parseNlNum(getEntityProp(pvVeld, PROP.PV_OPP) || '0'),
-      });
-    }
+  const pvField = (pvVeld: UNIEC3Entity) => {
+    const pp = `solarPV[${solarPV.length}]`;
+    solarPV.push({
+      id: crypto.randomUUID(),
+      name: getEntityProp(pvVeld, PROP.PV_NAAM) || 'PV-veld',
+      peakPower: issues.number(`${pp}.peakPower`, getEntityProp(pvVeld, PROP.PV_WP), { fallback: 0, min: 0 }),
+      orientation: codeOf<Orientation>(issues, `${pp}.orientation`, getEntityProp(pvVeld, PROP.PV_ORIENT),
+        ORIENT_FROM_UNIEC3, 'S', 'Oriëntatie'),
+      tilt: issues.number(`${pp}.tilt`, getEntityProp(pvVeld, PROP.PV_HELLING), { fallback: 30, min: 0, max: 90, clamp: true }),
+      area: issues.number(`${pp}.area`, getEntityProp(pvVeld, PROP.PV_OPP), { fallback: 0, min: 0 }),
+    });
+  };
+  for (const pvGroup of getChildren(installParent.NTAEntityDataId, 'INST_PV')) {
+    getChildren(pvGroup.NTAEntityDataId, 'PV_VELD').forEach(pvField);
   }
+  if (solarPV.length === 0) findByType(ENT['PV-VELD']).forEach(pvField);
 
-  // Also check PV-VELD directly
-  if (solarPV.length === 0) {
-    for (const pvVeld of findByType(ENT['PV-VELD'])) {
-      solarPV.push({
-        id: crypto.randomUUID(),
-        name: getEntityProp(pvVeld, PROP.PV_NAAM) || 'PV-veld',
-        peakPower: parseNlNum(getEntityProp(pvVeld, PROP.PV_WP) || '0'),
-        orientation: ORIENT_FROM_UNIEC3[getEntityProp(pvVeld, PROP.PV_ORIENT) || ''] || 'S',
-        tilt: parseNlNum(getEntityProp(pvVeld, PROP.PV_HELLING) || '30'),
-        area: parseNlNum(getEntityProp(pvVeld, PROP.PV_OPP) || '0'),
-      });
-    }
-  }
-
-  // Solar thermal
-  const ztEntities = getChildren(installParent.NTAEntityDataId, 'INST_ZONTHERM');
-  for (const zt of ztEntities) {
+  for (const zt of getChildren(installParent.NTAEntityDataId, 'INST_ZONTHERM')) {
+    const tp = `solarThermal[${solarThermal.length}]`;
     solarThermal.push({
       id: crypto.randomUUID(),
       name: getEntityProp(zt, PROP.ZT_NAAM) || 'Zonnecollector',
-      collectorArea: parseNlNum(getEntityProp(zt, PROP.ZT_OPP) || '0'),
-      type: ST_FROM_UNIEC3[getEntityProp(zt, PROP.ZT_TYPE) || ''] || 'flat_plate',
-      orientation: ORIENT_FROM_UNIEC3[getEntityProp(zt, PROP.ZT_ORIENT) || ''] || 'S',
-      tilt: parseNlNum(getEntityProp(zt, PROP.ZT_HELLING) || '45'),
+      collectorArea: issues.number(`${tp}.collectorArea`, getEntityProp(zt, PROP.ZT_OPP), { fallback: 0, min: 0 }),
+      type: codeOf<SolarThermalType>(issues, `${tp}.type`, getEntityProp(zt, PROP.ZT_TYPE),
+        ST_FROM_UNIEC3, 'flat_plate', 'Collectorsoort'),
+      orientation: codeOf<Orientation>(issues, `${tp}.orientation`, getEntityProp(zt, PROP.ZT_ORIENT),
+        ORIENT_FROM_UNIEC3, 'S', 'Oriëntatie'),
+      tilt: issues.number(`${tp}.tilt`, getEntityProp(zt, PROP.ZT_HELLING), { fallback: 45, min: 0, max: 90, clamp: true }),
     });
   }
 
+  // What the file holds beyond this: entities nobody reads (another entity type, or one that is
+  // not linked where the importer looks) and properties of read entities the importer has no
+  // field for. Library copies and an empty settings entity hold nothing of their own.
+  const unreadEntities = new Map<string, number>();
+  const unreadProperties = new Map<string, Map<string, number>>();
+  for (const entity of unique) {
+    if (!read.has(entity)) {
+      const empty = entity.NTAPropertyDatas.every((property) => property.Value.trim() === '');
+      if (LIBRARY_ENTITIES.has(entity.NTAEntityId) || (entity.NTAEntityId === ENT.SETTINGS && empty)) continue;
+      unreadEntities.set(entity.NTAEntityId, (unreadEntities.get(entity.NTAEntityId) ?? 0) + 1);
+      continue;
+    }
+    for (const property of entity.NTAPropertyDatas) {
+      if (READ_PROPERTIES.has(property.NTAPropertyId) || property.Value.trim() === '') continue;
+      const names = unreadProperties.get(entity.NTAEntityId) ?? new Map<string, number>();
+      names.set(property.NTAPropertyId, (names.get(property.NTAPropertyId) ?? 0) + 1);
+      unreadProperties.set(entity.NTAEntityId, names);
+    }
+  }
+  unreadData(issues, 'entities', 'Entiteiten', unreadEntities);
+  for (const [type, names] of [...unreadProperties.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    unreadData(issues, type, `Eigenschappen van ${type}`, names);
+  }
+
+  sourceVersionNotCarried(issues, 'UNIEC3', sourceVersion);
+  ntaInputNotInFormat(issues, 'UNIEC3');
+
   return {
-    id: crypto.randomUUID(),
-    name: projectName,
-    description,
-    buildingFunction,
-    address,
-    city,
-    zones,
-    heatingSystems,
-    ventilationSystems,
-    coolingSystems,
-    hotWaterSystems,
-    solarPV,
-    solarThermal,
-    constructions,
+    project: {
+      id: crypto.randomUUID(),
+      name: projectName,
+      description,
+      buildingFunction,
+      address,
+      city,
+      zones,
+      heatingSystems,
+      ventilationSystems,
+      coolingSystems,
+      hotWaterSystems,
+      solarPV,
+      solarThermal,
+      constructions,
+    },
+    issues,
+    ...(sourceVersion ? { sourceVersion } : {}),
   };
+}
+
+/** The project of a Uniec 3 archive (see `readUNIEC3` for the import issues). */
+export function importFromUNIEC3(zipData: Uint8Array): IProject {
+  return readUNIEC3(zipData).project;
+}
+
+/** What a Uniec 3 export of this project leaves out (shown to the adviser). */
+export function uniec3ExportLosses(project: IProject): string[] {
+  return droppedOnExport(project, 'UNIEC3');
 }
 
 // ============================================================
 // Download helper (export)
 // ============================================================
 
-export function downloadUNIEC3(project: IProject): void {
-  const zipData = exportToUNIEC3(project);
-  const blob = new Blob([zipData.buffer as ArrayBuffer], { type: 'application/zip' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${project.name || 'project'}.input-draft.uniec3`;
-  a.click();
-  URL.revokeObjectURL(url);
+/**
+ * Saves the Uniec 3 archive and returns what the format left out (empty
+ * when nothing was lost), so the adviser can be told.
+ */
+export function downloadUNIEC3(project: IProject): string[] {
+  downloadBytes(exportToUNIEC3(project), `${project.name || 'project'}.input-draft.uniec3`);
+  return uniec3ExportLosses(project);
 }
 
 // ============================================================
 // File dialog helper (import)
 // ============================================================
 
-export function openUNIEC3FileDialog(): Promise<IProject> {
-  return new Promise((resolve, reject) => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.uniec3';
-    input.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) return reject(new Error('Geen bestand geselecteerd'));
-      const reader = new FileReader();
-      reader.onload = () => {
-        try {
-          const data = new Uint8Array(reader.result as ArrayBuffer);
-          const project = importFromUNIEC3(data, file.name);
-          resolve(project);
-        } catch (err) {
-          reject(err);
-        }
-      };
-      reader.onerror = () => reject(new Error('Bestand kon niet gelezen worden'));
-      reader.readAsArrayBuffer(file);
-    };
-    input.click();
-  });
+/** Picks and imports a Uniec 3 archive, with its name, SHA-256 and import issues. */
+export async function openUNIEC3FileDialog(): Promise<ImportResult> {
+  return importFile(await pickFile('.uniec3'), readUNIEC3);
 }
+

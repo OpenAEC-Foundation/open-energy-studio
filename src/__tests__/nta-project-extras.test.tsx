@@ -10,6 +10,7 @@ import { write, type Draft, type Path } from '../components/NtaPerformancePanel/
 import { withoutNulls } from '../core/nta/KernelInput';
 import { annexPGeneratorKindTemplate, annexPRouteTemplate, coolingSystemTemplate } from '../core/nta/NtaSystemTemplates';
 import { renderWithProviders, userEvent } from './test-utils';
+import { SLOW_UI_TEST_MS } from './timeouts';
 
 const project = {
   id: 'p', name: 'p', description: '', buildingFunction: 'office', address: '', city: '',
@@ -88,7 +89,7 @@ describe('NTA project input forms', () => {
       auxiliary: { distribution: { method: 'forfait', network: 'secondary' } },
       sourceReference: '',
     });
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 
   it('edits measured cold, a collective source and area electricity', async () => {
     const user = userEvent.setup();
@@ -111,7 +112,7 @@ describe('NTA project input forms', () => {
       collectiveHeatPumpSource: { temperatureClass: 'below20_c', supplierReference: 'factuur 12' },
       areaElectricity: [{ kind: 'declared', id: 'gebied-1', annualKwh: 800, sourceReference: '' }],
     });
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 
   it('edits a sunroom and a steam humidifier', async () => {
     const user = userEvent.setup();
@@ -126,17 +127,31 @@ describe('NTA project input forms', () => {
     await user.click(screen.getByRole('button', { name: 'Add humidifier' }));
     await user.selectOptions(screen.getByLabelText('Calculation zone'), 'zone-b');
     await user.selectOptions(screen.getByLabelText('Humidifier type'), 'steam');
-    await user.selectOptions(screen.getByLabelText('Steam generator'), 'gas_or_oil');
+    await user.selectOptions(screen.getByLabelText('Steam generator'), 'oil');
     await user.type(screen.getByLabelText('Area served by the steam humidifier, m² (12.2.1; empty: heating-system area)'), '650');
     const draft = withoutNulls(current());
     expect(draft.sunrooms).toEqual([{
       id: 'serre-1', glazingGHeating: 0.6, reductionFactor: 0.8, distributionFactor: 1, surfaces: [{ areaM2: 12 }], sourceReference: '',
     }]);
     expect(draft.humidifiers).toEqual([{
-      zoneId: 'zone-b', humidification: { humidifier: { kind: 'steam', carrier: 'gas_or_oil' }, rotaryWheel: false, equipmentReference: '' },
+      zoneId: 'zone-b', humidification: { humidifier: { kind: 'steam', carrier: 'oil' }, rotaryWheel: false, equipmentReference: '' },
       servedAreaM2: 650,
     }]);
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
+
+  it('offers gas and oil steam generators and keeps an earlier gas-or-oil choice visible (12.3, table 5.2)', () => {
+    const steam = (carrier: string) => ({ humidifiers: [{ zoneId: 'zone-b',
+      humidification: { humidifier: { kind: 'steam', carrier }, rotaryWheel: false, equipmentReference: '' } }] });
+    const options = () => [...(screen.getByLabelText('Steam generator') as HTMLSelectElement).options].map((option) => option.value);
+    const { unmount } = renderWithProviders(<Harness initial={steam('gas')}
+      body={(draft, change) => <HumidifiersFields draft={draft} change={change} project={project} />} />);
+    expect(options()).toEqual(expect.arrayContaining(['electricity', 'gas', 'oil']));
+    expect(options()).not.toContain('gas_or_oil');
+    unmount();
+    renderWithProviders(<Harness initial={steam('gas_or_oil')}
+      body={(draft, change) => <HumidifiersFields draft={draft} change={change} project={project} />} />);
+    expect((screen.getByLabelText('Steam generator') as HTMLSelectElement).value).toBe('gas_or_oil');
+  });
 
   it('switches between one cooling system and several per zone', async () => {
     const user = userEvent.setup();
@@ -158,7 +173,7 @@ describe('NTA project input forms', () => {
     await user.click(screen.getByLabelText('Several cooling systems, each for its own zones (§10.2)'));
     expect(current().coolingSystems).toEqual([]);
     expect(current().cooling.generators[0].generator.kind).toBe('compression');
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 
   it('keeps further cooling generators and clears hidden outdoor-air values', async () => {
     const user = userEvent.setup();
@@ -192,11 +207,11 @@ describe('NTA project input forms', () => {
     expect(withoutNulls(draft.heatPumpRenewable)).toEqual({
       sourceBelow20C: false, exhaustAirSource: false, combinedOutdoorAndExhaustAir: false, sourceReference: '',
     });
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 
   it('edits solar space heating, the collective installation and declared flows', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<Harness initial={{ declaredUses: [] }} body={(draft, change) => <>
+    renderWithProviders(<Harness initial={{ calculationScope: 'utility', declaredUses: [] }} body={(draft, change) => <>
       <SpaceHeatingSolarFields draft={draft} change={change} />
       <CollectiveAndRenewableFields draft={draft} change={change} />
       <DeclaredFlowsFields draft={draft} change={change} />
@@ -216,7 +231,7 @@ describe('NTA project input forms', () => {
     expect(draft.heatPumpRenewable).toEqual({
       sourceBelow20C: true, exhaustAirSource: false, combinedOutdoorAndExhaustAir: false, sourceReference: '',
     });
-    expect(draft.declaredUses).toEqual([{ id: 'gebruik-1', service: 'lighting', carrier: 'el', monthlyKwh: [40], sourceReference: '' }]);
-    expect(draft.onSiteProduction).toEqual([{ id: 'opwekking-1', kind: 'pv', monthlyKwh: [], sourceReference: '' }]);
-  }, 60000);
+    expect(draft.declaredUses).toEqual([{ id: 'gebruik-1', service: 'lighting', carrier: 'el', monthlyKwh: [40, ...Array(11).fill(null)], sourceReference: '' }]);
+    expect(draft.onSiteProduction).toEqual([{ id: 'opwekking-1', kind: 'pv', monthlyKwh: Array(12).fill(null), sourceReference: '' }]);
+  }, SLOW_UI_TEST_MS);
 });

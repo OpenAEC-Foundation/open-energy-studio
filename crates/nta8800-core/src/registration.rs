@@ -595,6 +595,9 @@ pub struct RegistrationContext {
     /// dwelling or a whole utility building), so its A_g is the building
     /// A_g for the WLC-GWP threshold.
     pub whole_building: bool,
+    /// Declared K_pk per PV system as entered, W/m² (`None` for the
+    /// table 16.1 and per-panel routes).
+    pub pv_peak_powers_w_per_m2: Vec<Option<f64>>,
 }
 
 /// Name of this program in the registration (Omgevingsregeling art. 5.14 lid 1 onder b).
@@ -1000,6 +1003,14 @@ pub fn plausibility_warnings(
         .any(|area| ((area * 100.0).round() - area * 100.0).abs() > 1e-6)
     {
         found.push(warning("usable_floor_area_precision", "zones"));
+    }
+    for (index, peak) in context.pv_peak_powers_w_per_m2.iter().enumerate() {
+        if peak.is_some_and(|peak| peak > crate::pv::PEAK_POWER_PLAUSIBLE_W_PER_M2) {
+            found.push(warning(
+                "plausibility_pv_peak_power",
+                &format!("pvSystems[{index}].peakPower.peakPowerWPerM2"),
+            ));
+        }
     }
     for summary in &context.envelope {
         let Some(u) = summary.mean_u_w_per_m2k else {
@@ -1514,6 +1525,67 @@ fn check_evidence(evidence: &[EvidenceItem], issues: &mut Vec<RegistrationIssue>
     }
 }
 
+/// Marks an array element by its `id` in an evidence link
+/// (`/zones/@z1/surfaces/@wall-n`), as the app writes it.
+pub const EVIDENCE_ID_SEGMENT: char = '@';
+
+/// The position form of an evidence link in `root`
+/// (`/zones/0/surfaces/2`): `@id` segments become the index of the one
+/// array element with that `id`. `None` when the link is no pointer, an
+/// `@id` names no element or more than one, or an index is out of range.
+/// Mirrors `resolvePointer` in `src/core/nta/EvidenceLinks.ts`.
+pub fn resolve_evidence_pointer(root: &Value, pointer: &str) -> Option<String> {
+    let rest = pointer.strip_prefix('/')?;
+    let mut resolved = String::new();
+    let mut value = root;
+    for raw in rest.split('/') {
+        let segment = raw.replace("~1", "/").replace("~0", "~");
+        match value {
+            Value::Array(items) => {
+                let index = if let Some(id) = segment.strip_prefix(EVIDENCE_ID_SEGMENT) {
+                    let found: Vec<usize> = items
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, item)| element_id(item) == Some(id))
+                        .map(|(position, _)| position)
+                        .collect();
+                    if found.len() != 1 {
+                        return None;
+                    }
+                    found[0]
+                } else if !segment.is_empty() && segment.bytes().all(|byte| byte.is_ascii_digit()) {
+                    let index: usize = segment.parse().ok()?;
+                    if index >= items.len() {
+                        return None;
+                    }
+                    index
+                } else {
+                    return None;
+                };
+                resolved.push('/');
+                resolved.push_str(&index.to_string());
+                value = &items[index];
+            }
+            other => {
+                if segment.starts_with(EVIDENCE_ID_SEGMENT) {
+                    return None;
+                }
+                resolved.push('/');
+                resolved.push_str(&segment.replace('~', "~0").replace('/', "~1"));
+                value = other.get(segment.as_str()).unwrap_or(&Value::Null);
+            }
+        }
+    }
+    Some(resolved)
+}
+
+fn element_id(value: &Value) -> Option<&str> {
+    value
+        .get("id")
+        .and_then(Value::as_str)
+        .filter(|id| !id.is_empty())
+}
+
 /// Marks an evidence id inside a `…Reference` text, e.g.
 /// `"factuur, evidence:ev-3"`.
 pub const EVIDENCE_REFERENCE_PREFIX: &str = "evidence:";
@@ -1533,7 +1605,9 @@ pub fn check_evidence_links(
         .collect();
     for (index, item) in registration.evidence.iter().enumerate() {
         for (link, pointer) in item.linked_paths.iter().enumerate() {
-            if pointer.starts_with('/') && project.pointer(pointer).is_none() {
+            let exists = resolve_evidence_pointer(project, pointer)
+                .is_some_and(|resolved| project.pointer(&resolved).is_some());
+            if pointer.starts_with('/') && !exists {
                 issues.push(issue(
                     "evidence_link_path_unknown",
                     &format!("evidence[{index}].linkedPaths[{link}]"),
@@ -2158,6 +2232,7 @@ mod tests {
         // decides, without a warning.
         let detached = RegistrationContext {
             whole_building: true,
+            pv_peak_powers_w_per_m2: Vec::new(),
             ..dwelling.clone()
         };
         apartment.building_usable_floor_area_m2 = None;
@@ -2198,6 +2273,7 @@ mod tests {
                 max_rc_m2k_per_w: None,
             }],
             whole_building: false,
+            pv_peak_powers_w_per_m2: vec![None, Some(310.0)],
         };
         let result = assess_registration_with(&registration, &context);
         assert!(result.ready_for_registration, "{:?}", result.issues);
@@ -2210,6 +2286,7 @@ mod tests {
             "plausibility_usable_floor_area",
             "usable_floor_area_precision",
             "plausibility_u_value",
+            "plausibility_pv_peak_power",
         ] {
             assert!(found.contains(&code), "{code}: {found:?}");
         }
@@ -2234,6 +2311,7 @@ mod tests {
             label_class: Some("A"),
             envelope: Vec::new(),
             whole_building: false,
+            pv_peak_powers_w_per_m2: Vec::new(),
         };
         registration.previous_label_class = Some("B".into());
         assert!(assess_registration_with(&registration, &calm)
@@ -2571,6 +2649,51 @@ mod tests {
             .iter()
             .any(|item| item.code == "evidence_link_path_unknown"));
         assert!(!result.ready_for_registration);
+    }
+
+    #[test]
+    fn evidence_pointers_resolve_like_the_app() {
+        // The shared cases are also resolved by the app's resolvePointer
+        // (src/__tests__/evidence-pointer-cases.test.ts).
+        let cases: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-evidence-pointer-cases.json"
+        ))
+        .unwrap();
+        let root = &cases["root"];
+        for case in cases["cases"].as_array().unwrap() {
+            let pointer = case["pointer"].as_str().unwrap();
+            let expected = case["resolved"].as_str().map(str::to_string);
+            assert_eq!(
+                resolve_evidence_pointer(root, pointer),
+                expected,
+                "{pointer}"
+            );
+        }
+    }
+
+    #[test]
+    fn evidence_links_by_id_are_checked_by_their_element() {
+        let mut registration = complete();
+        let project = serde_json::json!({
+            "zones": [{ "id": "z1", "surfaces": [
+                { "id": "wall-1" }, { "id": "dup" }, { "id": "dup" }
+            ] }]
+        });
+        let link_issues = |registration: &Registration| {
+            check_evidence_links(&project, registration)
+                .into_iter()
+                .filter(|item| item.code == "evidence_link_path_unknown")
+                .count()
+        };
+        registration.evidence = vec![evidence("ev-1")];
+        registration.evidence[0].linked_paths = vec!["/zones/@z1/surfaces/@wall-1".into()];
+        assert_eq!(link_issues(&registration), 0);
+        registration.evidence[0].linked_paths = vec!["/zones/@z1/surfaces/@wall-9".into()];
+        assert_eq!(link_issues(&registration), 1);
+        registration.evidence[0].linked_paths = vec!["/zones/@z1/surfaces/@dup".into()];
+        assert_eq!(link_issues(&registration), 1);
+        registration.evidence[0].linked_paths = vec!["/zones/0/surfaces/2".into()];
+        assert_eq!(link_issues(&registration), 0);
     }
 
     #[test]

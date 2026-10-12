@@ -4,6 +4,7 @@ import type { BuildingFunction, INtaHeatPumpInput } from '../../core/energy/type
 import { diagnoseGasHeatPumpForfaitDraftWithRust, type GasHeatPumpForfaitDraftAssessment, type GasHeatPumpForfaitDraftInput } from '../../core/nta/KernelClient';
 import { useI18n } from '../../i18n/i18n';
 import '../HeatPumpForfaitDiagnosticPanel/HeatPumpForfaitDiagnosticPanel.css';
+import { DecimalInput } from '../ui';
 
 const sourceMap: Record<string, GasHeatPumpForfaitDraftInput['source'] | undefined> = {
   ground: 'ground', outdoor_air: 'outdoor_air', exhaust_air: 'exhaust_air',
@@ -97,13 +98,13 @@ export function GasHeatPumpForfaitPanel({ pump, buildingFunction, onSave }: {
     <label>{t('kernel.gasForfait.applicationReference')}<input value={applicationReference} onChange={(event) => { setApplicationReference(event.target.value); invalidate(); }} /></label>
     <label>{t('kernel.gasForfait.collectiveFlag')}<input type="checkbox" checked={collective} onChange={(event) => { setCollective(event.target.checked); invalidate(); }} /></label>
     <label>{t('kernel.gasForfait.externalHeat')}<input type="checkbox" checked={externalHeat} onChange={(event) => { setExternalHeat(event.target.checked); invalidate(); }} /></label>
-    <label>{t('kernel.gasForfait.capacity')}<input type="number" min="0" step="any" value={capacity} onChange={(event) => { setCapacity(event.target.value); invalidate(); }} /></label>
+    <label>{t('kernel.gasForfait.capacity')}<DecimalInput min="0" step="any" value={capacity} onChange={(event) => { setCapacity(event.target.value); invalidate(); }} /></label>
     <label>{t('kernel.gasForfait.capacityReference')}<input value={capacityReference} onChange={(event) => { setCapacityReference(event.target.value); invalidate(); }} /></label>
     <label>{t('kernel.gasForfait.sourceReference')}<input value={sourceReference} onChange={(event) => { setSourceReference(event.target.value); invalidate(); }} /></label>
-    <label>{t('kernel.gasForfait.temperature')}<input type="number" min="0" max="55" step="any" value={temperature} onChange={(event) => { setTemperature(event.target.value); invalidate(); }} /></label>
+    <label>{t('kernel.gasForfait.temperature')}<DecimalInput min="0" max="55" step="any" value={temperature} onChange={(event) => { setTemperature(event.target.value); invalidate(); }} /></label>
     <label>{t('kernel.gasForfait.temperatureReference')}<input value={temperatureReference} onChange={(event) => { setTemperatureReference(event.target.value); invalidate(); }} /></label>
     {correctionRequired && <>
-      <label>{t('kernel.gasForfait.correction')}<input type="number" min="0" step="any" value={correction} onChange={(event) => { setCorrection(event.target.value); invalidate(); }} /></label>
+      <label>{t('kernel.gasForfait.correction')}<DecimalInput min="0" step="any" value={correction} onChange={(event) => { setCorrection(event.target.value); invalidate(); }} /></label>
       <label>{t('kernel.gasForfait.correctionReference')}<input value={correctionReference} onChange={(event) => { setCorrectionReference(event.target.value); invalidate(); }} /></label>
     </>}
     <button type="button" onClick={() => diagnose(false)} disabled={!source}>{t('kernel.gasForfait.lookup')}</button>

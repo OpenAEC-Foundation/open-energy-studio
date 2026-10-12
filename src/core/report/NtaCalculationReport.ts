@@ -1,11 +1,13 @@
 import type { IProject } from '../energy/types';
 import { legacyEdition, projectCalculated } from '../nta/KernelClient';
 import type {
-  BuildingPerformanceAssessment, LabelData, NtaChapterFiveIndicators, NtaCoolingResult, NtaInterpretationGroup,
+  BuildingPerformanceAssessment, CommonSpaceSplit, LabelData, NtaChapterFiveIndicators, NtaCoolingResult, NtaInterpretationGroup,
   NtaRegistration, ProjectPerformanceAssessment, RegistrationAssessment,
 } from '../nta/KernelClient';
 import { escapeHtml } from './HtmlEscaping';
+import { attestText, programIdentity, programText } from './ProgramIdentity';
 import { summarizeExtras } from '../nta/NtaResultSummary';
+import { buildingOnlyWarnings } from '../nta/buildingWarnings';
 import { summarizeServiceEnergy } from '../nta/ServiceEnergy';
 import { dutchCodeCell, dutchDetailHtml, dutchNumber, dutchTimeHtml } from './DutchReportText';
 
@@ -24,6 +26,29 @@ const PURPOSE: Record<string, string> = { existing_building: 'bestaand gebouw', 
 const SURVEY: Record<string, string> = { basic: 'basisopname', detailed: 'detailopname' };
 const REPRESENTATION: Record<string, string> = { unique: 'uniek', reference: 'referentiewoning', similar: 'gelijkende woning' };
 const CATEGORY: Record<string, string> = { facade: 'Gevel', roof: 'Dak', floor: 'Vloer', glazing: 'Beglazing' };
+
+function functionAreas(list: Array<{ function: string; areaM2: number }> | undefined): string {
+  return (list ?? []).map((part) => `${escapeHtml(part.function)} ${num(part.areaM2, 2)} m²`).join(' · ');
+}
+
+/**
+ * The kernel's 6.6.4 allocation of the common spaces and the input lists it filled from it, so a reader can
+ * trace function areas the adviser did not enter (review 25).
+ */
+export function commonSpaceSection(split: CommonSpaceSplit | undefined): string {
+  if (!split) return '';
+  const rows = split.spaces.map((space) => `<tr>${cell(space.zoneId)}${cell(space.id ?? '—')}<td class="n">${num(space.areaM2, 2)}</td>
+    <td>${functionAreas(space.withinZone)}</td><td>${functionAreas(space.building)}</td></tr>`).join('');
+  const filled = split.filled ?? [];
+  return `<h2>Gemeenschappelijke ruimten (6.6.4)</h2>
+    <table><thead><tr><th>Zone</th><th>Ruimte</th><th>A<sub>g</sub> [m²]</th><th>Binnen de rekenzone</th><th>Voor het gebouw (Bbl, label)</th></tr></thead>
+    <tbody>${rows}</tbody></table>
+    <table><tbody>
+      <tr><th>Verdeling binnen de rekenzones, opgeteld</th><td>${functionAreas(split.withinZones)}</td></tr>
+      <tr><th>Verdeling voor het gebouw</th><td>${functionAreas(split.building)}</td></tr>
+      <tr><th>Door de rekenkern ingevulde lijsten</th>${cell(filled.length ? filled.join(', ') : 'geen (alle lijsten opgegeven)')}</tr>
+    </tbody></table>`;
+}
 
 /** NTA 8800 chapter 5 label and record indicators. */
 export function chapterFiveSection(indicators: NtaChapterFiveIndicators | null | undefined): string {
@@ -139,7 +164,8 @@ const MESSAGE_TYPE: Record<string, string> = {
   regular: 'registratie', relabel: 'herlabelen', replacement: 'vervangen onjuist label',
 };
 
-function advisor(value: NtaRegistration['surveyingAdvisor']): string {
+/** An adviser with the vakbekwaamheidsnummer, as BRL 9500-W/U bijlage 3 asks. */
+export function advisor(value: NtaRegistration['surveyingAdvisor']): string {
   if (!value) return '—';
   return `${value.name || '—'} (vakbekwaamheid ${value.competenceNumber || '—'})`;
 }
@@ -158,7 +184,7 @@ export function readinessText(assessment: RegistrationAssessment | null | undefi
 export function registrationSection(registration: NtaRegistration | undefined, assessment: RegistrationAssessment | null | undefined,
   constructionYear?: number | null): string {
   if (!registration) {
-    return '<h2>Registratie</h2><p>Geen registratiegegevens ingevuld (projectgegevens → Registratie).</p>';
+    return '<h2>Registratie</h2><p>Geen registratiegegevens ingevuld (projectgegevens → Registratie): opnemend en registrerend adviseur met hun vakbekwaamheidsnummer, opname- en registratiedatum, BAG-object en EP-Online-nummer ontbreken nog.</p>';
   }
   const issues = [...(assessment?.issues ?? []), ...(assessment?.plausibility ?? [])].map((item) =>
     `<tr>${cell(item.severity === 'error' ? 'fout' : item.severity === 'warning' ? 'plausibiliteit' : 'ontbreekt')}${dutchCodeCell(item.code)}${cell(item.path)}</tr>`).join('');
@@ -223,9 +249,10 @@ export function generateNtaCalculationReportHTML(
   // Project plausibility and the kernel's own warnings (e.g. 10.15, 13.25).
   const warnings: Array<{ code: string; path: string; detail?: string | null }> = [
     ...(assessment.warnings ?? []),
-    ...(performance?.warnings ?? []),
+    ...buildingOnlyWarnings(assessment),
   ];
   const generatedTime = dutchTimeHtml(generatedAt);
+  const identity = programIdentity(assessment.kernelVersion, assessment.targetNormVersion);
   const head = `<!doctype html><html lang="nl"><head><meta charset="utf-8">
     <title>NTA 8800-rekenrapport — ${escapeHtml(project.name)}</title>
     <style>body{font:14px/1.5 system-ui,sans-serif;max-width:1100px;margin:32px auto;padding:0 20px;color:#202530}
@@ -240,8 +267,9 @@ export function generateNtaCalculationReportHTML(
     ${legacyEdition(assessment) ? `<div class="notice legacy-edition" role="note"><strong>Oudere uitgave — niet voor registratie.</strong>
     Berekend volgens ${escapeHtml(assessment.targetNormVersion)}. Alleen een berekening volgens de aangewezen uitgave (NTA 8800:2025+C1:2026) mag worden geregistreerd; deze uitkomst dient alleen ter vergelijking.</div>` : ''}
     <h2>Herleidbaarheid</h2><table><tbody>
-      <tr><th>Doeluitgave</th>${cell(assessment.targetNormVersion)}<th>Kernelversie</th>${cell(assessment.kernelVersion)}</tr>
-      <tr><th>Status</th>${cell(assessment.status)}<th>Atteststatus</th>${cell(assessment.attestStatus)}</tr>
+      <tr><th>Doeluitgave</th>${cell(assessment.targetNormVersion)}<th>Rekenkernversie</th>${cell(assessment.kernelVersion)}</tr>
+      <tr><th>Rekenprogramma</th>${cell(programText(identity))}<th>BRL 9501-attestnummer</th>${cell(attestText(identity))}</tr>
+      <tr><th>Status</th>${cell(assessment.status)}<th>Atteststatus</th>${cell(assessment.attestStatus === 'unattested' ? 'niet geattesteerd (BRL 9501)' : assessment.attestStatus)}</tr>
       <tr><th>Invoervingerafdruk</th><td colspan="3"><code>${escapeHtml(assessment.inputFingerprint)}</code></td></tr>
       ${assessment.geometry ? `<tr><th>A<sub>g</sub> / A<sub>ls</sub></th><td>${num(assessment.geometry.usableFloorAreaM2, 1)} / ${num(assessment.geometry.lossAreaM2, 1)} m²</td>
         <th>A<sub>ls</sub>/A<sub>g</sub></th><td>${num(assessment.geometry.lossAreaRatio, 3)}</td></tr>` : ''}
@@ -308,6 +336,7 @@ export function generateNtaCalculationReportHTML(
     ${serviceEnergySection(performance)}
     ${zebSection(performance)}
     ${labelDataSection(assessment.labelData)}
+    ${commonSpaceSection(assessment.commonSpaces)}
     ${ventilationRows ? `<h2>Ventilatie (hoofdstuk 11)</h2><table><thead><tr><th>Zone</th><th>q<sub>V;ODA;req</sub> jan [m³/h]</th><th>Infiltratie jan [m³/h]</th>
       <th>H<sub>ve</sub> jan [W/K]</th><th>Ventilatoren [kWh/jr]</th><th>Vorstbeveiliging [kWh/jr]</th><th>Voorverwarming roosters [kWh/jr]</th></tr></thead>
       <tbody>${ventilationRows}</tbody></table>` : ''}
@@ -337,7 +366,7 @@ export function generateNtaCalculationReportHTML(
       <li>Klimaat: ${escapeHtml(heating.demand.climateSource)}</li>
       <li>Hoofdstuk 9 (afgifte, opwekking): ${escapeHtml(heating.chapter9Source)}</li>
       <li>Hoofdstuk 5 (primaire energie, indicatoren): ${escapeHtml(performance.chapter5Source)}</li>
-      <li>Hoofdstukken 7–17: getranscribeerd uit NTA 8800:2025+C1:2026 (paginaverwijzingen in de kern); verificatie met referentiegevallen nog nodig.</li>
+      <li>Hoofdstukken 7–17: getranscribeerd uit NTA 8800:2025+C1:2026 (paginaverwijzingen in de kern)${legacyEdition(assessment) ? `, met de afwijkingen van ${escapeHtml(assessment.targetNormVersion)} uit het uitgaveprofiel van de kern` : ''}; verificatie met referentiegevallen nog nodig.</li>
     </ul>
     ${interpretationsSection(interpretations)}</body></html>`;
 }

@@ -83,16 +83,19 @@ export function formatQuantity(
  * "1.234,5"). Returns `null` for empty input and `NaN` for text that is not a number.
  */
 export function parseDecimal(text: string): number | null {
-  const trimmed = text.replace(/[\s  ]/g, '').replace(MINUS, '-');
+  const trimmed = normalizeNumerals(text).replace(/[\s  ]/g, '');
   if (trimmed === '') return null;
   let normalized = trimmed;
   const hasComma = normalized.includes(',');
   const hasPoint = normalized.includes('.');
   if (hasComma && hasPoint) {
-    // The separator that appears last is the decimal separator.
+    // The separator that appears last is the decimal separator; the other one groups
+    // thousands and must do so consistently, so a mix-up such as "0.8,04" is no number.
     if (normalized.lastIndexOf(',') > normalized.lastIndexOf('.')) {
+      if (!/^[-+]?\d{1,3}(\.\d{3})+,\d*$/.test(normalized)) return Number.NaN;
       normalized = normalized.replace(/\./g, '').replace(',', '.');
     } else {
+      if (!/^[-+]?\d{1,3}(,\d{3})+\.\d*$/.test(normalized)) return Number.NaN;
       normalized = normalized.replace(/,/g, '');
     }
   } else if (hasComma) {
@@ -100,7 +103,30 @@ export function parseDecimal(text: string): number | null {
     normalized = normalized.replace(',', '.');
   }
   if (!/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i.test(normalized)) return Number.NaN;
-  return Number(normalized);
+  const value = Number(normalized);
+  // An overflowing value ("1e999") is no number either.
+  return Number.isFinite(value) ? value : Number.NaN;
+}
+
+/**
+ * Latin digits and separators for numerals written in another script, as an IME or a
+ * fa/ar-formatted value gives them: Arabic-Indic (U+0660–0669) and Persian (U+06F0–06F9)
+ * digits, the Arabic decimal and thousands separators (U+066B, U+066C), full-width
+ * digits, comma, point and minus (U+FF10–FF19, U+FF0C, U+FF0E, U+FF0D) and the minus
+ * sign (U+2212). Direction marks are dropped.
+ */
+export function normalizeNumerals(text: string): string {
+  return text
+    .replace(/[\u0660-\u0669\u06F0-\u06F9\uFF10-\uFF19]/g, (digit) => {
+      const code = digit.charCodeAt(0);
+      const zero = code >= 0xff10 ? 0xff10 : code >= 0x06f0 ? 0x06f0 : 0x0660;
+      return String(code - zero);
+    })
+    .replace(/[\u066B\uFF0E]/g, '.')
+    .replace(/\uFF0C/g, ',')
+    .replace(/\u066C/g, '')
+    .replace(/[\u2212\uFF0D]/g, '-')
+    .replace(/[\u200E\u200F\u061C\u202A-\u202E\u2066-\u2069]/g, '');
 }
 
 export const KERNEL_CODE_PREFIXES = [

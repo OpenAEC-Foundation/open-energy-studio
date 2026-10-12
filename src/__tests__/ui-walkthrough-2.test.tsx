@@ -18,6 +18,7 @@ import { RegistrationForm } from '../components/shell/pages/RegistrationForm';
 import { ReportView } from '../components/ReportView/ReportView';
 import type { BuildingPerformanceAssessment, MwaVariantResult, ProjectPerformanceAssessment } from '../core/nta/KernelClient';
 import { renderWithProviders, userEvent } from './test-utils';
+import { SLOW_UI_TEST_MS } from './timeouts';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -190,7 +191,7 @@ describe('project information dialog', () => {
     expect(screen.queryByLabelText('Kernel version of original survey (relabel)')).not.toBeInTheDocument();
     await user.selectOptions(screen.getByLabelText('Message type (BRL 9500 §4.2.5)'), 'relabel');
     expect(screen.getByLabelText('Kernel version of original survey (relabel)')).toBeInTheDocument();
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 });
 
 describe('table 7.13 setpoint check', () => {

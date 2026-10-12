@@ -5,6 +5,9 @@ import { KernelProvider, useKernel } from './context/KernelProvider';
 import { projectCalculated } from './core/nta/KernelClient';
 import { summarizeForPreview } from './core/nta/PreviewSummary';
 import { NtaDraftProvider, useNtaDraft } from './context/NtaDraftProvider';
+import { RegistrationDraftProvider, useRegistrationDraft } from './context/RegistrationDraftProvider';
+import { SurveyResultProvider } from './context/SurveyResultProvider';
+import { MaatwerkadviesResultProvider } from './context/MaatwerkadviesResultProvider';
 import { I18nProvider } from './i18n/I18nProvider';
 import { WelcomeScreen, type NewProjectKind } from './components/WelcomeScreen/WelcomeScreen';
 import { surveyTemplate } from './core/nta/SurveyTemplates';
@@ -43,13 +46,15 @@ import { downloadModelIFC } from './core/ifc/IFCModelExporter';
 import { downloadUNIEC3, openUNIEC3FileDialog } from './core/io/UNIEC3Exporter';
 import { downloadVABI, openVABIFileDialog } from './core/io/VABIElementsBridge';
 import { withImportRecord } from './core/io/importLog';
-import { serializeProject, deserializeProjectFile, compareKernelStamp, describeStamp } from './core/io/ProjectSerializer';
+import { exportLossesSummary, importErrorText, importIssuesSummary } from './core/io/importText';
+import { serializeProject, deserializeProjectFile, compareKernelStamp, describeStamp, ProjectFileTooNewError } from './core/io/ProjectSerializer';
+import { confirmCloseAll, documentsNeedingConfirmation, isMissingFileError, saveProjectText, type ClosingDocument } from './core/io/projectFiles';
 import { migrateLegacyRelabel, relabelNoticeKey } from './core/nta/Registration';
 import { normalizeProject } from './core/energy/normalizeProject';
 import { stepStatuses } from './core/nta/stepStatus';
 import { adjacentStep, routeFromHash, routeToHash, stepDefinition, type Route } from './core/navigation/routes';
 import { selectionForPath } from './core/navigation/projectPaths';
-import { isTauri } from '@tauri-apps/api/core';
+import { invoke, isTauri } from '@tauri-apps/api/core';
 import { ConfirmProvider, Dialog, ToastProvider, useConfirm, useToast } from './components/ui';
 import { stampProject } from './core/io/KernelStampClient';
 import { forgetRecentProject, readRecentProjects, recordRecentProject } from './core/io/recentProjects';
@@ -119,8 +124,17 @@ function ActiveDocumentShell({ files, paletteOpen, setPaletteOpen }: {
   const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
   const [calculationError, setCalculationError] = useState<string | null>(null);
   const [inspectorOpen, setInspectorOpen] = useState(initialInspectorOpen);
+  const exportToast = useToast();
 
   useEffect(() => { setCalculationError(null); }, [project]);
+
+  // A UNIEC3 or VABI export leaves out what the format cannot hold; the adviser is told what.
+  const exportForeign = useCallback((format: 'UNIEC3' | 'VABI') => {
+    const losses = format === 'UNIEC3' ? downloadUNIEC3(project) : downloadVABI(project);
+    if (losses.length > 0) {
+      exportToast.show({ tone: 'warn', title: t('export.losses.title', { format }), message: exportLossesSummary(losses, t) });
+    }
+  }, [exportToast, project, t]);
 
   const toggleInspector = useCallback(() => {
     setInspectorOpen((open) => {
@@ -211,9 +225,9 @@ function ActiveDocumentShell({ files, paletteOpen, setPaletteOpen }: {
     printReport: () => setPrintPreviewOpen(true),
     exportIFC: handleExportIFC,
     exportModelIFC: () => downloadModelIFC(project),
-    exportUNIEC3: () => downloadUNIEC3(project),
+    exportUNIEC3: () => exportForeign('UNIEC3'),
     importUNIEC3: files.onImportUNIEC3,
-    exportVABI: () => downloadVABI(project),
+    exportVABI: () => exportForeign('VABI'),
     importVABI: files.onImportVABI,
     openSettings: files.onOpenSettings,
     openFeedback: files.onOpenFeedback,
@@ -360,6 +374,8 @@ export interface DocumentReport {
   projectId: string;
   /** The NTA draft has changes that are not applied. */
   draftDirty: boolean;
+  /** The registration draft has changes that are not saved into the project. */
+  registrationDirty: boolean;
   /** Label class of a calculated kernel answer, for the recent-projects list. */
   labelClass: string | null;
 }
@@ -367,11 +383,13 @@ export interface DocumentReport {
 function DocumentReporter({ onReport }: { onReport: (report: DocumentReport | null) => void }) {
   const { state } = useEnergy();
   const draftDirty = useNtaDraft()?.dirty ?? false;
+  const registrationDirty = useRegistrationDraft()?.dirty ?? false;
   const settled = useKernel()?.settled ?? null;
   const summary = settled ? summarizeForPreview(settled) : null;
   const labelClass = summary && projectCalculated(summary.status) ? summary.labelClass ?? null : null;
   const projectId = state.project.id;
-  useEffect(() => { onReport({ projectId, draftDirty, labelClass }); }, [projectId, draftDirty, labelClass, onReport]);
+  useEffect(() => { onReport({ projectId, draftDirty, registrationDirty, labelClass }); },
+    [projectId, draftDirty, registrationDirty, labelClass, onReport]);
   useEffect(() => () => onReport(null), [onReport]);
   return null;
 }
@@ -384,9 +402,15 @@ function ActiveDocumentContent({ onReport, ...props }: {
   return (
     <KernelProvider project={state.project}>
       <NtaDraftProvider>
-        <DocumentReporter onReport={onReport} />
-        <LibraryOutcomeRecorder />
-        <ActiveDocumentShell {...props} />
+        <RegistrationDraftProvider>
+          <SurveyResultProvider>
+            <MaatwerkadviesResultProvider>
+              <DocumentReporter onReport={onReport} />
+              <LibraryOutcomeRecorder />
+              <ActiveDocumentShell {...props} />
+            </MaatwerkadviesResultProvider>
+          </SurveyResultProvider>
+        </RegistrationDraftProvider>
       </NtaDraftProvider>
     </KernelProvider>
   );
@@ -477,48 +501,48 @@ function AppContent() {
     };
   }, []);
 
-  // ── Helper: write project to disk (returns filePath or null if cancelled) ──
+  // ── Helper: write project to disk ──
+  // Returns the saved path, 'browser-download', or null when the save was
+  // cancelled or failed. A failed desktop write is shown and never reported
+  // as a save (the document stays dirty, its tab stays open).
   const writeProjectToDisk = useCallback(async (
     project: IProject,
     existingPath: string | null,
     forcePrompt: boolean,
   ): Promise<string | null> => {
     const json = serializeProject(project, await stampProject(project));
-
-    // Save directly if we have a path and aren't forcing a prompt
-    if (existingPath && !forcePrompt) {
-      try {
-        const { writeTextFile } = await import('@tauri-apps/plugin-fs');
-        await writeTextFile(existingPath, json);
-        return existingPath;
-      } catch { /* fall through to Save As dialog */ }
+    const outcome = await saveProjectText(json, `${project.name || 'project'}.oes.json`, existingPath, forcePrompt, {
+      desktop: isTauri(),
+      pickPath: async (defaultPath) => {
+        const { save } = await import('@tauri-apps/plugin-dialog');
+        return save({ defaultPath, filters: [{ name: 'OES Project', extensions: ['oes.json', 'json'] }] });
+      },
+      write: (path, text) => invoke<void>('save_project', { path, text }),
+      download: (fileName, text) => {
+        const blob = new Blob([text], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      },
+    });
+    switch (outcome.kind) {
+      case 'saved': return outcome.path;
+      case 'downloaded': return 'browser-download';
+      case 'cancelled': return null;
+      case 'failed':
+        toast.show({
+          tone: 'error',
+          title: t('app.toast.saveFailed'),
+          message: t('project.saveFailed', { message: outcome.message }),
+        });
+        return null;
     }
-
-    // Show Save As dialog
-    try {
-      const { save } = await import('@tauri-apps/plugin-dialog');
-      const { writeTextFile } = await import('@tauri-apps/plugin-fs');
-      const filePath = await save({
-        defaultPath: existingPath || `${project.name || 'project'}.oes.json`,
-        filters: [{ name: 'OES Project', extensions: ['oes.json', 'json'] }],
-      });
-      if (!filePath) return null; // User cancelled
-      await writeTextFile(filePath, json);
-      return filePath;
-    } catch {
-      // Browser fallback (non-Tauri)
-      const blob = new Blob([json], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${project.name || 'project'}.oes.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-      return 'browser-download';
-    }
-  }, []);
+  }, [t, toast]);
 
   // ── New ──
   const handleNewProject = useCallback(() => {
@@ -627,11 +651,19 @@ function AppContent() {
   // saved location (desktop) or null (browser: a later save downloads a copy).
   const openProjectText = useCallback(async (json: string, filePath: string | null, label: string) => {
     try {
-      const { project: rawProject, kernel: saved } = deserializeProjectFile(json);
+      const { project: rawProject, kernel: saved, unknownFields, fileVersion } = deserializeProjectFile(json);
       const opened = normalizeProject(rawProject);
       const { project: loaded, missing, markedForReview } = migrateLegacyRelabel(opened);
       docDispatch({ type: 'DOC_OPEN', payload: { id: crypto.randomUUID(), project: loaded, filePath } });
       if (filePath) rememberRecent(filePath, loaded);
+      if (unknownFields && unknownFields.length > 0) {
+        // A newer 1.x file: its extra fields are not written back on save.
+        toast.show({
+          tone: 'warn',
+          title: t('app.toast.fileNewer'),
+          message: t('project.fileNewerFields', { version: fileVersion ?? '', fields: unknownFields.join(', ') }),
+        });
+      }
       // Marked invoices are always reported; a notice with only open
       // fields is shown once per project.
       if (markedForReview > 0
@@ -645,7 +677,11 @@ function AppContent() {
           }),
         });
       }
-      const current = await stampProject(loaded);
+      // The stamp covers the file as written, so it is compared with the
+      // project as read, before the defaults of normalizeProject: an older
+      // stamped file then shows no false "input changed".
+      let current = null;
+      try { current = await stampProject(rawProject); } catch { current = null; }
       const [difference] = compareKernelStamp(saved, current);
       if (difference === 'version' && saved && current) {
         toast.show({
@@ -660,24 +696,33 @@ function AppContent() {
       toast.show({
         tone: 'error',
         title: t('app.toast.openFailed'),
-        message: t('project.openFailed', { message: (err as Error).message ?? String(err) }),
+        message: err instanceof ProjectFileTooNewError
+          ? t('project.fileTooNew', { version: err.fileVersion })
+          : t('project.openFailed', { message: errorText(err) }),
       });
     }
   }, [docDispatch, t, toast, rememberRecent]);
 
+  // Desktop: read through the Rust command, which allows a file picked in a
+  // dialog this session or on its recent list (so also after a restart).
+  const readProjectFile = useCallback((path: string) => invoke<string>('read_project_file', { path }), []);
+
   const handleOpenRecent = useCallback(async (filePath: string) => {
+    let json: string;
     try {
-      const { readTextFile } = await import('@tauri-apps/plugin-fs');
-      await openProjectText(await readTextFile(filePath), filePath, filePath);
+      json = await readProjectFile(filePath);
     } catch (err) {
-      setRecentProjects(forgetRecentProject(filePath));
+      // Only a file that is gone leaves the list; any other error keeps it.
+      if (isMissingFileError(err)) setRecentProjects(forgetRecentProject(filePath));
       toast.show({
         tone: 'error',
         title: t('app.toast.openFailed'),
-        message: t('project.openFailed', { message: (err as Error).message ?? String(err) }),
+        message: t('project.openFailed', { message: errorText(err) }),
       });
+      return;
     }
-  }, [openProjectText, t, toast]);
+    await openProjectText(json, filePath, filePath);
+  }, [openProjectText, readProjectFile, t, toast]);
 
   const handleOpenProject = useCallback(async () => {
     if (!isTauri()) {
@@ -694,40 +739,44 @@ function AppContent() {
     }
     try {
       const { open } = await import('@tauri-apps/plugin-dialog');
-      const { readTextFile } = await import('@tauri-apps/plugin-fs');
       const filePath = await open({
         filters: [{ name: 'OES Project', extensions: ['oes.json', 'json'] }],
         multiple: false,
       });
       if (!filePath) return;
-      const json = await readTextFile(filePath as string);
+      const json = await readProjectFile(filePath as string);
       await openProjectText(json, filePath as string, filePath as string);
     } catch (err) {
-      const msg = (err as Error).message;
+      const msg = errorText(err);
       if (msg && !msg.includes('cancelled')) {
         toast.show({ tone: 'error', title: t('app.toast.openFailed'), message: t('project.openFailed', { message: msg }) });
       }
     }
-  }, [openProjectText, t, toast]);
+  }, [openProjectText, readProjectFile, t, toast]);
 
   // ── Import (UNIEC3 / VABI): each opens as a new document ──
-  const handleImportUNIEC3 = useCallback(async () => {
+  // The imported project goes through the same checks as an opened file, and the record names
+  // the file, its SHA-256 and what the importer filled in or left out (BRL 9501 §4.3.1).
+  const importForeign = useCallback(async (format: 'UNIEC3' | 'VABI') => {
     try {
-      const loaded = await openUNIEC3FileDialog();
+      const result = await (format === 'UNIEC3' ? openUNIEC3FileDialog() : openVABIFileDialog());
+      const loaded = normalizeProject(withImportRecord(result.project, format, result.fileName, undefined,
+        { sha256: result.sha256, sourceVersion: result.sourceVersion, issues: result.issues }));
       docDispatch({ type: 'DOC_NEW', payload: { id: crypto.randomUUID(), project: loaded } });
+      if (result.issues.length > 0) {
+        toast.show({
+          tone: 'warn',
+          title: t('import.issues.title', { format, count: result.issues.length }),
+          message: importIssuesSummary(result.issues, t),
+        });
+      }
     } catch (err) {
-      toast.show({ tone: 'error', title: t('app.toast.importFailed', { format: 'UNIEC3' }), message: (err as Error).message });
+      if (errorText(err).includes('Geen bestand geselecteerd')) return;
+      toast.show({ tone: 'error', title: t('app.toast.importFailed', { format }), message: importErrorText(err, t) });
     }
   }, [docDispatch, toast, t]);
-
-  const handleImportVABI = useCallback(async () => {
-    try {
-      const loaded = withImportRecord(await openVABIFileDialog(), 'VABI');
-      docDispatch({ type: 'DOC_NEW', payload: { id: crypto.randomUUID(), project: loaded } });
-    } catch (err) {
-      toast.show({ tone: 'error', title: t('app.toast.importFailed', { format: 'VABI' }), message: (err as Error).message });
-    }
-  }, [docDispatch, toast, t]);
+  const handleImportUNIEC3 = useCallback(() => importForeign('UNIEC3'), [importForeign]);
+  const handleImportVABI = useCallback(() => importForeign('VABI'), [importForeign]);
 
   // ── Save (Ctrl+S) — save to existing path, or prompt Save As if new ──
   const handleSaveProject = useCallback(async () => {
@@ -759,19 +808,24 @@ function AppContent() {
     docDispatch({ type: 'DOC_DISPATCH', payload: { id: activeDoc.id, action: { type: 'SET_DIRTY', payload: false } } });
   }, [docState, docDispatch, writeProjectToDisk, rememberRecent]);
 
+  // The question before discarding unapplied NTA input and/or unsaved registration data.
+  const unappliedQuestion = useCallback((name: string, ntaDraft: boolean, registration: boolean) => {
+    const prefix = ntaDraft && registration ? 'app.unappliedDraftAndRegistration'
+      : ntaDraft ? 'app.unappliedDraft' : 'app.unsavedRegistration';
+    return { title: t(`${prefix}.title`), message: t(`${prefix}.message`, { name }), confirmLabel: t(`${prefix}.discard`), danger: true };
+  }, [t]);
+
   // ── Close tab (with unsaved-changes check) ──
   const handleCloseTab = useCallback(async (id: string) => {
     const doc = docState.documents.find(d => d.id === id);
     if (!doc) return;
 
-    // NTA input that was edited but not applied is lost on closing (it is not part of the project yet).
-    if (id === docState.activeDocumentId && activeReport.current?.projectId === doc.state.project.id && activeReport.current.draftDirty) {
-      const choice = await confirmChoice({
-        title: t('app.unappliedDraft.title'),
-        message: t('app.unappliedDraft.message', { name: doc.state.project.name || t('app.untitled') }),
-        confirmLabel: t('app.unappliedDraft.discard'),
-        danger: true,
-      });
+    // NTA input that was edited but not applied, and registration data not
+    // saved, are lost on closing (they are not part of the project yet).
+    const report = id === docState.activeDocumentId && activeReport.current?.projectId === doc.state.project.id
+      ? activeReport.current : null;
+    if (report && (report.draftDirty || report.registrationDirty)) {
+      const choice = await confirmChoice(unappliedQuestion(doc.state.project.name || t('app.untitled'), report.draftDirty, report.registrationDirty));
       if (choice !== 'confirm') return;
     }
 
@@ -791,11 +845,78 @@ function AppContent() {
     }
 
     docDispatch({ type: 'DOC_CLOSE', payload: id });
-  }, [docState.documents, docState.activeDocumentId, docDispatch, writeProjectToDisk, confirmChoice, t]);
+  }, [docState.documents, docState.activeDocumentId, docDispatch, writeProjectToDisk, confirmChoice, t, unappliedQuestion]);
 
   const handleCloseActiveTab = useCallback(() => {
     if (docState.activeDocumentId) void handleCloseTab(docState.activeDocumentId);
   }, [docState.activeDocumentId, handleCloseTab]);
+
+  // ── Closing the window (close button, Alt+F4, quitting from the OS) ──
+  // The same questions as closing each tab with unsaved work. The latest
+  // documents are read through a ref, because the listener is registered once.
+  const closingDocuments = useCallback((): ClosingDocument[] => docState.documents.map((doc) => ({
+    id: doc.id,
+    name: doc.state.project.name || t('app.untitled'),
+    isDirty: doc.state.isDirty,
+    draftDirty: doc.id === docState.activeDocumentId
+      && activeReport.current?.projectId === doc.state.project.id
+      && Boolean(activeReport.current?.draftDirty),
+    registrationDirty: doc.id === docState.activeDocumentId
+      && activeReport.current?.projectId === doc.state.project.id
+      && Boolean(activeReport.current?.registrationDirty),
+  })), [docState.documents, docState.activeDocumentId, t]);
+
+  const confirmWindowClose = useCallback(() => confirmCloseAll(closingDocuments(), {
+    confirmDiscardDraft: async (doc) => (await confirmChoice(unappliedQuestion(doc.name, doc.draftDirty, Boolean(doc.registrationDirty)))) === 'confirm',
+    askUnsaved: async (doc) => {
+      const choice = await confirmChoice({
+        title: t('app.unsaved.title'),
+        message: t('app.unsaved.message', { name: doc.name }),
+        confirmLabel: t('app.unsaved.save'),
+        denyLabel: t('app.unsaved.discard'),
+      });
+      return choice === 'confirm' ? 'save' : choice === 'cancel' ? 'cancel' : 'discard';
+    },
+    save: async (doc) => {
+      const open = docState.documents.find((candidate) => candidate.id === doc.id);
+      if (!open) return true;
+      const savedPath = await writeProjectToDisk(open.state.project, open.filePath, false);
+      if (savedPath === null) return false;
+      if (savedPath !== 'browser-download') rememberRecent(savedPath, open.state.project);
+      docDispatch({ type: 'DOC_DISPATCH', payload: { id: open.id, action: { type: 'SET_DIRTY', payload: false } } });
+      return true;
+    },
+  }), [closingDocuments, confirmChoice, docState.documents, docDispatch, rememberRecent, t, writeProjectToDisk, unappliedQuestion]);
+
+  const windowClose = useRef({ confirm: confirmWindowClose, documents: closingDocuments });
+  windowClose.current = { confirm: confirmWindowClose, documents: closingDocuments };
+
+  useEffect(() => {
+    if (!isTauri()) {
+      // Browser build: the browser's own "leave site?" question.
+      const beforeUnload = (event: BeforeUnloadEvent) => {
+        if (documentsNeedingConfirmation(windowClose.current.documents()).length > 0) {
+          event.preventDefault();
+          event.returnValue = '';
+        }
+      };
+      window.addEventListener('beforeunload', beforeUnload);
+      return () => window.removeEventListener('beforeunload', beforeUnload);
+    }
+    let stop: (() => void) | undefined;
+    let cancelled = false;
+    void (async () => {
+      const { getCurrentWindow } = await import('@tauri-apps/api/window');
+      const win = getCurrentWindow();
+      const unlisten = await win.onCloseRequested(async (event) => {
+        if (documentsNeedingConfirmation(windowClose.current.documents()).length === 0) return;
+        event.preventDefault();
+        if (await windowClose.current.confirm()) await win.destroy();
+      });
+      if (cancelled) unlisten(); else stop = unlisten;
+    })();
+    return () => { cancelled = true; stop?.(); };
+  }, []);
 
   // ── Keyboard shortcuts (all screens) ──
   useEffect(() => {
@@ -932,6 +1053,13 @@ function AppContent() {
       {feedbackOpen && <FeedbackDialog onClose={() => setFeedbackOpen(false)} />}
     </div>
   );
+}
+
+/** The text of an error: Tauri commands reject with a string, JS with an Error. */
+function errorText(err: unknown): string {
+  if (typeof err === 'string') return err;
+  if (err instanceof Error) return err.message;
+  return String(err);
 }
 
 export default function App() {

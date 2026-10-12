@@ -31,8 +31,8 @@ Het venster heeft vijf delen:
 4. **Contextpaneel** rechts, met drie tabbladen:
    - *Eigenschappen*: de gegevens van het geselecteerde element (zone, constructie, vlak, raam, systeem). Je kunt ze hier direct wijzigen. Selecteer je een element, dan opent dit tabblad, ook als *Voorbeeld* open stond. Bij een vlak, raam, koudebrug of zone staat hier ook het blok **Bron & bewijs** met de bestanden die bij dat element horen;
    - *Voorbeeld*: label, BENG 1–3, TO<sub>juli</sub>, maandbehoefte en kerngetallen van de laatste doorrekening;
-   - *Controle*: de open punten van de rekenkern voor deze stap, elk met **Ga naar**.
-5. **Statusbalk** onderaan: de status van de rekenkern (actueel, verouderd, bezig), kern- en normversie, BENG 1–3, TO<sub>juli</sub> en het label. Klik op een waarde om Resultaten te openen.
+   - *Controle*: de open punten van de rekenkern voor deze stap, elk met **Ga naar**. Zonder meldingen staat er "Geen fouten of aandachtspunten.", zolang de rekenkern nog niet heeft geantwoord "Nog geen antwoord van de rekenkern.".
+5. **Statusbalk** onderaan: de status van de rekenkern (actueel, verouderd, bezig), de versie van de rekenkern en de uitgave van NTA 8800 waarmee het project rekent (bijvoorbeeld "Kern 0.4.0 · NTA 8800 2025+C1"; in een breed venster met de volledige naam van de uitgave), BENG 1–3, TO<sub>juli</sub> en het label. Zolang de rekenkern nog niet heeft geantwoord, staat alleen de uitgave er. Bij een oudere uitgave staat daarnaast "… — niet voor registratie". Klik op een waarde om Resultaten te openen.
 
 Onder de werkstappen staan **Gereedschap** en **Instellingen** (Ctrl+,).
 
@@ -57,6 +57,10 @@ Het menu **Gereedschap** bevat drie losse rekenhulpen die niets aan het project 
 
 Ze openen als pagina in het werkgebied.
 
+**Handleiding.** Gereedschap › Handleiding, of de knop **Handleiding** in de kop van een pagina, opent deze handleiding in het werkgebied, bij het hoofdstuk dat bij de pagina hoort. Links staan de hoofdstukken en de versies: de programmaversie, de rekenkern waarvoor de handleiding is nagelopen en de rekenkern van de installatie. Verschillen die twee, dan meldt de handleiding dat bovenaan.
+
+![Het venster Handleiding met links de hoofdstukken en de programma- en kernversies, rechts hoofdstuk 0 Werken met het programma](img/handleiding-venster.png)
+
 ## NTA-invoer in de stappen
 
 De invoer van het NTA 8800-formulier staat verdeeld over de stappen waar hij inhoudelijk hoort. Voorbeelden: gebruiksfuncties en setpoints onder *Gebouw › Rekenzones*, opwekker en afgifte onder *Installaties › Verwarming*. De volledige toewijzing staat in [hoofdstuk 3](03-projectberekening.md).
@@ -67,14 +71,17 @@ De invoer van het NTA 8800-formulier staat verdeeld over de stappen waar hij inh
 - **Verwarming** is opgedeeld in Opwekking, Distributie, Afgifte, Regeling & BCRG, Hulpenergie en Zonneverwarming. Het overzicht van Installaties toont deze keten per verwarmingssysteem. Een groene stip betekent dat dat deel is ingevuld; klik op een deel om het te openen.
 - **Eén concept.** Wijzigingen in de NTA-invoer gaan eerst in een concept dat over alle stappen heen blijft bestaan. De **toepasbalk** onderaan toont hoeveel wijzigingen nog niet zijn toegepast, met **Ongedaan maken**, **Vorige stap**, **Toepassen** en **Toepassen en verder**. Pas na Toepassen rekent de kern met de nieuwe invoer.
 - **Project zonder NTA-invoer.** Een nieuw project heeft nog geen NTA-invoer. Op de stap Project staat dan "Dit project heeft nog geen NTA-invoer" met de knop **NTA-invoer starten**; die maakt een concept in de uitgave die onder *Instellingen › Berekening* is gekozen (standaard NTA 8800:2025+C1:2026).
-- **Sluiten met een open concept.** Sluit je een projecttabblad terwijl het concept niet-toegepaste wijzigingen heeft, dan vraagt het programma eerst of je wilt sluiten zonder toe te passen. Daarna volgt, zoals altijd, de vraag om niet-opgeslagen wijzigingen op te slaan.
-- **Bron & bewijs** onder een sectie toont de bronvelden en het bewijs bij die sectie. Per bronveld kies je een bewijsstuk uit het register of voeg je een bestand toe. Het bronveld krijgt dan `evidence:<id>` achter de tekst die er al stond, bijvoorbeeld `tekening A-101; evidence:ev-2`; een leeg bronveld krijgt alleen `evidence:<id>` (zie [hoofdstuk 7](07-herlabelen-registratie-dossier.md)).
+- **Sluiten met een open concept.** Sluit je een projecttabblad terwijl het concept niet-toegepaste wijzigingen heeft, dan vraagt het programma eerst of je wilt sluiten zonder toe te passen. Hetzelfde geldt voor registratiegegevens die je in werkstap 10 hebt gewijzigd maar nog niet met **Opslaan** in het project hebt gezet. Daarna volgt, zoals altijd, de vraag om niet-opgeslagen wijzigingen op te slaan.
+- **Bron & bewijs** onder een sectie toont de bronvelden en het bewijs bij die sectie. Elke regel noemt het veld met het label uit het formulier, bijvoorbeeld "Bron toestel"; het pad van de rekenkern staat in de tooltip. Per bronveld kies je een bewijsstuk uit het register of voeg je een bestand toe. Het bronveld krijgt dan `evidence:<id>` achter de tekst die er al stond, bijvoorbeeld `tekening A-101; evidence:ev-2`; een leeg bronveld krijgt alleen `evidence:<id>` (zie [hoofdstuk 7](07-herlabelen-registratie-dossier.md)).
+- Gaat er iets mis, bijvoorbeeld omdat de rekenkern niet bereikbaar is, dan zegt de melding in gewone taal wat er aan de hand is en wat je kunt doen. De technische foutmelding (zoals "HTTP 500") staat eronder achter **Technische details**; die heb je alleen nodig bij een vraag aan de ondersteuning.
 
 ## Controle en Ga naar
 
-Stap 4 **Controle** verzamelt alle meldingen van de rekenkern: fouten, waarschuwingen en ontbrekende invoer, gegroepeerd per stap. Elke melding heeft **Ga naar**. Die opent de juiste stap, subpagina en (bij verwarming) het juiste deel van de keten, en zet de focus op het veld. Een veld met een melding krijgt een rode (fout) of gele (waarschuwing) rand.
+Stap 4 **Controle** verzamelt alle meldingen van de rekenkern: fouten, waarschuwingen en ontbrekende invoer, gegroepeerd per stap. Daar horen ook de meldingen van de berekening zelf bij (bijvoorbeeld een ketel voor meer dan 500 m² of de gevel naar een serre bij TOjuli): die staan bij de invoer waar ze vandaan komen, met het pad in de berekening als toelichting. Elke melding heeft **Ga naar**. Die opent de juiste stap, subpagina en (bij verwarming) het juiste deel van de keten, en zet de focus op het veld. Een veld met een melding krijgt een rode (fout) of gele (waarschuwing) rand.
 
 ![Controle](img/controle.png)
+
+Is de lijst *Open punten* hier of op de stap Project leeg, dan zegt ze waarom. Alleen als de rekenkern heeft geantwoord staat er "Geen open punten van de rekenkern.". Rekent hij nog, dan staat er "Berekenen…". Is hij niet bereikbaar, dan staat er "Rekenkern niet bereikbaar". Is er nog geen antwoord, dan staat er "Nog geen antwoord van de rekenkern". Een lege lijst betekent dus niet vanzelf dat alles in orde is.
 
 Dezelfde meldingen voor de huidige stap staan in het contextpaneel onder *Controle*. Ga naar werkt ook vanuit Resultaten, Registratie, de basisopname en herlabelen.
 
@@ -108,6 +115,8 @@ Stap 10 **Registratie** is een eigen pagina. Bovenaan staat of het project geree
 - Alle tekst haalt in elk thema een contrast van minstens 4,5:1, invoerranden en statusmarkeringen minstens 3:1.
 - Het programma is volledig met het toetsenbord te bedienen. De focus is altijd zichtbaar als amberkleurige rand. **Naar inhoud** (eerste Tab) springt over de navigatie heen.
 - Meldingen (de status van de rekenkern en de pop-upberichten rechtsonder) worden voorgelezen door schermlezers. Bij de systeeminstelling "minder beweging" staan animaties uit.
+- Elk invoerveld heeft een naam die een schermlezer voorleest. Is een veld fout of ontbreekt het, dan leest de schermlezer ook de foutmelding bij dat veld voor. **Ga naar** bij een melding zet de focus in het bijbehorende veld.
+- Een venster (bijvoorbeeld *Overnemen in projectmodel* of een invoervenster) houdt de focus vast zolang het open is: Tab en Shift+Tab blijven binnen het venster, Escape sluit het, en daarna staat de focus weer op de knop waarmee je het opende.
 
 ## Sneltoetsen
 

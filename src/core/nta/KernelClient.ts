@@ -1,7 +1,7 @@
 import { regenerateTemplatePatches, type LegacyTemplate, type MwaMeasureTemplate } from './MwaTemplates';
 import { kernelCall, kernelGet } from './kernelTransport';
 import type { IProject, INtaHeatPumpInput } from '../energy/types';
-import { kernelProject } from './KernelInput';
+import { kernelProject, projectRouteInput } from './KernelInput';
 
 /** Annex T Gaskeur test report (gas water heaters and combi appliances). */
 export type NtaAnnexTTest =
@@ -528,13 +528,15 @@ export interface NtaHeatedBasement {
   wallDepths?: Array<{ lengthM: number; depthM: number }>;
   wallResistanceM2kPerW: number;
   forfaitDeltaUWPerM2k?: number | null;
+  /** ΣA_T;bw of K.1.2 for A_ls (6.7.2) and the 8.38 forfait; omitted = z·P. */
+  wallAreaM2?: number | null;
 }
 
 /** Chapter 12 humidifier of one zone (space-heating chain input). */
 export interface NtaZoneHumidifier {
   zoneId: string;
   humidification: {
-    humidifier: { kind: 'atomising' } | { kind: 'steam'; carrier: 'electricity' | 'gas_or_oil' };
+    humidifier: { kind: 'atomising' } | { kind: 'steam'; carrier: 'electricity' | 'gas' | 'oil' | 'gas_or_oil' };
     rotaryWheel: boolean;
     equipmentReference: string;
   };
@@ -1392,6 +1394,15 @@ export interface SpaceHeatingChainInput {
       kind:
         | { kind: 'direct'; radialFan?: boolean | null }
         | { kind: 'indirect'; roomHeightAbove8M?: boolean | null; warmAirReturn?: boolean | null; ecMotor?: boolean | null };
+      /** Number of heaters of `kind`; absent means all heaters of the zone. */
+      count?: number | null;
+      /** Heaters of other types in the same zone (9.23 sums per type). */
+      further?: {
+        kind:
+          | { kind: 'direct'; radialFan?: boolean | null }
+          | { kind: 'indirect'; roomHeightAbove8M?: boolean | null; warmAirReturn?: boolean | null; ecMotor?: boolean | null };
+        count: number;
+      }[];
       /** Q_h;b per EN 12831-1, W; absent means the table 9.12 estimate. */
       designHeatLoadW?: number | null;
       sourceReference: string;
@@ -1523,6 +1534,8 @@ export interface SpaceHeatingChainInput {
         chp?: { powerKw: number; builtAfter2006: boolean; hreDeclared?: boolean; lowTemperature?: boolean } | null;
         /** Method 1 (9.6.6.2): micro-CHP with NEN-EN 50465 test values. */
         method1?: NtaMicroChp | null;
+        /** Method 2 with ε_chp;th and ε_chp;el from a quality declaration (§9.1) instead of table 9.31. */
+        declaredEfficiencies?: NtaDeclaredChpEfficiencies | null;
         auxiliary?: NtaOtherGeneratorAuxiliary | null;
         equipmentReference: string;
       }
@@ -2021,7 +2034,7 @@ export type ConstructionLayer =
       reflectiveFacingUp?: boolean;
       hermeticallySealed?: boolean;
     }
-  | { kind: 'narrow_cavity'; thicknessMm: number; widthMm: number }
+  | { kind: 'narrow_cavity'; thicknessMm: number; widthMm: number; weaklyVentilated?: boolean }
   | { kind: 'tubular_cavity'; thicknessMm: number; widthMm: number; orientation: 'horizontal' | 'vertical' }
   | { kind: 'attic'; roof: 'tiles_without_underlay' | 'tiles_or_slates_with_underlay' | 'tiles_with_underlay_and_reflective_foil' | 'boarding_and_felt' }
   | {
@@ -2426,6 +2439,12 @@ export interface ResidentialSurvey {
       reedThicknessMm?: number | null;
       exposedPerimeterM?: number;
       crawlspaceBottomInsulated?: boolean | null;
+      /** H2 (ISSO 82.1 4e druk p. 73): top of the ground floor to ground level, m; used by NTA 8800:2022 and 2020+A1 (8.47). */
+      floorHeightAboveGroundM?: number | null;
+      /** H1 (ISSO 82.1 7e druk §8.4 p. 74–75): for a façade part against the ground, top of the floor to ground level, m; the floor becomes a heated basement (NTA 8800 8.3.3.2). */
+      depthBelowGroundM?: number | null;
+      /** The floor (ground, crawlspace or unheated cellar) a façade part against the ground belongs to; needed with several such floors. */
+      groundFloorId?: string | null;
       /** §8.7.2.1: insulated at a renovation or extension (with present_unknown_thickness). */
       renovation?: { year?: number | null; meetsRequirementsOfYear?: boolean } | null;
       /** Utility survey with `zones`: the calculation zone; absent: split over the zones by A_g. */
@@ -3306,7 +3325,8 @@ export interface NtaEnergyStorage {
 /** Chapter 14 lighting of one calculation zone. */
 export interface NtaZoneLighting {
   zoneId: string;
-  functions: Array<{ function: NtaLabelFunction; areaM2: number }>;
+  /** Empty or omitted with common spaces (6.6.4): the kernel fills the zone's within-zone split. */
+  functions?: Array<{ function: NtaLabelFunction; areaM2: number }>;
   lightingZones: Array<{
     id: string;
     areaM2: number;
@@ -3766,6 +3786,8 @@ export type NtaHotWaterGenerator =
     | { kind: 'heating_system' }
     /** §13.8.4.7.4/§13.8.4.8 building CHP: method 2 (`chp`) or method 1 (`method1`), exclusive. */
     | { kind: 'chp'; chp?: NtaChpClass | null; method1?: NtaMicroChp | null; alsoSpaceHeating?: boolean;
+        /** Method 2 with ε_chp;th and ε_chp;el from a quality declaration (§9.1) instead of table 9.31 (§13.8.4.7.4). */
+        declaredEfficiencies?: NtaDeclaredChpEfficiencies | null;
         /** Method 1 without NEN-EN 50465 auxiliary powers: 9.6.8 (9.91/9.92), per 9.6.6.2.2.3. */
         auxiliary?: NtaOtherGeneratorAuxiliary | null; equipmentReference: string };
 
@@ -3777,7 +3799,9 @@ export interface NtaHotWaterSystem {
   unheatedReductionFactor?: number | null;
   need:
     | { method: 'residential'; dwellingCount: number; /** 6.2b: A_g;zi / Σ A_g;zi; omitted: derived for multi-zone projects. */ dwellingShare?: number | null; sourceReference: string }
-    | { method: 'utility'; areas: Array<{ function: NtaLabelFunction; areaM2: number }>; sourceReference: string };
+    | { method: 'utility';
+        /** Empty or omitted with common spaces (6.6.4) and one system: the kernel fills the within-zone split summed over the zones (13.19). */
+        areas?: Array<{ function: NtaLabelFunction; areaM2: number }>; sourceReference: string };
   emission:
     | { method: 'residential'; served: 'kitchen_and_bathroom' | 'bathroom_only' | 'kitchen_only';
         kitchenLengthM?: number | null;
@@ -3901,7 +3925,8 @@ export async function fetchKernelInterpretations(): Promise<NtaInterpretationGro
 }
 
 export interface BuildingPerformanceAssessment {
-  status: 'calculated_unverified' | 'invalid';
+  /** `calculated_legacy_edition` when the project or survey route ran in an older edition (norm_versions::request::stamp). */
+  status: 'calculated_unverified' | 'calculated_legacy_edition' | 'invalid';
   normVersion?: NormVersion;
   registrationEligible?: boolean;
   scope: string;
@@ -3919,7 +3944,7 @@ export interface BuildingPerformanceAssessment {
   }>;
   /** §5.5.3/5.20: the carriers split per energy function. */
   energyByService?: NtaServiceEnergyBreakdown;
-  electricityBalance: Array<{ month: number; usedKwh: number; producedKwh: number; selfUsedKwh: number; exportedKwh: number }>;
+  electricityBalance: Array<{ month: number; usedKwh: number; producedKwh: number; producedRenewableKwh: number; selfUsedKwh: number; exportedKwh: number }>;
   annualPrimaryFossilKwh: number | null;
   annualRenewablePrimaryKwh: number | null;
   annualHeatPumpAmbientHeatKwh: number | null;
@@ -3999,6 +4024,12 @@ export interface NtaProjectHeatingSystem {
 /** Edition of NTA 8800 a calculation follows (`ntaCalculation.normVersion`); absent is the current one. */
 export type NormVersion = '2020+A1' | '2022' | '2023' | '2024' | '2025+C1';
 export const DEFAULT_NORM_VERSION: NormVersion = '2025+C1';
+
+/** Table 9.28: the dated NEN-EN 14511-2 the minimum COP is tested to, per
+ * edition (2020+A1 p. 314 and 2022 p. 316: 2007; from 2023 p. 322: 2022). */
+export function heatPumpHighTestStandard(edition: NormVersion | null | undefined): string {
+  return edition === '2020+A1' || edition === '2022' ? 'NEN-EN 14511-2:2007' : 'NEN-EN 14511-2:2022';
+}
 /** Editions the kernel can calculate; only the default one is registrable (BRL 9500). */
 export const IMPLEMENTED_NORM_VERSIONS: NormVersion[] = ['2025+C1', '2024', '2023', '2022', '2020+A1'];
 
@@ -4054,6 +4085,8 @@ export interface NtaCalculationInput {
     heatedBasement?: NtaHeatedBasement | null;
     sourceReference: string;
   }>;
+  /** 8.2.1 thermal-bridge route of the whole building; absent, the floor edges decide. `forfait` gives ΔU_for also without a ground floor. */
+  thermalBridgeRoute?: 'detailed' | 'forfait' | null;
   ventilationFlows: MonthlyDemandInput['ventilationFlows'];
   ventilation?: VentilationInput | null;
   /** 7.3.3 vertical pipes (single-zone projects; per zone in `zoneData`); `[]` is none, absent is unknown (a gap). */
@@ -4061,7 +4094,10 @@ export interface NtaCalculationInput {
   zoneData?: Array<{
     zoneId: string;
     verticalPipes?: Array<{ id: string; storeys?: number; buildingHeightM?: number | null; areaShare?: number | null; insulated: boolean; sharedZones?: number; sourceReference: string }> | null;
+    /** With `commonSpaces`: the zone's own (initial) function areas. */
     functionAreas?: Array<{ function: NtaUsageFunction; areaM2: number }>;
+    /** 6.6.4 common spaces in the zone; the kernel allocates them (empty `servedFunctions`: all functions). */
+    commonSpaces?: NtaCommonSpace[];
     ventilationFlows: MonthlyDemandInput['ventilationFlows'];
     ventilation?: VentilationInput | null;
     internalGains: MonthlyDemandInput['internalGains'];
@@ -4143,6 +4179,8 @@ export interface NtaChapterFiveIndicators {
   heatingAndCoolingNeedKwhPerM2: number;
   /** §5.3.2 Standaard voor woningisolatie (dwellings), whole kWh/m². */
   standardInsulationKwhPerM2: number | null;
+  /** §5.3.2 with the values "na 1945" (renovation passport, ISSO 82.2 §1.10.2). */
+  standardInsulationPost1945KwhPerM2?: number | null;
   meetsStandardInsulation: boolean | null;
   /** §5.3.1.3 EwePrenTot, rounded down to 0,01. */
   renewableIndicatorKwhPerM2: number;
@@ -4213,6 +4251,30 @@ export interface ProjectPerformanceAssessment {
   } | null;
   /** Omgevingsregeling art. 5.13 label data. */
   labelData?: LabelData | null;
+  /** 6.6.4 allocation of the common spaces; absent without any. */
+  commonSpaces?: CommonSpaceSplit;
+}
+
+/** A common space lying in a calculation zone (6.6.4). */
+export interface NtaCommonSpace {
+  id?: string | null;
+  areaM2: number;
+  servedFunctions?: NtaUsageFunction[];
+  sourceReference: string;
+}
+
+type FunctionAreaList = Array<{ function: NtaUsageFunction; areaM2: number }>;
+
+/** The kernel's allocation of the common spaces (crates/nta8800-core/src/common_space.rs). */
+export interface CommonSpaceSplit {
+  source: string;
+  spaces: Array<{ zoneId: string; id?: string; areaM2: number; withinZone: FunctionAreaList; building: FunctionAreaList }>;
+  zones: Array<{ zoneId: string; initial: FunctionAreaList; allocated: FunctionAreaList }>;
+  building: FunctionAreaList;
+  /** Within-zone split summed over the zones (hot water, 13.19). */
+  withinZones: FunctionAreaList;
+  /** Input lists the kernel filled from the split, below ntaCalculation. */
+  filled?: string[];
 }
 
 /** Registration data of the EP report (crates/nta8800-core/src/registration.rs); all optional. */
@@ -4576,6 +4638,8 @@ export interface MwaVariantResult {
     /** NTA 8800 §5.3.2 net heat need and Standaard voor Woningisolatie (dwellings). */
     heatingNeedKwhPerM2?: number | null;
     standardInsulationKwhPerM2?: number | null;
+    /** §5.3.2 with the values "na 1945" (ISSO 82.2 §1.10.2 p. 22). */
+    standardInsulationPost1945KwhPerM2?: number | null;
     /** Table 5.7 renovation standard EP2 (utility). */
     renovationStandardKwhPerM2?: number | null;
   };
@@ -4813,8 +4877,51 @@ export interface NtaLabelStatements {
 }
 
 export async function calculateProjectPerformanceWithRust(input: IProject): Promise<ProjectPerformanceAssessment> {
-  const project = kernelProject(input);
+  // The project route gets the blanks as null: its blank search names each one as `nta_value_missing`
+  // at its own path, where an absent member only gave `nta_calculation_block_invalid` for the whole block.
+  const project = projectRouteInput(input);
   return kernelCall<ProjectPerformanceAssessment>('calculate_project_performance', '/api/v1/nta8800/project/performance', { project });
+}
+
+/** One input a change of edition refuses, requires, ignores or reads differently; see crates/nta8800-core/src/edition_switch.rs. */
+export interface EditionSwitchItem {
+  category: 'refused' | 'required' | 'ignored' | 'reinterpreted' | 'warning';
+  code: string;
+  /** Project input path, e.g. `ntaCalculation.groundFloors[0].below.wallHeightAboveGroundM`. */
+  path: string;
+  /** Switch point numbers of docs/nta8800-normversies.md. */
+  points: string[];
+  subject?: string | null;
+  /** `drop`, `switchOff` and `set` are safe and applied in `adjustedProject`; the others are left to the adviser. */
+  fix: 'drop' | 'switchOff' | 'set' | 'enter' | 'choose' | 'review';
+  value?: unknown;
+  resolvedByAutomaticChanges: boolean;
+}
+
+export interface EditionSwitchReport {
+  fromNormVersion: NormVersion;
+  toNormVersion: NormVersion;
+  fromLabel: string;
+  toLabel: string;
+  switchPoints: Array<{ points: string[]; subject: string; fields: string[]; hasInputs: boolean }>;
+  items: EditionSwitchItem[];
+  /** The project in the target edition with the automatic changes applied. */
+  adjustedProject: { ntaCalculation?: Record<string, unknown> } & Record<string, unknown>;
+  statusAfterAutomaticChanges: string;
+  remainingAfterAutomaticChanges: Array<{ code: string; path: string; detail?: string }>;
+}
+
+export const AUTOMATIC_EDITION_FIXES: ReadonlyArray<EditionSwitchItem['fix']> = ['drop', 'switchOff', 'set'];
+
+/** What changes when the project's NTA block moves to edition `target`; the project itself is not changed. */
+export async function compareProjectEditionsWithRust(input: IProject, target: NormVersion): Promise<EditionSwitchReport> {
+  const project = projectRouteInput(input);
+  const report = await kernelCall<Partial<EditionSwitchReport>>('compare_project_editions', '/api/v1/nta8800/project/editions/compare', { project, normVersion: target });
+  // Anything else than a comparison (an older service) counts as unavailable.
+  if (!Array.isArray(report.items) || !Array.isArray(report.remainingAfterAutomaticChanges)) {
+    throw new Error('edition comparison not available');
+  }
+  return report as EditionSwitchReport;
 }
 
 /** Chapter 13 result; see crates/nta8800-core/src/domestic_hot_water.rs. */
@@ -4864,6 +4971,13 @@ export interface NtaHotWaterAssessment {
 }
 
 /** 9.6.6.2 test point (table 9.33); omitted efficiencies take table 9.37. */
+/** §9.1 quality declaration of a CHP: ε_chp;th and ε_chp;el, rounded down to two decimals by the kernel. */
+export interface NtaDeclaredChpEfficiencies {
+  thermal: number;
+  electric: number;
+  declarationReference: string;
+}
+
 export interface NtaChpTestPoint {
   thermalPowerKw: number;
   electricPowerKw?: number | null;

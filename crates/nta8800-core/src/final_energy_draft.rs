@@ -311,7 +311,7 @@ pub fn assess_final_energy_draft(input: &FinalEnergyDraftInput) -> FinalEnergyDr
             "input_valid"
         },
         scope: "public_chapter_5_draft_arithmetic_only",
-        draft_source: DRAFT_SOURCE,
+        draft_source: crate::norm_versions::cite(DRAFT_SOURCE),
         target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint: fingerprint,

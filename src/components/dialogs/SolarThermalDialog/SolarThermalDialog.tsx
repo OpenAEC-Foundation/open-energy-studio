@@ -3,6 +3,7 @@ import { useI18n } from '../../../i18n/i18n';
 import { useEnergy } from '../../../context/EnergyContext';
 import { ISolarThermal, SolarThermalType, Orientation } from '../../../core/energy/types';
 import { DialogShell } from '../DialogShell';
+import { DecimalInput } from '../../ui';
 
 interface SolarThermalDialogProps {
   editId?: string | null;
@@ -74,8 +75,7 @@ export function SolarThermalDialog({ editId, onClose }: SolarThermalDialogProps)
 
         <div className="dialog-field">
           <label htmlFor={`${fieldId}-2`}>{t('dialog.solarThermal.collectorArea')}</label>
-          <input id={`${fieldId}-2`}
-            type="number"
+          <DecimalInput id={`${fieldId}-2`}
             min={0}
             step={0.1}
             value={collectorArea}
@@ -107,8 +107,7 @@ export function SolarThermalDialog({ editId, onClose }: SolarThermalDialogProps)
 
         <div className="dialog-field">
           <label htmlFor={`${fieldId}-5`}>{t('dialog.solarThermal.tilt')}</label>
-          <input id={`${fieldId}-5`}
-            type="number"
+          <DecimalInput id={`${fieldId}-5`}
             min={0}
             max={90}
             step={1}

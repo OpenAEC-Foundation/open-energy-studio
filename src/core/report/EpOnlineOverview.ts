@@ -1,5 +1,6 @@
+import { attestText, programIdentity } from './ProgramIdentity';
 import type { IProject } from '../energy/types';
-import type { ProjectPerformanceAssessment } from '../nta/KernelClient';
+import { legacyEdition, type ProjectPerformanceAssessment } from '../nta/KernelClient';
 
 /**
  * EP-Online data overview for the project dossier.
@@ -13,6 +14,12 @@ import type { ProjectPerformanceAssessment } from '../nta/KernelClient';
  * serves only to check the registered label in EP-Online against the
  * calculation afterwards. It is NOT a registration file.
  */
+/** Fields left out when the result is in an older, non-registrable edition. */
+const LEGACY_OMITTED: EpOnlineField[] = [
+  'Energieklasse', 'Energiebehoefte', 'Primaire_fossiele_energie', 'Aandeel_hernieuwbare_energie',
+  'Temperatuuroverschrijding', 'Warmtebehoefte',
+];
+
 export const EP_ONLINE_OVERVIEW_NOTICE =
   'Overzicht ter controle van het geregistreerde label in EP-Online. Veldnamen volgen het openbare exportschema '
   + 'EpbdExportTypesV4 (Pandcertificaat). Dit is GEEN registratiebestand: het uploadformaat van EP-Online is niet '
@@ -86,6 +93,20 @@ export interface EpOnlineOverview {
     k_reageertOpExterneSignalen: boolean | null;
     l_afgiftesysteemLageTemperatuur: boolean | null;
   };
+  /**
+   * The calculation behind the overview (BRL 9501 §5.2, §5.3 opmerking 2 and §6.1; Omgevingsregeling
+   * art. 5.14 lid 1 onder b). The export schema has no fields for it, so it stands apart, like the
+   * statements; `attestnummer` is null and `attestnummerTekst` says so while there is no attest.
+   */
+  berekening: {
+    rekenprogramma: string;
+    programmaversie: string;
+    rekenkernversie: string | null;
+    uitgave: string | null;
+    invoervingerafdruk: string | null;
+    attestnummer: string | null;
+    attestnummerTekst: string;
+  };
 }
 
 export const LABEL_STATEMENTS_NOTE =
@@ -104,6 +125,10 @@ const STATUS_BY_PURPOSE: Record<string, string> = {
   bbl_check: 'Vergunningsaanvraag',
 };
 
+function filled(value: string | undefined | null): boolean {
+  return value != null && value.trim() !== '';
+}
+
 function epbdDate(value: string | null | undefined): string | null {
   if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
   return value.replace(/-/g, '');
@@ -116,11 +141,22 @@ function round(value: number | null | undefined, digits = 2): number | null {
 }
 
 /** Splits a Dutch house number like "12A" or "12-bis" into number, letter and addition. */
-function houseNumberParts(raw: string | undefined): { number: number | null; letter: string | null; addition: string | null } {
-  const match = /^\s*(\d+)\s*([A-Za-z])?(?:\s*[- ]?\s*(\S{1,4}))?\s*$/.exec(raw ?? '');
-  if (!match) return { number: null, letter: null, addition: null };
-  return { number: Number(match[1]), letter: match[2]?.toUpperCase() ?? null, addition: match[3] ?? null };
+function houseNumberParts(raw: string | undefined): { number: number | null; letter: string | null; addition: string | null; parsed: boolean } {
+  const match = /^\s*(\d+)\s*([A-Za-z])?(?:\s*[- ]?\s*(\S+))?\s*$/.exec(raw ?? '');
+  if (!match) return { number: null, letter: null, addition: null, parsed: false };
+  return { number: Number(match[1]), letter: match[2]?.toUpperCase() ?? null, addition: match[3] ?? null, parsed: true };
 }
+
+/** maxLength of the string types in the export XSD (RVO bijlage 1). */
+export const EP_ONLINE_MAX_LENGTH: Partial<Record<EpOnlineField, number>> = {
+  Huisletter: 1,
+  Huisnummertoevoeging: 4,
+  Detailaanduiding: 25,
+  Gebouwtype: 75,
+  Gebouwsubtype: 75,
+  SBIcode: 20,
+  Status: 256,
+};
 
 /** EP-Online data overview from the project and the kernel assessment. */
 export function buildEpOnlineOverview(
@@ -129,14 +165,28 @@ export function buildEpOnlineOverview(
 ): EpOnlineOverview {
   const registration = project.registration ?? {};
   const performance = assessment?.performance ?? null;
-  const calculated = performance?.status === 'calculated_unverified';
+  // An older edition calculates, but is not registrable: no class or indicators
+  // in an overview meant to check a registered label.
+  const legacy = assessment != null && legacyEdition(assessment);
+  const calculated = assessment?.status === 'calculated_unverified' && !legacy
+    && performance?.status === 'calculated_unverified';
   const indicators = assessment?.labelData?.indicators ?? null;
-  const residential = project.buildingFunction === 'residential';
+  // Woning or not follows the calculation scope the kernel used: a logiesfunctie
+  // calculated as a woning is labelled as one (Omgevingsregeling art. 5.11 lid 1,
+  // 5.13 onder a en d). Without kernel input, the building function decides.
+  const scope = assessment?.derivedInput?.calculationScope;
+  const residential = scope != null ? scope === 'residential' : project.buildingFunction === 'residential';
   const existing = (registration.purpose ?? 'existing_building') === 'existing_building';
   const values: Partial<Record<EpOnlineField, EpOnlineValue>> = {};
   const omitted: EpOnlineOverview['omitted'] = [];
   const set = (field: EpOnlineField, value: EpOnlineValue | undefined) => {
-    if (value !== null && value !== undefined && value !== '') values[field] = value;
+    if (value === null || value === undefined || value === '') return;
+    const max = EP_ONLINE_MAX_LENGTH[field];
+    if (max != null && typeof value === 'string' && [...value].length > max) {
+      omitted.push({ field, reason: `"${value}" is langer dan de ${max} tekens die het exportschema toestaat; corrigeer de invoer` });
+      return;
+    }
+    values[field] = value;
   };
 
   set('Registratiedatum', epbdDate(registration.registrationDate));
@@ -146,13 +196,19 @@ export function buildEpOnlineOverview(
   set('Soort_opname', registration.surveyType === 'detailed' ? 'Detailopname' : registration.surveyType === 'basic' ? 'Basisopname' : null);
   set('Status', STATUS_BY_PURPOSE[registration.purpose ?? 'existing_building'] ?? null);
   set('Berekeningstype', 'NTA 8800');
-  values.Op_basis_van_referentiegebouw = registration.representation === 'reference';
+  // True for the label of the gelijkende (not visited) object: it gets a
+  // referentie-energieprestatierapport; the visited referentieobject gets an
+  // individual one (BRL 9500-W §4.3 p. 26; RVO bijlage 2).
+  values.Op_basis_van_referentiegebouw = registration.representation === 'similar';
   values.Gebouwklasse = residential ? 'W' : 'U';
   set('Gebouwtype', registration.buildingType?.trim() || null);
 
   const postcode = registration.postcode?.replace(/\s+/g, '').toUpperCase();
   set('Postcode', postcode && /^\d{4}[A-Z]{2}$/.test(postcode) ? postcode : null);
   const house = houseNumberParts(registration.houseNumber);
+  if (filled(registration.houseNumber) && !house.parsed) {
+    omitted.push({ field: 'Huisnummer', reason: `"${registration.houseNumber}" is geen huisnummer (cijfers, eventueel een huisletter en een toevoeging); corrigeer de invoer` });
+  }
   set('Huisnummer', house.number);
   set('Huisletter', house.letter);
   set('Huisnummertoevoeging', registration.houseNumberAddition?.trim() || house.addition);
@@ -192,6 +248,10 @@ export function buildEpOnlineOverview(
       set('Eis_aandeel_hernieuwbare_energie', round(limits.renewableShareMinPercent, 1));
       if (residential) set('Eis_temperatuuroverschrijding', 1.2);
     }
+  } else if (legacy) {
+    values.Energieklasse = null;
+    const reason = `oudere uitgave (${assessment?.targetNormVersion ?? 'NTA 8800, onbekende uitgave'}), niet registreerbaar`;
+    for (const field of LEGACY_OMITTED) omitted.push({ field, reason });
   } else {
     values.Energieklasse = null;
     omitted.push({ field: 'Energieklasse', reason: 'geen berekend resultaat van de rekenkern' });
@@ -209,8 +269,11 @@ export function buildEpOnlineOverview(
   for (const [field] of EP_ONLINE_FIELDS) {
     if (field in values) ordered[field] = values[field] as EpOnlineValue;
   }
+  const identity = programIdentity(assessment?.kernelVersion, assessment?.targetNormVersion);
   return {
-    notice: EP_ONLINE_OVERVIEW_NOTICE,
+    notice: legacy
+      ? `${EP_ONLINE_OVERVIEW_NOTICE} Berekend in de oudere uitgave ${assessment?.targetNormVersion ?? 'NTA 8800, onbekende uitgave'}: niet registreerbaar, daarom zonder energieklasse en indicatoren.`
+      : EP_ONLINE_OVERVIEW_NOTICE,
     schema: 'EpbdExportTypesV4 (exportschema, Pandcertificaat)',
     pandcertificaat: ordered,
     omitted,
@@ -222,6 +285,15 @@ export function buildEpOnlineOverview(
         ?? registration.labelStatements?.respondsToExternalSignals ?? null,
       l_afgiftesysteemLageTemperatuur: indicators?.elements?.lowTemperatureHeating
         ?? registration.labelStatements?.lowTemperatureHeating ?? null,
+    },
+    berekening: {
+      rekenprogramma: identity.name,
+      programmaversie: identity.programVersion,
+      rekenkernversie: identity.kernelVersion,
+      uitgave: identity.normEdition,
+      invoervingerafdruk: assessment?.inputFingerprint ?? null,
+      attestnummer: identity.attestNumber,
+      attestnummerTekst: attestText(identity),
     },
   };
 }

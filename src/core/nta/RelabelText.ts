@@ -24,6 +24,10 @@ const CLUSTER_KEYS: Record<string, string> = {
   'change in distribution, emission or control not listed for this service': 'distributionNotListed',
   'one-to-one replacement or change: glazing properties': 'glazingProperties',
   'installation: share of a generator next to an added generator': 'generatorShare',
+  'airtightness or infiltration': 'airtightness',
+  'one-to-one replacement: gas-fired water heater by an electric boiler (ISSO 82.1/75.1 Bijlage A cluster 1)': 'hotWaterSwap',
+  'installation: cooling added or removed, a system change': 'coolingAddedRemoved',
+  'relabel uses the method and software version of the original survey: NTA 8800 edition changed': 'editionChanged',
 };
 
 const NOTE_KEYS: Record<string, string> = {
@@ -33,8 +37,9 @@ const NOTE_KEYS: Record<string, string> = {
   'lighting is not listed in Bijlage 6a or 6b; the adviser decides': 'lightingNotListed',
   'confirm: not insulation on the inside and not of elements outside the thermal zone (6b)': 'insulationConfirm',
   'decide with Bijlage 6a/6b and ISSO 82.1': 'decide',
-  'Bijlage 6a lists only the emission system for ventilation and hot water; the adviser decides': 'emissionOnly',
+  'Bijlage 6a lists emission and distribution for ventilation and only the emission system for hot water; the adviser decides': 'emissionOnly',
   'follows the added generator, a system change (6b); the adviser decides': 'addedGenerator',
+  'not listed in Bijlage 6a or 6b (W p. 67–68, U p. 58–60); the adviser decides, with the measurement report as evidence': 'airtightnessNotListed',
 };
 
 type Translate = (key: string, options?: Record<string, unknown>) => string;
@@ -44,10 +49,11 @@ type Translate = (key: string, options?: Record<string, unknown>) => string;
  * `is_production_path`; such a relabel needs photos with shading (BRL 9500-W p. 23).
  */
 export function isProductionPath(path: string): boolean {
-  if (/solar/i.test(path)) return true;
   return path.split('/').some((segment) => {
     const lower = segment.toLowerCase();
-    return lower === 'pv' || lower.startsWith('pvsystem') || lower === 'onsiteproduction';
+    // `windowSolar` holds the solar properties of the windows, not production.
+    return (lower.includes('solar') && !lower.startsWith('window'))
+      || lower === 'pv' || lower.startsWith('pvsystem') || lower === 'onsiteproduction';
   });
 }
 

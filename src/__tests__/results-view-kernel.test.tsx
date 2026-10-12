@@ -11,6 +11,7 @@ import { defaultValueLabel } from '../components/BasisopnamePanel/BasisopnamePan
 import { table713Setpoints } from '../components/NtaPerformancePanel/NtaCalculationForm';
 import type { BuildingPerformanceAssessment } from '../core/nta/KernelClient';
 import { renderWithProviders, userEvent } from './test-utils';
+import { SLOW_UI_TEST_MS } from './timeouts';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -110,7 +111,7 @@ describe('results view', () => {
     expect(screen.getByRole('region', { name: 'Tailored advice (maatwerkadvies)' })).toBeInTheDocument();
     expect(screen.getByTestId('results-stale')).toBeInTheDocument();
     expect(await screen.findByTestId('beng-cards-indicative')).toBeInTheDocument();
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 });
 
 describe('results withheld when the kernel refuses the input', () => {
@@ -122,7 +123,7 @@ describe('results withheld when the kernel refuses the input', () => {
       await user.click(screen.getByRole('button', { name: 'Calculate' }));
       expect(await screen.findByTestId('results-withheld')).toHaveTextContent('Results withheld');
       expect(screen.queryByTestId('beng-cards-indicative')).not.toBeInTheDocument();
-    }, 60000);
+    }, SLOW_UI_TEST_MS);
   }
 });
 

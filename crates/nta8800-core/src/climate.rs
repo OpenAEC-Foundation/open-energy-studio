@@ -17,6 +17,32 @@ use serde::{Deserialize, Serialize};
 pub const CLIMATE_SOURCE: &str =
     "NTA 8800:2025+C1:2026 tables 17.1/17.2 (transcribed via Open Heatloss Studio; review pending)";
 
+/// The climate source of the edition a result is calculated in. Table 17.2
+/// is identical in every edition; table 17.1 differs only in θ_e;argII for
+/// May–September (2023, 2022 and 2020+A1 against 2024 and later), which the
+/// edition profile switches (`argii_temperature_c`), and 2020+A1 has no
+/// ϑ_ODA;preh;WTWC column (cold recovery is refused there, switch point 79).
+/// Pages: 2025+C1 p. 690, 2024 p. 674, 2023 p. 676, 2022 p. 666,
+/// 2020+A1 p. 662.
+pub const fn climate_source(version: crate::norm_versions::NormVersion) -> &'static str {
+    use crate::norm_versions::NormVersion;
+    match version {
+        NormVersion::V2025C1 => CLIMATE_SOURCE,
+        NormVersion::V2024 => {
+            "NTA 8800:2024 tables 17.1/17.2 (17.2 equal to 2025+C1; transcribed via Open Heatloss Studio; review pending)"
+        }
+        NormVersion::V2023 => {
+            "NTA 8800:2023 tables 17.1/17.2 (θ_e;argII of 2023; 17.2 equal to 2025+C1; transcribed via Open Heatloss Studio; review pending)"
+        }
+        NormVersion::V2022 => {
+            "NTA 8800:2022 tables 17.1/17.2 (θ_e;argII of 2022; 17.2 equal to 2025+C1; transcribed via Open Heatloss Studio; review pending)"
+        }
+        NormVersion::V2020A1 => {
+            "NTA 8800:2020+A1:2020 tables 17.1/17.2 (θ_e;argII of 2020+A1; 17.2 equal to 2025+C1; transcribed via Open Heatloss Studio; review pending)"
+        }
+    }
+}
+
 /// Table 17.1, `t_mi` in hours; sums to 8760 h.
 pub const MONTH_HOURS: [f64; 12] = [
     744.0, 672.0, 744.0, 720.0, 744.0, 720.0, 744.0, 744.0, 720.0, 744.0, 720.0, 744.0,
@@ -304,6 +330,24 @@ mod tests {
     #[test]
     fn month_hours_sum_to_a_year() {
         assert_eq!(MONTH_HOURS.iter().sum::<f64>(), 8760.0);
+    }
+
+    #[test]
+    fn climate_source_names_the_calculated_edition() {
+        use crate::norm_versions::NormVersion;
+        assert_eq!(climate_source(NormVersion::V2025C1), CLIMATE_SOURCE);
+        for version in NormVersion::ALL {
+            let source = climate_source(version);
+            assert!(
+                source.starts_with(version.label().split(" met").next().unwrap()),
+                "{source}"
+            );
+        }
+        // The monthly demand result carries the source of the active edition.
+        let older = crate::norm_versions::with_version(NormVersion::V2022, || {
+            climate_source(crate::norm_versions::current())
+        });
+        assert!(older.starts_with("NTA 8800:2022 "), "{older}");
     }
 
     #[test]

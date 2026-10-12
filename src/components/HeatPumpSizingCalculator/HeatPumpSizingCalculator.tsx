@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useI18n } from '../../i18n/i18n';
+import { formatNumber } from '../../i18n/format';
 import { useEnergy } from '../../context/EnergyContext';
 import {
   calculateHeatPumpSizing,
@@ -8,9 +9,10 @@ import {
   type ZoneSizingResult,
 } from '../../core/energy/HeatPumpSizingCalc';
 import './HeatPumpSizingCalculator.css';
+import { DecimalInput } from '../ui';
 
 export function HeatPumpSizingCalculator() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { state } = useEnergy();
   const { project } = state;
 
@@ -46,8 +48,8 @@ export function HeatPumpSizingCalculator() {
     });
   };
 
-  const fmt = (v: number, decimals = 0) => v.toFixed(decimals);
-  const fmtW = (v: number) => v >= 1000 ? `${(v / 1000).toFixed(2)} kW` : `${v.toFixed(0)} W`;
+  const fmt = (v: number, decimals = 0) => formatNumber(v, locale, decimals);
+  const fmtW = (v: number) => v >= 1000 ? `${formatNumber(v / 1000, locale, 2)} kW` : `${formatNumber(v, locale, 0)} W`;
 
   if (project.zones.length === 0) {
     return (
@@ -91,7 +93,7 @@ export function HeatPumpSizingCalculator() {
           <div className="hp-result-divider" />
           <div className="hp-result-item hp-result-highlight">
             <span className="hp-result-label">{t('hp.recommendation')}</span>
-            <span className="hp-result-value">{result.recommendedKW.toFixed(1)}</span>
+            <span className="hp-result-value">{formatNumber(result.recommendedKW, locale, 1)}</span>
             <span className="hp-result-unit">kW</span>
           </div>
         </div>
@@ -111,8 +113,7 @@ export function HeatPumpSizingCalculator() {
           <div className="hp-input-row">
             <div className="hp-input-group">
               <span className="hp-input-label">{t('hp.outdoorTemp')}</span>
-              <input
-                type="number"
+              <DecimalInput
                 className="hp-input"
                 aria-label={t('hp.outdoorTemp')}
                 value={designOutdoorTemp}
@@ -122,8 +123,7 @@ export function HeatPumpSizingCalculator() {
             </div>
             <div className="hp-input-group">
               <span className="hp-input-label">{t('hp.indoorTemp')}</span>
-              <input
-                type="number"
+              <DecimalInput
                 className="hp-input"
                 aria-label={t('hp.indoorTemp')}
                 value={customIndoorTemp ?? params.thetaInt}
@@ -136,8 +136,7 @@ export function HeatPumpSizingCalculator() {
             </div>
             <div className="hp-input-group">
               <span className="hp-input-label">{t('hp.safetyMargin')}</span>
-              <input
-                type="number"
+              <DecimalInput
                 className="hp-input"
                 aria-label={t('hp.safetyMargin')}
                 value={safetyMargin}
@@ -210,19 +209,19 @@ export function HeatPumpSizingCalculator() {
               </div>
               <div className="hp-summary-item hp-summary-highlight">
                 <span className="hp-summary-label">{t('hp.recommendation')}</span>
-                <span className="hp-summary-value">{result.recommendedKW.toFixed(1)} kW</span>
+                <span className="hp-summary-value">{formatNumber(result.recommendedKW, locale, 1)} kW</span>
               </div>
               <div className="hp-summary-item">
                 <span className="hp-summary-label">H_t ({t('hp.transmissionCoeff')})</span>
-                <span className="hp-summary-value">{result.htTransmission.toFixed(1)} W/K</span>
+                <span className="hp-summary-value">{formatNumber(result.htTransmission, locale, 1)} W/K</span>
               </div>
               <div className="hp-summary-item">
                 <span className="hp-summary-label">{t('hp.specificLoad')}</span>
-                <span className="hp-summary-value">{result.specificLoad.toFixed(1)} W/m²</span>
+                <span className="hp-summary-value">{formatNumber(result.specificLoad, locale, 1)} W/m²</span>
               </div>
               <div className="hp-summary-item">
                 <span className="hp-summary-label">{t('hp.totalFloorArea')}</span>
-                <span className="hp-summary-value">{result.totalFloorArea.toFixed(1)} m²</span>
+                <span className="hp-summary-value">{formatNumber(result.totalFloorArea, locale, 1)} m²</span>
               </div>
             </div>
           </div>
@@ -240,7 +239,8 @@ function ZoneDetail({ zone, expanded, onToggle, t }: {
   onToggle: () => void;
   t: (key: string) => string;
 }) {
-  const fmtW = (v: number) => v.toFixed(0);
+  const { locale } = useI18n();
+  const fmtW = (v: number) => formatNumber(v, locale, 0);
 
   return (
     <div className="hp-card">
@@ -248,8 +248,8 @@ function ZoneDetail({ zone, expanded, onToggle, t }: {
         <div className="hp-zone-header" onClick={onToggle}>
           <span className={`hp-zone-toggle ${expanded ? 'hp-expanded' : ''}`}>&#9654;</span>
           <h4>{zone.zoneName}</h4>
-          <span className="hp-zone-badge">{zone.floorArea.toFixed(1)} m²</span>
-          <span className="hp-zone-badge">{(zone.totalZoneLoss / 1000).toFixed(2)} kW</span>
+          <span className="hp-zone-badge">{formatNumber(zone.floorArea, locale, 1)} m²</span>
+          <span className="hp-zone-badge">{formatNumber(zone.totalZoneLoss / 1000, locale, 2)} kW</span>
         </div>
       </div>
       {expanded && (
@@ -274,9 +274,9 @@ function ZoneDetail({ zone, expanded, onToggle, t }: {
                     <tr key={s.surfaceId}>
                       <td>{s.surfaceName}</td>
                       <td>{t(`surfaceType.${s.surfaceType}`)}</td>
-                      <td className="hp-td-mono">{s.netArea.toFixed(1)}</td>
-                      <td className="hp-td-mono">{s.uValue.toFixed(3)}</td>
-                      <td className="hp-td-mono">{s.deltaT.toFixed(0)}</td>
+                      <td className="hp-td-mono">{formatNumber(s.netArea, locale, 1)}</td>
+                      <td className="hp-td-mono">{formatNumber(s.uValue, locale, 3)}</td>
+                      <td className="hp-td-mono">{formatNumber(s.deltaT, locale, 0)}</td>
                       <td className="hp-td-mono">{fmtW(s.heatLoss)}</td>
                     </tr>
                   ))}
@@ -311,9 +311,9 @@ function ZoneDetail({ zone, expanded, onToggle, t }: {
                     <tr key={w.windowId}>
                       <td>{w.windowName}</td>
                       <td>{w.surfaceName}</td>
-                      <td className="hp-td-mono">{w.area.toFixed(1)}</td>
-                      <td className="hp-td-mono">{w.uValue.toFixed(2)}</td>
-                      <td className="hp-td-mono">{w.deltaT.toFixed(0)}</td>
+                      <td className="hp-td-mono">{formatNumber(w.area, locale, 1)}</td>
+                      <td className="hp-td-mono">{formatNumber(w.uValue, locale, 2)}</td>
+                      <td className="hp-td-mono">{formatNumber(w.deltaT, locale, 0)}</td>
                       <td className="hp-td-mono">{fmtW(w.heatLoss)}</td>
                     </tr>
                   ))}
@@ -346,9 +346,9 @@ function ZoneDetail({ zone, expanded, onToggle, t }: {
                   {zone.thermalBridgeLosses.map(tb => (
                     <tr key={tb.bridgeId}>
                       <td>{tb.bridgeName}</td>
-                      <td className="hp-td-mono">{tb.psiValue.toFixed(3)}</td>
-                      <td className="hp-td-mono">{tb.length.toFixed(1)}</td>
-                      <td className="hp-td-mono">{tb.deltaT.toFixed(0)}</td>
+                      <td className="hp-td-mono">{formatNumber(tb.psiValue, locale, 3)}</td>
+                      <td className="hp-td-mono">{formatNumber(tb.length, locale, 1)}</td>
+                      <td className="hp-td-mono">{formatNumber(tb.deltaT, locale, 0)}</td>
                       <td className="hp-td-mono">{fmtW(tb.heatLoss)}</td>
                     </tr>
                   ))}

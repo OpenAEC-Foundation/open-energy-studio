@@ -189,8 +189,8 @@ pub fn assess_gas_collective_source_draft(
             "invalid"
         },
         scope: "public_chapters_5_and_9_collective_gas_heat_pump_source_forfait_only",
-        chapter_5_draft_source: CHAPTER_5,
-        chapter_9_draft_source: CHAPTER_9,
+        chapter_5_draft_source: crate::norm_versions::cite(CHAPTER_5),
+        chapter_9_draft_source: crate::norm_versions::cite(CHAPTER_9),
         target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint: input_fingerprint(&json!(input)),

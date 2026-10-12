@@ -11,6 +11,7 @@ import { screen, waitFor } from '@testing-library/react';
 import caseH from '../../training-data/nta8800-public-comparison-h.json';
 import office from '../../training-data/nta8800-example-office.kernel-output.json';
 import { renderWithProviders } from './test-utils';
+import { SLOW_UI_TEST_MS } from './timeouts';
 import { useEnergy } from '../context/EnergyContext';
 import { StepRouter } from '../components/shell/StepRouter';
 import type { ShellActions } from '../components/shell/ShellActions';
@@ -35,6 +36,18 @@ afterEach(() => {
 
 /** Generous: the full Vitest run shares the CPU with the Rust gate. */
 const PAGE_BUDGET_MS = 15000;
+/**
+ * Under machine load the absolute budget alone fails for reasons outside the app. Each
+ * budget test therefore first renders the same page for case H once (2 zones, 18 windows)
+ * and allows the 20-fold project this many times that baseline when it is larger than the
+ * absolute budget. Linear work grows about 20-fold; a quadratic lookup per row grows about
+ * 400-fold and still fails.
+ */
+const BASELINE_FACTOR = 80;
+
+function budgetMs(baselineMs: number): number {
+  return Math.max(PAGE_BUDGET_MS, BASELINE_FACTOR * baselineMs);
+}
 const COPIES = 20;
 const PER_ZONE = ['zoneData', 'groundFloors', 'surfaceTilts', 'windowObstructions', 'lighting'] as const;
 
@@ -112,34 +125,46 @@ describe('a large project in the interface', () => {
     ['check/overview', { step: 'check', sub: 'overview' }],
   ] as Array<[string, Route]>)('renders %s within the budget', async (_name, route) => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({ ok: true, json: async () => [] })));
-    const started = performance.now();
-    const { unmount } = renderWithProviders(<Shell route={route} project={project} />);
-    await screen.findByRole('heading', { level: 1 }, { timeout: PAGE_BUDGET_MS });
-    const elapsed = performance.now() - started;
-    expect(elapsed).toBeLessThan(PAGE_BUDGET_MS);
-    unmount();
-  }, 60000);
+    const timed = async (subject: IProject, timeout: number) => {
+      const started = performance.now();
+      const { unmount } = renderWithProviders(<Shell route={route} project={subject} />);
+      await screen.findByRole('heading', { level: 1 }, { timeout });
+      const elapsed = performance.now() - started;
+      unmount();
+      return elapsed;
+    };
+    const baseline = await timed(largeProject(1), PAGE_BUDGET_MS);
+    const budget = budgetMs(baseline);
+    expect(await timed(project, budget)).toBeLessThan(budget);
+  }, SLOW_UI_TEST_MS);
 
   it('renders every results tab of a 40-zone answer within the budget', async () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({ ok: true, json: async () => [] })));
-    const assessment = structuredClone(office) as unknown as ProjectPerformanceAssessment;
-    const heating = assessment.performance!.spaceHeating;
-    heating.additionalZoneDemands = Array.from({ length: 2 * COPIES - 1 }, () => structuredClone(heating.demand));
-    kernel.state = {
-      project: {} as KernelState['project'],
-      query: { kind: 'done', assessment } as KernelState['query'],
-      settled: assessment,
-      verdict: kernelVerdict(assessment),
-      phase: 'current',
-      error: null,
-      refresh: () => {},
+    const timed = async (zones: number, timeout: number) => {
+      const assessment = structuredClone(office) as unknown as ProjectPerformanceAssessment;
+      const heating = assessment.performance!.spaceHeating;
+      heating.additionalZoneDemands = Array.from({ length: zones - 1 }, () => structuredClone(heating.demand));
+      kernel.state = {
+        project: {} as KernelState['project'],
+        query: { kind: 'done', assessment } as KernelState['query'],
+        settled: assessment,
+        verdict: kernelVerdict(assessment),
+        phase: 'current',
+        error: null,
+        refresh: () => {},
+      };
+      const started = performance.now();
+      const { rerender, unmount } = renderWithProviders(<ResultsDashboard sub="overview" onNavigate={() => {}} />);
+      for (const sub of ['services', 'zones', 'monthly', 'provenance'] as const) {
+        rerender(<ResultsDashboard sub={sub} onNavigate={() => {}} />);
+      }
+      await waitFor(() => expect(screen.getByTestId('results-provenance')).toBeInTheDocument(), { timeout });
+      const elapsed = performance.now() - started;
+      unmount();
+      return elapsed;
     };
-    const started = performance.now();
-    const { rerender } = renderWithProviders(<ResultsDashboard sub="overview" onNavigate={() => {}} />);
-    for (const sub of ['services', 'zones', 'monthly', 'provenance'] as const) {
-      rerender(<ResultsDashboard sub={sub} onNavigate={() => {}} />);
-    }
-    await waitFor(() => expect(screen.getByTestId('results-provenance')).toBeInTheDocument());
-    expect(performance.now() - started).toBeLessThan(PAGE_BUDGET_MS);
-  }, 60000);
+    const baseline = await timed(2, PAGE_BUDGET_MS);
+    const budget = budgetMs(baseline);
+    expect(await timed(2 * COPIES, budget)).toBeLessThan(budget);
+  }, SLOW_UI_TEST_MS);
 });

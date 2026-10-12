@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useEnergy } from '../../context/EnergyContext';
 import { useI18n } from '../../i18n/i18n';
 import './UnheatedSpacesPanel.css';
+import { DecimalInput } from '../ui';
 
 export function UnheatedSpacesPanel() {
   const { state, dispatch } = useEnergy();
@@ -46,7 +47,7 @@ export function UnheatedSpacesPanel() {
     </li>)}</ul>}
     {editingId !== null && <div className="unheated-spaces-form">
       <label>{t('properties.name')}<input value={name} onChange={(event) => setName(event.target.value)} /></label>
-      <label>{t('kernel.unheated.factor')}<input type="number" min="0" max="1" step="any" value={factor}
+      <label>{t('kernel.unheated.factor')}<DecimalInput min="0" max="1" step="any" value={factor}
         onChange={(event) => setFactor(event.target.value)} /></label>
       <label>{t('kernel.unheated.source')}<input value={source} onChange={(event) => setSource(event.target.value)} /></label>
       {error && <p role="alert">{t('kernel.unheated.invalid')}</p>}

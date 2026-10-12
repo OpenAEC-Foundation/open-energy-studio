@@ -12,6 +12,7 @@ import {
   solarWaterHeaterTemplate, spaceGeneratorTemplate, testedSolarMethod, windowObstructionTemplate,
 } from '../core/nta/NtaSystemTemplates';
 import { renderWithProviders, userEvent } from './test-utils';
+import { SLOW_UI_TEST_MS } from './timeouts';
 
 const project = {
   id: 'p', name: 'p', description: '', buildingFunction: 'residential', address: '', city: '',
@@ -170,6 +171,19 @@ describe('NTA system sections', () => {
     });
   });
 
+  it('offers a vessel next to a hot-water CHP (13.8.4.7.4: its storage losses follow 13.6)', { timeout: 60000 }, async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Harness initial={{ hotWater: { generator: { kind: 'electric_boiler' } } }}
+      body={(draft, change) => <>
+        <HotWaterGeneratorFields draft={draft} change={change} base={['hotWater', 'generator']} />
+        <HotWaterStorageFields draft={draft} change={change} />
+      </>} />);
+    await user.selectOptions(screen.getByLabelText('Hot-water generator'), 'chp');
+    await user.click(screen.getByRole('button', { name: 'Add vessel' }));
+    expect(current().hotWater.generator.kind).toBe('chp');
+    expect(current().hotWater.storage).toHaveLength(1);
+  });
+
   it('adds hot-water vessels with every loss route (13.58–13.60)', { timeout: 60000 }, async () => {
     const user = userEvent.setup();
     renderWithProviders(<Harness initial={{ hotWater: { generator: { kind: 'measured_two_profiles' } } }}
@@ -286,7 +300,7 @@ describe('NTA system sections', () => {
     expect(draft.generator.forfait.qualityDeclaration).toEqual({
       declarationReference: 'BCRG 91849/03', generationEfficiency: 4.35, energyFraction: 1, auxiliaryKwhPerYear: 30 });
     expect(draft.hotWater.generator.declared).toEqual({ value: 1.3, sourceReference: '' });
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 
   it('assigns zones to a further heating system (§9.2)', async () => {
     const user = userEvent.setup();

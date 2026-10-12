@@ -14,7 +14,9 @@ import { NtaCalculationForm } from './NtaCalculationForm';
 import { summarizeExtras } from '../../core/nta/NtaResultSummary';
 import { summarizeServiceEnergy } from '../../core/nta/ServiceEnergy';
 import { kernelNote } from '../../core/nta/KernelNoteText';
+import { buildingOnlyWarnings } from '../../core/nta/buildingWarnings';
 import './NtaPerformancePanel.css';
+import { TechnicalDetails } from '../ui/Display';
 
 /** Short month name in the UI language. */
 export function shortMonth(month: number, locale: string): string {
@@ -29,6 +31,11 @@ interface NtaPerformancePanelProps {
 export function NtaPerformancePanel({ query: suppliedQuery }: NtaPerformancePanelProps = {}) {
   const { state, dispatch } = useEnergy();
   const { t, locale } = useI18n();
+  // Kernel carrier codes (el, gas, oil, bm, dh, dw, dc; table 5.2) with their name.
+  const carrierLabel = (code: string) => {
+    const text = t(`results.carrier.${code}`);
+    return text === `results.carrier.${code}` ? code : `${text} (${code})`;
+  };
   const project: IProject = state.project;
   const ownQuery = useKernelQuery(project, suppliedQuery === undefined);
   // The full form starts from the draft of the steps when it holds unapplied changes.
@@ -82,6 +89,7 @@ export function NtaPerformancePanel({ query: suppliedQuery }: NtaPerformancePane
 
 
   const performance = assessment?.performance ?? null;
+  const buildingWarnings = buildingOnlyWarnings(assessment);
   const calculated = projectCalculated(assessment?.status) && performance;
   const heating = performance?.spaceHeating;
   const issues = performance?.issues ?? [];
@@ -108,7 +116,7 @@ export function NtaPerformancePanel({ query: suppliedQuery }: NtaPerformancePane
       {!loading && error && (
         <div className="nta-performance-unavailable" role="alert">
           <CircleHelp size={18} />
-          <span>{t('kernel.unavailable')} <small>{error}</small></span>
+          <div>{t('kernel.unavailable')}<TechnicalDetails>{error}</TechnicalDetails></div>
         </div>
       )}
 
@@ -160,10 +168,10 @@ export function NtaPerformancePanel({ query: suppliedQuery }: NtaPerformancePane
         </div>
       )}
 
-      {!loading && calculated && (performance?.warnings?.length ?? 0) > 0 && (
+      {!loading && calculated && buildingWarnings.length > 0 && (
         <div className="nta-performance-gaps" data-testid="nta-performance-warnings">
           <p role="status"><AlertCircle size={16} /> {t('nta.performance.buildingWarnings')}</p>
-          <ul>{(performance?.warnings ?? []).map((item, index) => (
+          <ul>{buildingWarnings.map((item, index) => (
             <li key={`${item.code}-${index}`}><KernelCode code={item.code} /><code>{item.path}</code></li>
           ))}</ul>
         </div>
@@ -227,7 +235,7 @@ export function NtaPerformancePanel({ query: suppliedQuery }: NtaPerformancePane
               <thead><tr><th scope="col">{locale === 'nl' ? 'Energiedrager' : 'Energy carrier'}</th>
                 <th scope="col">{locale === 'nl' ? 'Finaal (kWh/jaar)' : 'Final (kWh/year)'}</th></tr></thead>
               <tbody>{performance.finalEnergyByCarrier.map((item) => <tr key={item.carrier}>
-                <th scope="row">{item.carrier}</th><td>{formatNumber(item.annualKwh, locale, 2)}</td>
+                <th scope="row">{carrierLabel(item.carrier)}</th><td>{formatNumber(item.annualKwh, locale, 2)}</td>
               </tr>)}</tbody>
             </table></div>}
           </details>}
@@ -235,7 +243,7 @@ export function NtaPerformancePanel({ query: suppliedQuery }: NtaPerformancePane
           <summary>{t('nta.performance.byService')}</summary>
           <div className="nta-performance-table"><table>
             <thead><tr><th scope="col">{t('nta.performance.byService.function')}</th>
-              {services.carriers.map((carrier) => <th scope="col" key={carrier}>{carrier}</th>)}
+              {services.carriers.map((carrier) => <th scope="col" key={carrier}>{carrierLabel(carrier)}</th>)}
               <th scope="col">{t('nta.performance.byService.primaryFossil')}</th>
               <th scope="col">{t('nta.performance.byService.renewable')}</th></tr></thead>
             <tbody>

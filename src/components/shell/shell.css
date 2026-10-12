@@ -12,7 +12,8 @@
   font-family: var(--font-ui);
   position: relative;
 }
-.app-shell--empty { grid-template-columns: minmax(0, 1fr); grid-template-areas: "top" "main" "status"; }
+/* Doubled class: the narrow-window rule below sets .app-shell columns and would otherwise squash the welcome screen into the nav column. */
+.app-shell.app-shell--empty { grid-template-columns: minmax(0, 1fr); grid-template-areas: "top" "main" "status"; }
 
 .skip-link {
   position: absolute; left: var(--space-2); top: -60px; z-index: 1000;
@@ -70,7 +71,7 @@
 .top-bar .document-tab:hover:not(.active) { background: var(--surface-hover); }
 .top-bar .document-tab::after, .top-bar .document-tab.active::after { display: none; }
 .top-bar .document-tab-dirty { color: var(--accent); }
-.top-bar .document-tab-add { align-self: center; color: var(--fg-3); }
+.top-bar .document-tab-add { align-self: center; color: var(--fg-3); flex: none; }
 
 /* Dropdown menus (Bestand, Gereedschap) */
 .shell-menu {
@@ -125,6 +126,9 @@
 .nav-count { font-size: 10.5px; font-weight: 600; padding: 0 6px; height: 18px; line-height: 18px; border-radius: 9px; flex: none; }
 .nav-count.errors { background: var(--error-subtle); color: var(--error-text); }
 .nav-count.warnings { background: var(--warn-subtle); color: var(--warn-text); }
+/* Not colour alone (WCAG 1.4.1): errors and warnings also differ in their mark. */
+.nav-count.errors::before { content: "\2715\00A0" / ""; }
+.nav-count.warnings::before { content: "\26A0\00A0" / ""; }
 .nav-subs { list-style: none; margin: 2px 0 6px 20px; border-left: 1px solid var(--line); padding: 0 0 0 8px; }
 .nav-sub {
   display: flex; align-items: center; gap: 8px; width: 100%; height: 28px; padding: 0 8px; border-radius: var(--radius-sm);
@@ -255,6 +259,16 @@
   .top-bar-brand { width: auto; }
   .top-bar-actions .ui-kbd { display: none; }
 }
+/* Below 1280 px the document tabs were squeezed to their first letter and the
+   new-tab button to a dot: search, Opslaan and Herberekenen become icon buttons.
+   Their text stays for screen readers (clipped, not removed). */
+@media (max-width: 1279px) {
+  .top-bar-search { width: auto; flex: none; min-width: 0; }
+  .top-bar .top-bar-label {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+}
 @media (max-width: 1100px) {
   .overview-grid { grid-template-columns: minmax(0, 1fr); }
   .overview-grid > .overview-progress { grid-row: auto; }
@@ -321,10 +335,13 @@
 /* ── F5 Installaties (mockup 03) ───────────────────────────────────── */
 .chain-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); align-items: start; }
 .chain-card .ui-card__actions { display: flex; align-items: center; gap: 6px; }
-.chain-stages { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px 22px; }
+/* The '›' between stages trails each stage. A stage that ends a row ends at the list's edge, so its
+   separator falls outside the 4px padding and is clipped: no stray '›' at the start of a wrapped row
+   (responsive audit, 1024 px). The padding keeps the focus ring visible. */
+.chain-stages { list-style: none; margin: -4px; padding: 4px; overflow: hidden; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px 22px; }
 .chain-stages:empty { display: none; }
 .chain-stages li { position: relative; display: flex; min-width: 0; }
-.chain-stages li + li::before { content: '›'; position: absolute; left: -15px; top: 50%; transform: translateY(-50%); color: var(--fg-3); font-size: var(--fs-md); }
+.chain-stages li:not(:last-child)::after { content: '›'; position: absolute; right: -15px; top: 50%; transform: translateY(-50%); color: var(--fg-3); font-size: var(--fs-md); }
 .chain-stage { all: unset; box-sizing: border-box; flex: 1; min-width: 0; display: grid; gap: 3px; align-content: start; padding: 10px 12px; border-radius: var(--radius-sm);
   border: 1px solid var(--line); background: var(--surface-sunken); cursor: default; }
 .chain-stage--nta { cursor: pointer; border-style: dashed; }

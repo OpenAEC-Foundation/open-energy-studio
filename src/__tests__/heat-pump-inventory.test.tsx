@@ -4,6 +4,7 @@ import { useEnergy } from '../context/EnergyContext';
 import { HeatPumpInventoryPanel } from '../components/HeatPumpInventoryPanel/HeatPumpInventoryPanel';
 import { PreviewPanel } from '../components/PreviewPanel/PreviewPanel';
 import { renderWithProviders, userEvent } from './test-utils';
+import { SLOW_UI_TEST_MS } from './timeouts';
 
 function InventoryWithState() {
   const { state } = useEnergy();
@@ -66,12 +67,12 @@ describe('standalone NTA heat pump inventory', () => {
     }));
     await user.click(screen.getByRole('button', { name: 'Draft COP table' }));
     await user.click(screen.getByRole('button', { name: 'Draft COP table' }));
-    expect(screen.getByLabelText('Design supply temperature (°C)')).toHaveValue(35);
+    expect(screen.getByLabelText('Design supply temperature (°C)')).toHaveValue('35');
     expect(screen.getByText(/Table input saved in this project/)).toBeInTheDocument();
     expect(document.querySelector('.preview-energy-label')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Remove table input' }));
     expect(screen.getByTestId('forfait-input')).toHaveTextContent('null');
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
   it('does not offer an air-to-air COP row for a non-air source', async () => {
     const user = userEvent.setup();
     renderWithProviders(<InventoryWithState />);
@@ -114,7 +115,7 @@ describe('standalone NTA heat pump inventory', () => {
       minimumOperatingCop: 2, maximumSupplyTemperatureC: 55,
       declarationNormVersion: 'NTA 8800:2024', sourceReference: 'BCRG 20240234GK p2',
     });
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
   it('keeps referenced DHW test-profile inputs separate from annual performance', async () => {
     const user = userEvent.setup();
     renderWithProviders(<InventoryWithState />);
@@ -139,7 +140,7 @@ describe('standalone NTA heat pump inventory', () => {
       declarationNormVersion: 'NTA 8800:2020',
     }]);
     expect(document.querySelector('.preview-energy-label')).not.toBeInTheDocument();
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
   it('records a water-source asset with its served zone and removes it', async () => {
     const user = userEvent.setup();
     renderWithProviders(<InventoryWithState />);

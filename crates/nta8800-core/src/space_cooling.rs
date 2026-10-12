@@ -1158,7 +1158,12 @@ pub fn validate_cooling(system: &CoolingSystem, path: &str) -> Vec<CoolingIssue>
             source_reference,
         } = &distribution.pipe
         {
-            if geometry.psi().is_none() {
+            if geometry.dimension_above_one_metre() {
+                push(
+                    "pipe_dimension_not_in_metres",
+                    "distribution.pipe.geometry".into(),
+                );
+            } else if geometry.psi().is_none() {
                 push(
                     "cooling_pipe_geometry_invalid",
                     "distribution.pipe.geometry".into(),
@@ -1539,6 +1544,26 @@ fn drive(kind: &CoolingGeneratorKind) -> Drive {
     }
 }
 
+/// 10.80/10.81 (p. 420) take the generator's own EER or ζ without f_prpr;
+/// for a declared value (§10.1) that is the value rounded down.
+fn declared_nominal(kind: &CoolingGeneratorKind) -> Option<f64> {
+    match kind {
+        CoolingGeneratorKind::Compression {
+            declared: Some(item),
+            ..
+        }
+        | CoolingGeneratorKind::RoomAirConditioner {
+            declared: Some(item),
+            ..
+        } => Some(round_down(item.value, 0.05)),
+        CoolingGeneratorKind::GasAbsorption {
+            declared: Some(item),
+            ..
+        } => Some(round_down(item.value, 0.025)),
+        _ => None,
+    }
+}
+
 /// 10.66: `PLV·ζ_n·f_prpr` with PLV 0,95 (10.67) and f_prpr 0,60 for direct
 /// condensation against outdoor air, 0,9 otherwise (§10.5.5.1).
 fn absorption_method_2(
@@ -1602,6 +1627,7 @@ pub const COOLING_INTERPRETATIONS: &[&str] = &[
     "10.68: Q_C;gen;in;req;si;mi of a generator is its share of the generator cold (10.52); method 2 counts all of it in 10.65, 10.70–10.72 only report the coverage",
     "tables 10.24/10.27 have no column for a cooling limit of 14 °C; the ≥15 column is used",
     "10.20 as printed: θ_SUP;dis;out − Δθ_hr − Δθ_rca + Δθ_fan, with the signed temperature changes of chapter 11",
+    "§10.1 with 10.5.6.2 (p. 365, 419): a declared EER or ζ that replaces a value of table 10.29/10.30 takes f_prpr 0,9, as the product values of methods 1/2 (10.54); the table values themselves take f_prpr 1 (p. 419), and the norm does not say which applies to a declared value (question 12 to NEN)",
 ];
 
 /// Table 10.17 `f_Q;C;bn`, rows ϑ_e;bn 14–32 °C, columns cooling limit
@@ -2591,8 +2617,9 @@ pub fn assess_cooling(system: &CoolingSystem, context: CoolingContext<'_>) -> Co
                 Drive::Electric(eer) => {
                     row.electricity_kwh += cold / eer;
                     if !matches!(generator.generator, CoolingGeneratorKind::UnknownCollective) {
-                        // 10.80 with the table EER; 10.83.
-                        auxiliary += cold * (1.0 + 1.0 / eer) * rejection.distribution_power();
+                        // 10.80 with the table or declared EER (no f_prpr); 10.83.
+                        let nominal = declared_nominal(&generator.generator).unwrap_or(eer);
+                        auxiliary += cold * (1.0 + 1.0 / nominal) * rejection.distribution_power();
                     }
                 }
                 Drive::Gas(efficiency) => {
@@ -2603,7 +2630,9 @@ pub fn assess_cooling(system: &CoolingSystem, context: CoolingContext<'_>) -> Co
                     ) {
                         EER_COMPRESSION_FORFAIT
                     } else {
-                        rated_heat_ratio(&generator.generator).unwrap_or(efficiency)
+                        rated_heat_ratio(&generator.generator)
+                            .or_else(|| declared_nominal(&generator.generator))
+                            .unwrap_or(efficiency)
                     };
                     // 10.80b/10.81 and 10.83.
                     auxiliary += cold * (1.0 + 1.0 / ratio) * rejection.distribution_power();
@@ -3052,6 +3081,32 @@ mod tests {
             "{codes:?}"
         );
         assert!(codes.contains(&"source_reference_required"), "{codes:?}");
+
+        // Depth and diameters typed in millimetres: refused with a units
+        // hint instead of a plausible Ψ. Cooling keeps its own h_a
+        // (p. 385), so a surface coefficient alone is no issue.
+        let (issues, _) = run(CoolingPipe::Calculated {
+            geometry: crate::heating_distribution::PipeGeometry::InsulatedEmbedded {
+                pipe_outer_diameter_m: 20.0,
+                insulated_diameter_m: 40.0,
+                insulation_lambda: 0.04,
+                embedding_lambda: 2.0,
+                depth_m: 30.0,
+            },
+            source_reference: "design".into(),
+        });
+        let codes: Vec<&str> = issues.iter().map(|issue| issue.code).collect();
+        assert_eq!(codes, ["pipe_dimension_not_in_metres"]);
+        let (issues, _) = run(CoolingPipe::Calculated {
+            geometry: crate::heating_distribution::PipeGeometry::InsulatedInAir {
+                pipe_outer_diameter_m: 0.015,
+                insulated_diameter_m: 0.045,
+                insulation_lambda: 0.035,
+                surface_coefficient: Some(10.0),
+            },
+            source_reference: "design".into(),
+        });
+        assert!(issues.is_empty(), "{issues:?}");
     }
 
     #[test]
@@ -3541,6 +3596,34 @@ mod tests {
     }
 
     #[test]
+    fn a_declared_eer_rejects_heat_without_the_practice_factor() {
+        // §10.1: a declared 4,37 replaces the 3,00 of table 10.29, rounded
+        // down to 4,35; the drive uses f_prpr 0,9 (question 12 to NEN), but
+        // 10.80 (p. 420) takes the generator's own EER without f_prpr.
+        let input = system(vec![generator(
+            CoolingGeneratorKind::Compression {
+                heat_rejection: Some(HeatRejection::ClosedCoolingTower),
+                declared: Some(DeclaredEfficiency {
+                    value: 4.37,
+                    source_reference: "quality statement".into(),
+                }),
+                performance: None,
+            },
+            None,
+        )]);
+        assert!(validate_cooling(&input, "cooling").is_empty());
+        let result = assess_cooling(&input, context(&rated_zones()));
+        let july = &result.months[6];
+        let cold = july.generator_cold_kwh;
+        assert!(cold > 0.0);
+        assert!((july.electricity_kwh - cold / (4.35 * 0.9)).abs() < 1e-9);
+        // 10.83 table 10.33 closed cooling tower 0,033; 10.82 is 0 in
+        // method 3 (p. 421); control 0,010 kW · 744 h.
+        let auxiliary = 7.44 + cold * (1.0 + 1.0 / 4.35) * 0.033;
+        assert!((july.auxiliary_electricity_kwh - auxiliary).abs() < 1e-9);
+    }
+
+    #[test]
     fn rated_generators_are_validated() {
         let rated = CompressionPerformance::En14511(En14511Performance {
             nominal_eer: 4.0,
@@ -3600,5 +3683,62 @@ mod tests {
             shifted.cooling_limit_c,
             cooling_limit_c(&zones[0].limit_need_kwh.unwrap())
         );
+    }
+
+    /// Review 52, independent recalculation of 10.76, 10.80 and 10.83 with
+    /// §10.1 (2025+C1 p. 365, 417–423) in method 3: a declared 5,04 of an
+    /// electric generator rounds down to 5,00 (dry cooler, p_dis 0,045), a
+    /// declared 3,18 to 3,15 (open tower, 0,018); the table 10.29 value 3,00
+    /// has f_prpr 1. Q_hr = Q_C·(1 + 1/EER) without f_prpr, 10.82 is 0 in
+    /// method 3, and the control energy does not depend on the heat
+    /// rejection.
+    #[test]
+    fn review52_method_3_condenser_heat_and_drive_energy() {
+        let run = |rejection: HeatRejection, declared: Option<f64>| {
+            let input = system(vec![generator(
+                CoolingGeneratorKind::Compression {
+                    heat_rejection: Some(rejection),
+                    declared: declared.map(|value| DeclaredEfficiency {
+                        value,
+                        source_reference: "quality statement".into(),
+                    }),
+                    performance: None,
+                },
+                None,
+            )]);
+            assert!(validate_cooling(&input, "cooling").is_empty());
+            assess_cooling(&input, context(&rated_zones()))
+        };
+        let mut control = Vec::new();
+        for (rejection, declared, eer, practice, p_dis) in [
+            (HeatRejection::DryCooler, Some(5.04), 5.00, 0.9, 0.045),
+            (
+                HeatRejection::OpenCoolingTower,
+                Some(3.18),
+                3.15,
+                0.9,
+                0.018,
+            ),
+            (HeatRejection::OpenCoolingTower, None, 3.00, 1.0, 0.018),
+        ] {
+            let result = run(rejection, declared);
+            for month in &result.months {
+                let cold = month.generator_cold_kwh;
+                let drive = cold / (eer * practice);
+                assert!(
+                    (month.electricity_kwh - drive).abs() < 1e-9,
+                    "{rejection:?}"
+                );
+                let rejected = cold * (1.0 + 1.0 / eer) * p_dis;
+                control.push(month.auxiliary_electricity_kwh - rejected);
+            }
+        }
+        for (index, value) in control.iter().enumerate() {
+            assert!(
+                (value - control[index % 12]).abs() < 1e-9,
+                "month {}",
+                index % 12
+            );
+        }
     }
 }

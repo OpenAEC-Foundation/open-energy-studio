@@ -21,6 +21,7 @@ use serde::{Deserialize, Serialize};
 use std::cell::Cell;
 
 pub mod request;
+pub mod switches;
 mod v2020a1;
 mod v2022;
 mod v2023;
@@ -147,7 +148,7 @@ pub fn supported_editions() -> Vec<EditionInfo> {
 }
 
 /// Route of annex AA (TOjuli capacity proof) per edition.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum AnnexAaVariant {
     /// 2024 p. 1115–1127: July monthly irradiance, SWM step and the t_max
     /// table by orientation.
@@ -157,7 +158,7 @@ pub enum AnnexAaVariant {
 }
 
 /// Collective heat-pump source route (9.6.3.1.3 / 9.6.8.1.1.2.3).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum HeatPumpSourceRoute {
     /// 2024 p. 323, with INT-V1: every source of at least 15 °C counts as
     /// external heat; source auxiliary energy Q/EER with EER 23 (aquifer
@@ -184,7 +185,7 @@ impl HeatPumpSourceRoute {
 }
 
 /// Table 13.18 lookup between columns.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum Table1318Lookup {
     /// 2024 p. 614: no interpolation rule; the column at or below the demand
     /// is used (interpretation, see docs/nta8800-normversies.md).
@@ -194,8 +195,10 @@ pub enum Table1318Lookup {
 }
 
 /// Version-dependent values and routes. Each field names the place where it
-/// switches; the edition files give the value and the page.
-#[derive(Debug, Clone, Copy, PartialEq)]
+/// switches; the edition files give the value and the page. Serialized
+/// with the field names, so [`switches`] can list the fields two editions
+/// differ in.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct NormProfile {
     pub version: NormVersion,
     /// 5.5.8/15.3: f_BACS 1,05 for utility buildings without adequate BACS.
@@ -277,8 +280,14 @@ pub struct NormProfile {
     /// P.6.5.4.8: geothermal efficiency is the forfait 20, without the
     /// temperature-difference correction.
     pub geothermal_efficiency_fixed: bool,
-    /// Annex AA as proof of the capacity of an active cooling system (5.7.1).
-    pub annex_aa_route: bool,
+    /// 5.7.1 methods 2 (annex AA) and 3 (toets op beperking van de
+    /// zoninstraling) as proof of the capacity of an active cooling system.
+    pub cooling_capacity_methods_route: bool,
+    /// 5.7.1 method 3, second situation: an opening with shading of table
+    /// 7.5 or 7.6 (screens, venetian blinds, roller shutters, metallised
+    /// fabric, awnings) limits solar gain (2024 p. 106). 2025+C1 names the
+    /// fixed louvres of tables 7.4a/7.4b instead (p. 114).
+    pub solar_limitation_movable_shading: bool,
     /// Table 5.7 renovatiestandaard (§5.3.1.2).
     pub renovation_standard: bool,
     /// Table 14.3 column "ledverlichting geïnstalleerd vanaf 2017".
@@ -434,6 +443,49 @@ pub fn current_label() -> &'static str {
 /// Profile of the active edition.
 pub fn profile() -> &'static NormProfile {
     current().profile()
+}
+
+/// A source citation written for the default edition ("NTA 8800:2025+C1:2026,
+/// §9.3, formules 9.9–9.12a (p. 294–297)"), made valid for the active one.
+/// In the default edition it is returned unchanged. Paragraph, formula, table
+/// and page numbers differ between the editions, while the chapters are the
+/// same, so an older edition keeps only its own label and the chapter:
+/// "NTA 8800:2022, hoofdstuk 9".
+pub fn cite(citation: &'static str) -> &'static str {
+    let version = current();
+    if version.is_default() {
+        return citation;
+    }
+    let rest = citation
+        .strip_prefix(crate::TARGET_NORM_VERSION)
+        .unwrap_or(citation);
+    let chapter: String = rest
+        .chars()
+        .skip_while(|c| !c.is_ascii_digit())
+        .take_while(char::is_ascii_digit)
+        .collect();
+    let text = if chapter.is_empty() {
+        version.label().to_string()
+    } else {
+        format!("{}, hoofdstuk {chapter}", version.label())
+    };
+    leak_once(version, citation, text)
+}
+
+/// The edition-specific text for `(version, key)`, made `'static` once. The
+/// keys are the kernel's own citation constants, so the set stays small.
+pub fn leak_once(version: NormVersion, key: &'static str, text: String) -> &'static str {
+    use std::collections::HashMap;
+    use std::sync::{Mutex, OnceLock};
+    type Cache = Mutex<HashMap<(NormVersion, &'static str), &'static str>>;
+    static CACHE: OnceLock<Cache> = OnceLock::new();
+    let mut cache = CACHE
+        .get_or_init(Default::default)
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    cache
+        .entry((version, key))
+        .or_insert_with(|| Box::leak(text.into_boxed_str()))
 }
 
 #[cfg(test)]

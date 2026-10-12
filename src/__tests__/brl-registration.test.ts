@@ -16,7 +16,7 @@ describe('project file kernel stamp', () => {
   it('round-trips the stamp and stays compatible with old files', () => {
     const project = createDefaultProject();
     const json = serializeProject(project, stamp);
-    expect(deserializeProjectFile(json)).toEqual({ project, kernel: stamp });
+    expect(deserializeProjectFile(json)).toEqual({ project, kernel: stamp, fileVersion: '1.0' });
     expect(deserializeProject(json)).toEqual(project);
     const old = serializeProject(project);
     expect(JSON.parse(old).kernel).toBeUndefined();

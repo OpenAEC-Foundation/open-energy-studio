@@ -14,6 +14,7 @@ import { ReportView } from '../components/ReportView/ReportView';
 import type { IProject } from '../core/energy/types';
 import type { ProjectPerformanceAssessment } from '../core/nta/KernelClient';
 import { renderWithProviders, userEvent } from './test-utils';
+import { SLOW_UI_TEST_MS } from './timeouts';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -142,7 +143,7 @@ describe('views keep simplified numbers back', () => {
     expect(screen.getByTestId('results-withheld')).toBeInTheDocument();
     expect(screen.queryByTestId('beng-cards-indicative')).not.toBeInTheDocument();
     expect(screen.queryByTestId('results-indicative')).not.toBeInTheDocument();
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 
   it('the report tab shows no indicative BENG table when the kernel result is invalid', async () => {
     stubKernelSequence([invalid]);
@@ -151,7 +152,7 @@ describe('views keep simplified numbers back', () => {
     await user.click(screen.getByRole('button', { name: 'Calculate' }));
     expect(await screen.findByText('Results withheld')).toBeInTheDocument();
     expect(screen.queryByTestId('report-beng-indicative')).not.toBeInTheDocument();
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 });
 
 describe('opening a file without air tightness', () => {

@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Open Energy Studio",
-  "version": "0.1.7-alpha",
+  "version": "0.2.0",
   "identifier": "com.openaec.open-energy-studio",
   "build": {
     "frontendDist": "../dist",
@@ -26,7 +26,20 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": {
+        "default-src": "'self' ipc: http://ipc.localhost",
+        "script-src": "'self'",
+        "style-src": "'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "font-src": "'self' data: https://fonts.gstatic.com",
+        "img-src": "'self' data: blob: asset: http://asset.localhost",
+        "connect-src": "'self' ipc: http://ipc.localhost http://localhost:3007 http://127.0.0.1:3007 https://open-feedback-studio.pages.dev",
+        "worker-src": "'self' blob:",
+        "frame-src": "'self' blob:",
+        "object-src": "'none'",
+        "base-uri": "'self'",
+        "form-action": "'self'"
+      },
+      "devCsp": null
     }
   },
   "bundle": {

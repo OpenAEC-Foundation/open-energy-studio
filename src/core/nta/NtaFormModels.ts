@@ -104,6 +104,52 @@ export function buildVentilationDraft(block: Block, project: IProject): Block {
  * one of both, and drops declared fan energy that chapter 11 replaces.
  */
 export function syncVentilation(block: Block, project: IProject): Block {
+  return syncVerticalPipes(syncVentilationOnly(block, project));
+}
+
+/**
+ * Whether a zone follows the residential route of 7.17a (storeys) rather than
+ * the utility route (building height H): the kernel decides by the zone's use
+ * function, which a zone's own data overrides (review 9).
+ */
+export function verticalPipesResidential(block: Block, zoneData?: Block): boolean {
+  const usage = (zoneData?.usageFunction ?? block.usageFunction) as string | undefined;
+  return usage == null ? block.calculationScope !== 'utility' : usage === 'residential';
+}
+
+/**
+ * A vertical pipe keeps only the members of its route: storeys on the
+ * residential route, building height and area share on the utility route.
+ * A member of the other route would stay hidden in the form and still block
+ * or change the kernel (review 9); a missing member of its own route is set
+ * blank so the kernel names it at the field the form shows.
+ */
+export function syncVerticalPipes(block: Block): Block {
+  const fix = (pipes: unknown, residential: boolean): unknown => Array.isArray(pipes)
+    ? pipes.map((pipe) => {
+      if (pipe == null || typeof pipe !== 'object') return pipe;
+      const { storeys, buildingHeightM, areaShare, ...rest } = pipe as Block;
+      return residential
+        ? { ...rest, storeys: storeys ?? null }
+        : { ...rest, buildingHeightM: buildingHeightM ?? null, ...(areaShare != null ? { areaShare } : {}) };
+    })
+    : pipes;
+  let next = block;
+  if (Array.isArray(block.verticalPipes)) {
+    next = { ...next, verticalPipes: fix(block.verticalPipes, verticalPipesResidential(block)) };
+  }
+  if (Array.isArray(block.zoneData)) {
+    next = {
+      ...next,
+      zoneData: (block.zoneData as Block[]).map((item) => Array.isArray(item?.verticalPipes)
+        ? { ...item, verticalPipes: fix(item.verticalPipes, verticalPipesResidential(block, item)) }
+        : item),
+    };
+  }
+  return next;
+}
+
+function syncVentilationOnly(block: Block, project: IProject): Block {
   const ventilation = block.ventilation as Block | null | undefined;
   if (!ventilation) return block;
   const zone = project.zones[0];
@@ -117,7 +163,13 @@ export function syncVentilation(block: Block, project: IProject): Block {
     zoneId: zone?.id ?? ventilation.zoneId,
     usableFloorAreaM2: area,
     category: residential ? 'residential' : 'utility',
-    functions: fn ? [{ function: fn, areaM2: area }] : ventilation.functions ?? [],
+    // 11.57: the swimming-pool flag of a sport function survives the sync.
+    functions: fn ? [{
+      function: fn,
+      areaM2: area,
+      ...(fn === 'sport' && (ventilation.functions as Block[] | undefined)?.[0]?.swimmingPool === true
+        ? { swimmingPool: true } : {}),
+    }] : ventilation.functions ?? [],
     heatingSetpointC: setpoints.heatingC ?? null,
     coolingSetpointC: setpoints.coolingC ?? null,
     dwellingCount: residential ? (gains?.dwellingCount ?? ventilation.dwellingCount ?? 1) : 0,
@@ -208,7 +260,9 @@ export function lightingTemplate(project: IProject, labelFunction: unknown): Blo
 
 export type NtaLayerDraft =
   | { kind: 'material'; name: string; thicknessM: number; lambda: number; sourceReference: string }
-  | { kind: 'air_cavity'; name: string; thicknessMm: number; ventilation: 'unventilated' | 'weakly' | 'strongly' };
+  | { kind: 'air_cavity'; name: string; thicknessMm: number; ventilation: 'unventilated' | 'weakly' | 'strongly' }
+  /** Table F.1 narrow air layer (U ≤ 1,0); weakly ventilated takes half the table value (F.2). */
+  | { kind: 'narrow_cavity'; name: string; thicknessMm: number; widthMm: number; weaklyVentilated: boolean };
 
 export interface NtaConstructionDraft {
   heatFlow: 'upward' | 'horizontal' | 'downward';
@@ -252,7 +306,9 @@ export function envelopeFromLayers(id: string, draft: NtaConstructionDraft): Env
                 thicknessM: layer.thicknessM,
                 conductivity: { method: 'calculated', lambdaCalc: layer.lambda, sourceReference: layer.sourceReference || layer.name },
               }
-              : { kind: 'air_cavity', thicknessMm: layer.thicknessMm, ventilation: { kind: layer.ventilation } }),
+              : layer.kind === 'narrow_cavity'
+                ? { kind: 'narrow_cavity', thicknessMm: layer.thicknessMm, widthMm: layer.widthMm, weaklyVentilated: layer.weaklyVentilated }
+                : { kind: 'air_cavity', thicknessMm: layer.thicknessMm, ventilation: { kind: layer.ventilation } }),
           },
         },
       },

@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { useProjectEdition } from '../../../context/EnergyContext';
 import { useI18n } from '../../../i18n/i18n';
+import { formatNumber } from '../../../i18n/format';
 import type { IConstructionLayer } from '../../../core/energy/types';
 import { calculateConstructionsWithRust, type EnvelopeAssessment } from '../../../core/nta/KernelClient';
 import {
   constructionDraft, envelopeFromForfait, envelopeFromLayers,
   type NtaConstructionDraft, type NtaForfaitDraft, type NtaLayerDraft,
 } from '../../../core/nta/NtaFormModels';
+import { DecimalInput } from '../../ui';
+import { TechnicalDetails } from '../../ui/Display';
 
 export interface NtaConstructionResult {
   rc: number | null;
@@ -27,7 +30,7 @@ export function NtaConstructionSection({ layers, onApply }: {
   layers: IConstructionLayer[];
   onApply: (result: NtaConstructionResult) => void;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [mode, setMode] = useState<'layers' | 'forfait'>('layers');
   const [draft, setDraft] = useState<NtaConstructionDraft>(() => constructionDraft({ layers }));
   const [forfait, setForfait] = useState<NtaForfaitDraft>({
@@ -100,21 +103,33 @@ export function NtaConstructionSection({ layers, onApply }: {
           <td style={cell}>
             <select aria-label={`${t('nta.construction.layerKind')} ${index + 1}`} value={layer.kind} onChange={(event) => updateLayer(index, event.target.value === 'air_cavity'
               ? { kind: 'air_cavity', name: layer.name, thicknessMm: 40, ventilation: 'unventilated' }
-              : { kind: 'material', name: layer.name, thicknessM: 0.1, lambda: 0.04, sourceReference: '' })}>
+              : event.target.value === 'narrow_cavity'
+                ? { kind: 'narrow_cavity', name: layer.name, thicknessMm: 10, widthMm: 50, weaklyVentilated: false }
+                : { kind: 'material', name: layer.name, thicknessM: 0.1, lambda: 0.04, sourceReference: '' })}>
               <option value="material">{t('nta.construction.kind.material')}</option>
               <option value="air_cavity">{t('nta.construction.kind.cavity')}</option>
+              <option value="narrow_cavity">{t('nta.construction.kind.narrowCavity')}</option>
             </select>
           </td>
           <td style={cell}><input aria-label={`${t('dialog.construction.material')} ${index + 1}`} value={layer.name} onChange={(event) => updateLayer(index, { ...layer, name: event.target.value })} /></td>
           {layer.kind === 'material' ? <>
-            <td style={cell}><input type="number" step="0.001" aria-label={`${t('nta.construction.thickness')} ${index + 1}`} value={layer.thicknessM}
+            <td style={cell}><DecimalInput step="0.001" aria-label={`${t('nta.construction.thickness')} ${index + 1}`} value={layer.thicknessM}
               onChange={(event) => updateLayer(index, { ...layer, thicknessM: Number(event.target.value) })} /></td>
-            <td style={cell}><input type="number" step="0.001" aria-label={`λ ${index + 1}`} value={layer.lambda}
+            <td style={cell}><DecimalInput step="0.001" aria-label={`λ ${index + 1}`} value={layer.lambda}
               onChange={(event) => updateLayer(index, { ...layer, lambda: Number(event.target.value) })} /></td>
             <td style={cell}><input aria-label={`${t('nta.form.source')} ${index + 1}`} value={layer.sourceReference}
               onChange={(event) => updateLayer(index, { ...layer, sourceReference: event.target.value })} /></td>
+          </> : layer.kind === 'narrow_cavity' ? <>
+            <td style={cell}><DecimalInput step="1" aria-label={`mm ${index + 1}`} value={layer.thicknessMm}
+              onChange={(event) => updateLayer(index, { ...layer, thicknessMm: Number(event.target.value) })} /> mm</td>
+            <td style={cell}><label>{t('nta.construction.narrowWidth')}{' '}
+              <DecimalInput step="1" aria-label={`${t('nta.construction.narrowWidth')} ${index + 1}`} value={layer.widthMm}
+                onChange={(event) => updateLayer(index, { ...layer, widthMm: Number(event.target.value) })} /> mm</label>
+              <label><input type="checkbox" aria-label={`${t('nta.construction.cavity.weakly')} ${index + 1}`} checked={layer.weaklyVentilated}
+                onChange={(event) => updateLayer(index, { ...layer, weaklyVentilated: event.target.checked })} /> {t('nta.construction.cavity.weakly')}</label></td>
+            <td style={cell} />
           </> : <>
-            <td style={cell}><input type="number" step="1" aria-label={`mm ${index + 1}`} value={layer.thicknessMm}
+            <td style={cell}><DecimalInput step="1" aria-label={`mm ${index + 1}`} value={layer.thicknessMm}
               onChange={(event) => updateLayer(index, { ...layer, thicknessMm: Number(event.target.value) })} /> mm</td>
             <td style={cell}><select aria-label={`${t('nta.construction.lambdaOrVentilation')} ${index + 1}`} value={layer.ventilation}
               onChange={(event) => updateLayer(index, { ...layer, ventilation: event.target.value as 'unventilated' | 'weakly' | 'strongly' })}>
@@ -141,7 +156,7 @@ export function NtaConstructionSection({ layers, onApply }: {
         </select>
       </label>
       <label>{t('nta.construction.forfaitYear')}
-        <input type="number" step="1" value={forfait.constructionYear}
+        <DecimalInput step="1" value={forfait.constructionYear}
           onChange={(event) => editForfait({ ...forfait, constructionYear: Number(event.target.value) })} />
       </label>
       <label>{t('nta.construction.insulation')}
@@ -152,7 +167,7 @@ export function NtaConstructionSection({ layers, onApply }: {
         </select>
       </label>
       {forfait.insulation === 'known_thickness' && <label>{t('nta.construction.insulationMm')}
-        <input type="number" step="10" value={forfait.thicknessMm}
+        <DecimalInput step="10" value={forfait.thicknessMm}
           onChange={(event) => editForfait({ ...forfait, thicknessMm: Number(event.target.value) })} />
       </label>}
       <label><input type="checkbox" checked={forfait.cavity}
@@ -161,13 +176,13 @@ export function NtaConstructionSection({ layers, onApply }: {
     <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
       <button type="button" className="btn btn-sm" disabled={busy} onClick={calculate}>{t('nta.construction.calculate')}</button>
       {element && <>
-        <span role="status">{t('nta.construction.result')}: U = {element.uRounded.toFixed(2)} W/m²K
-          {element.rCRounded != null && <> · R<sub>c</sub> = {element.rCRounded.toFixed(2)} m²K/W</>}</span>
+        <span role="status">{t('nta.construction.result')}: U = {formatNumber(element.uRounded, locale, 2)} W/m²K
+          {element.rCRounded != null && <> · R<sub>c</sub> = {formatNumber(element.rCRounded, locale, 2)} m²K/W</>}</span>
         <button type="button" className="btn btn-sm" onClick={() => onApply({ rc: element.rCRounded, u: element.uRounded, route: element.route, rse: element.opaque?.exteriorSurfaceResistance ?? 0.04 })}>
           {t('nta.construction.apply')}</button>
       </>}
     </div>
-    {error && <p role="alert">{t('kernel.unavailable')} <small>{error}</small></p>}
+    {error && <div role="alert">{t('kernel.unavailable')}<TechnicalDetails>{error}</TechnicalDetails></div>}
     {result?.status === 'invalid' && <ul role="alert">
       {result.issues.map((item, index) => <li key={index}><strong>{item.code}</strong> <code>{item.path}</code></li>)}
     </ul>}

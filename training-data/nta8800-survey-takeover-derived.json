@@ -1,0 +1,2609 @@
+{
+  "derived": {
+    "nta8800-opname-1930-terraced.json": {
+      "activeCooling": null,
+      "areaSourceReference": "synthetic: NEN 2580 measurement",
+      "bacsFactor": 1.0,
+      "bacsSourceReference": "residential: f_BACS 1,0 (§5.5.8)",
+      "batteryStoragePresent": false,
+      "bblFunction": null,
+      "calculationScope": "residential",
+      "constructionYear": 1930,
+      "cooling": null,
+      "declaredRenewableHeat": [],
+      "declaredUses": [],
+      "demandUsesFixedC1Ventilation": false,
+      "externalSupply": {
+        "areaElectricity": [],
+        "collectiveHeatPumpSource": null,
+        "cooling": null,
+        "heating": null,
+        "hotWater": null
+      },
+      "heatPumpRenewable": null,
+      "hotWater": {
+        "boilingWaterTap": false,
+        "circulation": null,
+        "collective": null,
+        "deliverySets": null,
+        "emission": {
+          "bathroomLengthM": 6.0,
+          "kitchenLengthM": 3.0,
+          "method": "residential",
+          "served": "kitchen_and_bathroom",
+          "sourceReference": "synthetic survey; tap lengths per ISSO 82.1 p. 178"
+        },
+        "equipmentReference": "synthetic survey",
+        "generator": {
+          "appliance": "without_gaskeur",
+          "declared": null,
+          "kind": "gas_appliance",
+          "kitchenOnly": false,
+          "measuredClass": null
+        },
+        "need": {
+          "dwellingCount": 1,
+          "method": "residential",
+          "sourceReference": "synthetic survey"
+        },
+        "showerHeatRecovery": null,
+        "storage": []
+      },
+      "labelFunction": null,
+      "lighting": [],
+      "lossAreaM2": 163.6,
+      "lossAreaSourceReference": "basisopname: survey surfaces with f_ls (NTA 6.7.3)",
+      "onSiteProduction": [],
+      "permitApplicationAfter20260529": false,
+      "productionInventoryComplete": true,
+      "pvSystems": [],
+      "spaceHeating": {
+        "demand": {
+          "areaSourceReference": "synthetic: NEN 2580 measurement",
+          "dwellingType": "other",
+          "internalGains": {
+            "dwellingCount": 1,
+            "method": "residential",
+            "sourceReference": "one dwelling"
+          },
+          "opaqueElements": [
+            {
+              "areaM2": 1.6,
+              "id": "voordeur",
+              "orientation": "south",
+              "sourceReference": "synthetic survey",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 3.4
+            },
+            {
+              "areaM2": 19.0,
+              "id": "voorgevel",
+              "orientation": "south",
+              "sourceReference": "synthetic survey; basisopname R_c 0.35 (I.2.1.2)",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 1.92
+            },
+            {
+              "areaM2": 22.0,
+              "id": "achtergevel",
+              "orientation": "north",
+              "sourceReference": "synthetic survey: invoice cavity fill; basisopname R_c 1.248888888888889 (I.2.1.4)",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 0.7
+            },
+            {
+              "areaM2": 35.0,
+              "id": "dak-zuid",
+              "orientation": "south",
+              "sourceReference": "synthetic survey; basisopname R_c 0.72 (I.2.1.2)",
+              "tiltDeg": 45.0,
+              "uValueWPerM2k": 1.16
+            },
+            {
+              "areaM2": 35.0,
+              "id": "dak-noord",
+              "orientation": "north",
+              "sourceReference": "synthetic survey; basisopname R_c 0.72 (I.2.1.2)",
+              "tiltDeg": 45.0,
+              "uValueWPerM2k": 1.16
+            }
+          ],
+          "opaqueInventoryComplete": true,
+          "setpoints": {
+            "coolingC": 24.0,
+            "heatingC": 20.0,
+            "sourceReference": "NTA 8800 table 7.13 residential"
+          },
+          "thermalMass": {
+            "ceiling": "open_or_none",
+            "floor": "light",
+            "sourceReference": "synthetic: timber floors, load-bearing masonry; ISSO 82.1 tables 7.5/7.6",
+            "wall": "heavy"
+          },
+          "transmission": {
+            "direct": {
+              "elements": [
+                {
+                  "areaM2": 1.6,
+                  "id": "voordeur",
+                  "sourceReference": "synthetic survey",
+                  "uValueWPerM2k": 3.4
+                },
+                {
+                  "areaM2": 19.0,
+                  "id": "voorgevel",
+                  "sourceReference": "synthetic survey; basisopname R_c 0.35 (I.2.1.2)",
+                  "uValueWPerM2k": 1.92
+                },
+                {
+                  "areaM2": 22.0,
+                  "id": "achtergevel",
+                  "sourceReference": "synthetic survey: invoice cavity fill; basisopname R_c 1.248888888888889 (I.2.1.4)",
+                  "uValueWPerM2k": 0.7
+                },
+                {
+                  "areaM2": 35.0,
+                  "id": "dak-zuid",
+                  "sourceReference": "synthetic survey; basisopname R_c 0.72 (I.2.1.2)",
+                  "uValueWPerM2k": 1.16
+                },
+                {
+                  "areaM2": 35.0,
+                  "id": "dak-noord",
+                  "sourceReference": "synthetic survey; basisopname R_c 0.72 (I.2.1.2)",
+                  "uValueWPerM2k": 1.16
+                },
+                {
+                  "areaM2": 9.0,
+                  "id": "ramen-voor",
+                  "sourceReference": "synthetic survey",
+                  "uValueWPerM2k": 5.1
+                },
+                {
+                  "areaM2": 0.3999999999999999,
+                  "id": "voordeur-glass",
+                  "sourceReference": "synthetic survey",
+                  "uValueWPerM2k": 5.1
+                },
+                {
+                  "areaM2": 8.0,
+                  "id": "ramen-achter",
+                  "sourceReference": "synthetic survey",
+                  "uValueWPerM2k": 2.3
+                }
+              ],
+              "linearBridges": [],
+              "pointBridges": []
+            },
+            "groundFloors": [
+              {
+                "areaM2": 48.0,
+                "below": {
+                  "depthClass": "other",
+                  "floorResistanceM2kPerW": 0.0,
+                  "kind": "crawlspace",
+                  "ventilationOpeningM2PerM": null,
+                  "wallResistanceM2kPerW": 0.35,
+                  "wallUValueWPerM2k": 1.92
+                },
+                "constructionResistanceM2kPerW": 0.32,
+                "edgeInsulation": [],
+                "edgeThermalBridges": {
+                  "method": "forfait"
+                },
+                "exposedPerimeterM": 12.0,
+                "id": "vloer",
+                "sourceReference": "synthetic survey; basisopname R_c 0.15 (I.2.1.2)"
+              }
+            ],
+            "groundInventoryConfirmed": true,
+            "method": "components",
+            "unheated": null,
+            "verticalPipes": [
+              {
+                "id": "leiding-1",
+                "insulated": false,
+                "sharedZones": 1,
+                "sourceReference": "synthetic fixture, not a real dwelling; basisopname §7.2.4",
+                "storeys": 2
+              },
+              {
+                "id": "leiding-2",
+                "insulated": false,
+                "sharedZones": 1,
+                "sourceReference": "synthetic fixture, not a real dwelling; basisopname §7.2.4",
+                "storeys": 2
+              }
+            ]
+          },
+          "usableFloorAreaM2": 95.0,
+          "usageFunction": "residential",
+          "ventilation": {
+            "apartmentBuilding": false,
+            "buildingHeightM": 9.5,
+            "category": "residential",
+            "combustionAppliances": [],
+            "constructionYear": 1930,
+            "coolingSetpointC": 24.0,
+            "dwellingCount": 1,
+            "fans": {
+              "current": "ac",
+              "manufactureYear": 1930,
+              "method": "forfait"
+            },
+            "floorAboveCrawlspace": true,
+            "flowReduction": {
+              "collective": false,
+              "evidenceReference": null,
+              "flowControlPercent": null,
+              "recirculationPercent": null
+            },
+            "functions": [
+              {
+                "areaM2": 95.0,
+                "function": "residential",
+                "swimmingPool": false
+              }
+            ],
+            "grillePreheating": null,
+            "heatingSetpointC": 20.0,
+            "infiltration": {
+              "buildingType": "pitched_roof_terraced",
+              "method": "reference",
+              "renovationYear": null
+            },
+            "installedCapacity": null,
+            "maximumCapacityForCooling": null,
+            "overventilation": null,
+            "sourceReference": "synthetic survey: windows and a bathroom fan on the light switch; basisopname",
+            "system": {
+              "kind": "single",
+              "unit": {
+                "airHandlingUnit": null,
+                "ducts": "no_ducts",
+                "equipmentReference": "synthetic survey: windows and a bathroom fan on the light switch",
+                "heatRecovery": null,
+                "variant": "a1"
+              }
+            },
+            "usableFloorAreaM2": 95.0,
+            "ventilativeCooling": null,
+            "wholeDwellingAreaM2": null,
+            "zoneId": "woning"
+          },
+          "ventilationFlows": [],
+          "windowInventoryComplete": true,
+          "windows": [
+            {
+              "areaM2": 9.0,
+              "frameFraction": 0.25,
+              "gPerpendicular": 0.85,
+              "id": "ramen-voor",
+              "obstruction": {
+                "method": "minimal"
+              },
+              "orientation": "south",
+              "sourceReference": "synthetic survey",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 5.1
+            },
+            {
+              "areaM2": 0.3999999999999999,
+              "frameFraction": 0.25,
+              "gPerpendicular": 0.85,
+              "id": "voordeur-glass",
+              "obstruction": {
+                "method": "minimal"
+              },
+              "orientation": "south",
+              "sourceReference": "synthetic survey",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 5.1
+            },
+            {
+              "areaM2": 8.0,
+              "frameFraction": 0.25,
+              "gPerpendicular": 0.6,
+              "id": "ramen-achter",
+              "obstruction": {
+                "method": "minimal"
+              },
+              "orientation": "north",
+              "sourceReference": "synthetic survey",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 2.3
+            }
+          ],
+          "zoneId": "woning"
+        },
+        "distribution": {
+          "heatingLimitExtraKwh": null,
+          "method": "calculated",
+          "sourceReference": "synthetic survey: type plate unreadable; basisopname: pipes in unheated spaces (afb. 9.1)"
+        },
+        "distributionSystem": {
+          "actualPipeLengthM": null,
+          "bufferVessel": null,
+          "collectiveHotWaterDeliverySet": false,
+          "connectedStoreys": 2,
+          "designTemperatureClass": "90_70",
+          "installation": "individual",
+          "pipeTransmittance": {
+            "insulation": {
+              "state": "uninsulated"
+            },
+            "method": "forfait"
+          },
+          "pipesAlsoForHotWater": false,
+          "pump": {
+            "method": "included_in_generator_auxiliary"
+          },
+          "sourceReference": "synthetic survey: type plate unreadable; basisopname",
+          "unheatedAmbientC": null,
+          "unheatedPipeLengthM": null,
+          "unheatedPipeTransmittance": null,
+          "unheatedReductionFactor": null,
+          "usageFunction": "residential",
+          "valvesInsulated": false
+        },
+        "emission": {
+          "balancing": "none_or_unknown",
+          "control": "other_or_unknown",
+          "sourceReference": "synthetic survey: type plate unreadable; basisopname",
+          "system": "radiators_or_convectors"
+        },
+        "generator": {
+          "boiler": {
+            "averageDesignEmissionTemperatureC": 80.0,
+            "emissionCircuit": "direct",
+            "equipmentReference": "synthetic survey: type plate unreadable",
+            "fuel": "natural_gas",
+            "generatorId": "opwekker-1",
+            "installationYear": 1930,
+            "installationYearReference": "basisopname (ISSO 82.1 p. 28)",
+            "kind": "conventional",
+            "location": "inside_thermal_boundary",
+            "locationReference": "synthetic survey: type plate unreadable",
+            "pilotFlamePresent": true,
+            "role": "individual_main",
+            "temperatureAndCircuitReference": "synthetic survey: type plate unreadable; table 9.9 class 90/70"
+          },
+          "kind": "gas_boiler"
+        }
+      },
+      "storage": null,
+      "totalUsableFloorAreaM2": 95.0,
+      "useInventoryComplete": true
+    },
+    "nta8800-opname-1975-apartment.json": {
+      "activeCooling": null,
+      "areaSourceReference": "synthetic: NEN 2580 measurement",
+      "bacsFactor": 1.0,
+      "bacsSourceReference": "residential: f_BACS 1,0 (§5.5.8)",
+      "batteryStoragePresent": false,
+      "bblFunction": null,
+      "calculationScope": "residential",
+      "constructionYear": 1975,
+      "cooling": null,
+      "declaredRenewableHeat": [],
+      "declaredUses": [],
+      "demandUsesFixedC1Ventilation": false,
+      "externalSupply": {
+        "areaElectricity": [],
+        "collectiveHeatPumpSource": null,
+        "cooling": null,
+        "heating": null,
+        "hotWater": null
+      },
+      "heatPumpRenewable": null,
+      "hotWater": {
+        "boilingWaterTap": false,
+        "circulation": null,
+        "collective": null,
+        "deliverySets": null,
+        "emission": {
+          "bathroomLengthM": 4.0,
+          "kitchenLengthM": 2.0,
+          "method": "residential",
+          "served": "kitchen_and_bathroom",
+          "sourceReference": "synthetic survey; tap lengths per ISSO 82.1 p. 178"
+        },
+        "equipmentReference": "synthetic survey",
+        "generator": {
+          "appliance": "combi_gaskeur",
+          "declared": null,
+          "kind": "gas_appliance",
+          "kitchenOnly": false,
+          "measuredClass": "class4"
+        },
+        "need": {
+          "dwellingCount": 1,
+          "method": "residential",
+          "sourceReference": "synthetic survey"
+        },
+        "showerHeatRecovery": null,
+        "storage": []
+      },
+      "labelFunction": null,
+      "lighting": [],
+      "lossAreaM2": 56.0,
+      "lossAreaSourceReference": "basisopname: survey surfaces with f_ls (NTA 6.7.3)",
+      "onSiteProduction": [],
+      "permitApplicationAfter20260529": false,
+      "productionInventoryComplete": true,
+      "pvSystems": [],
+      "spaceHeating": {
+        "demand": {
+          "areaSourceReference": "synthetic: NEN 2580 measurement",
+          "dwellingType": "apartment_building",
+          "internalGains": {
+            "dwellingCount": 1,
+            "method": "residential",
+            "sourceReference": "one dwelling"
+          },
+          "opaqueElements": [
+            {
+              "areaM2": 13.0,
+              "id": "gevel-zuid",
+              "orientation": "south",
+              "sourceReference": "synthetic survey; basisopname R_c 1.3 (I.2.1.3)",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 0.7100000000000001
+            },
+            {
+              "areaM2": 16.0,
+              "id": "gevel-noord",
+              "orientation": "north",
+              "sourceReference": "synthetic survey; basisopname R_c 1.3 (I.2.1.3)",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 0.7100000000000001
+            }
+          ],
+          "opaqueInventoryComplete": true,
+          "setpoints": {
+            "coolingC": 24.0,
+            "heatingC": 20.0,
+            "sourceReference": "NTA 8800 table 7.13 residential"
+          },
+          "thermalMass": {
+            "ceiling": "open_or_none",
+            "floor": "heavy",
+            "sourceReference": "synthetic: hollow-core floors, masonry; ISSO 82.1 tables 7.5/7.6",
+            "wall": "heavy"
+          },
+          "transmission": {
+            "direct": {
+              "elements": [
+                {
+                  "areaM2": 13.0,
+                  "id": "gevel-zuid",
+                  "sourceReference": "synthetic survey; basisopname R_c 1.3 (I.2.1.3)",
+                  "uValueWPerM2k": 0.7100000000000001
+                },
+                {
+                  "areaM2": 16.0,
+                  "id": "gevel-noord",
+                  "sourceReference": "synthetic survey; basisopname R_c 1.3 (I.2.1.3)",
+                  "uValueWPerM2k": 0.7100000000000001
+                },
+                {
+                  "areaM2": 9.0,
+                  "id": "ramen-zuid",
+                  "sourceReference": "synthetic survey: spacer marking",
+                  "uValueWPerM2k": 2.33
+                },
+                {
+                  "areaM2": 6.0,
+                  "id": "ramen-noord",
+                  "sourceReference": "synthetic survey",
+                  "uValueWPerM2k": 4.13
+                }
+              ],
+              "linearBridges": [],
+              "pointBridges": []
+            },
+            "groundFloors": [],
+            "groundInventoryConfirmed": true,
+            "method": "components",
+            "unheated": {
+              "spaces": [
+                {
+                  "boundary": {
+                    "elements": [
+                      {
+                        "areaM2": 2.0,
+                        "id": "trappenhuis-0",
+                        "sourceReference": "synthetic survey",
+                        "uValueWPerM2k": 2.7
+                      },
+                      {
+                        "areaM2": 10.0,
+                        "id": "trappenhuis-1",
+                        "sourceReference": "synthetic survey; basisopname R_c 1.3 (I.2.1.3)",
+                        "uValueWPerM2k": 0.64
+                      }
+                    ],
+                    "linearBridges": [],
+                    "pointBridges": []
+                  },
+                  "factorSourceReference": "basisopname: H_ue = 5·A_T;iu (NTA I.8), b_U per 8.53",
+                  "id": "trappenhuis",
+                  "outside": null,
+                  "reductionFactor": 0.8356545961002786
+                }
+              ]
+            },
+            "verticalPipes": [
+              {
+                "id": "leiding-1",
+                "insulated": false,
+                "sharedZones": 1,
+                "sourceReference": "synthetic fixture, not a real dwelling; basisopname §7.2.4",
+                "storeys": 1
+              }
+            ]
+          },
+          "usableFloorAreaM2": 75.0,
+          "usageFunction": "residential",
+          "ventilation": {
+            "apartmentBuilding": true,
+            "buildingHeightM": 12.0,
+            "category": "residential",
+            "combustionAppliances": [],
+            "constructionYear": 1975,
+            "coolingSetpointC": 24.0,
+            "dwellingCount": 1,
+            "fans": {
+              "current": "ac",
+              "manufactureYear": 1975,
+              "method": "forfait"
+            },
+            "floorAboveCrawlspace": false,
+            "flowReduction": {
+              "collective": false,
+              "evidenceReference": null,
+              "flowControlPercent": null,
+              "recirculationPercent": null
+            },
+            "functions": [
+              {
+                "areaM2": 75.0,
+                "function": "residential",
+                "swimmingPool": false
+              }
+            ],
+            "grillePreheating": null,
+            "heatingSetpointC": 20.0,
+            "infiltration": {
+              "buildingType": "storey_middle_lower_or_intermediate",
+              "method": "reference",
+              "renovationYear": null
+            },
+            "installedCapacity": null,
+            "maximumCapacityForCooling": null,
+            "overventilation": null,
+            "sourceReference": "synthetic survey: roof fan; basisopname",
+            "system": {
+              "kind": "single",
+              "unit": {
+                "airHandlingUnit": null,
+                "ducts": "unknown",
+                "equipmentReference": "synthetic survey: roof fan",
+                "heatRecovery": null,
+                "variant": "c1"
+              }
+            },
+            "usableFloorAreaM2": 75.0,
+            "ventilativeCooling": null,
+            "wholeDwellingAreaM2": null,
+            "zoneId": "woning"
+          },
+          "ventilationFlows": [],
+          "windowInventoryComplete": true,
+          "windows": [
+            {
+              "areaM2": 9.0,
+              "frameFraction": 0.25,
+              "gPerpendicular": 0.6,
+              "id": "ramen-zuid",
+              "obstruction": {
+                "method": "minimal"
+              },
+              "orientation": "south",
+              "sourceReference": "synthetic survey: spacer marking",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 2.33
+            },
+            {
+              "areaM2": 6.0,
+              "frameFraction": 0.25,
+              "gPerpendicular": 0.75,
+              "id": "ramen-noord",
+              "obstruction": {
+                "method": "minimal"
+              },
+              "orientation": "north",
+              "sourceReference": "synthetic survey",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 4.13
+            }
+          ],
+          "zoneId": "woning"
+        },
+        "distribution": {
+          "heatingLimitExtraKwh": null,
+          "method": "calculated",
+          "sourceReference": "synthetic survey: type plate; basisopname: pipes in unheated spaces (afb. 9.1)"
+        },
+        "distributionSystem": {
+          "actualPipeLengthM": null,
+          "bufferVessel": null,
+          "collectiveHotWaterDeliverySet": false,
+          "connectedStoreys": 1,
+          "designTemperatureClass": "90_70",
+          "installation": "individual",
+          "pipeTransmittance": {
+            "insulation": {
+              "state": "uninsulated"
+            },
+            "method": "forfait"
+          },
+          "pipesAlsoForHotWater": false,
+          "pump": {
+            "method": "included_in_generator_auxiliary"
+          },
+          "sourceReference": "synthetic survey: type plate; basisopname",
+          "unheatedAmbientC": null,
+          "unheatedPipeLengthM": null,
+          "unheatedPipeTransmittance": null,
+          "unheatedReductionFactor": null,
+          "usageFunction": "residential",
+          "valvesInsulated": false
+        },
+        "emission": {
+          "balancing": "none_or_unknown",
+          "control": "main_room_thermostat",
+          "sourceReference": "synthetic survey: type plate; basisopname",
+          "system": "radiators_or_convectors"
+        },
+        "generator": {
+          "boiler": {
+            "averageDesignEmissionTemperatureC": 80.0,
+            "emissionCircuit": "direct",
+            "equipmentReference": "synthetic survey: type plate",
+            "fuel": "natural_gas",
+            "generatorId": "opwekker-1",
+            "installationYear": 2012,
+            "installationYearReference": "basisopname (ISSO 82.1 p. 28)",
+            "kind": "hr107",
+            "location": "inside_thermal_boundary",
+            "locationReference": "synthetic survey: type plate",
+            "pilotFlamePresent": false,
+            "role": "individual_main",
+            "temperatureAndCircuitReference": "synthetic survey: type plate; table 9.9 class 90/70"
+          },
+          "kind": "gas_boiler"
+        }
+      },
+      "storage": null,
+      "totalUsableFloorAreaM2": 75.0,
+      "useInventoryComplete": true
+    },
+    "nta8800-opname-2015-detached.json": {
+      "activeCooling": null,
+      "areaSourceReference": "synthetic: NEN 2580 measurement",
+      "bacsFactor": 1.0,
+      "bacsSourceReference": "residential: f_BACS 1,0 (§5.5.8)",
+      "batteryStoragePresent": false,
+      "bblFunction": null,
+      "calculationScope": "residential",
+      "constructionYear": 2015,
+      "cooling": null,
+      "declaredRenewableHeat": [],
+      "declaredUses": [],
+      "demandUsesFixedC1Ventilation": false,
+      "externalSupply": {
+        "areaElectricity": [],
+        "collectiveHeatPumpSource": null,
+        "cooling": null,
+        "heating": null,
+        "hotWater": null
+      },
+      "heatPumpRenewable": {
+        "combinedOutdoorAndExhaustAir": false,
+        "exhaustAirSource": false,
+        "outdoorAirFractionReference": null,
+        "outdoorAirHeatFraction": null,
+        "sourceBelow20C": true,
+        "sourceReference": "synthetic survey: type plate"
+      },
+      "hotWater": {
+        "boilingWaterTap": false,
+        "circulation": null,
+        "collective": null,
+        "deliverySets": null,
+        "emission": {
+          "bathroomLengthM": 4.0,
+          "kitchenLengthM": 5.0,
+          "method": "residential",
+          "served": "kitchen_and_bathroom",
+          "sourceReference": "synthetic survey; tap lengths per ISSO 82.1 p. 178"
+        },
+        "equipmentReference": "synthetic survey",
+        "generator": {
+          "exhaustAirSource": false,
+          "kind": "heat_pump",
+          "measuredClass": null,
+          "outdoorAirFraction": null,
+          "sourceCorrection": null
+        },
+        "need": {
+          "dwellingCount": 1,
+          "method": "residential",
+          "sourceReference": "synthetic survey"
+        },
+        "showerHeatRecovery": {
+          "assignmentUnknown": false,
+          "connection": "unknown",
+          "showers": [
+            {
+              "unit": "vertical"
+            }
+          ],
+          "sourceReference": "synthetic survey"
+        },
+        "storage": []
+      },
+      "labelFunction": null,
+      "lighting": [],
+      "lossAreaM2": 309.5,
+      "lossAreaSourceReference": "basisopname: survey surfaces with f_ls (NTA 6.7.3)",
+      "onSiteProduction": [],
+      "permitApplicationAfter20260529": false,
+      "productionInventoryComplete": true,
+      "pvSystems": [
+        {
+          "azimuthDeg": 180.0,
+          "collective": null,
+          "id": "pv-zuid",
+          "mounting": "not_ventilated",
+          "obstruction": {
+            "method": "minimal"
+          },
+          "obstructionFactors": [],
+          "peakPower": {
+            "method": "table16_1",
+            "moduleType": "monocrystalline2015_to2017",
+            "panelAreaM2": 20.0
+          },
+          "sourceReference": "synthetic survey",
+          "tiltDeg": 40.0
+        }
+      ],
+      "spaceHeating": {
+        "demand": {
+          "areaSourceReference": "synthetic: NEN 2580 measurement",
+          "dwellingType": "other",
+          "internalGains": {
+            "dwellingCount": 1,
+            "method": "residential",
+            "sourceReference": "one dwelling"
+          },
+          "opaqueElements": [
+            {
+              "areaM2": 26.0,
+              "id": "gevel-zuid",
+              "orientation": "south",
+              "sourceReference": "synthetic survey: drawing and core sample; basisopname R_c 3.4711111111111115 (I.2.1.4)",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 0.41007575757575765
+            },
+            {
+              "areaM2": 2.2,
+              "id": "voordeur",
+              "orientation": "north",
+              "sourceReference": "synthetic survey",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 2.1400757575757576
+            },
+            {
+              "areaM2": 31.8,
+              "id": "gevel-noord",
+              "orientation": "north",
+              "sourceReference": "synthetic survey; basisopname R_c 3.4711111111111115 (I.2.1.4)",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 0.41007575757575765
+            },
+            {
+              "areaM2": 25.0,
+              "id": "gevel-oost",
+              "orientation": "east",
+              "sourceReference": "synthetic survey; basisopname R_c 3.4711111111111115 (I.2.1.4)",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 0.41007575757575765
+            },
+            {
+              "areaM2": 25.0,
+              "id": "gevel-west",
+              "orientation": "west",
+              "sourceReference": "synthetic survey; basisopname R_c 3.4711111111111115 (I.2.1.4)",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 0.41007575757575765
+            },
+            {
+              "areaM2": 55.0,
+              "id": "dak-zuid",
+              "orientation": "south",
+              "sourceReference": "synthetic survey; basisopname R_c 4.664444444444444 (I.2.1.4)",
+              "tiltDeg": 40.0,
+              "uValueWPerM2k": 0.3500757575757576
+            },
+            {
+              "areaM2": 55.0,
+              "id": "dak-noord",
+              "orientation": "north",
+              "sourceReference": "synthetic survey; basisopname R_c 4.664444444444444 (I.2.1.4)",
+              "tiltDeg": 40.0,
+              "uValueWPerM2k": 0.3500757575757576
+            }
+          ],
+          "opaqueInventoryComplete": true,
+          "setpoints": {
+            "coolingC": 24.0,
+            "heatingC": 20.0,
+            "sourceReference": "NTA 8800 table 7.13 residential"
+          },
+          "thermalMass": {
+            "ceiling": "open_or_none",
+            "floor": "heavy",
+            "sourceReference": "synthetic: hollow-core floor, sand-lime walls; ISSO 82.1 tables 7.5/7.6",
+            "wall": "heavy"
+          },
+          "transmission": {
+            "direct": {
+              "elements": [
+                {
+                  "areaM2": 26.0,
+                  "id": "gevel-zuid",
+                  "sourceReference": "synthetic survey: drawing and core sample; basisopname R_c 3.4711111111111115 (I.2.1.4)",
+                  "uValueWPerM2k": 0.41007575757575765
+                },
+                {
+                  "areaM2": 2.2,
+                  "id": "voordeur",
+                  "sourceReference": "synthetic survey",
+                  "uValueWPerM2k": 2.1400757575757576
+                },
+                {
+                  "areaM2": 31.8,
+                  "id": "gevel-noord",
+                  "sourceReference": "synthetic survey; basisopname R_c 3.4711111111111115 (I.2.1.4)",
+                  "uValueWPerM2k": 0.41007575757575765
+                },
+                {
+                  "areaM2": 25.0,
+                  "id": "gevel-oost",
+                  "sourceReference": "synthetic survey; basisopname R_c 3.4711111111111115 (I.2.1.4)",
+                  "uValueWPerM2k": 0.41007575757575765
+                },
+                {
+                  "areaM2": 25.0,
+                  "id": "gevel-west",
+                  "sourceReference": "synthetic survey; basisopname R_c 3.4711111111111115 (I.2.1.4)",
+                  "uValueWPerM2k": 0.41007575757575765
+                },
+                {
+                  "areaM2": 55.0,
+                  "id": "dak-zuid",
+                  "sourceReference": "synthetic survey; basisopname R_c 4.664444444444444 (I.2.1.4)",
+                  "uValueWPerM2k": 0.3500757575757576
+                },
+                {
+                  "areaM2": 55.0,
+                  "id": "dak-noord",
+                  "sourceReference": "synthetic survey; basisopname R_c 4.664444444444444 (I.2.1.4)",
+                  "uValueWPerM2k": 0.3500757575757576
+                },
+                {
+                  "areaM2": 14.0,
+                  "id": "ramen-zuid",
+                  "sourceReference": "synthetic survey",
+                  "uValueWPerM2k": 1.9400757575757577
+                },
+                {
+                  "areaM2": 6.0,
+                  "id": "ramen-noord",
+                  "sourceReference": "synthetic survey",
+                  "uValueWPerM2k": 1.9400757575757577
+                },
+                {
+                  "areaM2": 5.0,
+                  "id": "ramen-oost",
+                  "sourceReference": "synthetic survey",
+                  "uValueWPerM2k": 1.9400757575757577
+                },
+                {
+                  "areaM2": 5.0,
+                  "id": "ramen-west",
+                  "sourceReference": "synthetic survey",
+                  "uValueWPerM2k": 1.5400757575757575
+                }
+              ],
+              "linearBridges": [],
+              "pointBridges": []
+            },
+            "groundFloors": [
+              {
+                "areaM2": 85.0,
+                "constructionResistanceM2kPerW": 2.9866666666666664,
+                "edgeInsulation": [],
+                "edgeThermalBridges": {
+                  "method": "forfait"
+                },
+                "exposedPerimeterM": 38.0,
+                "id": "begane-grondvloer",
+                "sourceReference": "synthetic survey; basisopname R_c 2.8166666666666664 (I.2.1.4)"
+              }
+            ],
+            "groundInventoryConfirmed": true,
+            "method": "components",
+            "unheated": null,
+            "verticalPipes": [
+              {
+                "id": "leiding-1",
+                "insulated": false,
+                "sharedZones": 1,
+                "sourceReference": "synthetic fixture, not a real dwelling; basisopname §7.2.4",
+                "storeys": 2
+              },
+              {
+                "id": "leiding-2",
+                "insulated": false,
+                "sharedZones": 1,
+                "sourceReference": "synthetic fixture, not a real dwelling; basisopname §7.2.4",
+                "storeys": 2
+              }
+            ]
+          },
+          "usableFloorAreaM2": 160.0,
+          "usageFunction": "residential",
+          "ventilation": {
+            "apartmentBuilding": false,
+            "buildingHeightM": 9.0,
+            "category": "residential",
+            "combustionAppliances": [],
+            "constructionYear": 2015,
+            "coolingSetpointC": 24.0,
+            "dwellingCount": 1,
+            "fans": {
+              "current": "dc",
+              "manufactureYear": 2015,
+              "method": "forfait"
+            },
+            "floorAboveCrawlspace": false,
+            "flowReduction": {
+              "collective": false,
+              "evidenceReference": null,
+              "flowControlPercent": null,
+              "recirculationPercent": null
+            },
+            "functions": [
+              {
+                "areaM2": 160.0,
+                "function": "residential",
+                "swimmingPool": false
+              }
+            ],
+            "grillePreheating": null,
+            "heatingSetpointC": 20.0,
+            "infiltration": {
+              "buildingType": "pitched_roof_detached",
+              "method": "reference",
+              "renovationYear": null
+            },
+            "installedCapacity": null,
+            "maximumCapacityForCooling": null,
+            "overventilation": null,
+            "sourceReference": "synthetic survey: unit data sheet; basisopname",
+            "system": {
+              "kind": "single",
+              "unit": {
+                "airHandlingUnit": null,
+                "ducts": "unknown",
+                "equipmentReference": "synthetic survey: unit data sheet",
+                "heatRecovery": {
+                  "bypass": {
+                    "coldRecoveryEvidence": null,
+                    "kind": "full"
+                  },
+                  "constantVolumeControl": false,
+                  "efficiency": {
+                    "exchanger": "counter_flow_plastic",
+                    "method": "table"
+                  },
+                  "equipmentReference": "synthetic survey: unit data sheet",
+                  "layout": "central",
+                  "manufactureYear": 2015,
+                  "supplyDuctInsulation": {
+                    "kind": "uninsulated"
+                  },
+                  "supplyDuctLengthM": null
+                },
+                "variant": "d2"
+              }
+            },
+            "usableFloorAreaM2": 160.0,
+            "ventilativeCooling": null,
+            "wholeDwellingAreaM2": null,
+            "zoneId": "woning"
+          },
+          "ventilationFlows": [],
+          "windowInventoryComplete": true,
+          "windows": [
+            {
+              "areaM2": 14.0,
+              "frameFraction": 0.25,
+              "gPerpendicular": 0.6,
+              "id": "ramen-zuid",
+              "obstruction": {
+                "method": "minimal"
+              },
+              "orientation": "south",
+              "sourceReference": "synthetic survey",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 1.9400757575757577
+            },
+            {
+              "areaM2": 6.0,
+              "frameFraction": 0.25,
+              "gPerpendicular": 0.6,
+              "id": "ramen-noord",
+              "obstruction": {
+                "method": "minimal"
+              },
+              "orientation": "north",
+              "sourceReference": "synthetic survey",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 1.9400757575757577
+            },
+            {
+              "areaM2": 5.0,
+              "frameFraction": 0.25,
+              "gPerpendicular": 0.6,
+              "id": "ramen-oost",
+              "obstruction": {
+                "method": "minimal"
+              },
+              "orientation": "east",
+              "sourceReference": "synthetic survey",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 1.9400757575757577
+            },
+            {
+              "areaM2": 5.0,
+              "frameFraction": 0.25,
+              "gPerpendicular": 0.5,
+              "id": "ramen-west",
+              "obstruction": {
+                "method": "minimal"
+              },
+              "orientation": "west",
+              "sourceReference": "synthetic survey",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 1.5400757575757575
+            }
+          ],
+          "zoneId": "woning"
+        },
+        "distribution": {
+          "method": "heated_zone_only_space_heating",
+          "sourceReference": "synthetic fixture, not a real dwelling; basisopname: pipes in the heated zone"
+        },
+        "emission": {
+          "balancing": "static",
+          "control": "individual_room_thermostats",
+          "sourceReference": "synthetic survey: type plate; basisopname",
+          "system": "floor_heating"
+        },
+        "generator": {
+          "forfait": {
+            "capacitySourceReference": "synthetic survey: type plate",
+            "classificationSourceReference": "synthetic survey: type plate",
+            "collectiveBuildingInstallation": false,
+            "designSupplyTemperatureC": 45.0,
+            "generatorId": "opwekker-1",
+            "scope": "residential_at_most25_kw",
+            "sink": "hydronic",
+            "source": "outdoor_air",
+            "sourceCorrectionFactor": null,
+            "sourceCorrectionReference": null,
+            "thermalCapacityKw": 7.0
+          },
+          "kind": "heat_pump_forfait",
+          "sourceSystem": "individual",
+          "sourceSystemReference": "synthetic survey: type plate"
+        }
+      },
+      "storage": null,
+      "totalUsableFloorAreaM2": 160.0,
+      "useInventoryComplete": true
+    },
+    "nta8800-opname-utility-1970-retail.json": {
+      "activeCooling": null,
+      "areaSourceReference": "synthetic: NEN 2580 measurement on site",
+      "bacsFactor": 1.05,
+      "bacsSourceReference": "f_BACS 1,05: system above 290 kW without compliant BACS (§5.5.8, ISSO 75.1 table 7.3)",
+      "batteryStoragePresent": false,
+      "bblFunction": null,
+      "calculationScope": "utility",
+      "constructionYear": 1970,
+      "cooling": {
+        "boosterHeatPumpExtractionKwh": [],
+        "collective": null,
+        "distribution": {
+          "designTemperature": "t6_to12_or_unknown",
+          "fittingsInsulated": false,
+          "pipe": {
+            "kind": "uninsulated"
+          },
+          "pipeLengthM": null,
+          "pump": {
+            "energyEfficiencyIndex": null,
+            "floorCount": 1,
+            "heatMeter": true,
+            "hydraulicallyBalanced": false,
+            "individualDwellingInstallation": false,
+            "labelPowerKw": null,
+            "maxPipeLengthM": null,
+            "sourceReference": "basisopname forfait"
+          },
+          "sourceReference": "synthetic survey: chiller on the roof; basisopname",
+          "unconditionedAmbientC": null,
+          "unconditionedPipeLengthM": null
+        },
+        "emission": {
+          "balancing": "none_or_unknown",
+          "control": "unknown_or_other",
+          "emitter": "fan_coil_or_rac_on_ceiling",
+          "fanCoilCount": 40,
+          "sourceReference": "synthetic survey: chiller on the roof; basisopname"
+        },
+        "generators": [
+          {
+            "capacityKw": null,
+            "equipmentReference": "synthetic survey: chiller on the roof",
+            "generator": {
+              "declared": null,
+              "heatRejection": null,
+              "kind": "compression",
+              "performance": null
+            },
+            "id": "koeling"
+          }
+        ]
+      },
+      "declaredRenewableHeat": [],
+      "declaredUses": [],
+      "demandUsesFixedC1Ventilation": false,
+      "externalSupply": {
+        "areaElectricity": [],
+        "collectiveHeatPumpSource": null,
+        "cooling": null,
+        "heating": null,
+        "hotWater": null
+      },
+      "heatPumpRenewable": null,
+      "hotWater": {
+        "boilingWaterTap": false,
+        "circulation": {
+          "connectedDwellings": null,
+          "declaredPsiWPerMk": null,
+          "fittingsInsulated": false,
+          "floorCount": 1,
+          "insulation": "unknown",
+          "lengthM": null,
+          "outerDiameterMm": null,
+          "pump": {
+            "control": "uncontrolled_or_unknown",
+            "energyEfficiencyIndex": null,
+            "labelPowerKw": null
+          },
+          "sourceReference": "synthetic survey: storage vessel, no plate; basisopname",
+          "sportHallAreaM2": 0.0,
+          "unheatedAmbientC": null,
+          "unheatedLengthM": null
+        },
+        "collective": null,
+        "deliverySets": null,
+        "emission": {
+          "meanLengthM": 4.0,
+          "method": "utility",
+          "sourceReference": "synthetic survey: storage vessel, no plate; basisopname"
+        },
+        "equipmentReference": "synthetic survey: storage vessel, no plate",
+        "generator": {
+          "gasFired": true,
+          "kind": "large_direct_storage"
+        },
+        "need": {
+          "areas": [
+            {
+              "areaM2": 3000.0,
+              "function": "retail"
+            }
+          ],
+          "method": "utility",
+          "sourceReference": "NTA table 13.1"
+        },
+        "showerHeatRecovery": null,
+        "storage": []
+      },
+      "labelFunction": "retail",
+      "lighting": [
+        {
+          "functions": [
+            {
+              "areaM2": 3000.0,
+              "function": "retail"
+            }
+          ],
+          "lightingZones": [
+            {
+              "areaM2": 3000.0,
+              "daylight": {
+                "method": "none"
+              },
+              "extractedLuminaires": false,
+              "id": "winkelvloer",
+              "occupancy": {
+                "centralOnControl": true,
+                "control": "manual_or_unknown",
+                "largeOfficeGroup": false
+              },
+              "parasitic": {
+                "method": "forfait"
+              },
+              "power": {
+                "ledFrom2017": false,
+                "method": "forfait"
+              }
+            }
+          ],
+          "sourceReference": "synthetic fixture, not a real building; basisopname",
+          "zoneId": "utiliteit"
+        }
+      ],
+      "lossAreaM2": 5700.0,
+      "lossAreaSourceReference": "basisopname: survey surfaces with f_ls (NTA 6.7.3)",
+      "onSiteProduction": [],
+      "permitApplicationAfter20260529": false,
+      "productionInventoryComplete": true,
+      "pvSystems": [],
+      "spaceHeating": {
+        "demand": {
+          "areaSourceReference": "synthetic: NEN 2580 measurement on site",
+          "internalGains": {
+            "hotWaterRecoverableKwh": [],
+            "lighting": {
+              "method": "chapter14"
+            },
+            "method": "utility",
+            "sourceReference": "NTA tables 7.2/7.3; lighting from chapter 14"
+          },
+          "opaqueElements": [
+            {
+              "areaM2": 150.0,
+              "id": "pui-zuid",
+              "orientation": "south",
+              "sourceReference": "synthetic survey; basisopname R_c 0.43 (I.2.1.3)",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 1.67
+            },
+            {
+              "areaM2": 12.0,
+              "id": "laaddeur",
+              "orientation": "north",
+              "sourceReference": "synthetic survey",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 3.4
+            },
+            {
+              "areaM2": 268.0,
+              "id": "gevel-noord",
+              "orientation": "north",
+              "sourceReference": "synthetic survey; basisopname R_c 0.43 (I.2.1.3)",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 1.67
+            },
+            {
+              "areaM2": 3000.0,
+              "id": "dak",
+              "orientation": "south",
+              "sourceReference": "synthetic survey; basisopname R_c 0.86 (I.2.1.3)",
+              "tiltDeg": 0.0,
+              "uValueWPerM2k": 1.0
+            }
+          ],
+          "opaqueInventoryComplete": true,
+          "setpoints": {
+            "coolingC": 24.0,
+            "heatingC": 21.0,
+            "sourceReference": "NTA 8800 table 7.13 (§6.5.3 weighted)"
+          },
+          "thermalMass": {
+            "ceiling": "closed_or_suspended",
+            "floor": "heavy",
+            "sourceReference": "synthetic: concrete floor, suspended ceiling; ISSO 75.1 table 7.5",
+            "wall": "heavy"
+          },
+          "transmission": {
+            "direct": {
+              "elements": [
+                {
+                  "areaM2": 150.0,
+                  "id": "pui-zuid",
+                  "sourceReference": "synthetic survey; basisopname R_c 0.43 (I.2.1.3)",
+                  "uValueWPerM2k": 1.67
+                },
+                {
+                  "areaM2": 12.0,
+                  "id": "laaddeur",
+                  "sourceReference": "synthetic survey",
+                  "uValueWPerM2k": 3.4
+                },
+                {
+                  "areaM2": 268.0,
+                  "id": "gevel-noord",
+                  "sourceReference": "synthetic survey; basisopname R_c 0.43 (I.2.1.3)",
+                  "uValueWPerM2k": 1.67
+                },
+                {
+                  "areaM2": 3000.0,
+                  "id": "dak",
+                  "sourceReference": "synthetic survey; basisopname R_c 0.86 (I.2.1.3)",
+                  "uValueWPerM2k": 1.0
+                },
+                {
+                  "areaM2": 150.0,
+                  "id": "etalage",
+                  "sourceReference": "synthetic survey: visible sun-control film",
+                  "uValueWPerM2k": 4.1
+                },
+                {
+                  "areaM2": 20.0,
+                  "id": "ramen-noord",
+                  "sourceReference": "synthetic survey",
+                  "uValueWPerM2k": 6.2
+                }
+              ],
+              "linearBridges": [],
+              "pointBridges": []
+            },
+            "groundFloors": [
+              {
+                "areaM2": 3000.0,
+                "constructionResistanceM2kPerW": 0.34,
+                "edgeInsulation": [],
+                "edgeThermalBridges": {
+                  "method": "forfait"
+                },
+                "exposedPerimeterM": 100.0,
+                "id": "vloer",
+                "sourceReference": "synthetic survey; basisopname R_c 0.17 (I.2.1.3)"
+              }
+            ],
+            "groundInventoryConfirmed": true,
+            "method": "components",
+            "unheated": null,
+            "verticalPipes": [
+              {
+                "id": "leiding-1",
+                "insulated": false,
+                "sharedZones": 1,
+                "sourceReference": "synthetic fixture, not a real building; basisopname §7.2.4",
+                "storeys": 1
+              }
+            ]
+          },
+          "usableFloorAreaM2": 3000.0,
+          "usageFunction": "retail",
+          "ventilation": {
+            "apartmentBuilding": false,
+            "buildingHeightM": 6.0,
+            "category": "utility",
+            "combustionAppliances": [],
+            "constructionYear": 1970,
+            "coolingSetpointC": 24.0,
+            "dwellingCount": 0,
+            "fans": {
+              "current": "ac",
+              "manufactureYear": 1970,
+              "method": "forfait"
+            },
+            "floorAboveCrawlspace": false,
+            "flowReduction": {
+              "collective": false,
+              "evidenceReference": null,
+              "flowControlPercent": 80,
+              "recirculationPercent": null
+            },
+            "functions": [
+              {
+                "areaM2": 3000.0,
+                "function": "retail",
+                "swimmingPool": false
+              }
+            ],
+            "grillePreheating": null,
+            "heatingSetpointC": 21.0,
+            "infiltration": {
+              "buildingType": "flat_roof_terraced",
+              "method": "reference",
+              "renovationYear": null
+            },
+            "installedCapacity": null,
+            "maximumCapacityForCooling": null,
+            "overventilation": null,
+            "sourceReference": "synthetic survey: AHU in plant room; basisopname",
+            "system": {
+              "kind": "single",
+              "unit": {
+                "airHandlingUnit": {
+                  "coolingCoil": false,
+                  "heatingCoil": false,
+                  "insideThermalZone": false,
+                  "supplyDuctsOutside": "situation3"
+                },
+                "ducts": "unknown",
+                "equipmentReference": "synthetic survey: AHU in plant room",
+                "heatRecovery": null,
+                "variant": "d1"
+              }
+            },
+            "usableFloorAreaM2": 3000.0,
+            "ventilativeCooling": null,
+            "wholeDwellingAreaM2": null,
+            "zoneId": "utiliteit"
+          },
+          "ventilationFlows": [],
+          "windowInventoryComplete": true,
+          "windows": [
+            {
+              "areaM2": 150.0,
+              "frameFraction": 0.25,
+              "gPerpendicular": 0.4,
+              "id": "etalage",
+              "obstruction": {
+                "method": "minimal"
+              },
+              "orientation": "south",
+              "sourceReference": "synthetic survey: visible sun-control film",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 4.1
+            },
+            {
+              "areaM2": 20.0,
+              "frameFraction": 0.25,
+              "gPerpendicular": 0.85,
+              "id": "ramen-noord",
+              "obstruction": {
+                "method": "minimal"
+              },
+              "orientation": "north",
+              "sourceReference": "synthetic survey",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 6.2
+            }
+          ],
+          "zoneId": "utiliteit"
+        },
+        "distribution": {
+          "heatingLimitExtraKwh": null,
+          "method": "calculated",
+          "sourceReference": "synthetic survey: no type plate readable; basisopname forfait"
+        },
+        "distributionSystem": {
+          "actualPipeLengthM": null,
+          "bufferVessel": null,
+          "collectiveHotWaterDeliverySet": false,
+          "connectedStoreys": 1,
+          "designTemperatureClass": "90_70",
+          "installation": "collective",
+          "pipeTransmittance": {
+            "insulation": {
+              "state": "uninsulated"
+            },
+            "method": "forfait"
+          },
+          "pipesAlsoForHotWater": false,
+          "pump": {
+            "designFlowM3PerH": null,
+            "electricPowerKw": null,
+            "energyEfficiencyIndex": null,
+            "heatMeterPresent": true,
+            "maxPipeLengthM": null,
+            "method": "calculated",
+            "onePipeEmitterCount": null,
+            "sourceReference": "basisopname forfait"
+          },
+          "sourceReference": "synthetic survey: no type plate readable; basisopname",
+          "unheatedAmbientC": null,
+          "unheatedPipeLengthM": 0.0,
+          "unheatedPipeTransmittance": null,
+          "unheatedReductionFactor": null,
+          "usageFunction": "retail",
+          "valvesInsulated": false
+        },
+        "emission": {
+          "balancing": "none_or_unknown",
+          "control": "other_or_unknown",
+          "sourceReference": "synthetic survey: no type plate readable; basisopname",
+          "system": "radiators_or_convectors"
+        },
+        "generator": {
+          "auxiliary": {
+            "electricallyConnectedDevices": 1,
+            "nominalPowerKw": 350.0,
+            "sourceReference": "synthetic survey: no type plate readable"
+          },
+          "boiler": {
+            "averageDesignEmissionTemperatureC": 80.0,
+            "emissionCircuit": "direct",
+            "equipmentReference": "synthetic survey: no type plate readable",
+            "fuel": "natural_gas",
+            "generatorId": "opwekker-1",
+            "installationYear": 1970,
+            "installationYearReference": "basisopname (ISSO 82.1 p. 28)",
+            "kind": "conventional",
+            "location": "outside_thermal_boundary",
+            "locationReference": "synthetic survey: no type plate readable",
+            "pilotFlamePresent": true,
+            "role": "collective",
+            "temperatureAndCircuitReference": "synthetic survey: no type plate readable; table 9.9 class 90/70"
+          },
+          "kind": "gas_boiler"
+        },
+        "humidifiers": [
+          {
+            "humidification": {
+              "equipmentReference": "synthetic survey: steam lance in AHU",
+              "humidifier": {
+                "carrier": "electricity",
+                "kind": "steam"
+              },
+              "rotaryWheel": false
+            },
+            "servedAreaM2": null,
+            "zoneId": "utiliteit"
+          }
+        ]
+      },
+      "storage": null,
+      "totalUsableFloorAreaM2": 3000.0,
+      "useInventoryComplete": true
+    },
+    "nta8800-opname-utility-1985-office.json": {
+      "activeCooling": null,
+      "areaSourceReference": "synthetic: NEN 2580 measurement from drawings",
+      "bacsFactor": 1.0,
+      "bacsSourceReference": "f_BACS 1,0: no system above 290 kW (§5.5.8)",
+      "batteryStoragePresent": false,
+      "bblFunction": null,
+      "calculationScope": "utility",
+      "constructionYear": 1985,
+      "cooling": null,
+      "declaredRenewableHeat": [],
+      "declaredUses": [],
+      "demandUsesFixedC1Ventilation": false,
+      "externalSupply": {
+        "areaElectricity": [],
+        "collectiveHeatPumpSource": null,
+        "cooling": null,
+        "heating": null,
+        "hotWater": null
+      },
+      "heatPumpRenewable": null,
+      "hotWater": {
+        "boilingWaterTap": false,
+        "circulation": null,
+        "collective": null,
+        "deliverySets": null,
+        "emission": {
+          "meanLengthM": 4.0,
+          "method": "utility",
+          "sourceReference": "synthetic survey: pantry boilers; basisopname"
+        },
+        "equipmentReference": "synthetic survey: pantry boilers",
+        "generator": {
+          "kind": "electric_boiler"
+        },
+        "need": {
+          "areas": [
+            {
+              "areaM2": 1300.0,
+              "function": "office"
+            }
+          ],
+          "method": "utility",
+          "sourceReference": "NTA table 13.1"
+        },
+        "showerHeatRecovery": null,
+        "storage": [
+          {
+            "connectionFactor": 2,
+            "id": "pantry-boilers",
+            "inHeatedZone": true,
+            "loss": {
+              "method": "unknown_label",
+              "producedFrom2018": false
+            },
+            "sourceReference": "synthetic survey: two 15 l close-in boilers",
+            "unheatedAmbientC": null,
+            "volumeL": 30.0
+          }
+        ]
+      },
+      "labelFunction": "office",
+      "lighting": [
+        {
+          "functions": [
+            {
+              "areaM2": 1300.0,
+              "function": "office"
+            }
+          ],
+          "lightingZones": [
+            {
+              "areaM2": 1100.0,
+              "daylight": {
+                "method": "none"
+              },
+              "extractedLuminaires": false,
+              "id": "kantoren",
+              "occupancy": {
+                "centralOnControl": false,
+                "control": "manual_or_unknown",
+                "largeOfficeGroup": true
+              },
+              "parasitic": {
+                "method": "forfait"
+              },
+              "power": {
+                "dynamicFactor": null,
+                "luminaires": [
+                  {
+                    "count": 1,
+                    "power": {
+                      "lampCount": 900,
+                      "lampPowerW": 36.0,
+                      "method": "lamps",
+                      "technology": "fluorescent_t8_conventional"
+                    }
+                  }
+                ],
+                "method": "installed",
+                "sourceReference": "synthetic survey: lamp count"
+              }
+            },
+            {
+              "areaM2": 200.0,
+              "daylight": {
+                "method": "none"
+              },
+              "extractedLuminaires": false,
+              "id": "verkeer-kantine",
+              "occupancy": {
+                "centralOnControl": true,
+                "control": "manual_or_unknown",
+                "largeOfficeGroup": false
+              },
+              "parasitic": {
+                "method": "forfait"
+              },
+              "power": {
+                "dynamicFactor": null,
+                "luminaires": [
+                  {
+                    "count": 60,
+                    "power": {
+                      "method": "system",
+                      "powerW": 46.0
+                    }
+                  }
+                ],
+                "method": "installed",
+                "sourceReference": "synthetic survey"
+              }
+            }
+          ],
+          "sourceReference": "synthetic fixture, not a real building; basisopname",
+          "zoneId": "utiliteit"
+        }
+      ],
+      "lossAreaM2": 1819.0,
+      "lossAreaSourceReference": "basisopname: survey surfaces with f_ls (NTA 6.7.3)",
+      "onSiteProduction": [],
+      "permitApplicationAfter20260529": false,
+      "productionInventoryComplete": true,
+      "pvSystems": [],
+      "spaceHeating": {
+        "demand": {
+          "areaSourceReference": "synthetic: NEN 2580 measurement from drawings",
+          "internalGains": {
+            "hotWaterRecoverableKwh": [],
+            "lighting": {
+              "method": "chapter14"
+            },
+            "method": "utility",
+            "sourceReference": "NTA tables 7.2/7.3; lighting from chapter 14"
+          },
+          "opaqueElements": [
+            {
+              "areaM2": 4.0,
+              "id": "entree",
+              "orientation": "south",
+              "sourceReference": "synthetic survey",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 3.4503761061946903
+            },
+            {
+              "areaM2": 108.0,
+              "id": "gevel-zuid",
+              "orientation": "south",
+              "sourceReference": "synthetic survey: drawing; basisopname R_c 1.471111111111111 (I.2.1.4)",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 0.6603761061946902
+            },
+            {
+              "areaM2": 122.0,
+              "id": "gevel-noord",
+              "orientation": "north",
+              "sourceReference": "synthetic survey; basisopname R_c 1.471111111111111 (I.2.1.4)",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 0.6603761061946902
+            },
+            {
+              "areaM2": 125.0,
+              "id": "gevel-oost",
+              "orientation": "east",
+              "sourceReference": "synthetic survey; basisopname R_c 1.471111111111111 (I.2.1.4)",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 0.6603761061946902
+            },
+            {
+              "areaM2": 125.0,
+              "id": "gevel-west",
+              "orientation": "west",
+              "sourceReference": "synthetic survey; basisopname R_c 1.471111111111111 (I.2.1.4)",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 0.6603761061946902
+            },
+            {
+              "areaM2": 650.0,
+              "id": "dak",
+              "orientation": "south",
+              "sourceReference": "synthetic survey: roof core sample; basisopname R_c 1.5533333333333332 (I.2.1.4)",
+              "tiltDeg": 0.0,
+              "uValueWPerM2k": 0.6403761061946902
+            }
+          ],
+          "opaqueInventoryComplete": true,
+          "setpoints": {
+            "coolingC": 24.0,
+            "heatingC": 21.0,
+            "sourceReference": "NTA 8800 table 7.13 (§6.5.3 weighted)"
+          },
+          "thermalMass": {
+            "ceiling": "open_or_none",
+            "floor": "heavy",
+            "sourceReference": "synthetic: concrete floors, masonry; ISSO 75.1 table 7.5",
+            "wall": "heavy"
+          },
+          "transmission": {
+            "direct": {
+              "elements": [
+                {
+                  "areaM2": 4.0,
+                  "id": "entree",
+                  "sourceReference": "synthetic survey",
+                  "uValueWPerM2k": 3.4503761061946903
+                },
+                {
+                  "areaM2": 108.0,
+                  "id": "gevel-zuid",
+                  "sourceReference": "synthetic survey: drawing; basisopname R_c 1.471111111111111 (I.2.1.4)",
+                  "uValueWPerM2k": 0.6603761061946902
+                },
+                {
+                  "areaM2": 122.0,
+                  "id": "gevel-noord",
+                  "sourceReference": "synthetic survey; basisopname R_c 1.471111111111111 (I.2.1.4)",
+                  "uValueWPerM2k": 0.6603761061946902
+                },
+                {
+                  "areaM2": 125.0,
+                  "id": "gevel-oost",
+                  "sourceReference": "synthetic survey; basisopname R_c 1.471111111111111 (I.2.1.4)",
+                  "uValueWPerM2k": 0.6603761061946902
+                },
+                {
+                  "areaM2": 125.0,
+                  "id": "gevel-west",
+                  "sourceReference": "synthetic survey; basisopname R_c 1.471111111111111 (I.2.1.4)",
+                  "uValueWPerM2k": 0.6603761061946902
+                },
+                {
+                  "areaM2": 650.0,
+                  "id": "dak",
+                  "sourceReference": "synthetic survey: roof core sample; basisopname R_c 1.5533333333333332 (I.2.1.4)",
+                  "uValueWPerM2k": 0.6403761061946902
+                },
+                {
+                  "areaM2": 70.0,
+                  "id": "ramen-zuid",
+                  "sourceReference": "synthetic survey",
+                  "uValueWPerM2k": 3.35037610619469
+                },
+                {
+                  "areaM2": 60.0,
+                  "id": "ramen-noord",
+                  "sourceReference": "synthetic survey",
+                  "uValueWPerM2k": 3.35037610619469
+                },
+                {
+                  "areaM2": 50.0,
+                  "id": "ramen-oost",
+                  "sourceReference": "synthetic survey",
+                  "uValueWPerM2k": 3.35037610619469
+                },
+                {
+                  "areaM2": 50.0,
+                  "id": "ramen-west",
+                  "sourceReference": "synthetic survey",
+                  "uValueWPerM2k": 3.35037610619469
+                }
+              ],
+              "linearBridges": [],
+              "pointBridges": []
+            },
+            "groundFloors": [
+              {
+                "areaM2": 650.0,
+                "constructionResistanceM2kPerW": 1.47,
+                "edgeInsulation": [],
+                "edgeThermalBridges": {
+                  "method": "forfait"
+                },
+                "exposedPerimeterM": 102.0,
+                "id": "begane-grondvloer",
+                "sourceReference": "synthetic survey; basisopname R_c 1.3 (I.2.1.3)"
+              }
+            ],
+            "groundInventoryConfirmed": true,
+            "method": "components",
+            "unheated": null,
+            "verticalPipes": [
+              {
+                "id": "leiding-1",
+                "insulated": false,
+                "sharedZones": 1,
+                "sourceReference": "synthetic fixture, not a real building; basisopname §7.2.4",
+                "storeys": 2
+              }
+            ]
+          },
+          "usableFloorAreaM2": 1300.0,
+          "usageFunction": "office",
+          "ventilation": {
+            "apartmentBuilding": false,
+            "buildingHeightM": 7.5,
+            "category": "utility",
+            "combustionAppliances": [],
+            "constructionYear": 1985,
+            "coolingSetpointC": 24.0,
+            "dwellingCount": 0,
+            "fans": {
+              "current": "ac",
+              "manufactureYear": 1985,
+              "method": "forfait"
+            },
+            "floorAboveCrawlspace": false,
+            "flowReduction": {
+              "collective": false,
+              "evidenceReference": null,
+              "flowControlPercent": null,
+              "recirculationPercent": 20
+            },
+            "functions": [
+              {
+                "areaM2": 1300.0,
+                "function": "office",
+                "swimmingPool": false
+              }
+            ],
+            "grillePreheating": null,
+            "heatingSetpointC": 21.0,
+            "infiltration": {
+              "buildingType": "multi_storey_whole_building",
+              "method": "reference",
+              "renovationYear": null
+            },
+            "installedCapacity": null,
+            "maximumCapacityForCooling": null,
+            "overventilation": null,
+            "sourceReference": "synthetic survey: AHU on the roof; basisopname",
+            "system": {
+              "kind": "single",
+              "unit": {
+                "airHandlingUnit": {
+                  "coolingCoil": false,
+                  "heatingCoil": false,
+                  "insideThermalZone": false,
+                  "supplyDuctsOutside": "none"
+                },
+                "ducts": "unknown",
+                "equipmentReference": "synthetic survey: AHU on the roof",
+                "heatRecovery": {
+                  "bypass": {
+                    "bypassPresent": false,
+                    "kind": "unknown"
+                  },
+                  "constantVolumeControl": false,
+                  "efficiency": {
+                    "exchanger": "cross_flow",
+                    "method": "table"
+                  },
+                  "equipmentReference": "synthetic survey: AHU on the roof",
+                  "layout": "central",
+                  "manufactureYear": null,
+                  "supplyDuctInsulation": {
+                    "kind": "uninsulated"
+                  },
+                  "supplyDuctLengthM": null
+                },
+                "variant": "d2"
+              }
+            },
+            "usableFloorAreaM2": 1300.0,
+            "ventilativeCooling": null,
+            "wholeDwellingAreaM2": null,
+            "zoneId": "utiliteit"
+          },
+          "ventilationFlows": [],
+          "windowInventoryComplete": true,
+          "windows": [
+            {
+              "areaM2": 70.0,
+              "frameFraction": 0.25,
+              "gPerpendicular": 0.75,
+              "id": "ramen-zuid",
+              "obstruction": {
+                "method": "minimal"
+              },
+              "orientation": "south",
+              "sourceReference": "synthetic survey",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 3.35037610619469
+            },
+            {
+              "areaM2": 60.0,
+              "frameFraction": 0.25,
+              "gPerpendicular": 0.75,
+              "id": "ramen-noord",
+              "obstruction": {
+                "method": "minimal"
+              },
+              "orientation": "north",
+              "sourceReference": "synthetic survey",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 3.35037610619469
+            },
+            {
+              "areaM2": 50.0,
+              "frameFraction": 0.25,
+              "gPerpendicular": 0.75,
+              "id": "ramen-oost",
+              "obstruction": {
+                "method": "minimal"
+              },
+              "orientation": "east",
+              "sourceReference": "synthetic survey",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 3.35037610619469
+            },
+            {
+              "areaM2": 50.0,
+              "frameFraction": 0.25,
+              "gPerpendicular": 0.75,
+              "id": "ramen-west",
+              "obstruction": {
+                "method": "minimal"
+              },
+              "orientation": "west",
+              "sourceReference": "synthetic survey",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 3.35037610619469
+            }
+          ],
+          "zoneId": "utiliteit"
+        },
+        "distribution": {
+          "heatingLimitExtraKwh": null,
+          "method": "calculated",
+          "sourceReference": "synthetic survey: type plate boiler room; basisopname forfait"
+        },
+        "distributionSystem": {
+          "actualPipeLengthM": null,
+          "bufferVessel": null,
+          "collectiveHotWaterDeliverySet": false,
+          "connectedStoreys": 2,
+          "designTemperatureClass": "90_70",
+          "installation": "collective",
+          "pipeTransmittance": {
+            "insulation": {
+              "state": "uninsulated"
+            },
+            "method": "forfait"
+          },
+          "pipesAlsoForHotWater": false,
+          "pump": {
+            "designFlowM3PerH": null,
+            "electricPowerKw": null,
+            "energyEfficiencyIndex": null,
+            "heatMeterPresent": true,
+            "maxPipeLengthM": null,
+            "method": "calculated",
+            "onePipeEmitterCount": null,
+            "sourceReference": "basisopname forfait"
+          },
+          "sourceReference": "synthetic survey: type plate boiler room; basisopname",
+          "unheatedAmbientC": null,
+          "unheatedPipeLengthM": 0.0,
+          "unheatedPipeTransmittance": null,
+          "unheatedReductionFactor": null,
+          "usageFunction": "office",
+          "valvesInsulated": false
+        },
+        "emission": {
+          "balancing": "none_or_unknown",
+          "control": "central_with_room_valves",
+          "sourceReference": "synthetic survey: type plate boiler room; basisopname",
+          "system": "radiators_or_convectors"
+        },
+        "generator": {
+          "auxiliary": {
+            "electricallyConnectedDevices": 1,
+            "nominalPowerKw": 150.0,
+            "sourceReference": "synthetic survey: type plate boiler room"
+          },
+          "boiler": {
+            "averageDesignEmissionTemperatureC": 80.0,
+            "emissionCircuit": "direct",
+            "equipmentReference": "synthetic survey: type plate boiler room",
+            "fuel": "natural_gas",
+            "generatorId": "opwekker-1",
+            "installationYear": 2004,
+            "installationYearReference": "basisopname (ISSO 82.1 p. 28)",
+            "kind": "hr104",
+            "location": "outside_thermal_boundary",
+            "locationReference": "synthetic survey: type plate boiler room",
+            "pilotFlamePresent": false,
+            "role": "collective",
+            "temperatureAndCircuitReference": "synthetic survey: type plate boiler room; table 9.9 class 90/70"
+          },
+          "kind": "gas_boiler"
+        }
+      },
+      "storage": null,
+      "totalUsableFloorAreaM2": 1300.0,
+      "useInventoryComplete": true
+    },
+    "nta8800-opname-utility-2005-school.json": {
+      "activeCooling": null,
+      "areaSourceReference": "synthetic: NEN 2580 measurement from drawings",
+      "bacsFactor": 1.0,
+      "bacsSourceReference": "f_BACS 1,0: no system above 290 kW (§5.5.8)",
+      "batteryStoragePresent": false,
+      "bblFunction": null,
+      "calculationScope": "utility",
+      "constructionYear": 2005,
+      "cooling": null,
+      "declaredRenewableHeat": [],
+      "declaredUses": [],
+      "demandUsesFixedC1Ventilation": false,
+      "externalSupply": {
+        "areaElectricity": [],
+        "collectiveHeatPumpSource": null,
+        "cooling": null,
+        "heating": null,
+        "hotWater": null
+      },
+      "heatPumpRenewable": null,
+      "hotWater": {
+        "boilingWaterTap": false,
+        "circulation": null,
+        "collective": null,
+        "deliverySets": null,
+        "emission": {
+          "meanLengthM": 2.0,
+          "method": "utility",
+          "sourceReference": "synthetic survey: cold taps only; basisopname"
+        },
+        "equipmentReference": "synthetic survey: cold taps only",
+        "generator": {
+          "kind": "electric_instantaneous"
+        },
+        "need": {
+          "areas": [
+            {
+              "areaM2": 2400.0,
+              "function": "education"
+            }
+          ],
+          "method": "utility",
+          "sourceReference": "NTA table 13.1"
+        },
+        "showerHeatRecovery": null,
+        "storage": []
+      },
+      "labelFunction": "education",
+      "lighting": [
+        {
+          "functions": [
+            {
+              "areaM2": 2400.0,
+              "function": "education"
+            }
+          ],
+          "lightingZones": [
+            {
+              "areaM2": 1800.0,
+              "daylight": {
+                "daylightControl": true,
+                "method": "forfait"
+              },
+              "extractedLuminaires": false,
+              "id": "lokalen",
+              "occupancy": {
+                "centralOnControl": false,
+                "control": "auto_on_dimmed",
+                "largeOfficeGroup": false
+              },
+              "parasitic": {
+                "method": "forfait"
+              },
+              "power": {
+                "dynamicFactor": null,
+                "luminaires": [
+                  {
+                    "count": 540,
+                    "power": {
+                      "method": "system",
+                      "powerW": 58.0
+                    }
+                  }
+                ],
+                "method": "installed",
+                "sourceReference": "synthetic survey: luminaire data sheet"
+              }
+            },
+            {
+              "areaM2": 600.0,
+              "daylight": {
+                "method": "none"
+              },
+              "extractedLuminaires": false,
+              "id": "gangen",
+              "occupancy": {
+                "centralOnControl": false,
+                "control": "manual_or_unknown",
+                "largeOfficeGroup": false
+              },
+              "parasitic": {
+                "method": "forfait"
+              },
+              "power": {
+                "dynamicFactor": null,
+                "luminaires": [
+                  {
+                    "count": 100,
+                    "power": {
+                      "method": "system",
+                      "powerW": 40.0
+                    }
+                  }
+                ],
+                "method": "installed",
+                "sourceReference": "synthetic survey"
+              }
+            }
+          ],
+          "sourceReference": "synthetic fixture, not a real building; basisopname",
+          "zoneId": "utiliteit"
+        }
+      ],
+      "lossAreaM2": 4980.0,
+      "lossAreaSourceReference": "basisopname: survey surfaces with f_ls (NTA 6.7.3)",
+      "onSiteProduction": [],
+      "permitApplicationAfter20260529": false,
+      "productionInventoryComplete": true,
+      "pvSystems": [
+        {
+          "azimuthDeg": 180.0,
+          "collective": null,
+          "id": "pv-dak",
+          "mounting": "not_ventilated",
+          "obstruction": {
+            "method": "minimal"
+          },
+          "obstructionFactors": [],
+          "peakPower": {
+            "method": "table16_1",
+            "moduleType": "multicrystalline_before2001",
+            "panelAreaM2": 300.0
+          },
+          "sourceReference": "synthetic survey",
+          "tiltDeg": 15.0
+        }
+      ],
+      "spaceHeating": {
+        "demand": {
+          "areaSourceReference": "synthetic: NEN 2580 measurement from drawings",
+          "internalGains": {
+            "hotWaterRecoverableKwh": [],
+            "lighting": {
+              "method": "chapter14"
+            },
+            "method": "utility",
+            "sourceReference": "NTA tables 7.2/7.3; lighting from chapter 14"
+          },
+          "opaqueElements": [
+            {
+              "areaM2": 160.0,
+              "id": "gevel-zuid",
+              "orientation": "south",
+              "sourceReference": "synthetic survey; basisopname R_c 2.5 (I.2.1.3)",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 0.4754966611018364
+            },
+            {
+              "areaM2": 5.0,
+              "id": "hoofdingang",
+              "orientation": "north",
+              "sourceReference": "synthetic survey",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 2.1054966611018364
+            },
+            {
+              "areaM2": 155.0,
+              "id": "gevel-noord",
+              "orientation": "north",
+              "sourceReference": "synthetic survey; basisopname R_c 2.5 (I.2.1.3)",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 0.4754966611018364
+            },
+            {
+              "areaM2": 140.0,
+              "id": "gevel-oost",
+              "orientation": "east",
+              "sourceReference": "synthetic survey; basisopname R_c 2.5 (I.2.1.3)",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 0.4754966611018364
+            },
+            {
+              "areaM2": 140.0,
+              "id": "gevel-west",
+              "orientation": "west",
+              "sourceReference": "synthetic survey; basisopname R_c 2.5 (I.2.1.3)",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 0.4754966611018364
+            },
+            {
+              "areaM2": 2400.0,
+              "id": "dak",
+              "orientation": "south",
+              "sourceReference": "synthetic survey; basisopname R_c 2.5 (I.2.1.3)",
+              "tiltDeg": 0.0,
+              "uValueWPerM2k": 0.4854966611018364
+            }
+          ],
+          "opaqueInventoryComplete": true,
+          "setpoints": {
+            "coolingC": 24.0,
+            "heatingC": 21.0,
+            "sourceReference": "NTA 8800 table 7.13 (§6.5.3 weighted)"
+          },
+          "thermalMass": {
+            "ceiling": "open_or_none",
+            "floor": "heavy",
+            "sourceReference": "synthetic: concrete floor, sand-lime walls; ISSO 75.1 table 7.5",
+            "wall": "heavy"
+          },
+          "transmission": {
+            "direct": {
+              "elements": [
+                {
+                  "areaM2": 160.0,
+                  "id": "gevel-zuid",
+                  "sourceReference": "synthetic survey; basisopname R_c 2.5 (I.2.1.3)",
+                  "uValueWPerM2k": 0.4754966611018364
+                },
+                {
+                  "areaM2": 5.0,
+                  "id": "hoofdingang",
+                  "sourceReference": "synthetic survey",
+                  "uValueWPerM2k": 2.1054966611018364
+                },
+                {
+                  "areaM2": 155.0,
+                  "id": "gevel-noord",
+                  "sourceReference": "synthetic survey; basisopname R_c 2.5 (I.2.1.3)",
+                  "uValueWPerM2k": 0.4754966611018364
+                },
+                {
+                  "areaM2": 140.0,
+                  "id": "gevel-oost",
+                  "sourceReference": "synthetic survey; basisopname R_c 2.5 (I.2.1.3)",
+                  "uValueWPerM2k": 0.4754966611018364
+                },
+                {
+                  "areaM2": 140.0,
+                  "id": "gevel-west",
+                  "sourceReference": "synthetic survey; basisopname R_c 2.5 (I.2.1.3)",
+                  "uValueWPerM2k": 0.4754966611018364
+                },
+                {
+                  "areaM2": 2400.0,
+                  "id": "dak",
+                  "sourceReference": "synthetic survey; basisopname R_c 2.5 (I.2.1.3)",
+                  "uValueWPerM2k": 0.4854966611018364
+                },
+                {
+                  "areaM2": 110.0,
+                  "id": "ramen-zuid",
+                  "sourceReference": "synthetic survey: spacer marking",
+                  "uValueWPerM2k": 1.9054966611018365
+                },
+                {
+                  "areaM2": 110.0,
+                  "id": "ramen-noord",
+                  "sourceReference": "synthetic survey",
+                  "uValueWPerM2k": 1.9054966611018365
+                },
+                {
+                  "areaM2": 40.0,
+                  "id": "ramen-oost",
+                  "sourceReference": "synthetic survey",
+                  "uValueWPerM2k": 1.9054966611018365
+                },
+                {
+                  "areaM2": 40.0,
+                  "id": "ramen-west",
+                  "sourceReference": "synthetic survey",
+                  "uValueWPerM2k": 1.9054966611018365
+                }
+              ],
+              "linearBridges": [],
+              "pointBridges": []
+            },
+            "groundFloors": [
+              {
+                "areaM2": 2400.0,
+                "below": {
+                  "depthClass": "other",
+                  "floorResistanceM2kPerW": 0.0,
+                  "kind": "crawlspace",
+                  "ventilationOpeningM2PerM": null,
+                  "wallResistanceM2kPerW": 2.5,
+                  "wallUValueWPerM2k": 0.37
+                },
+                "constructionResistanceM2kPerW": 2.67,
+                "edgeInsulation": [],
+                "edgeThermalBridges": {
+                  "method": "forfait"
+                },
+                "exposedPerimeterM": 200.0,
+                "id": "vloer",
+                "sourceReference": "synthetic survey; basisopname R_c 2.5 (I.2.1.3)"
+              }
+            ],
+            "groundInventoryConfirmed": true,
+            "method": "components",
+            "unheated": null,
+            "verticalPipes": [
+              {
+                "id": "leiding-1",
+                "insulated": false,
+                "sharedZones": 1,
+                "sourceReference": "synthetic fixture, not a real building; basisopname §7.2.4",
+                "storeys": 1
+              }
+            ]
+          },
+          "usableFloorAreaM2": 2400.0,
+          "usageFunction": "education",
+          "ventilation": {
+            "apartmentBuilding": false,
+            "buildingHeightM": 4.5,
+            "category": "utility",
+            "combustionAppliances": [],
+            "constructionYear": 2005,
+            "coolingSetpointC": 24.0,
+            "dwellingCount": 0,
+            "fans": {
+              "current": "ac",
+              "manufactureYear": 2005,
+              "method": "forfait"
+            },
+            "floorAboveCrawlspace": true,
+            "flowReduction": {
+              "collective": false,
+              "evidenceReference": null,
+              "flowControlPercent": null,
+              "recirculationPercent": null
+            },
+            "functions": [
+              {
+                "areaM2": 2400.0,
+                "function": "education",
+                "swimmingPool": false
+              }
+            ],
+            "grillePreheating": null,
+            "heatingSetpointC": 21.0,
+            "infiltration": {
+              "buildingType": "flat_roof_detached",
+              "method": "reference",
+              "renovationYear": null
+            },
+            "installedCapacity": null,
+            "maximumCapacityForCooling": null,
+            "overventilation": null,
+            "sourceReference": "synthetic survey: roof fans; basisopname",
+            "system": {
+              "kind": "single",
+              "unit": {
+                "airHandlingUnit": null,
+                "ducts": "unknown",
+                "equipmentReference": "synthetic survey: roof fans",
+                "heatRecovery": null,
+                "variant": "c2a"
+              }
+            },
+            "usableFloorAreaM2": 2400.0,
+            "ventilativeCooling": null,
+            "wholeDwellingAreaM2": null,
+            "zoneId": "utiliteit"
+          },
+          "ventilationFlows": [],
+          "windowInventoryComplete": true,
+          "windows": [
+            {
+              "areaM2": 110.0,
+              "frameFraction": 0.25,
+              "gPerpendicular": 0.6,
+              "id": "ramen-zuid",
+              "obstruction": {
+                "method": "minimal"
+              },
+              "orientation": "south",
+              "sourceReference": "synthetic survey: spacer marking",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 1.9054966611018365
+            },
+            {
+              "areaM2": 110.0,
+              "frameFraction": 0.25,
+              "gPerpendicular": 0.6,
+              "id": "ramen-noord",
+              "obstruction": {
+                "method": "minimal"
+              },
+              "orientation": "north",
+              "sourceReference": "synthetic survey",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 1.9054966611018365
+            },
+            {
+              "areaM2": 40.0,
+              "frameFraction": 0.25,
+              "gPerpendicular": 0.6,
+              "id": "ramen-oost",
+              "obstruction": {
+                "method": "minimal"
+              },
+              "orientation": "east",
+              "sourceReference": "synthetic survey",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 1.9054966611018365
+            },
+            {
+              "areaM2": 40.0,
+              "frameFraction": 0.25,
+              "gPerpendicular": 0.6,
+              "id": "ramen-west",
+              "obstruction": {
+                "method": "minimal"
+              },
+              "orientation": "west",
+              "sourceReference": "synthetic survey",
+              "tiltDeg": 90.0,
+              "uValueWPerM2k": 1.9054966611018365
+            }
+          ],
+          "zoneId": "utiliteit"
+        },
+        "distribution": {
+          "heatingLimitExtraKwh": null,
+          "method": "calculated",
+          "sourceReference": "synthetic survey: type plate; basisopname forfait"
+        },
+        "distributionSystem": {
+          "actualPipeLengthM": null,
+          "bufferVessel": null,
+          "collectiveHotWaterDeliverySet": false,
+          "connectedStoreys": 1,
+          "designTemperatureClass": "90_70",
+          "installation": "collective",
+          "pipeTransmittance": {
+            "insulation": {
+              "state": "uninsulated"
+            },
+            "method": "forfait"
+          },
+          "pipesAlsoForHotWater": false,
+          "pump": {
+            "designFlowM3PerH": null,
+            "electricPowerKw": null,
+            "energyEfficiencyIndex": null,
+            "heatMeterPresent": true,
+            "maxPipeLengthM": null,
+            "method": "calculated",
+            "onePipeEmitterCount": null,
+            "sourceReference": "basisopname forfait"
+          },
+          "sourceReference": "synthetic survey: type plate; basisopname",
+          "unheatedAmbientC": null,
+          "unheatedPipeLengthM": null,
+          "unheatedPipeTransmittance": null,
+          "unheatedReductionFactor": null,
+          "usageFunction": "education",
+          "valvesInsulated": false
+        },
+        "emission": {
+          "balancing": "none_or_unknown",
+          "control": "central_with_room_valves",
+          "sourceReference": "synthetic survey: type plate; basisopname",
+          "system": "radiators_or_convectors"
+        },
+        "generator": {
+          "auxiliary": {
+            "electricallyConnectedDevices": 1,
+            "nominalPowerKw": 200.0,
+            "sourceReference": "synthetic survey: type plate"
+          },
+          "boiler": {
+            "averageDesignEmissionTemperatureC": 80.0,
+            "emissionCircuit": "direct",
+            "equipmentReference": "synthetic survey: type plate",
+            "fuel": "natural_gas",
+            "generatorId": "opwekker-1",
+            "installationYear": 2005,
+            "installationYearReference": "basisopname (ISSO 82.1 p. 28)",
+            "kind": "hr107",
+            "location": "outside_thermal_boundary",
+            "locationReference": "synthetic survey: type plate",
+            "pilotFlamePresent": false,
+            "role": "collective",
+            "temperatureAndCircuitReference": "synthetic survey: type plate; table 9.9 class 90/70"
+          },
+          "kind": "gas_boiler"
+        }
+      },
+      "storage": null,
+      "totalUsableFloorAreaM2": 2400.0,
+      "useInventoryComplete": true
+    }
+  },
+  "description": "The NTA input the kernel derives from every training-data/nta8800-opname-*.json survey. Generated by crates/nta8800-core/tests/survey_takeover_completeness.rs (NTA_WRITE_TAKEOVER_FIXTURE=1)."
+}

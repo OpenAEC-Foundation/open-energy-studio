@@ -1,5 +1,6 @@
 import type { IConstruction, IProject, ISurface, IZone } from './types';
 import { migrateEvidenceLinks, withSurveyItemIds } from '../nta/EvidenceLinks';
+import { repairEvidenceIds } from '../nta/Evidence';
 
 /**
  * Fills the arrays the editor relies on when a project file left them out
@@ -113,5 +114,28 @@ export function normalizeProject(project: IProject): IProject {
   };
   // Evidence links of older projects named elements by position; they become id-based. Survey
   // lists that had no ids get them first, so their links can follow too.
-  return migrateEvidenceLinks(withSurveyItemIds(changed ? normalized : project));
+  return withUniqueEvidenceIds(migrateEvidenceLinks(withSurveyItemIds(changed ? normalized : project)));
+}
+
+/**
+ * Evidence ids must be unique: the dossier names each file after its id,
+ * and `evidence:<id>` references must point to one file. A repeated id (a
+ * hand-edited file, or an addition that raced another) keeps its first
+ * entry; later ones get a fresh `ev-N` and a note in their description,
+ * so the adviser sees what changed. A project without repeats is returned
+ * unchanged.
+ */
+function withUniqueEvidenceIds(project: IProject): IProject {
+  const evidence = project.registration?.evidence;
+  if (!Array.isArray(evidence) || evidence.length < 2) return project;
+  const { evidence: repaired, renamed } = repairEvidenceIds(evidence);
+  if (renamed.length === 0) return project;
+  let next = 0;
+  const noted = repaired.map((item, index) => {
+    if (item === evidence[index]) return item;
+    const { from } = renamed[next++];
+    const note = `id hersteld bij openen: was ${from || '(leeg)'}, dubbel in het register`;
+    return { ...item, description: item.description ? `${item.description} — ${note}` : note };
+  });
+  return { ...project, registration: { ...project.registration, evidence: noted } };
 }

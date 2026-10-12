@@ -1,0 +1,15 @@
+{
+  "description": "Survey answers a form may write as null: the kernel reads null as 'not answered' (Option with serde default). Checked by crates/nta8800-core/tests/survey_form_shapes.rs (null_tolerant_survey_answers_are_accepted) and used by src/__tests__/survey-null-paths.test.tsx. Paths use [] for any list index.",
+  "residentialSurvey": [
+    "heating.balanced",
+    "ventilation.bypassPresent"
+  ],
+  "utilitySurvey": [
+    "heating.balanced",
+    "ventilation.bypassPresent",
+    "cooling.pipesInsulated",
+    "hotWater.circulation",
+    "hotWater.storage[].producedFrom2018",
+    "hotWater.storage[].inHeatedZone"
+  ]
+}

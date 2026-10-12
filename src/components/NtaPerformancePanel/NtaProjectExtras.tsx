@@ -1,4 +1,5 @@
 import { PipeGeometryFields } from './NtaPipeGeometry';
+import { CollectiveCoolingField } from './NtaCollectiveShare';
 import { CoolingEmission2023Fields } from './NtaEdition2023Fields';
 import { useI18n } from '../../i18n/i18n';
 import type { IProject } from '../../core/energy/types';
@@ -31,24 +32,59 @@ function RemoveButton({ label, onClick }: { label: string; onClick: () => void }
   return <button type="button" className="nta-form-remove" onClick={onClick}>{label}</button>;
 }
 
-/** 7.30b adjacent unheated sunrooms with their glazing and surfaces. */
-export function SunroomsFields({ draft, change }: SectionProps) {
+/** Every sunroom list of the draft (the block's and each zone's) with the zone it belongs to. */
+function sunroomLists(draft: Draft): Array<{ base: Path; zoneId: string | null }> {
+  return [
+    { base: ['sunrooms'], zoneId: null },
+    ...list(draft, ['zoneData']).map((item, index) => ({ base: ['zoneData', index, 'sunrooms'] as Path, zoneId: String(item.zoneId ?? '') })),
+  ];
+}
+
+/** A sunroom id no sunroom list of the draft uses yet, so a new sunroom is not shared by accident. */
+function freeSunroomId(draft: Draft): string {
+  const used = new Set(sunroomLists(draft).flatMap(({ base }) => list(draft, base).map((room) => String(room.id ?? ''))));
+  let number = 1;
+  while (used.has(`serre-${number}`)) number += 1;
+  return `serre-${number}`;
+}
+
+/**
+ * 7.30b adjacent unheated sunrooms with their glazing and surfaces. The same sunroom id in the sunroom lists
+ * of several zones is one sunroom shared by those zones: the kernel caps its gain with 7.38 over all of them,
+ * each with its own H_zi;ztu and setpoint. The id names the project's unheated space of the sunroom.
+ */
+export function SunroomsFields({ draft, change, base = ['sunrooms'], project }: SectionProps & { base?: Path; project?: IProject }) {
   const { t } = useI18n();
   const field = { draft, onChange: change };
-  const rooms = list(draft, ['sunrooms']);
+  const rooms = list(draft, base);
+  const spaces = project?.unheatedSpaces ?? [];
+  const zoneName = (zoneId: string) => project?.zones.find((item) => item.id === zoneId)?.name || zoneId;
+  const own = JSON.stringify(base);
+  const sharedWith = (id: string) => sunroomLists(draft)
+    .filter((entry): entry is { base: Path; zoneId: string } => JSON.stringify(entry.base) !== own && entry.zoneId != null)
+    .filter((entry) => list(draft, entry.base).some((room) => String(room.id ?? '') === id))
+    .map((entry) => zoneName(entry.zoneId));
   return <div className="nta-form-subsection">
-    {rooms.map((_, index) => {
-      const at = (...rest: Path): Path => ['sunrooms', index, ...rest];
+    {rooms.map((room, index) => {
+      const at = (...rest: Path): Path => [...base, index, ...rest];
       const surfaces = list(draft, at('surfaces'));
+      const id = typeof room.id === 'string' ? room.id : '';
+      const shared = id ? sharedWith(id) : [];
+      const spaceOptions: Array<[string, string]> = spaces.map((space) => [space.id, space.name ? `${space.name} (${space.id})` : space.id]);
+      if (id && !spaces.some((space) => space.id === id)) spaceOptions.push([id, id]);
       return <fieldset key={index} className="nta-form-row">
         <legend>{t('nta.form.sunroom')} {index + 1}</legend>
-        <TextField {...field} path={at('id')} label={t('nta.form.sunroom.id')} />
+        {spaces.length > 0
+          ? <SelectField {...field} path={at('id')} label={t('nta.form.sunroom.space')} options={spaceOptions} />
+          : <TextField {...field} path={at('id')} label={t('nta.form.sunroom.id')} />}
+        {shared.length > 0 && <p className="nta-form-note" data-testid="sunroom-shared">
+          {t('nta.form.sunroom.sharedWith', { zones: shared.join(', ') })}</p>}
         <NumberField {...field} path={at('glazingGHeating')} label={t('nta.form.sunroom.gHeating')} />
         <NumberField {...field} path={at('glazingGCooling')} label={t('nta.form.sunroom.gCooling')} />
         <NumberField {...field} path={at('exteriorFrameFraction')} label={t('nta.form.sunroom.frame')} />
         <NumberField {...field} path={at('reductionFactor')} label={t('nta.form.sunroom.reduction')} />
         <NumberField {...field} path={at('zoneConductanceWPerK')} label={t('nta.form.sunroom.conductance')} />
-        <NumberField {...field} path={at('distributionFactor')} label={t('nta.form.sunroom.distribution')} />
+        <NumberField {...field} path={at('distributionFactor')} label={t('nta.form.sunroom.distribution')} optional />
         {surfaces.map((__, surface) => <div key={surface} className="nta-form-row">
           <NumberField {...field} path={at('surfaces', surface, 'areaM2')} label={t('nta.form.sunroom.surfaceArea')} />
           <NumberField {...field} path={at('surfaces', surface, 'absorptance')} label={t('nta.form.sunroom.absorptance')} />
@@ -61,12 +97,13 @@ export function SunroomsFields({ draft, change }: SectionProps) {
           {t('nta.form.sunroom.addSurface')}
         </button>
         <TextField {...field} path={at('sourceReference')} label={t('nta.form.source')} />
-        <RemoveButton label={t('nta.form.remove')} onClick={() => change(['sunrooms'], rooms.filter((__, other) => other !== index))} />
+        <RemoveButton label={t('nta.form.remove')} onClick={() => change(base, rooms.filter((__, other) => other !== index))} />
       </fieldset>;
     })}
-    <button type="button" className="btn" onClick={() => change(['sunrooms'], [...rooms, sunroomTemplate(rooms.length)])}>
+    <button type="button" className="btn" onClick={() => change(base, [...rooms, { ...sunroomTemplate(rooms.length), id: freeSunroomId(draft) }])}>
       {t('nta.form.sunroom.add')}
     </button>
+    <p className="nta-form-note">{t('nta.form.sunroom.shareNote')}</p>
   </div>;
 }
 
@@ -80,16 +117,21 @@ export function HumidifiersFields({ draft, change, project }: SectionProps & { p
     {rows.map((_, index) => {
       const at = (...rest: Path): Path => ['humidifiers', index, ...rest];
       const kind = read(draft, at('humidification', 'humidifier', 'kind'));
+      // Projects saved before the gas/oil split keep their "gas or oil"
+      // choice visible; the kernel books it as natural gas.
+      const legacyCarrier = read(draft, at('humidification', 'humidifier', 'carrier')) === 'gas_or_oil';
       return <fieldset key={index} className="nta-form-row">
         <legend>{t('nta.form.humidifier')} {index + 1}</legend>
         <SelectField {...field} path={at('zoneId')} label={t('nta.form.humidifier.zone')} options={zones} />
-        <SelectField {...field} path={at('humidification', 'humidifier', 'kind')} label={t('nta.form.humidifier.kind')} options={[
+        <SelectField required {...field} path={at('humidification', 'humidifier', 'kind')} label={t('nta.form.humidifier.kind')} options={[
           ['atomising', t('nta.form.humidifier.atomising')], ['steam', t('nta.form.humidifier.steam')]]}
           onChange={(_, value) => change(at('humidification', 'humidifier'), value === 'steam'
             ? { kind: 'steam', carrier: 'electricity' } : { kind: 'atomising' })} />
         {kind === 'steam' && <SelectField {...field} path={at('humidification', 'humidifier', 'carrier')}
           label={t('nta.form.humidifier.carrier')} options={[
-            ['electricity', t('nta.form.humidifier.electricity')], ['gas_or_oil', t('nta.form.humidifier.gasOrOil')]]} />}
+            ['electricity', t('nta.form.humidifier.electricity')], ['gas', t('nta.form.humidifier.gas')],
+            ['oil', t('nta.form.humidifier.oil')],
+            ...(legacyCarrier ? [['gas_or_oil', t('nta.form.humidifier.gasOrOil')] as [string, string]] : [])]} />}
         {kind === 'steam' && <NumberField {...field} path={at('servedAreaM2')} label={t('nta.form.humidifier.servedArea')} />}
         <CheckField {...field} path={at('humidification', 'rotaryWheel')} label={t('nta.form.humidifier.rotaryWheel')} />
         <TextField {...field} path={at('humidification', 'equipmentReference')} label={t('nta.form.boilerEquipmentSource')} />
@@ -179,7 +221,7 @@ export function CoolingSystemFields({ draft, change, base, allowNone }: SectionP
       <SelectField {...field} path={at('emission', 'control')} label={t('nta.form.coolingControl')} options={[
         ['unknown_or_other', t('nta.form.coolCtrl.unknown')], ['standalone_per_room', t('nta.form.coolCtrl.standalone')],
         ['central_with_room_control', t('nta.form.coolCtrl.central')]]} />
-      <NumberField {...field} path={at('emission', 'fanCoilCount')} label={t('nta.form.coolingFanCoils')} />
+      <NumberField {...field} path={at('emission', 'fanCoilCount')} label={t('nta.form.coolingFanCoils')} optional />
       <CoolingEmission2023Fields draft={draft} change={change} base={at('emission')} />
       <TextField {...field} path={at('emission', 'sourceReference')} label={t('nta.form.source')} />
       <label className="nta-form-check">
@@ -201,6 +243,26 @@ export function CoolingSystemFields({ draft, change, base, allowNone }: SectionP
           <TextField {...field} path={at('distribution', 'pipe', 'sourceReference')} label={t('nta.form.pipeGeometry.source')} />
         </>}
         <CheckField {...field} path={at('distribution', 'fittingsInsulated')} label={t('nta.form.coolingFittings')} />
+        <NumberField {...field} path={at('distribution', 'pipeLengthM')} label={t('nta.form.coolDist.pipeLength')} optional unit="m" />
+        <NumberField {...field} path={at('distribution', 'unconditionedPipeLengthM')} label={t('nta.form.coolDist.unconditionedLength')} optional unit="m" />
+        <NumberField {...field} path={at('distribution', 'unconditionedAmbientC')} label={t('nta.form.coolDist.unconditionedAmbient')} optional unit="°C" />
+        <label className="nta-form-check">
+          <input type="checkbox" checked={read(draft, at('distribution', 'pump')) != null}
+            onChange={(event) => change(at('distribution', 'pump'), event.target.checked
+              ? { hydraulicallyBalanced: false, floorCount: 1, heatMeter: false, individualDwellingInstallation: false, sourceReference: '' }
+              : null)} />
+          {t('nta.form.coolDist.pump')}
+        </label>
+        {read(draft, at('distribution', 'pump')) != null && <div className="nta-form-subsection">
+          <CheckField {...field} path={at('distribution', 'pump', 'hydraulicallyBalanced')} label={t('nta.form.coolDist.balanced')} />
+          <NumberField {...field} path={at('distribution', 'pump', 'floorCount')} label={t('nta.form.coolDist.floors')} step="1" />
+          <CheckField {...field} path={at('distribution', 'pump', 'heatMeter')} label={t('nta.form.coolDist.meter')} />
+          <CheckField {...field} path={at('distribution', 'pump', 'individualDwellingInstallation')} label={t('nta.form.coolDist.individual')} />
+          <NumberField {...field} path={at('distribution', 'pump', 'labelPowerKw')} label={t('nta.form.coolDist.labelPower')} optional unit="kW" />
+          <NumberField {...field} path={at('distribution', 'pump', 'energyEfficiencyIndex')} label={t('nta.dist.pump.eei')} optional />
+          <NumberField {...field} path={at('distribution', 'pump', 'maxPipeLengthM')} label={t('nta.dist.pump.maxLength')} optional unit="m" />
+          <TextField {...field} path={at('distribution', 'pump', 'sourceReference')} label={t('nta.form.coolDist.pumpSource')} />
+        </div>}
         <TextField {...field} path={at('distribution', 'sourceReference')} label={t('nta.form.source')} />
       </>}
     </>}
@@ -235,6 +297,7 @@ export function CoolingSystemsFields({ draft, change, project }: SectionProps & 
       {t('nta.form.coolingSystems.several')}
     </label>}
     {!several && <CoolingSystemFields draft={draft} change={change} base={['cooling']} allowNone />}
+    {!several && <CollectiveCoolingField draft={draft} change={change} />}
     {several && <div className="nta-form-subsection">
       {systems.map((system, index) => {
         const zoneIds = Array.isArray(system.zoneIds) ? system.zoneIds as string[] : [];
@@ -248,6 +311,7 @@ export function CoolingSystemsFields({ draft, change, project }: SectionProps & 
             {zone.name || zone.id}
           </label>)}
           <CoolingSystemFields draft={draft} change={change} base={['coolingSystems', index, 'system']} allowNone={false} />
+          <CollectiveCoolingField draft={draft} change={change} system={['coolingSystems', index, 'system']} />
           <RemoveButton label={t('nta.form.remove')}
             onClick={() => change(['coolingSystems'], systems.filter((__, other) => other !== index))} />
         </fieldset>;
@@ -324,7 +388,9 @@ export function DeclaredFlowsFields({ draft, change }: SectionProps) {
       <legend>{t('nta.form.declaredUse')} {index + 1}</legend>
       <TextField {...field} path={['declaredUses', index, 'id']} label={t('nta.form.declared.id')} />
       <SelectField {...field} path={['declaredUses', index, 'service']} label={t('nta.form.declaredUse.service')}
-        options={SERVICES.map((key) => [key, t(`nta.form.service.${key}`)])} />
+        // §5.5: dwellings leave lighting out of the calculation (residential_lighting_must_be_omitted).
+        options={SERVICES.filter((key) => key !== 'lighting' || read(draft, ['calculationScope']) === 'utility')
+          .map((key) => [key, t(`nta.form.service.${key}`)])} />
       <SelectField {...field} path={['declaredUses', index, 'carrier']} label={t('nta.form.declaredUse.carrier')} options={carriers} />
       <MonthlyValues draft={draft} change={change} path={['declaredUses', index, 'monthlyKwh']} label={t('nta.form.declared.monthly')} />
       <TextField {...field} path={['declaredUses', index, 'sourceReference']} label={t('nta.form.source')} />

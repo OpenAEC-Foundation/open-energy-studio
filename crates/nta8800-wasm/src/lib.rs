@@ -56,7 +56,7 @@ pub fn run(route: &str, body: &str) -> String {
             }
         }
     };
-    outcome_json((op.run)(&body))
+    outcome_json((op.run)(body))
 }
 
 /// Kernel, norm and build identity, the same object as `GET /v1/version`.

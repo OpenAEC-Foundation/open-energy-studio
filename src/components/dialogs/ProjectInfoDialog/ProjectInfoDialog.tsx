@@ -3,6 +3,7 @@ import { useI18n } from '../../../i18n/i18n';
 import { useEnergy } from '../../../context/EnergyContext';
 import { BuildingFunction } from '../../../core/energy/types';
 import { DialogShell } from '../DialogShell';
+import { ImportLog } from './ImportLog';
 
 interface ProjectInfoDialogProps {
   editId?: string | null;
@@ -78,6 +79,7 @@ export function ProjectInfoDialog({ onClose }: ProjectInfoDialogProps) {
         </div>
         <p className="dialog-hint">{t('dialog.projectInfo.registrationMoved')}</p>
       </section>
+      <ImportLog records={project.importLog ?? []} />
     </DialogShell>
   );
 }

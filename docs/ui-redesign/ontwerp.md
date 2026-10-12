@@ -1117,3 +1117,29 @@ Testbestanden die de ribbon of de projectboom als UI testen (`ribbon.test.tsx`, 
   - "Geavanceerd" per veld;
   - een paperclip-upload bij Bron & bewijs;
   - foto's in de basisopname (§12).
+
+## UX-bevindingen (10 oktober 2026)
+
+Een rondgang als EP-adviseur die voor het eerst met het programma werkt: een woning met geregistreerd label (project → gebouw → installaties → resultaten → registratie → rapport), een basisopname (opname → doorrekenen → overnemen) en een kantoor met een gemeenschappelijke ruimte en een wissel van uitgave. Gelezen naast de handleiding, hoofdstukken 0–3, 7 en 10. De pagina's zijn met headless Firefox op 1366 px vastgelegd en daarnaast per pagina als tekst in het Nederlands uitgelezen; de schermafdrukken staan niet in de repository.
+
+**Direct opgelost** (geen rekenwijziging):
+
+- *Open punten* op de projectpagina en onder Controle zei "Geen open punten van de rekenkern" ook als de kern nog niet had geantwoord of onbereikbaar was. Dat zegt nu "Nog geen antwoord van de rekenkern", "Berekenen…" of "Rekenkern niet bereikbaar".
+- De warmtepompdimensionering, de constructie-editor, de eigenschappen van installaties, de keuzelijst constructies in de vlakeditor en de maandgrafiek toonden getallen met een decimale punt (7.57 kW, U=0.250). Ze volgen nu de taal van de interface (7,57 kW).
+- Eén naam voor de kern in de Nederlandse interface: *rekenkern* (was ook Rust-kern, Rust-kernel, Rust-rekenkern en Rust-invoercontrole) en *rekenkernversie* (was Kernelversie), in de labels, de rapporten en de handleiding.
+- De melding bij een onbereikbare kern zegt nu wat je kunt doen: "kies Herberekenen".
+- Vier meldingen verwezen nog naar het "NTA-paneel" uit het oude ontwerp; ze noemen nu *Resultaten*, *Controle › Controleoverzicht* of de stap *Project*.
+- Handleiding: *Gebouw › Zones* heet in het programma *Gebouw › Rekenzones*, *Controle › Overzicht* heet *Controle › Controleoverzicht*, en de vloeren op grond staan onder *Gebouw › Schil & ramen*, niet onder "Thermische schil". De zonegegevens zijn bij utiliteit ook bij één rekenzone te openen.
+- De kop "Naam" in de installatietabellen stond als enige in hoofdletters.
+
+**Voorstellen die een ontwerpbesluit vragen:**
+
+1. **Technische foutmelding.** Na de Nederlandse melding staat de ruwe fout, bijvoorbeeld "JSON.parse: unexpected end of data at line 1 column 1" of "Rust API: HTTP 500". Voorstel: die achter een uitklapper *Technische details* zetten. *Gedaan (10 oktober 2026):* de ruwe fout staat achter een dichtgeklapte uitklapper *Technische details* (met het toetsenbord te openen), op Resultaten, in de NTA-panelen, het voorbeeld en de constructie-editor.
+2. **Resultaten zonder antwoord.** Onder Resultaten › Overzicht staat midden op de pagina "Nog geen resultaten berekend" zonder knop. Voorstel: daar de knop *Herberekenen* en een verwijzing naar *Controle › Controleoverzicht*. *Gedaan:* het lege overzicht heeft **Herberekenen**, en **Ga naar Controle › Controleoverzicht** als de kern de invoer onvolledig of ongeldig vindt; de foutmelding van een onbereikbare kern heeft ook **Herberekenen**.
+3. **Rapport zonder uitkomst.** Onder Rapport & dossier zegt de bovenste melding dat exporteren kan zonder BENG-uitkomst, terwijl onderaan "het rapport kan nog niet worden samengesteld" staat en de exportknoppen actief blijven. Voorstel: één melding, en de rapportknoppen uitgeschakeld met uitleg zolang er geen uitkomst is. *Gedaan:* één melding bovenaan ("het rapport kan nog niet worden samengesteld; het invoerdossier wel"), en exporteren en afdrukken staan uit met die uitleg als beschrijving, ook onder Exports. Het invoerdossier blijft beschikbaar.
+4. **Bron & bewijs toont kernpaden.** Elke regel begint met het pad (`generator.boiler.equipmentReference`) in monospace. Voor een adviseur is het veldlabel ("Bron: toestel") herkenbaarder; het pad kan in een tooltip. *Gedaan:* de regel toont het label uit het formulier; het kernpad staat in de tooltip en blijft de terugval voor een veld zonder eigen label.
+5. **Aantallen.** "0 fout(en)", "1 fout(en)": met de meervoudsvormen van i18next wordt dat "geen fouten", "1 fout", "3 fouten". *Gedaan:* meervoudsvormen van i18next voor fouten, aandachtspunten, wijzigingen, koppelingen en bewijsbestanden ("geen fouten", "1 fout", "3 fouten").
+6. **Voorbeeldprojecten in het Engels.** De bronvelden van de voorbeeldprojecten zijn Engels ("synthetic type plate", "NTA 8800 table 7.13 office"). Ze zijn ook testinvoer; vertalen vraagt een besluit over de fixtures. *Gedaan:* de bronteksten van de twee voorbeeldprojecten (en hun vastgelegde kernuitvoer) zijn Nederlands; alleen tekstvelden, geen rekenwijziging. Bronteksten die de kern zelf afleidt blijven zoals de kern ze schrijft.
+7. **"Setpoint".** *Setpoint verwarming/koeling* is het enige Engelse vakwoord in de zone-invoer. Voorstel: de Nederlandse term uit de normtekst gebruiken. *Gedaan:* *instelwaarde* (en *instelwaarden voor de binnentemperatuur*) in de Nederlandse interface, de meldingen van de kern en de handleiding.
+8. **Opslaan zonder wijziging.** Op Registratie is *Opslaan* actief terwijl *Verwerpen* uit staat en er niets is gewijzigd. *Gedaan:* **Opslaan** staat uit zolang er niets is gewijzigd, met de tekst *Geen wijzigingen om op te slaan* als beschrijving.
+9. **Gaswarmtepomp-referentievergelijking.** *Vergelijk conceptwaarden* staat uit zonder uitleg tot er een case is geladen; de knop kan zeggen "laad eerst een case". *Gedaan:* onder de uitgeschakelde knop staat "Laad eerst een case (voorbeeld of JSON-bestand); daarna kunt u vergelijken.", gekoppeld als beschrijving.

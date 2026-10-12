@@ -1,5 +1,7 @@
 # Dependencies
 node_modules/
+# A worktree may link node_modules from the main checkout; the link is not a change.
+/node_modules
 
 # Build output
 dist/

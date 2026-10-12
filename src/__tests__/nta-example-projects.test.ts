@@ -34,7 +34,7 @@ describe('NTA example projects', () => {
     expect(exampleProject('small_office').id).not.toBe(exampleProject('small_office').id);
   });
 
-  it('posts the example without nulls to the project route', async () => {
+  it('posts the example to the project route with its blanks as null', async () => {
     vi.stubEnv('DEV', true);
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({ status: 'calculated_unverified', gaps: [] })));
     vi.stubGlobal('fetch', fetchMock);
@@ -47,11 +47,10 @@ describe('NTA example projects', () => {
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe('/api/v1/nta8800/project/performance');
     const body = JSON.parse(String(init.body)) as { project: { ntaCalculation: Record<string, unknown> } };
-    expect(nullPaths(body)).toEqual([]);
-    // The template's unknown values are absent, so the kernel names them as gaps.
-    const boiler = (body.project.ntaCalculation.generator as { boiler: Record<string, unknown> }).boiler;
-    expect(boiler).not.toHaveProperty('kind');
+    // The template's unknown values stay null, so the kernel's blank search names each one as a gap
+    // (nta_value_missing at its path); an absent member only gave nta_calculation_block_invalid.
     expect(nullPaths(generator)).toContain('boiler.kind');
+    expect(nullPaths(body.project.ntaCalculation)).toEqual(nullPaths(generator).map((path) => `generator.${path}`));
     vi.unstubAllEnvs();
   });
 });

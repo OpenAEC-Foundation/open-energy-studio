@@ -38,6 +38,15 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 
+/// Linear thermal bridges of the building (8.2.1): ψ·ℓ per bridge, or the
+/// forfait ΔU_for of 8.3 on every part of H_D.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ThermalBridgeRoute {
+    Detailed,
+    Forfait,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct NtaCalculationInput {
@@ -93,6 +102,13 @@ pub struct NtaCalculationInput {
     pub vertical_pipes: Option<Vec<crate::monthly_demand::VerticalPipe>>,
     #[serde(default)]
     pub ground_floors: Vec<GroundFloorData>,
+    /// 8.2.1/8.3: the linear thermal-bridge route of the whole building.
+    /// Absent, the ground floors' edge route decides (8.37/8.38 forfait
+    /// selects ΔU_for); `forfait` selects ΔU_for (8.2, 8.3) also for a
+    /// building without a floor on the ground. One route for the building:
+    /// a ground floor on the other route is `thermal_bridge_methods_mixed`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thermal_bridge_route: Option<ThermalBridgeRoute>,
     #[serde(default)]
     pub ventilation_flows: Vec<VentilationFlow>,
     /// Chapter 11 input (single-zone projects; per zone in `zoneData`).
@@ -189,9 +205,13 @@ pub struct NtaCalculationInput {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ZoneNtaData {
     pub zone_id: String,
-    /// §6.5.3 functions with areas for a mixed zone.
+    /// §6.5.3 functions with areas for a mixed zone. With `commonSpaces`
+    /// these are the initial (non-common) areas of the zone.
     #[serde(default)]
     pub function_areas: Vec<crate::monthly_demand::UsageFunctionArea>,
+    /// 6.6.4 common spaces lying in this zone; the kernel allocates them.
+    #[serde(default)]
+    pub common_spaces: Vec<crate::common_space::CommonSpace>,
     #[serde(default)]
     pub sunrooms: Vec<crate::monthly_demand::Sunroom>,
     /// 7.3.3 vertical pipes of this zone; `[]` states none, absent falls
@@ -335,6 +355,9 @@ pub struct ProjectPerformanceAssessment {
     pub bacs: Option<crate::bacs_draft::BacsDraftAssessment>,
     /// Label data of Omgevingsregeling art. 5.13.
     pub label_data: Option<crate::label_data::LabelData>,
+    /// 6.6.4 allocation of the common spaces, when the zones give any.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub common_spaces: Option<crate::common_space::CommonSpaceSplit>,
 }
 
 /// A further heating system of the project (§9.2) with the zones it serves.
@@ -456,9 +479,37 @@ fn loss_area_weight(boundary: ThermalBoundary) -> Option<f64> {
     }
 }
 
-/// Geometry of the project without any NTA block; `None` for an unreadable project.
+/// The walls of a heated basement border the ground and count in `A_ls`
+/// with f_ls 0,7 (6.7.3 c, 2020+A1 p. 144; 2025+C1 p. 162). 6.7.2 takes
+/// their projected area A_T (annex K): the entered `wallAreaM2`, otherwise
+/// z·P of 8.39 (with z of 8.42 over the wall parts). They are no project
+/// surface of their own: the floor's `groundFloors` entry carries them. 0
+/// without a heated basement or with an unusable depth or area.
+fn basement_wall_loss_area(data: &GroundFloorData) -> f64 {
+    let Some(basement) = &data.heated_basement else {
+        return 0.0;
+    };
+    let wall_area = basement.wall_area(data.exposed_perimeter_m);
+    if wall_area.is_finite() && wall_area > 0.0 {
+        0.7 * wall_area
+    } else {
+        0.0
+    }
+}
+
+/// Geometry of the project; the NTA block is read only for the heated
+/// basement walls of its ground floors. `None` for an unreadable project.
 pub fn project_geometry(project_value: &Value) -> Option<GeometrySummary> {
     let project: ProjectInput = serde_json::from_value(project_value.clone()).ok()?;
+    let basements: HashMap<String, GroundFloorData> = project_value
+        .pointer("/ntaCalculation/groundFloors")
+        .and_then(Value::as_array)
+        .map(Vec::as_slice)
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|item| serde_json::from_value::<GroundFloorData>(item.clone()).ok())
+        .map(|item| (item.surface_id.clone(), item))
+        .collect();
     let mut floor = 0.0;
     let mut loss = 0.0;
     let mut envelope = 0.0;
@@ -475,6 +526,17 @@ pub fn project_geometry(project_value: &Value) -> Option<GeometrySummary> {
                         let area = surface.get("area").and_then(Value::as_f64).unwrap_or(0.0);
                         loss += weight * area;
                         envelope += area;
+                    }
+                    if boundary == ThermalBoundary::Ground {
+                        if let Some(data) = surface
+                            .get("id")
+                            .and_then(Value::as_str)
+                            .and_then(|id| basements.get(id))
+                        {
+                            let walls = basement_wall_loss_area(data);
+                            loss += walls;
+                            envelope += walls / 0.7;
+                        }
                     }
                 }
                 None => unclassified += 1,
@@ -529,6 +591,21 @@ fn registration_context(
             .map(|data| data.envelope.clone())
             .unwrap_or_default(),
         whole_building: single_detached_dwelling(project, project_value, derived),
+        pv_peak_powers_w_per_m2: derived
+            .map(|input| {
+                input
+                    .pv_systems
+                    .iter()
+                    .map(|system| match system.peak_power {
+                        crate::pv::PeakPower::DeclaredSpecific {
+                            peak_power_w_per_m2,
+                            ..
+                        } => Some(peak_power_w_per_m2),
+                        _ => None,
+                    })
+                    .collect()
+            })
+            .unwrap_or_default(),
     }
 }
 
@@ -616,35 +693,68 @@ fn collect_airtightness_types(value: &Value, out: &mut Vec<String>) {
     }
 }
 
-/// 8.2.1 and 8.3.3.1: a forfait floor edge (0,5·P of 8.37/8.38) selects
-/// the forfait treatment of linear thermal bridges for the whole building,
-/// so H_D takes ΔU_for of 8.3 and no ψ-values may be entered; mixing the
-/// two methods is not allowed. Returns ΔU_for for the forfait route.
+/// The forfait thermal-bridge route of 8.2.1 is chosen: by
+/// `thermalBridgeRoute`, or else by a forfait floor edge.
+fn forfait_bridges_chosen(nta: &NtaCalculationInput) -> bool {
+    match nta.thermal_bridge_route {
+        Some(route) => route == ThermalBridgeRoute::Forfait,
+        None => nta
+            .ground_floors
+            .iter()
+            .any(|floor| matches!(floor.edge_thermal_bridges, EdgeThermalBridges::Forfait)),
+    }
+}
+
+/// 8.2.1 and 8.3.3.1: a forfait floor edge (0,5·P of 8.37/8.38) or
+/// `thermalBridgeRoute` `forfait` selects the forfait treatment of linear
+/// thermal bridges for the whole building, so H_D takes ΔU_for of 8.3 and
+/// no ψ-values may be entered; mixing the two methods is not allowed (2025+C1
+/// p. 225 and 254). The route needs no floor on the ground: 8.2.1 applies
+/// to every building. Returns ΔU_for for the forfait route.
 fn forfait_bridge_route(
     project: &ProjectInput,
     nta: &NtaCalculationInput,
     constructions: &HashMap<&str, &Value>,
     gaps: &mut Vec<InputGap>,
 ) -> Option<f64> {
-    let forfait = nta
-        .ground_floors
-        .iter()
-        .any(|floor| matches!(floor.edge_thermal_bridges, EdgeThermalBridges::Forfait));
-    if !forfait {
+    if let Some(route) = nta.thermal_bridge_route {
+        // The building route and the floor edges must agree: a forfait
+        // building needs 0,5·P on its floors (8.37/8.38), a detailed one
+        // Σℓ·ψ_gr (8.36/8.39).
+        let disagrees = nta.ground_floors.iter().any(|floor| {
+            matches!(floor.edge_thermal_bridges, EdgeThermalBridges::Forfait)
+                != (route == ThermalBridgeRoute::Forfait)
+        });
+        if disagrees {
+            gaps.push(gap(
+                "thermal_bridge_methods_mixed",
+                "ntaCalculation.thermalBridgeRoute",
+            ));
+        }
+    }
+    if !forfait_bridges_chosen(nta) {
         return None;
     }
     let detailed_edges = nta.ground_floors.iter().any(|floor| {
         matches!(&floor.edge_thermal_bridges, EdgeThermalBridges::Detailed { bridges } if !bridges.is_empty())
     });
-    let psi = project.zones.iter().any(|zone| {
+    // ψ-values in a zone point at that zone's thermal bridges: with the
+    // building route a project may have no ground floor at all.
+    let psi = project.zones.iter().position(|zone| {
         zone.thermal_bridges
             .as_deref()
             .is_some_and(|items| !items.is_empty())
     });
-    if detailed_edges || psi {
+    if detailed_edges {
         gaps.push(gap(
             "thermal_bridge_methods_mixed",
             "ntaCalculation.groundFloors",
+        ));
+    }
+    if let Some(index) = psi {
+        gaps.push(gap(
+            "thermal_bridge_methods_mixed",
+            format!("zones[{index}].thermalBridges"),
         ));
     }
     let boundary = |surface: &Value| {
@@ -653,16 +763,26 @@ fn forfait_bridge_route(
             .and_then(|value| serde_json::from_value::<ThermalBoundary>(value.clone()).ok())
     };
     let surfaces = || project.zones.iter().flat_map(|zone| &zone.surfaces);
-    // 8.4: in the forfait route H_U;for = 0 and the partition joins H_D;for
-    // with U_iu;equi of C.1.3, which this route does not derive.
-    if surfaces().any(|surface| boundary(surface) == Some(ThermalBoundary::UnheatedSpace)) {
-        gaps.push(gap(
-            "forfait_thermal_bridges_unheated_space_unsupported",
-            "ntaCalculation.groundFloors",
-        ));
-    }
-    // 8.3: area-weighted U of the opaque parts bordering outdoor air.
+    // 8.3: area-weighted U of the opaque external parts.
     let (mut sum_au, mut sum_a) = (0.0, 0.0);
+    // 8.4.1 note 5 (2025+C1 p. 266; 2022 p. 240): in the forfait route
+    // H_U;for = 0 and a partition to an unheated space is an external
+    // construction with U_iu;equi = U_C·b_U (C.10), so it also counts here.
+    if surfaces().any(|surface| boundary(surface) == Some(ThermalBoundary::UnheatedSpace)) {
+        let partitions = crate::unheated_reduction_factors(project)
+            .and_then(|factors| crate::forfait_partition_elements(project, None, &factors));
+        match partitions {
+            Some(elements) => {
+                for (element, opaque) in elements {
+                    if opaque {
+                        sum_au += element.area_m2 * element.u_value_w_per_m2k;
+                        sum_a += element.area_m2;
+                    }
+                }
+            }
+            None => gaps.push(gap("unheated_transmission_unresolved", "unheatedSpaces")),
+        }
+    }
     for surface in surfaces().filter(|surface| boundary(surface) == Some(ThermalBoundary::Outdoor))
     {
         let windows: f64 = surface
@@ -943,20 +1063,30 @@ fn input_range_findings(project_value: &Value) -> (Vec<InputGap>, Vec<InputGap>)
             );
         }
     }
-    // q_v10 and the dwelling counts may sit at several places in the NTA
-    // block (block level, per zone, per ventilation system).
+    // q_v10, the dwelling counts and the connected area of a collective
+    // installation may sit at several places in the NTA block (block level,
+    // per zone, per ventilation or heating system).
     let mut keyed = Vec::new();
     if let Some(nta) = project_value.get("ntaCalculation") {
         collect_keys(
             nta,
             "ntaCalculation",
-            &["qv10DmPerSM2", "dwellingCount"],
+            &["qv10DmPerSM2", "dwellingCount", "connectedUsableAreaM2"],
             &mut keyed,
         );
     }
     for (key, path, value) in &keyed {
         match key.as_str() {
             "qv10DmPerSM2" => found.check(*value, &QV10_BOUND, "qv10_out_of_range", path.clone()),
+            // Review 55: the connected area of a collective installation
+            // takes the zone-area bounds; 10³⁰⁰ m² made the 9.4 auxiliary
+            // energy non-finite instead of naming the input.
+            "connectedUsableAreaM2" => found.check(
+                *value,
+                &AREA_BOUND,
+                "connected_area_out_of_range",
+                path.clone(),
+            ),
             _ if total_area > 0.0
                 && *value > 0.0
                 && total_area / *value < MIN_AREA_PER_DWELLING_M2 =>
@@ -1220,8 +1350,13 @@ fn plausibility_warnings(project_value: &Value) -> Vec<InputGap> {
     }
 
     // §5.5.8: f_BACS = 1,0 in a utility building needs every heating and
-    // cooling system shown at most 290 kW (or class A/B automation).
-    if !residential && nta.bacs.is_none() && nta.bacs_factor < 1.05 {
+    // cooling system shown at most 290 kW (or class A/B automation). Older
+    // editions have no f_BACS, so the warning is 2025+C1 only.
+    if nta.norm_version.profile().bacs_factor_route
+        && !residential
+        && nta.bacs.is_none()
+        && nta.bacs_factor < 1.05
+    {
         warnings.push(InputGap {
             detail: Some(
                 "§5.5.8: without the bacs block (system powers ≤ 290 kW or BACS evidence) f_BACS is 1,05".into(),
@@ -1266,6 +1401,43 @@ fn plausibility_warnings(project_value: &Value) -> Vec<InputGap> {
 /// Smallest mean floor width the perimeter check accepts, m: a floor of
 /// area A and width w ≥ 1 m has a perimeter of at most 2·A/w + 2·w.
 const MIN_FLOOR_WIDTH_M: f64 = 1.0;
+/// 7.38 (2025+C1 p. 187): a sunroom id that appears in several zones is one
+/// shared sunroom; each zone's copy gets every bordering zone's H_zi;ztu and
+/// heating setpoint, so the cap sums H_zi,j;ztu·(θ_int;set;H;stc;zi − θ_e)
+/// with each zone's own setpoint. A sunroom of one zone keeps 7.37.
+fn share_sunroom_bordering_zones(zones: &mut [ChainZone]) {
+    use crate::monthly_demand::SunroomBorderingZone;
+    let mut shared: HashMap<String, Vec<SunroomBorderingZone>> = HashMap::new();
+    for zone in zones.iter() {
+        // A blank id names no sunroom: two zones without one do not share.
+        for room in zone
+            .demand
+            .sunrooms
+            .iter()
+            .filter(|room| !room.id.trim().is_empty())
+        {
+            shared
+                .entry(room.id.clone())
+                .or_default()
+                .push(SunroomBorderingZone {
+                    zone_id: zone.demand.zone_id.clone(),
+                    conductance_w_per_k: room.zone_conductance_w_per_k,
+                    heating_setpoint_c: zone.demand.setpoints.heating_c,
+                });
+        }
+    }
+    shared.retain(|_, list| list.iter().any(|item| item.zone_id != list[0].zone_id));
+    // The list is derived here only: one entered in the project input (the
+    // field belongs to the derived chain input) would bypass the zones and
+    // their setpoints, so it is replaced, and cleared for a sunroom of one
+    // zone.
+    for zone in zones.iter_mut() {
+        for room in &mut zone.demand.sunrooms {
+            room.bordering_zones = shared.get(&room.id).cloned().unwrap_or_default();
+        }
+    }
+}
+
 /// Relative deviation of a declared sunroom b_U or H_zi;ztu from the value
 /// derived from the matching unheated space before a warning.
 const SUNROOM_DEVIATION: f64 = 0.10;
@@ -1315,14 +1487,29 @@ fn chapter8_warnings(
                 });
             }
         }
+        // 8.36/8.39: the detailed edge sums ℓ_j·ψ_gr;j along the exposed
+        // perimeter (2025+C1 p. 253 and 255); with none entered H_g has no
+        // edge loss at all, where the forfait would add 0,5·P.
+        if matches!(&floor.edge_thermal_bridges, EdgeThermalBridges::Detailed { bridges } if bridges.is_empty())
+            && floor.exposed_perimeter_m > 0.0
+        {
+            warnings.push(InputGap {
+                detail: Some(format!(
+                    "Detailed floor edge (8.36/8.39) without ψ_gr over P = {:.1} m; the forfait 8.37/8.38 would add {:.1} W/K",
+                    floor.exposed_perimeter_m,
+                    0.5 * floor.exposed_perimeter_m
+                )),
+                ..gap(
+                    "ground_floor_edge_bridges_none_entered",
+                    format!("{path}.edgeThermalBridges"),
+                )
+            });
+        }
     }
 
     // 8.2.1: the detailed route sums ψ·ℓ over the linear thermal bridges of
     // H_D; with none entered H_D carries no bridges at all.
-    let forfait = nta
-        .ground_floors
-        .iter()
-        .any(|floor| matches!(floor.edge_thermal_bridges, EdgeThermalBridges::Forfait));
+    let forfait = forfait_bridges_chosen(nta);
     let outdoor = |item: &Value| {
         item.get("thermalBoundary")
             .and_then(|value| serde_json::from_value::<ThermalBoundary>(value.clone()).ok())
@@ -1393,6 +1580,56 @@ fn chapter8_warnings(
             }
         }
     }
+
+    // vragen-nen 11: the partition to a sunroom gets no solar gain of its
+    // own. In the forfait route 7.6.1 (2025+C1 p. 182) determines one; in the
+    // calculated route 7.6.6.1.1 (p. 189) would pass sun through its windows
+    // with the g of the sunroom glazing, which 7.34 note 2 (p. 185) leaves out.
+    let sunroom_sets = std::iter::once((None, "ntaCalculation.sunrooms".to_owned(), &nta.sunrooms))
+        .chain(nta.zone_data.iter().enumerate().map(|(index, item)| {
+            (
+                Some(item.zone_id.as_str()),
+                format!("ntaCalculation.zoneData[{index}].sunrooms"),
+                &item.sunrooms,
+            )
+        }));
+    for (zone_id, base, sunrooms) in sunroom_sets {
+        for (index, room) in sunrooms.iter().enumerate() {
+            let partitions: Vec<&Value> = project
+                .zones
+                .iter()
+                .filter(|zone| zone_id.map_or(true, |id| zone.id == id))
+                .flat_map(|zone| &zone.surfaces)
+                .filter(|surface| {
+                    surface.get("unheatedSpaceId").and_then(Value::as_str) == Some(room.id.as_str())
+                        && surface.get("thermalBoundary").and_then(|value| {
+                            serde_json::from_value::<ThermalBoundary>(value.clone()).ok()
+                        }) == Some(ThermalBoundary::UnheatedSpace)
+                })
+                .collect();
+            let windows = partitions
+                .iter()
+                .filter_map(|surface| surface.get("windows").and_then(Value::as_array))
+                .map(Vec::len)
+                .sum::<usize>();
+            let detail = if partitions.is_empty() {
+                continue;
+            } else if forfait {
+                "forfait route (8.4.1): the partition to the sunroom gets no solar gain of its own (7.6.1) and the 7.30b gains apply; question 11 to NEN".to_owned()
+            } else if windows > 0 {
+                format!("{windows} window(s) in the partition to the sunroom get no direct solar gain (7.6.6.1.1); only the 7.30b gains count; question 11 to NEN")
+            } else {
+                continue;
+            };
+            warnings.push(InputGap {
+                detail: Some(detail),
+                ..gap(
+                    "sunroom_partition_gain_interpreted",
+                    format!("{base}[{index}]"),
+                )
+            });
+        }
+    }
 }
 
 /// Lowest residential f_ctrl·f_sys of table 11.5 (p. 460) for system B and
@@ -1401,6 +1638,229 @@ const RESIDENTIAL_MIN_CONTROL_FACTOR_B: f64 = 0.57;
 const RESIDENTIAL_MIN_CONTROL_FACTOR_CD: f64 = 0.52;
 
 const VERTICAL_PIPES_UNKNOWN_DETAIL: &str = "7.3.3: state the pipes, [] for none; when unknown enter one fictitious uninsulated pipe per storey of the zone (dwelling outside a residential building), one per dwelling (residential building) or one per toilet group with N = H/3 shared by usable area over the zones (utility building)";
+
+/// Common spaces of all zones for the 6.6.4 allocation.
+fn common_space_zones<'a>(
+    project: &'a ProjectInput,
+    nta: &'a NtaCalculationInput,
+) -> Vec<crate::common_space::ZoneCommonSpaces<'a>> {
+    project
+        .zones
+        .iter()
+        .map(|zone| {
+            let index = nta
+                .zone_data
+                .iter()
+                .position(|item| item.zone_id == zone.id);
+            let data = index.map(|index| &nta.zone_data[index]);
+            crate::common_space::ZoneCommonSpaces {
+                zone_id: zone.id.as_str(),
+                data_index: index.unwrap_or_default(),
+                floor_area_m2: zone.floor_area,
+                initial: data
+                    .map(|item| item.function_areas.as_slice())
+                    .unwrap_or(&[]),
+                usage_function: data
+                    .and_then(|item| item.usage_function)
+                    .unwrap_or(nta.usage_function),
+                common_spaces: data
+                    .map(|item| item.common_spaces.as_slice())
+                    .unwrap_or(&[]),
+            }
+        })
+        .collect()
+}
+
+/// 6.6.4 allocation of the common spaces of the zones, `None` without any.
+/// `filled` names the input lists the kernel fills from it.
+pub fn common_space_split(project_value: &Value) -> Option<crate::common_space::CommonSpaceSplit> {
+    let project: ProjectInput = serde_json::from_value(project_value.clone()).ok()?;
+    let block = project_value.get("ntaCalculation")?;
+    let mut nta: NtaCalculationInput = serde_json::from_value(without_null_members(block)).ok()?;
+    let zones = common_space_zones(&project, &nta);
+    let mut split = crate::common_space::allocate(&zones)?.ok()?;
+    let use_areas = crate::common_space::zone_use_areas(&zones, &split);
+    split.filled = fill_from_common_spaces(&mut nta, &split, use_areas.as_deref());
+    Some(split)
+}
+
+/// Fills the empty use-function lists from the 6.6.4 allocation and returns
+/// their paths below `ntaCalculation`: `bblFunctions` and `labelFunctions`
+/// with the building split (5.3.1), the lighting functions of each zone
+/// with the zone's within-zone split (t_D, t_N and P_n;spec "gewogen naar
+/// de gebruiksoppervlakte van de gebruiksfuncties die in de rekenzone zijn
+/// gelegen", 2025+C1 p. 657 and 661) and the areas of a single utility
+/// hot-water system with the within-zone split summed over the zones (13.19,
+/// p. 538). Entered lists take precedence.
+fn fill_from_common_spaces(
+    nta: &mut NtaCalculationInput,
+    split: &crate::common_space::CommonSpaceSplit,
+    use_areas: Option<&[(String, Vec<crate::monthly_demand::UsageFunctionArea>)]>,
+) -> Vec<String> {
+    let mut filled = Vec::new();
+    if split.building.len() > 1 {
+        if nta.bbl_functions.is_empty() {
+            if let Some(functions) = crate::common_space::bbl_functions(split) {
+                nta.bbl_functions = functions;
+                filled.push("bblFunctions".to_string());
+            }
+        }
+        if nta.label_functions.is_empty() {
+            if let Some(functions) = crate::common_space::label_functions(split) {
+                nta.label_functions = functions;
+                filled.push("labelFunctions".to_string());
+            }
+        }
+    }
+    let Some(use_areas) = use_areas else {
+        return filled;
+    };
+    for (index, lighting) in nta.lighting.iter_mut().enumerate() {
+        if !lighting.functions.is_empty() {
+            continue;
+        }
+        let Some((_, parts)) = use_areas.iter().find(|(id, _)| *id == lighting.zone_id) else {
+            continue;
+        };
+        let functions: Option<Vec<crate::lighting::UseArea>> = parts
+            .iter()
+            .map(|part| {
+                Some(crate::lighting::UseArea {
+                    function: crate::common_space::label_function(part.function)?,
+                    area_m2: part.area_m2,
+                })
+            })
+            .collect();
+        if let Some(functions) = functions {
+            lighting.functions = functions;
+            filled.push(format!("lighting[{index}].functions"));
+        }
+    }
+    // 13.20: with several systems each serves its own part of the building,
+    // which the split does not fix.
+    if nta.additional_hot_water_systems.is_empty() {
+        if let Some(crate::domestic_hot_water::HotWaterNeed::Utility { areas, .. }) =
+            nta.hot_water.as_mut().map(|system| &mut system.need)
+        {
+            if areas.is_empty() {
+                // The within-zone parts of every zone, scaled to the zone
+                // areas (13.19 takes A_g;zi).
+                let mut summed: Vec<crate::monthly_demand::UsageFunctionArea> = Vec::new();
+                for (_, parts) in use_areas {
+                    for part in parts {
+                        match summed
+                            .iter_mut()
+                            .find(|item| item.function == part.function)
+                        {
+                            Some(item) => item.area_m2 += part.area_m2,
+                            None => summed.push(part.clone()),
+                        }
+                    }
+                }
+                let parts: Option<Vec<crate::domestic_hot_water::UtilityArea>> = summed
+                    .iter()
+                    .map(|part| {
+                        Some(crate::domestic_hot_water::UtilityArea {
+                            function: crate::common_space::label_function(part.function)?,
+                            area_m2: part.area_m2,
+                        })
+                    })
+                    .collect();
+                if let Some(parts) = parts.filter(|parts| !parts.is_empty()) {
+                    *areas = parts;
+                    filled.push("hotWater.need.areas".to_string());
+                }
+            }
+        }
+    }
+    filled
+}
+
+/// Writes the 6.6.4 allocation into the zone function areas, the zone
+/// ventilation functions and the empty use-function lists
+/// (`fill_from_common_spaces`). `false` when the common spaces are refused.
+fn apply_common_spaces(
+    project: &ProjectInput,
+    nta: &mut NtaCalculationInput,
+    gaps: &mut Vec<InputGap>,
+) -> bool {
+    let zones = common_space_zones(project, nta);
+    let allocation = crate::common_space::allocate(&zones);
+    let use_areas = match &allocation {
+        Some(Ok(split)) => crate::common_space::zone_use_areas(&zones, split),
+        _ => None,
+    };
+    let split = match allocation {
+        None => return true,
+        Some(Ok(split)) => split,
+        Some(Err(issues)) => {
+            gaps.extend(issues.into_iter().map(|issue| InputGap {
+                code: issue.code,
+                path: format!("ntaCalculation.{}", issue.path),
+                detail: None,
+            }));
+            return false;
+        }
+    };
+    for zone in &split.zones {
+        let Some(data) = nta
+            .zone_data
+            .iter_mut()
+            .find(|item| item.zone_id == zone.zone_id)
+        else {
+            continue;
+        };
+        if data.common_spaces.is_empty() {
+            continue;
+        }
+        // A single-function zone keeps the single-function route.
+        if !(data.function_areas.is_empty() && zone.allocated.len() == 1) {
+            data.function_areas = zone.allocated.clone();
+        }
+        // The chapter 11 functions of the zone are its allocated function
+        // areas (11.2.2.5.1 with 6.5.3). Entries of one function (a part
+        // with and a part without a swimming pool) share its allocated area
+        // in the ratio of their entered areas.
+        if let Some(ventilation) = data.ventilation.as_mut() {
+            ventilation.functions =
+                allocated_ventilation_functions(&zone.allocated, &ventilation.functions);
+        }
+    }
+    fill_from_common_spaces(nta, &split, use_areas.as_deref());
+    true
+}
+
+/// The zone's chapter 11 function areas after the 6.6.4 allocation.
+fn allocated_ventilation_functions(
+    allocated: &[crate::monthly_demand::UsageFunctionArea],
+    entered: &[crate::ventilation::FunctionArea],
+) -> Vec<crate::ventilation::FunctionArea> {
+    let mut result = Vec::new();
+    for part in allocated {
+        let function = crate::zoning::ventilation_function(part.function);
+        let own: Vec<&crate::ventilation::FunctionArea> = entered
+            .iter()
+            .filter(|item| {
+                item.function == function && item.area_m2.is_finite() && item.area_m2 > 0.0
+            })
+            .collect();
+        let total: f64 = own.iter().map(|item| item.area_m2).sum();
+        if own.len() < 2 || total <= 0.0 {
+            result.push(crate::ventilation::FunctionArea {
+                function,
+                area_m2: part.area_m2,
+                swimming_pool: own.iter().any(|item| item.swimming_pool),
+            });
+            continue;
+        }
+        result.extend(own.iter().map(|item| crate::ventilation::FunctionArea {
+            function,
+            area_m2: part.area_m2 * item.area_m2 / total,
+            swimming_pool: item.swimming_pool,
+        }));
+    }
+    result
+}
 
 fn gap(code: &'static str, path: impl Into<String>) -> InputGap {
     InputGap {
@@ -1503,6 +1963,134 @@ fn building_issue_gaps(
         }
     }
     gaps
+}
+
+/// Refusals of the building calculation that only follow from a refused NTA
+/// block: without its chapter 11 ventilation the zone has no airflows, and
+/// without its chapter 14 lighting the utility gains have no lighting. When
+/// that block has a gap of its own, the follow-up is not a second open point
+/// for the one input the user left open (review 58). (code, path, block)
+const CONSEQUENCES: [(&str, &str, &str); 2] = [
+    (
+        "ventilation_flow_required",
+        "ntaCalculation.ventilationFlows",
+        "ntaCalculation.ventilation",
+    ),
+    (
+        "lighting_gain_requires_chapter_14",
+        "ntaCalculation.internalGains.lighting",
+        "ntaCalculation.lighting",
+    ),
+];
+
+fn without_consequences(gaps: Vec<InputGap>) -> Vec<InputGap> {
+    let within = |path: &str, block: &str| {
+        path.strip_prefix(block)
+            .is_some_and(|rest| rest.is_empty() || rest.starts_with(['.', '[']))
+    };
+    let caused = |gap: &InputGap| {
+        CONSEQUENCES.iter().any(|(code, path, block)| {
+            gap.code == *code
+                && gap.path == *path
+                && gaps.iter().any(|other| within(&other.path, block))
+        })
+    };
+    let keep: Vec<bool> = gaps.iter().map(|gap| !caused(gap)).collect();
+    gaps.into_iter()
+        .zip(keep)
+        .filter_map(|(gap, keep)| keep.then_some(gap))
+        .collect()
+}
+
+/// Warnings of the building calculation (`performance.warnings`, e.g. a
+/// boiler of a system over 500 m² or the TOjuli sunroom facade) carry a path
+/// in the derived input. Each becomes a project warning at the project input
+/// that feeds it, so the workflow lists it with "Ga naar"; the derived path
+/// stays in `detail` as `derivedInput.<path>`.
+fn building_warning_gaps(
+    result: &BuildingPerformanceAssessment,
+    derived: &BuildingPerformanceInput,
+    project_value: &Value,
+    existing: &[InputGap],
+) -> Vec<InputGap> {
+    let mut warnings: Vec<InputGap> = Vec::new();
+    for item in &result.warnings {
+        let path = match tojuli_project_path(&item.path, result, project_value) {
+            Some(path) => path,
+            // Copied from the NTA input, also when it is absent there.
+            None if item.path == "constructionYear" => "ntaCalculation.constructionYear".into(),
+            None => project_path_for_derived(&item.path, derived, project_value),
+        };
+        let known = existing
+            .iter()
+            .chain(warnings.iter())
+            .any(|gap| gap.code == item.code && gap.path == path);
+        if !known {
+            warnings.push(InputGap {
+                detail: Some(format!("derivedInput.{}", item.path)),
+                ..gap(item.code, path)
+            });
+        }
+    }
+    warnings
+}
+
+/// `tojuli[i].…` of the building calculation: the TOjuli assessment of one
+/// zone. Its sunrooms are the zone's own (`zoneData`) or the block's, its
+/// active-cooling evidence is `ntaCalculation.activeCooling`; anything else
+/// is the zone.
+fn tojuli_project_path(
+    path: &str,
+    result: &BuildingPerformanceAssessment,
+    project_value: &Value,
+) -> Option<String> {
+    let (member, index, rest) = split_member(path);
+    if member != "tojuli" {
+        return None;
+    }
+    let zone_id = index
+        .and_then(|index| result.tojuli.get(index))
+        .map(|zone| zone.zone_id.as_str());
+    let rest = rest.strip_prefix('.').unwrap_or(rest);
+    let (part, _, _) = split_member(rest);
+    if part == "activeCooling" {
+        return Some(format!("ntaCalculation.{rest}"));
+    }
+    let zone_data = zone_id.and_then(|zone_id| {
+        project_value
+            .pointer("/ntaCalculation/zoneData")
+            .and_then(Value::as_array)
+            .and_then(|items| {
+                items
+                    .iter()
+                    .position(|item| item.get("zoneId").and_then(Value::as_str) == Some(zone_id))
+            })
+    });
+    if part == "sunrooms" {
+        let own = zone_data.filter(|index| {
+            project_value
+                .pointer(&format!("/ntaCalculation/zoneData/{index}/sunrooms"))
+                .is_some_and(|value| !value.is_null())
+        });
+        return Some(match own {
+            Some(index) => format!("ntaCalculation.zoneData[{index}].sunrooms"),
+            None => "ntaCalculation.sunrooms".to_string(),
+        });
+    }
+    let zone_index = zone_id.and_then(|zone_id| {
+        project_value
+            .get("zones")
+            .and_then(Value::as_array)
+            .and_then(|items| {
+                items
+                    .iter()
+                    .position(|item| item.get("id").and_then(Value::as_str) == Some(zone_id))
+            })
+    });
+    Some(match zone_index {
+        Some(index) => format!("zones[{index}]"),
+        None => "zones".to_string(),
+    })
 }
 
 /// Splits `a.b[2].c` into its first member, the index directly after it and
@@ -1657,6 +2245,8 @@ fn zone_path(
                 "thermalMass" | "setpoints" | "usageFunction" => {
                     per_zone(field, &indexed, zone_has(field))
                 }
+                // Copied from the NTA input for every zone (review 58).
+                "areaSourceReference" => format!("ntaCalculation.{field}{indexed}"),
                 // A zone that overrides the usage function brings its own
                 // dwelling type.
                 "dwellingType" => per_zone(
@@ -1831,6 +2421,7 @@ fn assess_project_in_edition(project_value: &Value) -> ProjectPerformanceAssessm
         if !result.status.starts_with("calculated") {
             let found = building_issue_gaps(&result.issues, input, project_value, &gaps);
             gaps.extend(found);
+            gaps = without_consequences(gaps);
         }
     }
     let version = project_norm_version(project_value);
@@ -1911,6 +2502,10 @@ fn assess_project_in_edition(project_value: &Value) -> ProjectPerformanceAssessm
     let (range_gaps, range_warnings) = input_range_findings(project_value);
     let mut warnings = plausibility_warnings(project_value);
     warnings.extend(range_warnings);
+    if let (Some(input), Some(result)) = (&derived, &performance) {
+        let found = building_warning_gaps(result, input, project_value, &warnings);
+        warnings.extend(found);
+    }
     let blocked_by_range = !range_gaps.is_empty();
     gaps.extend(range_gaps);
     let mut assessment = ProjectPerformanceAssessment {
@@ -1924,6 +2519,7 @@ fn assess_project_in_edition(project_value: &Value) -> ProjectPerformanceAssessm
         registration,
         bacs,
         label_data,
+        common_spaces: common_space_split(project_value),
         gaps,
         warnings,
         geometry: project_geometry(project_value),
@@ -2143,11 +2739,407 @@ thread_local! {
 /// Cost: phase 1 is bounded by a few deserializations per null leaf and per
 /// filled location (guarded), phase 2 by about 2·k·log2(n) deserializations
 /// for k blanks among n nulls.
+/// The value with every null object member taken out, at any depth. Array
+/// elements keep their position (a null element stays a null).
+pub(crate) fn without_null_members(value: &Value) -> Value {
+    match value {
+        Value::Object(map) => Value::Object(
+            map.iter()
+                .filter(|(key, item)| !item.is_null() || crate::is_explicit_null_member(key))
+                .map(|(key, item)| (key.clone(), without_null_members(item)))
+                .collect(),
+        ),
+        Value::Array(items) => Value::Array(items.iter().map(without_null_members).collect()),
+        other => other.clone(),
+    }
+}
+
+/// Puts a null leaf back into the repaired copy the way the kernel reads it.
+/// A null object member means the same as an absent one (the input
+/// fingerprint follows the same rule), so it is taken out: only a required
+/// member then fails. A null array element stays a null.
+fn put_back(trial: &mut Value, leaf: &NullLeaf) {
+    if leaf.removed {
+        remove_member(trial, &leaf.steps);
+    } else {
+        set_at(trial, &leaf.steps, Value::Null);
+    }
+}
+
+/// The blank search of [`blank_search_exhaustive`], run on a reduced copy
+/// of the block.
+///
+/// The search deserializes the whole block per try, so on a large block its
+/// cost grows with the blanks times the block size (the scale audit of
+/// 10 October 2026: 200 blanks in a 2 250-window building took 20 s). Every
+/// list of objects in the block is cut down to its first element and the
+/// elements that hold a null leaf; the dropped elements hold no null, so
+/// the search never changes them, and a derived `Vec<T>` deserializes each
+/// element on its own (no kernel input type has a custom list
+/// deserializer or a fixed-size list of structs). The search on the
+/// reduced copy then makes the same decisions as on the whole block.
+///
+/// That reasoning is checked on the whole block afterwards: the repaired
+/// copy, with the dropped elements put back, must deserialize; each blank
+/// put back on its own must fail it, and all other nulls put back together
+/// must not. When the reduced search does not settle, or a check fails, the
+/// whole block is searched instead. `custom_deserialization_in_the_kernel_is_known`
+/// in `tests/blank_search_equivalence.rs` lists the serde constructs that
+/// could break the assumption (review 27).
+/// Members of the NTA block that must equal another member
+/// (`ventilation_setpoint_mismatch`): the ventilation copies the zone's
+/// setpoints, so a form clears both when the user clears the setpoint.
+/// (copy, source)
+const BLANK_MIRRORS: [(&str, &str); 2] = [
+    ("ventilation.heatingSetpointC", "setpoints.heatingC"),
+    ("ventilation.coolingSetpointC", "setpoints.coolingC"),
+];
+
+/// A blank copy is not a second missing input next to its blank source:
+/// one cleared field gives one gap, at the field the user cleared.
+fn without_blank_mirrors(paths: Vec<String>) -> Vec<String> {
+    paths
+        .iter()
+        .filter(|path| {
+            !BLANK_MIRRORS
+                .iter()
+                .any(|(copy, source)| path.as_str() == *copy && paths.iter().any(|p| p == source))
+        })
+        .cloned()
+        .collect()
+}
+
 fn blank_paths<T: serde::de::DeserializeOwned>(block: &Value) -> BlankSearch {
+    let reduced = reduce_lists(block);
+    if !reduced.dropped {
+        return blank_search_exhaustive::<T>(block).search;
+    }
+    let state = blank_search_exhaustive::<T>(&reduced.value);
+    let confirmed = confirm_reduced::<T>(block, &reduced.shape, &state);
+    REDUCED_SEARCHES.with(|counts| {
+        let (confirmed_count, fell_back) = counts.get();
+        counts.set(if confirmed.is_some() {
+            (confirmed_count + 1, fell_back)
+        } else {
+            (confirmed_count, fell_back + 1)
+        });
+    });
+    confirmed.unwrap_or_else(|| blank_search_exhaustive::<T>(block).search)
+}
+
+thread_local! {
+    /// Reduced blank searches confirmed on the whole block, and those that
+    /// fell back to the whole block, on this thread (for the equivalence
+    /// tests: a test reads only its own searches).
+    static REDUCED_SEARCHES: std::cell::Cell<(usize, usize)> =
+        const { std::cell::Cell::new((0, 0)) };
+}
+
+/// The counts behind [`REDUCED_SEARCHES`] on this thread: (confirmed, fell
+/// back).
+#[doc(hidden)]
+pub fn reduced_blank_searches() -> (usize, usize) {
+    REDUCED_SEARCHES.with(|counts| counts.get())
+}
+
+/// The blank search of the NTA block as the project route runs it
+/// (`exhaustive` false) or on the whole block (`exhaustive` true): the
+/// reported paths and whether the block still fails otherwise. For the
+/// equivalence tests only.
+#[doc(hidden)]
+pub fn nta_blank_search(block: &Value, exhaustive: bool) -> (Vec<String>, bool) {
+    let search = if exhaustive {
+        blank_search_exhaustive::<NtaCalculationInput>(block).search
+    } else {
+        blank_paths::<NtaCalculationInput>(block)
+    };
+    (search.paths, search.residual)
+}
+
+/// What [`blank_search_exhaustive`] decided, kept to check a search on a
+/// reduced block against the whole block.
+struct SearchState {
+    search: BlankSearch,
+    /// The repaired copy (every null leaf filled), when the repair settled.
+    work: Value,
+    settled: bool,
+    leaves: Vec<NullLeaf>,
+    /// Per leaf: refused by the kernel (before blank tags hide the leaves
+    /// next to them).
+    blank: Vec<bool>,
+    /// Per leaf: reported.
+    reported: Vec<bool>,
+}
+
+/// Where a reduced block's lists come from in the whole block.
+enum Shape {
+    /// Unchanged below this point.
+    Same,
+    /// An object with changed members below it.
+    Object(Vec<(String, Shape)>),
+    /// A list: the original index of each kept element.
+    List { kept: Vec<usize>, items: Vec<Shape> },
+}
+
+static SAME: Shape = Shape::Same;
+
+struct Reduced {
+    value: Value,
+    shape: Shape,
+    has_null: bool,
+    dropped: bool,
+}
+
+/// The block with every list of objects cut down to its first element and
+/// the elements that hold a null leaf.
+fn reduce_lists(value: &Value) -> Reduced {
+    match value {
+        Value::Null => Reduced {
+            value: Value::Null,
+            shape: Shape::Same,
+            has_null: true,
+            dropped: false,
+        },
+        Value::Object(map) => {
+            let mut out = serde_json::Map::new();
+            let mut members = Vec::new();
+            let (mut has_null, mut dropped) = (false, false);
+            for (key, item) in map {
+                let reduced = reduce_lists(item);
+                has_null |= reduced.has_null;
+                dropped |= reduced.dropped;
+                if !matches!(reduced.shape, Shape::Same) {
+                    members.push((key.clone(), reduced.shape));
+                }
+                out.insert(key.clone(), reduced.value);
+            }
+            Reduced {
+                value: Value::Object(out),
+                shape: if members.is_empty() {
+                    Shape::Same
+                } else {
+                    Shape::Object(members)
+                },
+                has_null,
+                dropped,
+            }
+        }
+        Value::Array(list) => {
+            let reduced: Vec<Reduced> = list.iter().map(reduce_lists).collect();
+            let mut kept = Vec::new();
+            let mut values = Vec::new();
+            let mut items = Vec::new();
+            let (mut has_null, mut dropped, mut changed) = (false, false, false);
+            for (index, (original, item)) in list.iter().zip(reduced).enumerate() {
+                has_null |= item.has_null;
+                if index > 0 && original.is_object() && !item.has_null {
+                    dropped = true;
+                    changed = true;
+                    continue;
+                }
+                dropped |= item.dropped;
+                changed |= !matches!(item.shape, Shape::Same);
+                kept.push(index);
+                values.push(item.value);
+                items.push(item.shape);
+            }
+            Reduced {
+                value: Value::Array(values),
+                shape: if changed {
+                    Shape::List { kept, items }
+                } else {
+                    Shape::Same
+                },
+                has_null,
+                dropped,
+            }
+        }
+        other => Reduced {
+            value: other.clone(),
+            shape: Shape::Same,
+            has_null: false,
+            dropped: false,
+        },
+    }
+}
+
+/// The steps of a reduced block's location in the whole block.
+fn whole_steps(shape: &Shape, steps: &[PathStep]) -> Option<Vec<PathStep>> {
+    let mut shape = shape;
+    let mut out = Vec::with_capacity(steps.len());
+    for step in steps {
+        match (shape, step) {
+            (Shape::List { kept, items }, PathStep::Index(index)) => {
+                out.push(PathStep::Index(*kept.get(*index)?));
+                shape = items.get(*index)?;
+            }
+            (Shape::Object(members), PathStep::Key(key)) => {
+                out.push(step.clone());
+                shape = members
+                    .iter()
+                    .find(|(name, _)| name == key)
+                    .map_or(&SAME, |(_, shape)| shape);
+            }
+            (Shape::Same, _) => out.push(step.clone()),
+            _ => return None,
+        }
+    }
+    Some(out)
+}
+
+/// The whole block with the reduced block's values in place: the dropped
+/// list elements come from `whole`. None when the reduced block no longer
+/// has the shape it was cut to (the repair replaced a cut list).
+fn merge_reduced(whole: &Value, reduced: &Value, shape: &Shape) -> Option<Value> {
+    match shape {
+        Shape::Same => Some(reduced.clone()),
+        Shape::Object(members) => {
+            let mut out = reduced.as_object()?.clone();
+            for (key, shape) in members {
+                let merged = merge_reduced(whole.get(key)?, out.get(key)?, shape)?;
+                out.insert(key.clone(), merged);
+            }
+            Some(Value::Object(out))
+        }
+        Shape::List { kept, items } => {
+            let reduced = reduced.as_array()?;
+            if reduced.len() != kept.len() {
+                return None;
+            }
+            let mut out = whole.as_array()?.clone();
+            for ((index, item), shape) in kept.iter().zip(reduced).zip(items) {
+                let merged = merge_reduced(out.get(*index)?, item, shape)?;
+                out[*index] = merged;
+            }
+            Some(Value::Array(out))
+        }
+    }
+}
+
+/// The reduced search's result in the whole block's paths, when the whole
+/// block confirms it (see [`blank_paths`]).
+fn confirm_reduced<T: serde::de::DeserializeOwned>(
+    block: &Value,
+    shape: &Shape,
+    state: &SearchState,
+) -> Option<BlankSearch> {
+    if !state.settled {
+        return None;
+    }
+    let fails = |candidate: &Value| {
+        #[cfg(test)]
+        BLANK_SEARCH_DESERIALIZATIONS.with(|count| count.set(count.get() + 1));
+        <T as serde::Deserialize>::deserialize(candidate).is_err()
+    };
+    let work = merge_reduced(block, &state.work, shape)?;
+    if fails(&work) {
+        return None;
+    }
+    let leaves = state
+        .leaves
+        .iter()
+        .map(|leaf| {
+            Some(NullLeaf {
+                steps: whole_steps(shape, &leaf.steps)?,
+                path: String::new(),
+                removed: leaf.removed,
+            })
+        })
+        .collect::<Option<Vec<_>>>()?;
+    for refused in [true, false] {
+        let group: Vec<&NullLeaf> = leaves
+            .iter()
+            .zip(&state.blank)
+            .filter(|(_, blank)| **blank == refused)
+            .map(|(leaf, _)| leaf)
+            .collect();
+        if group.is_empty() {
+            continue;
+        }
+        let mut trial = work.clone();
+        for leaf in group {
+            put_back(&mut trial, leaf);
+        }
+        if fails(&trial) != refused {
+            return None;
+        }
+    }
+    // The group check above only shows that some blank fails the whole
+    // block. Each blank must fail it on its own, as in the whole-block
+    // search: a list whose elements depend on a dropped element could make
+    // the reduced copy refuse a null the whole block accepts (review 27).
+    let blanks: Vec<&NullLeaf> = leaves
+        .iter()
+        .zip(&state.blank)
+        .filter(|(_, blank)| **blank)
+        .map(|(leaf, _)| leaf)
+        .collect();
+    if blanks.len() > 1 {
+        // In place and restored after each try: a copy of a large block per
+        // blank doubled the cost of the check.
+        let mut work = work;
+        for leaf in blanks {
+            if !put_back_fails(&mut work, leaf, &fails)? {
+                return None;
+            }
+        }
+    }
+    Some(BlankSearch {
+        paths: leaves
+            .iter()
+            .zip(&state.reported)
+            .filter(|(_, reported)| **reported)
+            .map(|(leaf, _)| render_path(&leaf.steps))
+            .collect(),
+        residual: state.search.residual,
+    })
+}
+
+/// Whether `work` fails with this one null put back, tried in place: the
+/// leaf's value is taken out (or replaced by a null) and restored afterwards.
+/// A restored member may come back in another order in its object, which
+/// does not decide whether a derived input deserializes. None when the leaf
+/// is not where its steps say.
+fn put_back_fails(
+    work: &mut Value,
+    leaf: &NullLeaf,
+    fails: &impl Fn(&Value) -> bool,
+) -> Option<bool> {
+    let (last, parents) = leaf.steps.split_last()?;
+    let held = match (last, walk_mut(work, parents)?) {
+        // A removed null the repair left out: putting it back changes nothing.
+        (PathStep::Key(key), Value::Object(map)) if leaf.removed => match map.remove(key) {
+            Some(value) => value,
+            None => return Some(fails(work)),
+        },
+        (PathStep::Key(key), Value::Object(map)) => {
+            std::mem::replace(map.get_mut(key.as_str())?, Value::Null)
+        }
+        (PathStep::Index(index), Value::Array(items)) => {
+            std::mem::replace(items.get_mut(*index)?, Value::Null)
+        }
+        _ => return None,
+    };
+    let failed = fails(work);
+    match (last, walk_mut(work, parents)?) {
+        (PathStep::Key(key), Value::Object(map)) => {
+            map.insert(key.clone(), held);
+        }
+        (PathStep::Index(index), Value::Array(items)) => *items.get_mut(*index)? = held,
+        _ => return None,
+    }
+    Some(failed)
+}
+
+/// The blank search on the block as it is (see the design note above
+/// [`without_null_members`]). [`blank_paths`] runs it on a reduced copy.
+fn blank_search_exhaustive<T: serde::de::DeserializeOwned>(block: &Value) -> SearchState {
     let first_error = |candidate: &Value| -> FirstError {
         #[cfg(test)]
         BLANK_SEARCH_DESERIALIZATIONS.with(|count| count.set(count.get() + 1));
-        serde_path_to_error::deserialize::<_, T>(candidate.clone())
+        // Deserialized from the borrowed value: a clone of a large block per
+        // try doubled the cost of the search.
+        serde_path_to_error::deserialize::<_, T>(candidate)
             .err()
             .map(|error| {
                 (
@@ -2161,7 +3153,7 @@ fn blank_paths<T: serde::de::DeserializeOwned>(block: &Value) -> BlankSearch {
     let leaves: Vec<NullLeaf> = raw
         .into_iter()
         .map(|(path, steps)| NullLeaf {
-            removed: matches!(steps.last(), Some(PathStep::Key(_))),
+            removed: matches!(steps.last(), Some(PathStep::Key(key)) if !crate::is_explicit_null_member(key)),
             path,
             steps,
         })
@@ -2238,7 +3230,7 @@ fn blank_paths<T: serde::de::DeserializeOwned>(block: &Value) -> BlankSearch {
             }
             let mut trial = work.clone();
             for &index in &group {
-                set_at(&mut trial, &leaves[index].steps, Value::Null);
+                put_back(&mut trial, &leaves[index]);
             }
             if first_error(&trial).is_none() {
                 continue;
@@ -2257,13 +3249,17 @@ fn blank_paths<T: serde::de::DeserializeOwned>(block: &Value) -> BlankSearch {
         let baseline = first_error(&work);
         for (index, leaf) in leaves.iter().enumerate() {
             let mut trial = work.clone();
-            set_at(&mut trial, &leaf.steps, Value::Null);
+            put_back(&mut trial, leaf);
             let error = first_error(&trial);
             blank[index] = match &error {
                 None => false,
                 Some((at, message)) => {
                     error != baseline
-                        && is_blank_error(message)
+                        && (is_blank_error(message)
+                            || (leaf.removed
+                                && missing_field(message).is_some_and(|field| {
+                                    leaf.steps.last() == Some(&PathStep::Key(field.to_string()))
+                                })))
                         && (*at == leaf.path || is_under(&leaf.path, at))
                 }
             };
@@ -2274,23 +3270,31 @@ fn blank_paths<T: serde::de::DeserializeOwned>(block: &Value) -> BlankSearch {
     // variant the repair happened to choose: only the tag is reported, and
     // the user fills the rest once the variant is known.
     let tags = blank_tags(&work, &slots, &leaves, &blank, &first_error);
+    let mut reported = blank.clone();
     for (index, leaf) in leaves.iter().enumerate() {
-        if blank[index]
+        if reported[index]
             && tags
                 .iter()
                 .any(|(tag, parent)| leaf.path != *tag && is_under(&leaf.path, parent))
         {
-            blank[index] = false;
+            reported[index] = false;
         }
     }
-    BlankSearch {
-        paths: leaves
-            .into_iter()
-            .zip(blank)
-            .filter(|(_, blank)| *blank)
-            .map(|(leaf, _)| leaf.path)
-            .collect(),
-        residual: absent || !settled,
+    SearchState {
+        search: BlankSearch {
+            paths: leaves
+                .iter()
+                .zip(&reported)
+                .filter(|(_, reported)| **reported)
+                .map(|(leaf, _)| leaf.path.clone())
+                .collect(),
+            residual: absent || !settled,
+        },
+        work,
+        settled,
+        leaves,
+        blank,
+        reported,
     }
 }
 
@@ -2335,13 +3339,48 @@ where
                     && error.is_some_and(|(_, message)| {
                         message.starts_with("unknown field") || message.starts_with("missing field")
                     })
-            });
+            })
+            || unit_variant_tag(work, slot, first_error);
         if shapes_object {
             let parent = render_path(&slot.steps[..slot.steps.len() - 1]);
             tags.push((leaf.path.clone(), parent));
         }
     }
     tags
+}
+
+/// Review 55: a tag whose other variants are unit variants of an internally
+/// tagged enum (`atomising` next to `steam { carrier }`, a metallised fabric
+/// next to a screen with a colour). A unit variant ignores the members of
+/// the object, so switching to it gives no unknown or missing field and
+/// [`blank_tags`] took the tag for a plain enum: a blank carrier or colour
+/// next to the blank tag was reported, although the variant decides whether
+/// it is asked. With the object reduced to the tag, the variants ask for
+/// different members: then it is a tag.
+fn unit_variant_tag<F>(work: &Value, slot: &Slot, first_error: &F) -> bool
+where
+    F: Fn(&Value) -> FirstError,
+{
+    let Some((PathStep::Key(key), parent_steps)) = slot.steps.split_last() else {
+        return false;
+    };
+    let parent = render_path(parent_steps);
+    let mut outcomes = std::collections::BTreeSet::new();
+    let mut asks_members = false;
+    for name in slot.variants.iter().take(9) {
+        let mut trial = work.clone();
+        set_at(
+            &mut trial,
+            parent_steps,
+            serde_json::json!({ key.as_str(): name.as_str() }),
+        );
+        let error = first_error(&trial);
+        asks_members |= error
+            .as_ref()
+            .is_some_and(|(at, message)| *at == parent && message.starts_with("missing field"));
+        outcomes.insert(error);
+    }
+    asks_members && outcomes.len() > 1
 }
 
 /// Resolves ``missing field `field` `` at `at`: the removed null member of
@@ -3121,7 +4160,7 @@ fn collect_nulls(
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 enum PathStep {
     Key(String),
     Index(usize),
@@ -3187,7 +4226,12 @@ fn derive_input(
             None
         }
         Some(value) => {
-            match serde_path_to_error::deserialize::<_, NtaCalculationInput>(value.clone()) {
+            // A null object member means the same as an absent one, as in the
+            // input fingerprint: a cleared field with a kernel default keeps
+            // its default instead of stopping the calculation.
+            match serde_path_to_error::deserialize::<_, NtaCalculationInput>(without_null_members(
+                value,
+            )) {
                 Ok(block) => Some(block),
                 Err(error) => {
                     // A blank value (null) where the kernel needs a number,
@@ -3205,7 +4249,7 @@ fn derive_input(
                             ..gap("nta_calculation_block_invalid", "ntaCalculation")
                         });
                     }
-                    for path in search.paths {
+                    for path in without_blank_mirrors(search.paths) {
                         gaps.push(InputGap {
                             detail: Some(error.to_string()),
                             ..gap("nta_value_missing", format!("ntaCalculation.{path}"))
@@ -3219,7 +4263,10 @@ fn derive_input(
     if project.zones.is_empty() {
         gaps.push(gap("zone_required", "zones"));
     }
-    let nta = nta?;
+    let mut nta = nta?;
+    if !apply_common_spaces(&project, &mut nta, gaps) {
+        return None;
+    }
     let multi_zone = project.zones.len() > 1;
     let total_zone_area: f64 = project.zones.iter().map(|zone| zone.floor_area).sum();
     if multi_zone
@@ -3262,6 +4309,34 @@ fn derive_input(
         .map(|item| (item.surface_id.as_str(), item))
         .collect();
     let delta_u_forfait = forfait_bridge_route(&project, &nta, &constructions, gaps);
+    // 8.36/8.39: the floor-edge bridges to the ground are ψ_gr of the
+    // ground floor (2025+C1 p. 253 and 255–256; 8.3.6 p. 263); H_D, H_U and
+    // H_g take no zone bridge with boundary "ground", so it would be lost.
+    for (zone_index, zone) in project.zones.iter().enumerate() {
+        for (list, items) in [
+            ("thermalBridges", zone.thermal_bridges.as_deref()),
+            ("pointThermalBridges", zone.point_thermal_bridges.as_deref()),
+        ] {
+            for (index, bridge) in items.unwrap_or_default().iter().enumerate() {
+                let ground = bridge.get("thermalBoundary").and_then(|value| {
+                    serde_json::from_value::<ThermalBoundary>(value.clone()).ok()
+                }) == Some(ThermalBoundary::Ground);
+                if ground {
+                    gaps.push(gap(
+                        "thermal_bridge_ground_on_floor_edge",
+                        format!("zones[{zone_index}].{list}[{index}].thermalBoundary"),
+                    ));
+                }
+            }
+        }
+    }
+    // b_U per unheated space for the forfait route (8.4.1 note 5, C.10).
+    let partition_factors = match delta_u_forfait {
+        Some(_) if !project.unheated_spaces.is_empty() => {
+            crate::unheated_reduction_factors(&project)
+        }
+        _ => None,
+    };
     let mut used_ground = HashSet::new();
     let mut window_shadings: HashMap<&str, (usize, &ProjectWindowShading)> = HashMap::new();
     for (index, item) in nta.window_shadings.iter().enumerate() {
@@ -3404,10 +4479,25 @@ fn derive_input(
                 loss_area += weight * surface.get("area").and_then(Value::as_f64).unwrap_or(0.0);
             }
             match boundary {
+                // 8.3 has a ground route for floors only; walls below ground
+                // level are the walls of a heated basement (8.3.3.2, 2025+C1
+                // p. 255), entered on its floor (`heatedBasement`). A wall or
+                // roof surface to the ground would take the floor formulas
+                // and, next to a heated basement, count twice in H_g and A_ls.
+                ThermalBoundary::Ground if matches!(surface_type, "wall" | "roof") => {
+                    // Its groundFloors entry, if any, is not orphaned.
+                    used_ground.insert(id.to_owned());
+                    gaps.push(gap(
+                        "ground_surface_not_floor",
+                        format!("{path}.thermalBoundary"),
+                    ));
+                    continue;
+                }
                 ThermalBoundary::Ground => {
                     match ground_data.get(id) {
                         Some(data) => {
                             used_ground.insert(id.to_owned());
+                            loss_area += basement_wall_loss_area(data);
                             ground_floors.push(SlabOnGround {
                                 id: id.to_owned(),
                                 area_m2: surface.get("area").and_then(Value::as_f64).unwrap_or(0.0),
@@ -3458,9 +4548,18 @@ fn derive_input(
                                     .iter()
                                     .position(|item| item.surface_id == id)
                                     .unwrap_or_default();
+                                // The edition issues of 8.47 are about h, so
+                                // they point at h itself.
+                                let member = match code {
+                                    "route_not_in_edition"
+                                    | "ground_floor_wall_height_required" => {
+                                        ".below.wallHeightAboveGroundM"
+                                    }
+                                    _ => "",
+                                };
                                 gaps.push(gap(
                                     code,
-                                    format!("ntaCalculation.groundFloors[{index}]"),
+                                    format!("ntaCalculation.groundFloors[{index}]{member}"),
                                 ));
                             }
                         }
@@ -3469,6 +4568,90 @@ fn derive_input(
                     continue;
                 }
                 ThermalBoundary::Outdoor => {}
+                ThermalBoundary::UnheatedSpace if delta_u_forfait.is_some() => {
+                    // 8.4.1 note 5 with C.10: the partition is in H_D;for
+                    // (added with the direct elements below); the TOjuli
+                    // split (§5.7.2) takes it on its own orientation, without
+                    // solar gain behind the unheated space.
+                    let factor = surface
+                        .get("unheatedSpaceId")
+                        .and_then(Value::as_str)
+                        .and_then(|space| partition_factors.as_ref()?.get(space).copied());
+                    if let Some(factor) = factor {
+                        let side = surface
+                            .get("orientation")
+                            .and_then(Value::as_str)
+                            .and_then(orientation)
+                            .flatten();
+                        let tilt = tilts
+                            .get(id)
+                            .copied()
+                            .unwrap_or(match (side, surface_type) {
+                                (Some(_), _) => 90.0,
+                                (None, "floor") => 180.0,
+                                (None, _) => 0.0,
+                            });
+                        let mut push =
+                            |element_id: String, area: f64, u_value: f64, reference: String| {
+                                opaque.push(OpaqueElement {
+                                    id: element_id,
+                                    area_m2: area,
+                                    orientation: side.unwrap_or(Orientation::South),
+                                    tilt_deg: tilt,
+                                    u_value_w_per_m2k: u_value * factor,
+                                    forfait_delta_u_w_per_m2k: delta_u_forfait,
+                                    behind_unheated_space: true,
+                                    source_reference: reference,
+                                })
+                            };
+                        let mut window_area = 0.0;
+                        for window in surface
+                            .get("windows")
+                            .and_then(Value::as_array)
+                            .map(Vec::as_slice)
+                            .unwrap_or_default()
+                        {
+                            let (Some(window_id), Some(area), Some(u_value)) = (
+                                window.get("id").and_then(Value::as_str),
+                                window.get("area").and_then(Value::as_f64),
+                                window.get("uValue").and_then(Value::as_f64),
+                            ) else {
+                                continue;
+                            };
+                            window_area += area;
+                            push(
+                                format!("window:{window_id}"),
+                                area,
+                                u_value,
+                                format!("project:window:{window_id}.uValue · b_U (C.10)"),
+                            );
+                        }
+                        let opaque_area =
+                            surface.get("area").and_then(Value::as_f64).unwrap_or(0.0)
+                                - window_area;
+                        let construction_id = surface
+                            .get("constructionId")
+                            .and_then(Value::as_str)
+                            .unwrap_or("");
+                        if let (true, Some(u_value)) = (
+                            opaque_area > 1e-9,
+                            constructions
+                                .get(construction_id)
+                                .and_then(|item| item.get("uValue"))
+                                .and_then(Value::as_f64),
+                        ) {
+                            push(
+                                format!("surface:{id}:opaque"),
+                                opaque_area,
+                                u_value,
+                                format!(
+                                    "project:construction:{construction_id}.uValue · b_U (C.10)"
+                                ),
+                            );
+                        }
+                    }
+                    continue;
+                }
                 _ => continue,
             }
             // Outdoor surface: solar gains for windows and the opaque rest.
@@ -3604,12 +4787,23 @@ fn derive_input(
                     source_reference.push_str(&format!("; glazing: {}", item.source_reference));
                     item.glazing.clone()
                 });
+                // g_gl;n comes from NEN-EN 410 or from table 7.4 (2025+C1
+                // p. 190): a chosen glazing type replaces the window's own
+                // gValue, which then stays out of the derived input.
+                let g_perpendicular = if glazing
+                    .as_ref()
+                    .is_some_and(|item| item.glazing_type.is_some())
+                {
+                    f64::NAN
+                } else {
+                    g_value
+                };
                 windows.push(Window {
                     id: format!("window:{window_id}"),
                     area_m2: area,
                     orientation: azimuth_orientation,
                     tilt_deg: tilt,
-                    g_perpendicular: g_value,
+                    g_perpendicular,
                     frame_fraction: nta.window_solar.frame_fraction,
                     u_value_w_per_m2k: u_value,
                     forfait_delta_u_w_per_m2k: delta_u_forfait,
@@ -3639,6 +4833,7 @@ fn derive_input(
                         tilt_deg: tilt,
                         u_value_w_per_m2k: u_value,
                         forfait_delta_u_w_per_m2k: delta_u_forfait,
+                        behind_unheated_space: false,
                         source_reference: format!("project:construction:{construction_id}.uValue"),
                     }),
                     None => gaps.push(gap(
@@ -3664,6 +4859,37 @@ fn derive_input(
             gaps.push(gap("direct_transmission_unresolved", zone_path.clone()));
         }
         let unheated = if project.unheated_spaces.is_empty() {
+            None
+        } else if let Some(delta) = delta_u_forfait {
+            // 8.4.1 note 5 with C.10: H_U;for = 0; the partitions join H_D;for
+            // as U_C·b_U with ΔU_for like every other H_D element.
+            // A zone without partitions to an unheated space adds nothing and
+            // needs no b_U.
+            let borders_unheated = zone.surfaces.iter().any(|surface| {
+                surface
+                    .get("thermalBoundary")
+                    .and_then(|value| serde_json::from_value::<ThermalBoundary>(value.clone()).ok())
+                    == Some(ThermalBoundary::UnheatedSpace)
+            });
+            let partitions = if borders_unheated {
+                partition_factors.as_ref().and_then(|factors| {
+                    crate::forfait_partition_elements(&project, Some(&zone.id), factors)
+                })
+            } else {
+                Some(Vec::new())
+            };
+            match (partitions, direct.as_mut()) {
+                (Some(elements), Some(direct)) => {
+                    for (mut element, _) in elements {
+                        element.u_value_w_per_m2k += delta;
+                        element.source_reference =
+                            format!("{} + ΔU_for {delta:.3}", element.source_reference);
+                        direct.elements.push(element);
+                    }
+                }
+                (None, _) => gaps.push(gap("unheated_transmission_unresolved", zone_path.clone())),
+                (Some(_), None) => {}
+            }
             None
         } else {
             let resolved = unheated_zone_input(&project, Some(&zone.id));
@@ -3787,6 +5013,24 @@ fn derive_input(
                 .unwrap_or_else(|| nta.distribution.clone()),
         });
     }
+    // One sunroom id once per list: a second entry would count the same
+    // sunroom twice for the zone (7.30b) and twice in the 7.38 cap.
+    let sunroom_lists = std::iter::once(("ntaCalculation.sunrooms".to_owned(), &nta.sunrooms))
+        .chain(nta.zone_data.iter().enumerate().map(|(index, item)| {
+            (
+                format!("ntaCalculation.zoneData[{index}].sunrooms"),
+                &item.sunrooms,
+            )
+        }));
+    for (base, rooms) in sunroom_lists {
+        let mut seen = HashSet::new();
+        for (index, room) in rooms.iter().enumerate() {
+            if !room.id.trim().is_empty() && !seen.insert(room.id.as_str()) {
+                gaps.push(gap("sunroom_id_duplicate", format!("{base}[{index}].id")));
+            }
+        }
+    }
+    share_sunroom_bordering_zones(&mut zones);
     for (index, item) in nta.window_obstructions.iter().enumerate() {
         if used_obstruction.contains(&item.window_id) {
             continue;
@@ -3946,16 +5190,30 @@ fn derive_input(
             ));
             return None;
         }
-        Some(bacs) => match crate::bacs_draft::assess_bacs_draft(bacs).factor {
-            Some(factor) => (
-                factor,
-                "NTA 8800 §5.5.8 (derived from ntaCalculation.bacs)".into(),
-            ),
-            None => {
-                gaps.push(gap("bacs_factor_undetermined", "ntaCalculation.bacs"));
-                return None;
+        Some(bacs) => {
+            let assessed = crate::bacs_draft::assess_bacs_draft(bacs);
+            match assessed.factor {
+                Some(factor) => (
+                    factor,
+                    "NTA 8800 §5.5.8 (derived from ntaCalculation.bacs)".into(),
+                ),
+                // The inventory's own issues name the input to fill in; the
+                // undetermined factor only when none does (review 58).
+                None if !assessed.issues.is_empty() => {
+                    for issue in assessed.issues {
+                        gaps.push(gap(
+                            issue.code,
+                            format!("ntaCalculation.bacs.{}", issue.path),
+                        ));
+                    }
+                    return None;
+                }
+                None => {
+                    gaps.push(gap("bacs_factor_undetermined", "ntaCalculation.bacs"));
+                    return None;
+                }
             }
-        },
+        }
     };
     // 5.5.8 is new in 2025+C1: older editions have no f_BACS.
     let (bacs_factor, bacs_source_reference) = if nta.norm_version.profile().bacs_factor_route {
@@ -4476,6 +5734,58 @@ mod tests {
         assert!(gains(&result) < gains(&base));
     }
 
+    /// g_gl;n comes from NEN-EN 410 or from table 7.4 (2025+C1 p. 190): a
+    /// glazing type on win-S replaces that window's own gValue, so the
+    /// project calculates and gives the same numbers as the window with
+    /// the table value 0,60 for double low-e glass as its gValue.
+    #[test]
+    fn window_glazing_type_replaces_the_window_g_value() {
+        let mut value = project();
+        value["ntaCalculation"]["windowGlazings"] = serde_json::json!([{
+            "windowId": "win-S",
+            "glazing": {"glazingType": "double_low_e"},
+            "sourceReference": "survey: HR++ glass"
+        }]);
+        let result = assess_project_performance(&value);
+        assert_eq!(result.status, "calculated_unverified", "{:?}", result.gaps);
+        let demand = &result.derived_input.as_ref().unwrap().space_heating.demand;
+        let south = demand
+            .windows
+            .iter()
+            .find(|item| item.id == "window:win-S")
+            .unwrap();
+        assert!(south.g_perpendicular.is_nan());
+        let serialised = serde_json::to_value(south).unwrap();
+        assert!(serialised.get("gPerpendicular").is_none());
+
+        let mut equal = project();
+        let windows = equal["zones"][0]["surfaces"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .filter_map(|surface| surface.get_mut("windows"))
+            .filter_map(Value::as_array_mut)
+            .flatten();
+        for window in windows {
+            if window["id"] == "win-S" {
+                window["gValue"] = serde_json::json!(0.60);
+            }
+        }
+        let reference = assess_project_performance(&equal);
+        let ep = |item: &ProjectPerformanceAssessment| {
+            item.performance
+                .as_ref()
+                .unwrap()
+                .space_heating
+                .demand
+                .monthly
+                .iter()
+                .map(|month| month.cooling.gains_kwh)
+                .sum::<f64>()
+        };
+        assert!((ep(&result) - ep(&reference)).abs() < 1e-9);
+    }
+
     /// Projects without `windowGlazings`, and entries without glazing
     /// details, give identical numbers.
     #[test]
@@ -4759,6 +6069,55 @@ mod tests {
             .iter()
             .any(|(code, _)| *code == "nta_calculation_block_invalid"));
         assert_eq!(result.status, "incomplete");
+    }
+
+    /// Review 21: a declared K_pk between 300 and 400 W/m² calculates on the
+    /// project route and reaches the registration check as a plausibility
+    /// warning on the field; above 400 W/m² the kernel refuses it.
+    #[test]
+    fn declared_pv_peak_power_warns_on_the_project_route() {
+        let with_peak = |peak: f64| {
+            let mut value: Value = serde_json::from_str(include_str!(
+                "../../../training-data/nta8800-example-terraced-dwelling.json"
+            ))
+            .unwrap();
+            value["ntaCalculation"]["pvSystems"][0]["peakPower"] = serde_json::json!({
+                "method": "declared_specific",
+                "peakPowerWPerM2": peak,
+                "panelAreaM2": 10.0
+            });
+            value["registration"] = serde_json::json!({});
+            assess_project_performance(&value)
+        };
+        let warned = |result: &ProjectPerformanceAssessment| {
+            result
+                .registration
+                .as_ref()
+                .unwrap()
+                .plausibility
+                .iter()
+                .any(|issue| {
+                    issue.code == "plausibility_pv_peak_power"
+                        && issue.path == "pvSystems[0].peakPower.peakPowerWPerM2"
+                })
+        };
+        let plausible = with_peak(290.0);
+        assert!(plausible.performance.is_some(), "{:?}", plausible.gaps);
+        assert!(!warned(&plausible));
+        let high = with_peak(310.0);
+        assert!(high.performance.is_some(), "{:?}", high.gaps);
+        assert!(warned(&high));
+        let refused = with_peak(401.0);
+        assert_eq!(refused.status, "invalid");
+        assert!(
+            refused
+                .gaps
+                .iter()
+                .any(|gap| gap.code == "pv_peak_power_invalid"
+                    && gap.path.ends_with("pvSystems[0].peakPower.peakPowerWPerM2")),
+            "{:?}",
+            refused.gaps
+        );
     }
 
     /// Omgevingsregeling art. 5.13a lid 1: the label elements the calculation
@@ -5178,7 +6537,7 @@ mod tests {
         let result = assess_project_performance(&value);
         let detail = result.gaps[0].detail.as_deref().unwrap();
         assert!(
-            detail.contains("ventilationFlows[0].months[3].conductanceWPerK"),
+            detail.contains("ventilationFlows[0].months[3]") && detail.contains("conductanceWPerK"),
             "{detail}"
         );
         // A blank number is a missing input at its own path.
@@ -5233,6 +6592,156 @@ mod tests {
         assert!(!result.gaps.iter().any(
             |gap| gap.path == "ntaCalculation.verticalPipes" && gap.code == "nta_value_missing"
         ));
+    }
+
+    /// Review 55: next to a blank tag whose other variants are unit variants
+    /// (`atomising` beside `steam { carrier }`, a metallised fabric beside a
+    /// screen with a colour) only the tag is reported; the variant decides
+    /// whether the member is asked at all.
+    /// The form copies the zone's setpoints into the chapter 11 ventilation,
+    /// so clearing a setpoint blanks both: one gap, at the setpoint.
+    #[test]
+    fn a_cleared_setpoint_is_one_gap_not_two() {
+        let dwelling: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-example-terraced-dwelling.json"
+        ))
+        .unwrap();
+        for (source, copy) in [
+            ("heatingC", "heatingSetpointC"),
+            ("coolingC", "coolingSetpointC"),
+        ] {
+            let mut value = dwelling.clone();
+            value["ntaCalculation"]["setpoints"][source] = Value::Null;
+            value["ntaCalculation"]["ventilation"][copy] = Value::Null;
+            let missing: Vec<String> = assess_project_performance(&value)
+                .gaps
+                .iter()
+                .filter(|gap| gap.code == "nta_value_missing")
+                .map(|gap| gap.path.clone())
+                .collect();
+            assert_eq!(missing, [format!("ntaCalculation.setpoints.{source}")]);
+        }
+        // A blank copy next to a filled setpoint is still named.
+        let mut value = dwelling.clone();
+        value["ntaCalculation"]["ventilation"]["heatingSetpointC"] = Value::Null;
+        assert!(assess_project_performance(&value)
+            .gaps
+            .iter()
+            .any(|gap| gap.code == "nta_value_missing"
+                && gap.path == "ntaCalculation.ventilation.heatingSetpointC"));
+    }
+
+    /// Review 58: one cleared field, one gap at that field (the clear-field
+    /// sweep in tests/project_form_guard.rs found each of these).
+    #[test]
+    fn a_cleared_field_is_named_where_it_was_cleared() {
+        let gaps_of = |value: &Value| -> Vec<(String, String)> {
+            assess_project_performance(value)
+                .gaps
+                .iter()
+                .map(|gap| (gap.code.to_string(), gap.path.clone()))
+                .collect()
+        };
+        let office: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-example-office.json"
+        ))
+        .unwrap();
+        let only = |gaps: Vec<(String, String)>, code: &str, path: &str| {
+            assert_eq!(gaps, [(code.to_string(), path.to_string())], "{path}");
+        };
+        // A refused chapter 11 block: no second gap at the airflows it
+        // would have given.
+        let mut value = office.clone();
+        value["ntaCalculation"]["ventilation"]["sourceReference"] = Value::from("");
+        only(
+            gaps_of(&value),
+            "source_reference_required",
+            "ntaCalculation.ventilation.sourceReference",
+        );
+        // A refused chapter 14 block: no second gap at the lighting gains.
+        let mut value = office.clone();
+        value["ntaCalculation"]["lighting"][0]["sourceReference"] = Value::from("");
+        only(
+            gaps_of(&value),
+            "source_reference_required",
+            "ntaCalculation.lighting[0].sourceReference",
+        );
+        // The area source is the NTA input's, not the zone's.
+        let mut value = office.clone();
+        value["ntaCalculation"]["areaSourceReference"] = Value::from("");
+        only(
+            gaps_of(&value),
+            "source_reference_required",
+            "ntaCalculation.areaSourceReference",
+        );
+        // The BACS inventory names its own blank, not the whole block.
+        let mut value = office.clone();
+        value["ntaCalculation"]["bacs"]["systems"][0]["sourceReference"] = Value::from("");
+        only(
+            gaps_of(&value),
+            "source_required",
+            "ntaCalculation.bacs.systems[0].sourceReference",
+        );
+        // A heat-pump year cleared next to its source (2020+A1, public case
+        // N): one gap at the year, no summary on the forfait lookup.
+        let mut case_n: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-public-comparison-n.json"
+        ))
+        .unwrap();
+        let forfait = &mut case_n["ntaCalculation"]["generator"]["forfait"];
+        if forfait.get("installationYearReference").is_some() {
+            forfait["installationYear"] = Value::Null;
+            only(
+                gaps_of(&case_n),
+                "installation_year_reference_without_year",
+                "ntaCalculation.generator.forfait.installationYear",
+            );
+        }
+    }
+
+    #[test]
+    fn a_blank_tag_with_unit_variants_hides_the_members_it_decides() {
+        let missing = |value: &Value| -> Vec<String> {
+            assess_project_performance(value)
+                .gaps
+                .iter()
+                .filter(|gap| gap.code == "nta_value_missing")
+                .map(|gap| gap.path.clone())
+                .collect()
+        };
+        let mut office: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-example-office.json"
+        ))
+        .unwrap();
+        office["ntaCalculation"]["humidifiers"] = serde_json::json!([{
+            "zoneId": "z1",
+            "humidification": {
+                "humidifier": {"kind": null, "carrier": null},
+                "rotaryWheel": false,
+                "equipmentReference": "steam unit"
+            }
+        }]);
+        assert_eq!(
+            missing(&office),
+            ["ntaCalculation.humidifiers[0].humidification.humidifier.kind"]
+        );
+        // The carrier alone stays a missing input of the steam variant.
+        office["ntaCalculation"]["humidifiers"][0]["humidification"]["humidifier"]["kind"] =
+            Value::from("steam");
+        assert_eq!(
+            missing(&office),
+            ["ntaCalculation.humidifiers[0].humidification.humidifier.carrier"]
+        );
+        let mut case_n: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-public-comparison-n.json"
+        ))
+        .unwrap();
+        case_n["ntaCalculation"]["windowShadings"][0]["movableShading"]["device"] =
+            serde_json::json!({"kind": null, "colour": null});
+        assert_eq!(
+            missing(&case_n),
+            ["ntaCalculation.windowShadings[0].movableShading.device.kind"]
+        );
     }
 
     /// A probe with nested arrays of internally tagged enums.
@@ -5372,7 +6881,8 @@ mod tests {
             }
         );
 
-        // A blank `#[serde(default)]` member that is not an Option.
+        // A blank `#[serde(default)]` member that is not an Option is the
+        // same as an absent one: it keeps its default and is no blank.
         #[derive(serde::Deserialize)]
         #[serde(rename_all = "camelCase")]
         #[allow(dead_code)]
@@ -5383,7 +6893,18 @@ mod tests {
             note: Option<String>,
         }
         let block = serde_json::json!({"otherLossKwh": null, "note": null});
-        assert_eq!(blank_paths::<Defaults>(&block).paths, ["otherLossKwh"]);
+        assert!(blank_paths::<Defaults>(&block).paths.is_empty());
+        // A required member next to it is still a blank.
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        #[allow(dead_code)]
+        struct Mixed {
+            #[serde(default)]
+            other_loss_kwh: f64,
+            power_kw: f64,
+        }
+        let block = serde_json::json!({"otherLossKwh": null, "powerKw": null});
+        assert_eq!(blank_paths::<Mixed>(&block).paths, ["powerKw"]);
 
         // A truly absent required field next to an optional null with the
         // same name elsewhere: the absent field is not a blank, the other
@@ -5502,6 +7023,123 @@ mod tests {
         assert!(blank_paths::<Holder>(&declared).paths.is_empty());
     }
 
+    /// The blank search deserializes the borrowed block instead of a clone
+    /// per try. Both give the same first error (path and message), so the
+    /// gaps stay the same: checked for every number of the example block
+    /// set to null, to text and to a list.
+    #[test]
+    fn borrowed_and_owned_blocks_give_the_same_first_error() {
+        let value = project();
+        let block = value["ntaCalculation"].clone();
+        let mut pointers = Vec::new();
+        fn numbers(value: &Value, pointer: String, out: &mut Vec<String>) {
+            match value {
+                Value::Number(_) => out.push(pointer),
+                Value::Object(map) => map
+                    .iter()
+                    .for_each(|(key, item)| numbers(item, format!("{pointer}/{key}"), out)),
+                Value::Array(items) => items
+                    .iter()
+                    .enumerate()
+                    .for_each(|(index, item)| numbers(item, format!("{pointer}/{index}"), out)),
+                _ => {}
+            }
+        }
+        numbers(&block, String::new(), &mut pointers);
+        assert!(pointers.len() > 20);
+        let first = |candidate: &Value, borrowed: bool| {
+            let result = if borrowed {
+                serde_path_to_error::deserialize::<_, NtaCalculationInput>(candidate).err()
+            } else {
+                serde_path_to_error::deserialize::<_, NtaCalculationInput>(candidate.clone()).err()
+            };
+            result.map(|error| (error.path().to_string(), error.inner().to_string()))
+        };
+        let mut errors = 0;
+        for pointer in &pointers {
+            for replacement in [Value::Null, Value::from("x"), serde_json::json!([1])] {
+                let mut candidate = block.clone();
+                *candidate.pointer_mut(pointer).unwrap() = replacement;
+                let owned = first(&candidate, false);
+                errors += usize::from(owned.is_some());
+                assert_eq!(first(&candidate, true), owned, "{pointer}");
+            }
+        }
+        assert!(errors > 0);
+    }
+
+    /// Review 27: a list whose elements depend on an earlier element breaks
+    /// the reduced search's assumption (each element deserializes on its
+    /// own). No kernel input type has such a list; the confirmation on the
+    /// whole block must still keep the reduced search from reporting a gap
+    /// the whole block does not have.
+    #[test]
+    fn reduced_blank_search_holds_for_a_list_whose_elements_depend_on_each_other() {
+        #[derive(serde::Deserialize)]
+        #[allow(dead_code)]
+        struct Strict {
+            a: f64,
+            #[serde(default)]
+            open: bool,
+        }
+        #[derive(serde::Deserialize)]
+        #[allow(dead_code)]
+        struct Loose {
+            #[serde(default)]
+            a: Option<f64>,
+        }
+        /// Elements need `a` until one has `open: true`; after it `a` may be
+        /// left out.
+        struct Items;
+        impl<'de> serde::Deserialize<'de> for Items {
+            fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+                struct Elements;
+                impl<'de> serde::de::Visitor<'de> for Elements {
+                    type Value = Items;
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                        formatter.write_str("a list")
+                    }
+                    fn visit_seq<A: serde::de::SeqAccess<'de>>(
+                        self,
+                        mut seq: A,
+                    ) -> Result<Items, A::Error> {
+                        let mut open = false;
+                        loop {
+                            if open {
+                                if seq.next_element::<Loose>()?.is_none() {
+                                    break;
+                                }
+                            } else {
+                                match seq.next_element::<Strict>()? {
+                                    Some(element) => open = element.open,
+                                    None => break,
+                                }
+                            }
+                        }
+                        Ok(Items)
+                    }
+                }
+                deserializer.deserialize_seq(Elements)
+            }
+        }
+        #[derive(serde::Deserialize)]
+        #[allow(dead_code)]
+        struct Outer {
+            items: Items,
+            y: f64,
+        }
+        // The second element opens the list, so the blank `a` of the third
+        // is allowed; `y` is the only gap. The reduced copy drops the second
+        // element (it holds no null) and would call the third `a` a gap too.
+        let block = serde_json::json!({
+            "items": [{"a": 1.0}, {"a": 1.0, "open": true}, {"a": null}],
+            "y": null
+        });
+        let whole = blank_search_exhaustive::<Outer>(&block).search;
+        assert_eq!(whole.paths, ["y"]);
+        assert_eq!(blank_paths::<Outer>(&block), whole);
+    }
+
     #[test]
     fn blank_search_tests_each_allowed_null_once() {
         // 200 rows of allowed nulls inside a tagged enum plus one blank.
@@ -5599,6 +7237,87 @@ mod tests {
             .any(|gap| gap.code == "vertical_pipes_unknown"
                 && gap.path == "ntaCalculation.verticalPipes"
                 && gap.detail.is_some()));
+    }
+
+    /// 8.2.1 (2025+C1 p. 224–225): the forfait ΔU_for applies to any
+    /// building, also one without a floor on the ground (an upper-floor
+    /// dwelling). Before, only a forfait floor edge could select it, so such
+    /// a building had to enter every ψ.
+    #[test]
+    fn forfait_bridges_without_a_ground_floor() {
+        let mut value = project();
+        value["zones"][0]["surfaces"][5]["thermalBoundary"] = Value::from("adjacent_conditioned");
+        value["ntaCalculation"]["groundFloors"] = serde_json::json!([]);
+        value["zones"][0]["thermalBridges"] = serde_json::json!([]);
+        value["ntaCalculation"]["thermalBridgeRoute"] = Value::from("forfait");
+        let result = assess_project_performance(&value);
+        assert_eq!(result.status, "calculated_unverified", "{:?}", result.gaps);
+        let mean = (98.0 * 0.21 + 52.0 * 0.16) / 150.0;
+        let delta = 0.1 - 0.25 * (mean - 0.4);
+        let expected = 98.0 * 0.21 + 52.0 * 0.16 + 12.0 * 1.1 + 162.0 * delta;
+        let summary = result
+            .performance
+            .as_ref()
+            .unwrap()
+            .space_heating
+            .demand
+            .transmission
+            .clone()
+            .unwrap();
+        assert!((summary.direct_conductance_w_per_k.unwrap() - expected).abs() < 1e-9);
+        assert!(!result
+            .warnings
+            .iter()
+            .any(|gap| gap.code == "detailed_thermal_bridges_none_entered"));
+        // Without the route the same building has no bridges at all.
+        value["ntaCalculation"]
+            .as_object_mut()
+            .unwrap()
+            .remove("thermalBridgeRoute");
+        let detailed = assess_project_performance(&value);
+        assert!(detailed
+            .warnings
+            .iter()
+            .any(|gap| gap.code == "detailed_thermal_bridges_none_entered"));
+        // The building route and a floor edge on the other route mix them.
+        let mut mixed = project();
+        mixed["ntaCalculation"]["thermalBridgeRoute"] = Value::from("forfait");
+        mixed["zones"][0]["thermalBridges"] = serde_json::json!([]);
+        let result = assess_project_performance(&mixed);
+        assert!(result
+            .gaps
+            .iter()
+            .any(|gap| gap.code == "thermal_bridge_methods_mixed"
+                && gap.path == "ntaCalculation.thermalBridgeRoute"));
+        // Review 54: ψ-values next to the forfait route point at the zone's
+        // thermal bridges, also without a floor on the ground.
+        let mut upper = project();
+        upper["ntaCalculation"]["thermalBridgeRoute"] = Value::from("forfait");
+        upper["ntaCalculation"]["groundFloors"] = serde_json::json!([]);
+        let result = assess_project_performance(&upper);
+        assert!(
+            result
+                .gaps
+                .iter()
+                .any(|gap| gap.code == "thermal_bridge_methods_mixed"
+                    && gap.path == "zones[0].thermalBridges"),
+            "{:?}",
+            result.gaps
+        );
+        assert!(!result
+            .gaps
+            .iter()
+            .any(|gap| gap.code == "thermal_bridge_methods_mixed"
+                && gap.path == "ntaCalculation.groundFloors"));
+        mixed["ntaCalculation"]["thermalBridgeRoute"] = Value::from("detailed");
+        mixed["ntaCalculation"]["groundFloors"][0]["edgeThermalBridges"] =
+            serde_json::json!({"method": "forfait"});
+        let result = assess_project_performance(&mixed);
+        assert!(result
+            .gaps
+            .iter()
+            .any(|gap| gap.code == "thermal_bridge_methods_mixed"
+                && gap.path == "ntaCalculation.thermalBridgeRoute"));
     }
 
     /// 8.2.1/8.3.3.1: the forfait floor edge selects ΔU_for for the whole
@@ -5699,7 +7418,10 @@ mod tests {
                 && gap.path
                     == "ntaCalculation.groundFloors[0].heatedBasement.forfaitDeltaUWPerM2k"));
 
-        // H_U;for = 0 with U_iu;equi (C.1.3) is not derived here.
+        // 8.4.1 note 5 with C.10 (2025+C1 p. 266; 2022 p. 240 and p. 748):
+        // H_U;for = 0 and the partition to an unheated space is an external
+        // construction with U_iu;equi = U_C·b_U, in Ū of 8.3 and in H_D;for
+        // with ΔU_for. Without a b_U for the space the route stays open.
         value["zones"][0]["surfaces"]
             .as_array_mut()
             .unwrap()
@@ -5709,10 +7431,139 @@ mod tests {
                 "area": 10.0, "orientation": "E", "constructionId": "c-wall",
                 "zoneId": "z1", "windows": []
             }));
+        value["unheatedSpaces"] = serde_json::json!([{
+            "id": "garage", "name": "Garage"
+        }]);
         assert!(assess_project_performance(&value)
             .gaps
             .iter()
-            .any(|gap| gap.code == "forfait_thermal_bridges_unheated_space_unsupported"));
+            .any(|gap| gap.code == "unheated_transmission_unresolved"));
+        value["unheatedSpaces"][0]["reductionFactor"] = Value::from(0.6);
+        value["unheatedSpaces"][0]["factorSourceReference"] = Value::from("8.4.1");
+        let result = assess_project_performance(&value);
+        assert_eq!(result.status, "calculated_unverified", "{:?}", result.gaps);
+        let partition = 0.21 * 0.6;
+        let mean = (98.0 * 0.21 + 52.0 * 0.16 + 10.0 * partition) / 160.0;
+        let delta = 0.1 - 0.25 * (mean - 0.4);
+        let expected = 98.0 * 0.21 + 52.0 * 0.16 + 12.0 * 1.1 + 10.0 * partition + 172.0 * delta;
+        let transmission = result
+            .performance
+            .as_ref()
+            .unwrap()
+            .space_heating
+            .demand
+            .transmission
+            .clone()
+            .unwrap();
+        assert!(
+            (transmission.direct_conductance_w_per_k.unwrap() - expected).abs() < 1e-9,
+            "{transmission:?}"
+        );
+        // H_U;for = 0: no separate unheated-space term remains.
+        let demand = &result.derived_input.as_ref().unwrap().space_heating.demand;
+        let crate::monthly_demand::Transmission::Components(components) = &demand.transmission
+        else {
+            panic!("component transmission");
+        };
+        assert!(components.unheated.is_none());
+        // The TOjuli split takes the partition on its orientation (east),
+        // shielded from the sun by the unheated space.
+        let partition = demand
+            .opaque_elements
+            .iter()
+            .find(|item| item.id == "surface:garage-wall:opaque")
+            .unwrap();
+        assert!(partition.behind_unheated_space);
+        assert!((partition.u_value_w_per_m2k - partition_u()).abs() < 1e-12);
+        assert_eq!(crate::monthly_demand::opaque_solar_kwh(partition, 7), 0.0);
+        let performance = result.performance.as_ref().unwrap();
+        assert!(performance
+            .tojuli
+            .iter()
+            .all(|item| item.status != "invalid"));
+
+        // A partition without a `windows` array has no windows; it is not an
+        // unresolved unheated transmission.
+        let mut no_windows = value.clone();
+        let wall = no_windows["zones"][0]["surfaces"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|surface| surface["id"] == "garage-wall")
+            .unwrap();
+        wall.as_object_mut().unwrap().remove("windows");
+        let without_array = assess_project_performance(&no_windows);
+        assert_eq!(
+            without_array.status, "calculated_unverified",
+            "{:?}",
+            without_array.gaps
+        );
+        assert_eq!(
+            without_array
+                .performance
+                .as_ref()
+                .unwrap()
+                .space_heating
+                .demand
+                .transmission
+                .as_ref()
+                .unwrap()
+                .direct_conductance_w_per_k,
+            Some(transmission.direct_conductance_w_per_k.unwrap())
+        );
+
+        // A space no surface borders needs no b_U: an unresolvable one leaves
+        // the forfait route calculating, as the per-zone route always did.
+        let mut unreferenced = value.clone();
+        unreferenced["unheatedSpaces"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!({ "id": "berging", "name": "Berging" }));
+        let unreferenced = assess_project_performance(&unreferenced);
+        assert_eq!(
+            unreferenced.status, "calculated_unverified",
+            "{:?}",
+            unreferenced.gaps
+        );
+        assert!(
+            (unreferenced
+                .performance
+                .as_ref()
+                .unwrap()
+                .space_heating
+                .demand
+                .transmission
+                .as_ref()
+                .unwrap()
+                .direct_conductance_w_per_k
+                .unwrap()
+                - expected)
+                .abs()
+                < 1e-9
+        );
+        fn partition_u() -> f64 {
+            0.21 * 0.6
+        }
+    }
+
+    #[test]
+    fn forfait_route_ignores_an_unreferenced_unheated_space() {
+        // Regression of the forfait route with an unheated space (8.4.1
+        // note 5): a project whose surfaces border no unheated space, with
+        // an unresolvable space in the list, calculates as before.
+        let mut value = project();
+        value["ntaCalculation"]["groundFloors"][0]["edgeThermalBridges"] =
+            serde_json::json!({ "method": "forfait" });
+        value["zones"][0]["thermalBridges"] = serde_json::json!([]);
+        let before = assess_project_performance(&value);
+        assert_eq!(before.status, "calculated_unverified", "{:?}", before.gaps);
+        value["unheatedSpaces"] = serde_json::json!([{ "id": "schuur", "name": "Schuur" }]);
+        let after = assess_project_performance(&value);
+        assert_eq!(after.status, before.status, "{:?}", after.gaps);
+        assert!(!after
+            .gaps
+            .iter()
+            .any(|gap| gap.code == "unheated_transmission_unresolved"));
     }
 
     #[test]
@@ -5834,16 +7685,144 @@ mod tests {
         assert_eq!(warning.path, "ntaCalculation.sunrooms[0]");
     }
 
+    /// Review 53: warnings of the building calculation reach the project
+    /// warnings at the input that feeds them, so the workflow lists them
+    /// with "Ga naar"; the derived path stays in `detail`.
+    #[test]
+    fn building_warnings_become_project_warnings_at_their_input() {
+        let mut value: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-example-terraced-dwelling.json"
+        ))
+        .unwrap();
+        value["zones"][0]["surfaces"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!({
+                "id": "wall-serre", "name": "Wand serre", "type": "wall",
+                "thermalBoundary": "unheated_space", "unheatedSpaceId": "serre",
+                "area": 10.0, "orientation": "S", "constructionId": "c-wall",
+                "zoneId": "z1", "windows": []
+            }));
+        value["unheatedSpaces"] = serde_json::json!([{
+            "id": "serre", "name": "Serre", "reductionFactor": 0.8,
+            "factorSourceReference": "8.4.1"
+        }]);
+        value["ntaCalculation"]["sunrooms"] = serde_json::json!([{
+            "id": "serre", "glazingGHeating": 0.6, "glazingGCooling": 0.6,
+            "exteriorFrameFraction": 0.2, "reductionFactor": 0.8,
+            "zoneConductanceWPerK": 10.0, "surfaces": [], "sourceReference": "x"
+        }]);
+        let result = assess_project_performance(&value);
+        assert!(result.status.starts_with("calculated"), "{:?}", result.gaps);
+        let lifted = result
+            .warnings
+            .iter()
+            .find(|item| item.code == "tojuli_sunroom_facade_left_out")
+            .unwrap();
+        assert_eq!(lifted.path, "ntaCalculation.sunrooms");
+        assert_eq!(
+            lifted.detail.as_deref(),
+            Some("derivedInput.tojuli[0].sunrooms")
+        );
+        // The building calculation keeps its own warning and path.
+        assert!(result
+            .performance
+            .unwrap()
+            .warnings
+            .iter()
+            .any(|item| item.code == "tojuli_sunroom_facade_left_out"
+                && item.path == "tojuli[0].sunrooms"));
+
+        // A boiler serving more than 500 m² (§9.6) points at its location.
+        let mut office: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-example-office.json"
+        ))
+        .unwrap();
+        office["zones"][0]["floorArea"] = Value::from(800.0);
+        let result = assess_project_performance(&office);
+        assert!(result
+            .warnings
+            .iter()
+            .any(|item| item.code == "generator_large_system_outside"
+                && item.path == "ntaCalculation.generator.boiler.location"
+                && item.detail.as_deref()
+                    == Some("derivedInput.spaceHeating.generator.boiler.location")));
+    }
+
+    #[test]
+    fn a_sunroom_partition_reports_the_gain_interpretation() {
+        // vragen-nen 11: forfait route (7.6.1) or windows in the partition
+        // (7.6.6.1.1) get no solar gain of their own.
+        let mut value: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-example-terraced-dwelling.json"
+        ))
+        .unwrap();
+        value["zones"][0]["surfaces"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!({
+                "id": "wall-serre", "name": "Wand serre", "type": "wall",
+                "thermalBoundary": "unheated_space", "unheatedSpaceId": "serre",
+                "area": 10.0, "orientation": "S", "constructionId": "c-wall",
+                "zoneId": "z1", "windows": []
+            }));
+        value["ntaCalculation"]["sunrooms"] = serde_json::json!([{
+            "id": "serre", "glazingGHeating": 0.6, "glazingGCooling": 0.6,
+            "exteriorFrameFraction": 0.2, "reductionFactor": 0.8,
+            "zoneConductanceWPerK": 10.0, "surfaces": [], "sourceReference": "x"
+        }]);
+        let found = |value: &Value| {
+            plausibility_warnings(value)
+                .into_iter()
+                .find(|item| item.code == "sunroom_partition_gain_interpreted")
+        };
+        // The example takes the forfait route through its floor edge.
+        let forfait = found(&value).unwrap();
+        assert_eq!(forfait.path, "ntaCalculation.sunrooms[0]");
+        assert!(forfait.detail.unwrap().starts_with("forfait route"));
+        // Calculated route: only a partition with windows is reported.
+        value["ntaCalculation"]["thermalBridgeRoute"] = Value::from("detailed");
+        value["ntaCalculation"]["groundFloors"][0]["edgeThermalBridges"] =
+            serde_json::json!({"method": "detailed", "bridges": []});
+        assert!(found(&value).is_none());
+        value["zones"][0]["surfaces"]
+            .as_array_mut()
+            .unwrap()
+            .last_mut()
+            .unwrap()["windows"] =
+            serde_json::json!([{"id": "w-serre", "area": 2.0, "uValue": 1.4, "gValue": 0.6}]);
+        assert!(found(&value)
+            .unwrap()
+            .detail
+            .unwrap()
+            .starts_with("1 window(s)"));
+    }
+
     #[test]
     fn plausibility_warnings_leave_the_calculation_running() {
         // The synthetic dwelling declares 1 800 kWh gas for 1 952 kWh need
         // and 35 W/K for a C system: about 152 m³/h (51 W/K) at f_ctrl 1,
         // but demand control (table 11.5, lowest 0,52) may bring it to
         // 26,5 W/K, so 35 W/K is plausible.
+        // Only the project's own plausibility findings; warnings lifted from
+        // the building calculation carry `derivedInput.` in their detail.
+        let own = |result: &ProjectPerformanceAssessment| -> Vec<InputGap> {
+            result
+                .warnings
+                .iter()
+                .filter(|item| {
+                    !item
+                        .detail
+                        .as_deref()
+                        .is_some_and(|detail| detail.starts_with("derivedInput."))
+                })
+                .cloned()
+                .collect()
+        };
         let mut value = project();
         let result = assess_project_performance(&value);
         assert_eq!(result.status, "calculated_unverified");
-        let codes: Vec<_> = result.warnings.iter().map(|item| item.code).collect();
+        let codes: Vec<_> = own(&result).iter().map(|item| item.code).collect();
         assert_eq!(codes, ["declared_hot_water_efficiency_above_one"]);
         // 20 W/K is below even the demand-controlled flow.
         for flow in value["ntaCalculation"]["ventilationFlows"]
@@ -5854,8 +7833,8 @@ mod tests {
                 month["conductanceWPerK"] = Value::from(20.0);
             }
         }
-        let low = assess_project_performance(&value);
-        let codes: Vec<_> = low.warnings.iter().map(|item| item.code).collect();
+        let low = own(&assess_project_performance(&value));
+        let codes: Vec<_> = low.iter().map(|item| item.code).collect();
         assert_eq!(
             codes,
             [
@@ -5863,11 +7842,7 @@ mod tests {
                 "declared_ventilation_below_required_flow"
             ]
         );
-        assert!(low.warnings[1]
-            .detail
-            .as_ref()
-            .unwrap()
-            .contains("26.5 W/K"));
+        assert!(low[1].detail.as_ref().unwrap().contains("26.5 W/K"));
 
         // Utility: f_BACS 1,0 without the bacs block and an open ceiling.
         let mut office: Value = serde_json::from_str(include_str!(
@@ -6081,6 +8056,175 @@ mod tests {
         }
     }
 
+    /// 7.38: one sunroom id in two zones is a shared sunroom; both copies
+    /// carry both zones' H_zi;ztu and heating setpoints, and the colder
+    /// neighbour lowers the capped gain of zone z1.
+    #[test]
+    fn a_shared_sunroom_lists_every_bordering_zone() {
+        let mut value = project();
+        let mut second = value["zones"][0].clone();
+        second["id"] = Value::from("z2");
+        second["floorArea"] = Value::from(50.0);
+        for surface in second["surfaces"].as_array_mut().unwrap() {
+            let id = surface["id"].as_str().unwrap().to_owned();
+            surface["id"] = Value::from(format!("{id}-2"));
+            surface["zoneId"] = Value::from("z2");
+            for window in surface["windows"].as_array_mut().unwrap() {
+                let window_id = window["id"].as_str().unwrap().to_owned();
+                window["id"] = Value::from(format!("{window_id}-2"));
+            }
+        }
+        for bridge in second["thermalBridges"].as_array_mut().unwrap() {
+            bridge["id"] = Value::from("tb1-2");
+            bridge["zoneId"] = Value::from("z2");
+        }
+        value["zones"].as_array_mut().unwrap().push(second);
+        let sunroom = |h: f64, f: f64| {
+            serde_json::json!([{
+                "id": "atrium", "glazingGHeating": 0.55, "glazingGCooling": 0.35,
+                "exteriorFrameFraction": 0.25, "reductionFactor": 0.7,
+                "zoneConductanceWPerK": h, "distributionFactor": f,
+                "surfaces": [
+                    {"areaM2": 60.0, "absorptance": 0.7, "azimuthDeg": 180.0, "tiltDeg": 0.0}
+                ],
+                "sourceReference": "drawing"
+            }])
+        };
+        let block = &mut value["ntaCalculation"];
+        let heating_setpoint = block["setpoints"]["heatingC"].as_f64().unwrap();
+        let zone_entry = |id: &str, h: f64, f: f64| {
+            serde_json::json!({
+                "zoneId": id,
+                "verticalPipes": [],
+                "ventilationFlows": block["ventilationFlows"].clone(),
+                "internalGains": block["internalGains"].clone(),
+                "sunrooms": sunroom(h, f)
+            })
+        };
+        let entries = vec![zone_entry("z1", 6.0, 0.3), zone_entry("z2", 14.0, 0.7)];
+        block["zoneData"] = Value::from(entries);
+        block["surfaceTilts"].as_array_mut().unwrap().push(
+            serde_json::json!({"surfaceId": "roof-2", "tiltDeg": 45.0, "sourceReference": "copy"}),
+        );
+        let mut floor = block["groundFloors"][0].clone();
+        floor["surfaceId"] = Value::from("floor-2");
+        block["groundFloors"].as_array_mut().unwrap().push(floor);
+        let gains = |value: &Value| -> f64 {
+            let result = assess_project_performance(value);
+            assert_eq!(result.status, "calculated_unverified", "{:?}", result.gaps);
+            let derived = result.derived_input.as_ref().unwrap();
+            let first = &derived.space_heating.demand.sunrooms[0];
+            let second = &derived.space_heating.additional_zones[0].demand.sunrooms[0];
+            assert_eq!(first.bordering_zones, second.bordering_zones);
+            assert_eq!(first.bordering_zones.len(), 2);
+            assert_eq!(first.bordering_zones[1].zone_id, "z2");
+            assert_eq!(first.bordering_zones[1].conductance_w_per_k, 14.0);
+            result
+                .performance
+                .as_ref()
+                .unwrap()
+                .space_heating
+                .demand
+                .monthly
+                .iter()
+                .map(|row| row.sunroom_gains_kwh)
+                .sum()
+        };
+        let same = gains(&value);
+        // Table 7.13: a sport zone is heated to 16 °C instead of 20 °C.
+        assert_eq!(heating_setpoint, 20.0);
+        let mut setpoints = value["ntaCalculation"]["setpoints"].clone();
+        setpoints["heatingC"] = Value::from(16.0);
+        let zone_two = &mut value["ntaCalculation"]["zoneData"][1];
+        zone_two["usageFunction"] = Value::from("sport");
+        zone_two["setpoints"] = setpoints;
+        zone_two["internalGains"] = serde_json::json!({
+            "method": "declared", "heatFluxWPerM2": 3.0, "sourceReference": "x"
+        });
+        let colder = gains(&value);
+        assert!(colder < same, "{colder} vs {same}");
+        // Review 54: one zone listing the same sunroom twice is a gap.
+        let twice = value["ntaCalculation"]["zoneData"][0]["sunrooms"][0].clone();
+        value["ntaCalculation"]["zoneData"][0]["sunrooms"]
+            .as_array_mut()
+            .unwrap()
+            .push(twice);
+        let result = assess_project_performance(&value);
+        assert!(
+            result
+                .gaps
+                .iter()
+                .any(|gap| gap.code == "sunroom_id_duplicate"
+                    && gap.path == "ntaCalculation.zoneData[0].sunrooms[1].id"),
+            "{:?}",
+            result.gaps
+        );
+        value["ntaCalculation"]["zoneData"][0]["sunrooms"]
+            .as_array_mut()
+            .unwrap()
+            .pop();
+        // Review 54: a blank sunroom id in both zones is no shared sunroom.
+        for index in 0..2 {
+            value["ntaCalculation"]["zoneData"][index]["sunrooms"][0]["id"] = Value::from("");
+        }
+        let result = assess_project_performance(&value);
+        let derived = result.derived_input.as_ref().unwrap();
+        assert!(derived.space_heating.demand.sunrooms[0]
+            .bordering_zones
+            .is_empty());
+        assert!(derived.space_heating.additional_zones[0].demand.sunrooms[0]
+            .bordering_zones
+            .is_empty());
+    }
+
+    /// Review 54: `borderingZones` in the project input is not taken over;
+    /// the project route derives it from the zones that share a sunroom
+    /// id, so an entered list naming zones that do not exist or another
+    /// setpoint has no effect, and a sunroom of one zone keeps 7.37.
+    #[test]
+    fn an_entered_list_of_bordering_zones_is_replaced() {
+        let mut value = project();
+        let sunroom = serde_json::json!({
+            "id": "atrium", "glazingGHeating": 0.55, "glazingGCooling": 0.35,
+            "exteriorFrameFraction": 0.25, "reductionFactor": 0.7,
+            "zoneConductanceWPerK": 6.0, "distributionFactor": 1.0,
+            "surfaces": [
+                {"areaM2": 60.0, "absorptance": 0.7, "azimuthDeg": 180.0, "tiltDeg": 0.0}
+            ],
+            "sourceReference": "drawing"
+        });
+        let gains = |value: &Value| -> (f64, usize) {
+            let result = assess_project_performance(value);
+            assert_eq!(result.status, "calculated_unverified", "{:?}", result.gaps);
+            let derived = result.derived_input.as_ref().unwrap();
+            let listed = derived.space_heating.demand.sunrooms[0]
+                .bordering_zones
+                .len();
+            let sum = result
+                .performance
+                .as_ref()
+                .unwrap()
+                .space_heating
+                .demand
+                .monthly
+                .iter()
+                .map(|row| row.sunroom_gains_kwh)
+                .sum();
+            (sum, listed)
+        };
+        value["ntaCalculation"]["sunrooms"] = serde_json::json!([sunroom.clone()]);
+        let plain = gains(&value);
+        let mut entered = sunroom;
+        entered["borderingZones"] = serde_json::json!([
+            {"zoneId": "z1", "conductanceWPerK": 6.0, "heatingSetpointC": 20.0},
+            {"zoneId": "elsewhere", "conductanceWPerK": 500.0, "heatingSetpointC": 20.0}
+        ]);
+        value["ntaCalculation"]["sunrooms"] = serde_json::json!([entered]);
+        let with_list = gains(&value);
+        assert_eq!(with_list.1, 0);
+        assert_eq!(with_list.0, plain.0);
+    }
+
     #[test]
     fn two_zones_need_zone_data_and_sum_areas() {
         let mut value = project();
@@ -6213,6 +8357,187 @@ mod tests {
         assert!((geometry.loss_area_m2 - 232.8).abs() < 1e-9);
         assert!((geometry.loss_area_ratio.unwrap() - 2.425).abs() < 1e-9);
         assert_eq!(geometry.unclassified_surface_count, 0);
+    }
+
+    #[test]
+    fn a_wall_or_roof_to_the_ground_is_refused() {
+        // 8.3 has ground formulas for floors only; a wall below ground level
+        // is a heated-basement wall (8.3.3.2, 2025+C1 p. 255), entered on the
+        // floor. A ground wall next to a heated basement would otherwise count
+        // twice in H_g and A_ls.
+        for (index, kind) in [(0, "wall"), (4, "roof")] {
+            let mut value = project();
+            let id = value["zones"][0]["surfaces"][index]["id"].clone();
+            value["zones"][0]["surfaces"][index]["thermalBoundary"] = Value::from("ground");
+            let floors = value["ntaCalculation"]["groundFloors"]
+                .as_array_mut()
+                .unwrap();
+            let mut entry = floors[0].clone();
+            entry["surfaceId"] = id;
+            floors.push(entry);
+            let result = assess_project_performance(&value);
+            assert_eq!(result.status, "incomplete", "{kind}");
+            let codes: Vec<_> = result
+                .gaps
+                .iter()
+                .map(|item| (item.code, item.path.as_str()))
+                .collect();
+            let path = format!("zones[0].surfaces[{index}].thermalBoundary");
+            assert!(
+                codes.contains(&("ground_surface_not_floor", path.as_str())),
+                "{kind}: {codes:?}"
+            );
+            assert!(
+                !codes
+                    .iter()
+                    .any(|(code, _)| *code == "ground_floor_data_without_ground_surface"),
+                "{kind}: {codes:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_detailed_floor_edge_without_psi_is_flagged() {
+        // 8.36/8.39: a detailed edge without ψ_gr gives H_g no edge loss.
+        let mut value = project();
+        value["ntaCalculation"]["groundFloors"][0]["edgeThermalBridges"]["bridges"] =
+            serde_json::json!([]);
+        let result = assess_project_performance(&value);
+        assert_eq!(result.status, "calculated_unverified", "{:?}", result.gaps);
+        assert!(result
+            .warnings
+            .iter()
+            .any(|gap| gap.code == "ground_floor_edge_bridges_none_entered"
+                && gap.path == "ntaCalculation.groundFloors[0].edgeThermalBridges"));
+        let base = assess_project_performance(&project());
+        assert!(!base
+            .warnings
+            .iter()
+            .any(|gap| gap.code == "ground_floor_edge_bridges_none_entered"));
+    }
+
+    #[test]
+    fn a_zone_bridge_to_the_ground_is_refused_not_dropped() {
+        // 8.36/8.39 (2025+C1 p. 253 and 255–256): ψ_gr belongs to the ground
+        // floor's edge bridges. H_D, H_U and H_g take no zone bridge with
+        // boundary "ground", so one entered there was silently lost.
+        let base = assess_project_performance(&project());
+        assert_eq!(base.status, "calculated_unverified", "{:?}", base.gaps);
+        let mut value = project();
+        value["zones"][0]["thermalBridges"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!({
+                "id": "tb-ground", "name": "Vloerrand", "psiValue": 0.6,
+                "length": 20.0, "zoneId": "z1", "thermalBoundary": "ground"
+            }));
+        value["zones"][0]["pointThermalBridges"] = serde_json::json!([{
+            "id": "pb-ground", "name": "Paal", "chiValue": 0.2,
+            "zoneId": "z1", "thermalBoundary": "ground", "sourceReference": "test"
+        }]);
+        let result = assess_project_performance(&value);
+        assert_eq!(result.status, "incomplete");
+        let codes: Vec<_> = result
+            .gaps
+            .iter()
+            .map(|item| (item.code, item.path.as_str()))
+            .collect();
+        for path in [
+            "zones[0].thermalBridges[1].thermalBoundary",
+            "zones[0].pointThermalBridges[0].thermalBoundary",
+        ] {
+            assert!(
+                codes.contains(&("thermal_bridge_ground_on_floor_edge", path)),
+                "{codes:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn heated_basement_walls_count_in_the_loss_area() {
+        // 6.7.3 c (2020+A1 p. 144, 2025+C1 p. 162): the walls of a heated
+        // basement border the ground, f_ls 0,7, over z·P of 8.39 (public
+        // case N: A_ls 5 457,41 m² as printed only with them).
+        let loss = |value: &Value| {
+            let result = assess_project_performance(value);
+            (
+                result.derived_input.unwrap().loss_area_m2.unwrap(),
+                result.geometry.unwrap(),
+            )
+        };
+        let base = project();
+        let (derived, geometry) = loss(&base);
+        let mut value = base.clone();
+        let perimeter = value["ntaCalculation"]["groundFloors"][0]["exposedPerimeterM"]
+            .as_f64()
+            .unwrap();
+        value["ntaCalculation"]["groundFloors"][0]["heatedBasement"] = serde_json::json!({
+            "wallDepths": [
+                { "lengthM": perimeter / 2.0, "depthM": 2.0 },
+                { "lengthM": perimeter / 2.0, "depthM": 0.0 }
+            ],
+            "wallResistanceM2kPerW": 3.5
+        });
+        let walls = 0.7 * 1.0 * perimeter;
+        let (with_derived, with_geometry) = loss(&value);
+        assert!((with_derived - derived - walls).abs() < 1e-9);
+        assert!((with_geometry.loss_area_m2 - geometry.loss_area_m2 - walls).abs() < 1e-9);
+        assert!(
+            (with_geometry.envelope_area_m2 - geometry.envelope_area_m2 - perimeter).abs() < 1e-9
+        );
+        // 6.7.2 takes the projected area A_T of annex K: an entered wall
+        // area replaces z·P (public case G: 130,45 m² against z·P 163,90).
+        value["ntaCalculation"]["groundFloors"][0]["heatedBasement"]["wallAreaM2"] =
+            Value::from(12.5);
+        let (entered_derived, entered_geometry) = loss(&value);
+        assert!((entered_derived - derived - 0.7 * 12.5).abs() < 1e-9);
+        assert!((entered_geometry.loss_area_m2 - geometry.loss_area_m2 - 0.7 * 12.5).abs() < 1e-9);
+    }
+
+    /// Review 24: after the 6.6.4 allocation a sport function entered as a
+    /// part with and a part without a swimming pool keeps that ratio; only the
+    /// pool part doubles q_usi;spec (11.2.2.5.1).
+    #[test]
+    fn allocated_ventilation_keeps_the_swimming_pool_part() {
+        use crate::monthly_demand::{UsageFunction, UsageFunctionArea};
+        use crate::ventilation::{FunctionArea, VentilationFunction};
+        let entered = [
+            FunctionArea {
+                function: VentilationFunction::Sport,
+                area_m2: 100.0,
+                swimming_pool: true,
+            },
+            FunctionArea {
+                function: VentilationFunction::Sport,
+                area_m2: 300.0,
+                swimming_pool: false,
+            },
+            FunctionArea {
+                function: VentilationFunction::Office,
+                area_m2: 50.0,
+                swimming_pool: false,
+            },
+        ];
+        let allocated = [
+            UsageFunctionArea {
+                function: UsageFunction::Sport,
+                area_m2: 440.0,
+            },
+            UsageFunctionArea {
+                function: UsageFunction::Office,
+                area_m2: 60.0,
+            },
+        ];
+        let functions = allocated_ventilation_functions(&allocated, &entered);
+        assert_eq!(functions.len(), 3);
+        let pool: f64 = functions
+            .iter()
+            .filter(|item| item.swimming_pool)
+            .map(|item| item.area_m2)
+            .sum();
+        assert!((pool - 110.0).abs() < 1e-9, "{functions:?}");
+        let total: f64 = functions.iter().map(|item| item.area_m2).sum();
+        assert!((total - 500.0).abs() < 1e-9);
     }
 
     #[test]
@@ -6355,6 +8680,66 @@ mod blank_fuzz {
         block
     }
 
+    /// Review 55: the synthetic block with the members of reviews 40–54 —
+    /// a zone sunroom (7.38), an oil-fired steam humidifier, a collective
+    /// installation with a delivery set and identical appliances, the
+    /// building's thermal-bridge route, TOjuli method 3 and a heated basement
+    /// with wall parts — so the blank search sees their required members.
+    fn new_routes_block() -> Value {
+        let mut block = block("nta8800-project-performance-synthetic.json");
+        block["zoneData"] = serde_json::json!([{
+            "zoneId": "z1",
+            "verticalPipes": [],
+            "ventilationFlows": block["ventilationFlows"].clone(),
+            "internalGains": block["internalGains"].clone(),
+            "sunrooms": [{
+                "id": "atrium", "glazingGHeating": 0.55, "glazingGCooling": 0.35,
+                "exteriorFrameFraction": 0.25, "reductionFactor": 0.7,
+                "zoneConductanceWPerK": 6.0, "distributionFactor": 0.3,
+                "surfaces": [
+                    {"areaM2": 60.0, "absorptance": 0.7, "azimuthDeg": 180.0, "tiltDeg": 0.0}
+                ],
+                "sourceReference": "review 55"
+            }]
+        }]);
+        block["humidifiers"] = serde_json::json!([{
+            "zoneId": "z1",
+            "humidification": {
+                "humidifier": {"kind": "steam", "carrier": "oil"},
+                "rotaryWheel": false,
+                "equipmentReference": "review 55"
+            }
+        }]);
+        block["distribution"] =
+            serde_json::json!({"method": "calculated", "sourceReference": "review 55"});
+        block["distributionSystem"] = serde_json::json!({
+            "designTemperatureClass": "70_60", "installation": "collective",
+            "usageFunction": "residential", "collectiveHotWaterDeliverySet": true,
+            "connectedStoreys": 5,
+            "pipeTransmittance": {"method": "forfait",
+                "insulation": {"state": "insulated", "period": "from1995"}},
+            "valvesInsulated": true, "actualPipeLengthM": 100.0, "unheatedPipeLengthM": 0.0,
+            "pump": {"method": "calculated", "heatMeterPresent": true, "sourceReference": "review 55"},
+            "sourceReference": "review 55"
+        });
+        block["collectiveConnection"] =
+            serde_json::json!({"connectedUsableAreaM2": 1200.0, "sourceReference": "review 55"});
+        block["identicalSystems"] = Value::from(2);
+        block["thermalBridgeRoute"] = Value::from("forfait");
+        block["activeCooling"] = serde_json::json!({
+            "system": "split_units_in_every_habitable_room",
+            "capacity": {"method": "solar_limitation", "criterion": "shaded_glazing",
+                "sourceReference": "review 55"},
+            "sourceReference": "review 55"
+        });
+        block["groundFloors"][0]["heatedBasement"] = serde_json::json!({
+            "wallDepths": [{"lengthM": 10.0, "depthM": 1.5}, {"lengthM": 10.0, "depthM": 0.0}],
+            "wallResistanceM2kPerW": 2.5
+        });
+        assert!(deserializes(&block), "review 55 block must deserialize");
+        block
+    }
+
     /// Serialized defaults (`None`) as absent members, as the app sends them.
     fn without_nulls(value: Value) -> Value {
         match value {
@@ -6401,17 +8786,39 @@ mod blank_fuzz {
             let Some(message) = error(&probe).filter(|m| m.starts_with("unknown variant")) else {
                 continue;
             };
-            let is_tag = super::variants(&message)
-                .into_iter()
-                .filter(|name| name != current)
+            let names = super::variants(&message);
+            let is_tag = names
+                .iter()
+                .filter(|name| *name != current)
                 .take(8)
                 .any(|name| {
                     let mut trial = block.clone();
-                    *trial.pointer_mut(pointer).unwrap() = Value::from(name);
+                    *trial.pointer_mut(pointer).unwrap() = Value::from(name.as_str());
                     error(&trial).is_some_and(|m| {
                         m.starts_with("unknown field") || m.starts_with("missing field")
                     })
-                });
+                })
+                // Review 55: a unit variant of an internally tagged enum
+                // ignores the members of the other variant, so switching to
+                // it from the full object gives no error (`detailed` →
+                // `forfait` floor-edge bridges). With the object reduced to
+                // its tag, the variants then ask for different members.
+                || {
+                    let parent_pointer = &pointer[..pointer.rfind('/').unwrap()];
+                    let key = &pointer[pointer.rfind('/').unwrap() + 1..];
+                    let outcomes: BTreeSet<Option<String>> = names
+                        .iter()
+                        .take(9)
+                        .map(|name| {
+                            let mut trial = block.clone();
+                            *trial.pointer_mut(parent_pointer).unwrap() =
+                                serde_json::json!({ key: name });
+                            error(&trial)
+                        })
+                        .collect();
+                    outcomes.len() > 1
+                        && outcomes.iter().flatten().any(|m| m.starts_with("missing field"))
+                };
             if is_tag {
                 found.insert(path.clone(), path[..dot].to_string());
             }
@@ -6468,7 +8875,8 @@ mod blank_fuzz {
             .map(|(path, pointer, _)| {
                 let mut trial = block.clone();
                 *trial.pointer_mut(pointer).unwrap() = Value::Null;
-                (path.clone(), !deserializes(&trial))
+                // A null member means the same as an absent one.
+                (path.clone(), !deserializes(&without_null_members(&trial)))
             })
             .collect();
         let tags = tags(&block, &all_nodes);
@@ -6593,6 +9001,26 @@ mod blank_fuzz {
             300,
         );
     }
+
+    #[test]
+    fn random_blanks_on_the_routes_of_reviews_40_to_54() {
+        check(
+            "review 55 routes",
+            new_routes_block(),
+            0x5DEE_CE66_D1CE_4E5B,
+            300,
+        );
+    }
+
+    #[test]
+    fn random_blanks_in_case_n() {
+        check(
+            "case N (heated basement, wall parts)",
+            block("nta8800-public-comparison-n.json"),
+            0x27BB_2EE6_87B0_B0FD,
+            300,
+        );
+    }
 }
 
 #[cfg(test)]
@@ -6633,10 +9061,6 @@ mod refusal_gaps {
                 "route_not_in_edition",
                 "ntaCalculation.pvSystems[0].peakPower.panelPeakPowerW",
             ),
-            (
-                "lighting_gain_requires_chapter_14",
-                "ntaCalculation.internalGains.lighting",
-            ),
         ] {
             assert!(
                 found
@@ -6645,9 +9069,22 @@ mod refusal_gaps {
                 "{expected:?} in {found:?}"
             );
         }
+        // The lighting gains only lack chapter 14 because its block is
+        // refused above: not a second gap for that one cause (review 58).
+        assert!(
+            !found
+                .iter()
+                .any(|(code, _, _)| *code == "lighting_gain_requires_chapter_14"),
+            "{found:?}"
+        );
         // The derived path stays in the detail.
-        assert!(found.iter().any(|(_, _, detail)| *detail
-            == Some("derivedInput.spaceHeating.demand.internalGains.lighting")));
+        assert!(
+            found
+                .iter()
+                .any(|(_, _, detail)| detail
+                    .is_some_and(|detail| detail.starts_with("derivedInput."))),
+            "{found:?}"
+        );
         // A calculated result gets no gaps from the building issues.
         assert!(office_in("2025+C1").status.starts_with("calculated"));
     }
@@ -6706,5 +9143,63 @@ mod refusal_gaps {
                 "{path}"
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod steam_humidifier_carrier {
+    use super::*;
+
+    fn office_with_steam(carrier: &str) -> ProjectPerformanceAssessment {
+        let mut office: Value = serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-example-office.json"
+        ))
+        .unwrap();
+        office["ntaCalculation"]["humidifiers"] = serde_json::json!([{
+            "zoneId": "z1",
+            "humidification": {
+                "humidifier": {"kind": "steam", "carrier": carrier},
+                "rotaryWheel": false,
+                "equipmentReference": "steam unit"
+            }
+        }]);
+        assess_project_performance(&office)
+    }
+
+    fn used(result: &ProjectPerformanceAssessment, carrier: &str) -> f64 {
+        result
+            .performance
+            .as_ref()
+            .unwrap()
+            .carriers
+            .iter()
+            .filter(|row| row.carrier == carrier)
+            .map(|row| row.used_kwh)
+            .sum()
+    }
+
+    /// 12.3 with table 5.2: the fuel of an oil-fired steam humidifier is
+    /// oil, not natural gas; the energy is the same (η 0,6 for both).
+    #[test]
+    fn an_oil_fired_steam_humidifier_uses_oil() {
+        let gas = office_with_steam("gas");
+        let oil = office_with_steam("oil");
+        for result in [&gas, &oil] {
+            assert!(
+                result.performance.is_some(),
+                "{} {:?}",
+                result.status,
+                result.gaps
+            );
+        }
+        let steam = used(&oil, "oil");
+        assert!(steam > 0.0);
+        assert_eq!(used(&gas, "oil"), 0.0);
+        assert!((used(&gas, "gas") - used(&oil, "gas") - steam).abs() < 1e-6);
+        assert!((used(&gas, "el") - used(&oil, "el")).abs() < 1e-9);
+        // The earlier "gas_or_oil" choice still books natural gas.
+        let legacy = office_with_steam("gas_or_oil");
+        assert!((used(&legacy, "gas") - used(&gas, "gas")).abs() < 1e-9);
+        assert_eq!(used(&legacy, "oil"), 0.0);
     }
 }

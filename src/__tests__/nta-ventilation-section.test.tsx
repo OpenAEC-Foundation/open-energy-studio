@@ -4,6 +4,7 @@ import { screen } from '@testing-library/react';
 import { NtaVentilationSection } from '../components/NtaPerformancePanel/NtaVentilationSection';
 import { write, type Draft, type Path } from '../components/NtaPerformancePanel/NtaFormFields';
 import { renderWithProviders, userEvent } from './test-utils';
+import { SLOW_UI_TEST_MS } from './timeouts';
 
 function Harness({ initial }: { initial: Draft }) {
   const [draft, setDraft] = useState<Draft>(initial);
@@ -28,5 +29,5 @@ describe('NTA ventilation section', () => {
     expect(current().ventilation.flowReduction).toMatchObject({
       flowControlPercent: 50, evidenceReference: 'design note V-01',
     });
-  }, 60_000);
+  }, SLOW_UI_TEST_MS);
 });

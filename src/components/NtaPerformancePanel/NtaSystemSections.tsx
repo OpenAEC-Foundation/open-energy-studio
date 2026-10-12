@@ -1,10 +1,12 @@
-import { DeclaredAuxiliaryConstantsFields, DeclaredChpEfficienciesFields } from './NtaPipeGeometry';
+import { DeclaredAuxiliaryConstantsFields, DeclaredChpEfficienciesFields, HotWaterCirculationFields } from './NtaPipeGeometry';
+import { NumberInput } from '../ui/Field';
 import { useI18n } from '../../i18n/i18n';
+import { ShowerHeatRecoveryFields } from './NtaShowerHeatRecovery';
 import { ElectricBoilerInsulatedPipe2022Field } from './NtaEdition2022Fields';
 import { HeatPumpInstallationYear2020Field } from './NtaEdition2020Fields';
 import type { IProject } from '../../core/energy/types';
 import {
-  additionalHotWaterGeneratorTemplate, calculatedSolarMethod, collectorObstructionTemplate, coolingPerformanceTemplate,
+  additionalHotWaterGeneratorTemplate, boosterHeatSourceTemplate, calculatedSolarMethod, collectorObstructionTemplate, coolingPerformanceTemplate,
   chpClassTemplate, declaredShareTemplate, en14825PointTemplate, exhaustAirUseTemplate, hotWaterGeneratorTemplate,
   hotWaterStorageTemplate, microChpStorageTemplate, microChpTemplate, preferredGeneratorTemplate, regenerationTemplate, solarRegenerationTemplate, solarWaterHeaterTemplate,
   spaceGeneratorTemplate, storageLossTemplate, testedSolarMethod, windowObstructionTemplate,
@@ -141,6 +143,12 @@ export function SpaceGeneratorFields({ draft, change, base, project, allowMultip
     {heatPumpNote && (kind === 'heat_pump_forfait' || kind === 'hybrid_heat_pump') && <p className="nta-form-note">{t('nta.form.heatPumpNote')}</p>}
     {(kind === 'heat_pump_forfait' || kind === 'hybrid_heat_pump') &&
       <HeatPumpInstallationYear2020Field draft={draft} change={change} base={at('forfait')} />}
+    {(kind === 'heat_pump_forfait' || kind === 'hybrid_heat_pump') && <>
+      <SelectField {...field} path={at('sourceSystem')} label={t('nta.form.hpSourceSystem')} options={[
+        ['individual', t('nta.form.hpSourceSystem.individual')], ['collective_ground', t('nta.form.hpSourceSystem.collective_ground')],
+        ['collective_groundwater_surface_or_at_least15_c', t('nta.form.hpSourceSystem.collective_groundwater_surface_or_at_least15_c')]]} />
+      <TextField {...field} path={at('sourceSystemReference')} label={t('nta.form.hpSourceSystem.source')} />
+    </>}
     {kind === 'heat_pump_forfait' && <RegenerationFields draft={draft} change={change} base={at('regeneration')} />}
     {kind === 'heat_pump_forfait' && <HeatPumpDeclarationFields draft={draft} change={change} base={at('forfait', 'qualityDeclaration')} />}
     {kind === 'multiple' && <MultipleGeneratorFields draft={draft} change={change} base={base} project={project} />}
@@ -340,7 +348,87 @@ function hotWaterGeneratorOptions(t: Translate): Array<[string, string]> {
     ['electric_instantaneous', t('nta.form.dhwGen.instantaneous')], ['electric_boiler', t('nta.form.dhwGen.electricBoiler')],
     ['indirect_boiler', t('nta.form.dhwGen.indirectBoiler')], ['external_heat', t('nta.form.dhwGen.external')],
     ['measured_two_profiles', t('nta.form.dhwGen.twoProfiles')], ['heat_pump_en16147', t('nta.form.dhwGen.en16147')], ['heating_system', t('nta.form.dhwGen.heatingSystem')],
-    ['chp', t('nta.form.generator.chp')]];
+    ['chp', t('nta.form.generator.chp')], ['booster_heat_pump_forfait', t('nta.form.dhwGen.boosterForfait')],
+    ['booster_heat_pump', t('nta.form.dhwGen.boosterAnnexW')], ['indirect_heat_pump', t('nta.form.dhwGen.indirectHeatPump')],
+    ['heat_pump_series', t('nta.form.dhwGen.heatPumpSeries')], ['biomass_combi', t('nta.form.dhwGen.biomassCombi')],
+    ['large_direct_storage', t('nta.form.dhwGen.largeDirectStorage')], ['gas_storage_heater', t('nta.form.dhwGen.gasStorageHeater')]];
+}
+
+/** Table 9.27/9.29 sources, for the last heat pump of a series (§13.8.4.10). */
+const HEAT_PUMP_TABLE_SOURCES = ['outdoor_air', 'exhaust_air', 'ground', 'groundwater_below15_c', 'ground_or_groundwater_unknown',
+  'surface_water', 'collective15_to20_c', 'collective20_to40_c', 'collective_at_least40_c'] as const;
+/** Table 9.29 has no 65–70 °C value for an unknown ground source, so heat pumps in series can't use it. */
+const SERIES_HEAT_PUMP_SOURCES = HEAT_PUMP_TABLE_SOURCES.filter((source) => source !== 'ground_or_groundwater_unknown');
+
+/**
+ * Annex W booster heat pump: the two test points (W.11–W.13), the measured class, the standing
+ * loss (W.17), the source inlet temperature (one value or twelve monthly values) and the source
+ * of its heat (figure W.1).
+ */
+function BoosterAnnexWFields({ draft, change, base }: SectionProps & { base: Path }) {
+  const { t } = useI18n();
+  const field = { draft, onChange: change };
+  const at = (...rest: Path): Path => [...base, ...rest];
+  const temperatures = list(draft, at('sourceTemperaturesC'));
+  const monthly = temperatures.length === 12;
+  const source = read(draft, at('heatSource', 'kind'));
+  return <div className="nta-form-subsection">
+    {(['lowTest', 'highTest'] as const).map((test) => <fieldset key={test} className="nta-form-row">
+      <legend>{t(`nta.form.boosterW.${test}`)}</legend>
+      <NumberField {...field} path={at(test, 'sourceTemperatureC')} label={t(`nta.form.boosterW.testTemperature.${test}`)} unit="°C" />
+      <NumberField {...field} path={at(test, 'cop')} label={t(`nta.form.boosterW.cop.${test}`)} />
+    </fieldset>)}
+    <SelectField {...field} path={at('measuredClass')} label={t('nta.form.dhwClass')} options={[
+      ['class1', '1 (CW-1+)'], ['class2', '2 (CW-2)'], ['class3', '3 (CW-3)'], ['class4', '4 (CW-4/5/6)']]} />
+    <NumberField {...field} path={at('standingLossKw')} label={t('nta.form.boosterW.standingLoss')} unit="kW" />
+    <CheckField draft={{ monthly }} path={['monthly']} label={t('nta.form.boosterW.monthly')}
+      onChange={(_, value) => change(at('sourceTemperaturesC'), value
+        ? Array.from({ length: 12 }, () => (typeof temperatures[0] === 'number' ? temperatures[0] : null))
+        : [typeof temperatures[0] === 'number' ? temperatures[0] : null])} />
+    {monthly
+      ? <MonthlyValues draft={draft} change={change} path={at('sourceTemperaturesC')} label={t('nta.form.boosterW.sourceTemperature')} />
+      : <NumberField {...field} path={at('sourceTemperaturesC', 0)} label={t('nta.form.boosterW.sourceTemperature')} unit="°C" />}
+    <SelectField required {...field} path={at('heatSource', 'kind')} label={t('nta.form.booster.heatSource')} options={[
+      ['external_heat', t('nta.form.booster.source.external')], ['heating_system', t('nta.form.booster.source.heatingSystem')],
+      ['collective_generator', t('nta.form.booster.source.collective')]]}
+      onChange={(_, value) => change(at('heatSource'), boosterHeatSourceTemplate(String(value ?? '')))} />
+    {source === 'collective_generator' && <>
+      <NumberField {...field} path={at('heatSource', 'generationEfficiency')} label={t('nta.form.booster.sourceEfficiency')} />
+      <SelectField {...field} path={at('heatSource', 'carrier')} label={t('nta.form.booster.sourceCarrier')} options={[
+        ['gas', t('nta.form.booster.carrier.gas')], ['oil', t('nta.form.booster.carrier.oil')],
+        ['electricity', t('nta.form.booster.carrier.electricity')]]} />
+      <TextField {...field} path={at('heatSource', 'sourceReference')} label={t('nta.form.booster.sourceReference')} />
+    </>}
+    <TextField {...field} path={at('testReportReference')} label={t('nta.form.boosterW.report')} />
+  </div>;
+}
+
+/**
+ * §13.8.4.4 booster heat pump with the forfait values of 13.162/13.163: the design supply
+ * temperature of the heating system that feeds it (empty when unknown) and the source of its
+ * heat (figure W.1).
+ */
+function BoosterForfaitFields({ draft, change, base }: SectionProps & { base: Path }) {
+  const { t } = useI18n();
+  const field = { draft, onChange: change };
+  const at = (...rest: Path): Path => [...base, ...rest];
+  const source = read(draft, at('heatSource', 'kind'));
+  return <div className="nta-form-subsection">
+    <NumberField {...field} path={at('designSupplyTemperatureC')} label={t('nta.form.booster.supplyTemperature')} optional unit="°C" />
+    <p className="nta-form-note">{t('nta.form.booster.supplyTemperatureNote')}</p>
+    <SelectField required {...field} path={at('heatSource', 'kind')} label={t('nta.form.booster.heatSource')} options={[
+      ['external_heat', t('nta.form.booster.source.external')], ['heating_system', t('nta.form.booster.source.heatingSystem')],
+      ['collective_generator', t('nta.form.booster.source.collective')]]}
+      onChange={(_, value) => change(at('heatSource'), boosterHeatSourceTemplate(String(value ?? '')))} />
+    {source === 'collective_generator' && <>
+      <NumberField {...field} path={at('heatSource', 'generationEfficiency')} label={t('nta.form.booster.sourceEfficiency')} />
+      <SelectField {...field} path={at('heatSource', 'carrier')} label={t('nta.form.booster.sourceCarrier')} options={[
+        ['gas', t('nta.form.booster.carrier.gas')], ['oil', t('nta.form.booster.carrier.oil')],
+        ['electricity', t('nta.form.booster.carrier.electricity')]]} />
+      <TextField {...field} path={at('heatSource', 'sourceReference')} label={t('nta.form.booster.sourceReference')} />
+    </>}
+    <TextField {...field} path={at('sourceReference')} label={t('nta.form.booster.reference')} />
+  </div>;
 }
 
 const PROFILES: Array<[string, string]> = ['s', 'm', 'l', 'xl', 'xxl', '3xl', '4xl'].map((key) => [key, key.toUpperCase()]);
@@ -434,7 +522,7 @@ function StorageLossFields({ draft, change, base }: SectionProps & { base: Path 
   const field = { draft, onChange: change };
   const method = read(draft, [...base, 'method']);
   return <>
-    <SelectField {...field} path={[...base, 'method']} label={t('nta.form.solar.storageLoss')} options={[
+    <SelectField required {...field} path={[...base, 'method']} label={t('nta.form.solar.storageLoss')} options={[
       ['label', t('nta.form.solar.storageLoss.label')], ['unknown_label', t('nta.form.solar.storageLoss.unknown')],
       ['measured', t('nta.form.solar.storageLoss.measured')], ['measured_standby', t('nta.form.storageLoss.standby')]]}
       onChange={(_, value) => change(base, storageLossTemplate(String(value ?? '')))} />
@@ -484,6 +572,31 @@ export function HotWaterStorageFields({ draft, change, base = ['hotWater'] }: Se
 }
 
 /** Per generator: 13.144a/13.148 exhaust-air use and the 13.146 declared share; `unit` holds `generator`. */
+/**
+ * A hot-water system's delivery sets of external heat (§13.4.2) and the b_U of the unheated
+ * space with its pipes or vessels (7.82).
+ */
+export function HotWaterSystemExtrasFields({ draft, change, base }: SectionProps & { base: Path }) {
+  const { t } = useI18n();
+  const field = { draft, onChange: change };
+  const sets = read(draft, [...base, 'deliverySets']);
+  const residential = read(draft, [...base, 'need', 'method']) !== 'utility';
+  return <>
+    <CheckField {...field} path={[...base, 'boilingWaterTap']} label={t('nta.form.dhwBoilingWaterTap')} />
+    <ShowerHeatRecoveryFields draft={draft} change={change} base={base} residential={residential} />
+    <label className="nta-form-check">
+      <input type="checkbox" checked={sets != null} onChange={(event) => change([...base, 'deliverySets'],
+        event.target.checked ? { count: 1, sourceReference: '' } : null)} />
+      {t('nta.form.dhwDeliverySets')}
+    </label>
+    {sets != null && <>
+      <NumberField {...field} path={[...base, 'deliverySets', 'count']} label={t('nta.form.dhwDeliverySets.count')} step="1" />
+      <TextField {...field} path={[...base, 'deliverySets', 'sourceReference']} label={t('nta.form.dhwDeliverySets.source')} />
+    </>}
+    <NumberField {...field} path={[...base, 'unheatedReductionFactor']} label={t('nta.form.dhwUnheatedReduction')} optional />
+  </>;
+}
+
 export function HotWaterUnitFields({ draft, change, unit }: SectionProps & { unit: Path }) {
   const { t } = useI18n();
   const field = { draft, onChange: change };
@@ -551,8 +664,26 @@ export function HotWaterGeneratorFields({ draft, change, base }: SectionProps & 
     {kind === 'measured_two_profiles' && <TwoProfileFields draft={draft} change={change} base={base} />}
     {kind === 'heat_pump_en16147' && <En16147Fields draft={draft} change={change} base={base} />}
     {kind === 'heating_system' && <p className="nta-form-note">{t('nta.form.dhwGen.heatingSystemNote')}</p>}
+    {kind === 'booster_heat_pump_forfait' && <BoosterForfaitFields draft={draft} change={change} base={base} />}
+    {kind === 'booster_heat_pump' && <BoosterAnnexWFields draft={draft} change={change} base={base} />}
+    {kind === 'large_direct_storage' && <CheckField {...field} path={[...base, 'gasFired']} label={t('nta.form.dhwLarge.gasFired')} />}
+    {kind === 'gas_storage_heater' && <>
+      <NumberField {...field} path={[...base, 'volumeL']} label={t('nta.form.dhwGasStorage.volume')} unit="l" />
+      <NumberField {...field} path={[...base, 'measuredStandbyKwhPerDay']} label={t('nta.form.dhwGasStorage.standby')} optional unit="kWh/d" />
+      <CheckField {...field} path={[...base, 'before1985']} label={t('nta.form.dhwGasStorage.before1985')} />
+      <CheckField {...field} path={[...base, 'inHeatedZone']} label={t('nta.form.dhwGasStorage.inHeatedZone')} />
+    </>}
+    {kind === 'biomass_combi' && <>
+      <SelectField {...field} path={[...base, 'insulation']} label={t('nta.form.dhwBiomass.insulation')} options={[
+        ['at_least20_mm', t('nta.form.dhwBiomass.insulation.at_least20_mm')], ['at_least10_mm', t('nta.form.dhwBiomass.insulation.at_least10_mm')],
+        ['none', t('nta.form.dhwBiomass.insulation.none')]]} />
+      <CheckField {...field} path={[...base, 'insideBoundary']} label={t('nta.form.dhwBiomass.insideBoundary')} />
+    </>}
+    {kind === 'heat_pump_series' && <SelectField {...field} path={[...base, 'lastSource']} label={t('nta.form.dhwSeriesHp.lastSource')}
+      options={SERIES_HEAT_PUMP_SOURCES.map((source) => [source, t(`kernel.forfait.source.${source}`)])} />}
+    {kind === 'indirect_heat_pump' && <CheckField {...field} path={[...base, 'alsoSpaceHeating']} label={t('nta.form.dhwIndirectHp.alsoHeating')} />}
     {kind === 'chp' && <>
-      <ChpClassFields draft={draft} change={change} base={base} />
+      <ChpClassFields draft={draft} change={change} base={base} declared />
       <CheckField {...field} path={[...base, 'alsoSpaceHeating']} label={t('nta.form.chp.alsoHeating')} />
     </>}
   </>;
@@ -562,25 +693,46 @@ export function HotWaterGeneratorFields({ draft, change, base }: SectionProps & 
 export function HotWaterGeneratorsFields({ draft, change }: SectionProps) {
   const { t } = useI18n();
   const field = { draft, onChange: change };
-  const extra = list(draft, ['hotWater', 'additionalGenerators']);
-  const series = read(draft, ['hotWater', 'series', 'kind']);
   return <div className="nta-form-subsection">
     <NumberField {...field} path={['hotWater', 'nominalPowerKw']} label={t('nta.form.dhwNominalPower')} />
     <HotWaterUnitFields draft={draft} change={change} unit={['hotWater']} />
+    <HotWaterSystemExtrasFields draft={draft} change={change} base={['hotWater']} />
+    <HotWaterExtraGeneratorsFields draft={draft} change={change} base={['hotWater']} />
+  </div>;
+}
+
+/**
+ * 13.8.2: further generators of a hot-water system (`base`: `['hotWater']` or a further system) and,
+ * with exactly one further generator, the series arrangement of 13.141a–d.
+ */
+export function HotWaterExtraGeneratorsFields({ draft, change, base }: SectionProps & { base: Path }) {
+  const { t } = useI18n();
+  const field = { draft, onChange: change };
+  const extra = list(draft, [...base, 'additionalGenerators']);
+  const series = read(draft, [...base, 'series', 'kind']);
+  return <>
     {extra.map((_, index) => <fieldset key={index} className="nta-form-row">
       <legend>{t('nta.form.dhwExtra')} {index + 1}</legend>
-      <HotWaterGeneratorFields draft={draft} change={change} base={['hotWater', 'additionalGenerators', index, 'generator']} />
-      <NumberField {...field} path={['hotWater', 'additionalGenerators', index, 'nominalPowerKw']} label={t('nta.form.dhwNominalPower')} />
-      <HotWaterUnitFields draft={draft} change={change} unit={['hotWater', 'additionalGenerators', index]} />
-      <TextField {...field} path={['hotWater', 'additionalGenerators', index, 'equipmentReference']} label={t('nta.form.boilerEquipmentSource')} />
-      <RemoveButton label={t('nta.form.remove')}
-        onClick={() => change(['hotWater', 'additionalGenerators'], extra.filter((__, other) => other !== index))} />
+      <HotWaterGeneratorFields draft={draft} change={change} base={[...base, 'additionalGenerators', index, 'generator']} />
+      <NumberField {...field} path={[...base, 'additionalGenerators', index, 'nominalPowerKw']} label={t('nta.form.dhwNominalPower')} />
+      <HotWaterUnitFields draft={draft} change={change} unit={[...base, 'additionalGenerators', index]} />
+      <TextField {...field} path={[...base, 'additionalGenerators', index, 'equipmentReference']} label={t('nta.form.boilerEquipmentSource')} />
+      <RemoveButton label={t('nta.form.remove')} onClick={() => {
+        const rest = extra.filter((__, other) => other !== index);
+        change([...base, 'additionalGenerators'], rest);
+        // The series arrangement needs exactly one further generator.
+        if (rest.length !== 1 && series != null) change([...base, 'series'], null);
+      }} />
     </fieldset>)}
-    <button type="button" onClick={() => change(['hotWater', 'additionalGenerators'], [...extra, additionalHotWaterGeneratorTemplate()])}>
+    <button type="button" onClick={() => {
+      change([...base, 'additionalGenerators'], [...extra, additionalHotWaterGeneratorTemplate()]);
+      // A second further generator ends the series arrangement (13.141a–d needs exactly one).
+      if (series != null) change([...base, 'series'], null);
+    }}>
       {t('nta.form.dhwExtraAdd')}
     </button>
     {extra.length === 1 && <label>{t('nta.form.dhwSeries')}
-      <select value={typeof series === 'string' ? series : ''} onChange={(event) => change(['hotWater', 'series'],
+      <select value={typeof series === 'string' ? series : ''} onChange={(event) => change([...base, 'series'],
         event.target.value === 'hotfill_electric_boiler' ? { kind: 'hotfill_electric_boiler' }
           : event.target.value === 'collective_first_also_heating'
             ? { kind: 'collective_first_also_heating', maximumSupplyC: Array(12).fill(null) } : null)}>
@@ -590,8 +742,8 @@ export function HotWaterGeneratorsFields({ draft, change }: SectionProps) {
       </select>
     </label>}
     {series === 'collective_first_also_heating' && <MonthlyValues draft={draft} change={change}
-      path={['hotWater', 'series', 'maximumSupplyC']} label={t('nta.form.dhwSeries.maxSupply')} />}
-  </div>;
+      path={[...base, 'series', 'maximumSupplyC']} label={t('nta.form.dhwSeries.maxSupply')} />}
+  </>;
 }
 
 /** A further hot-water system (§13.2.4), started from the main system. */
@@ -646,7 +798,11 @@ export function AdditionalHotWaterSystemsFields({ draft, change, residential }: 
         </>}
         <TextField {...field} path={[...base, 'emission', 'sourceReference']} label={t('nta.form.source')} />
         <HotWaterGeneratorFields draft={draft} change={change} base={[...base, 'generator']} />
+        <NumberField {...field} path={[...base, 'nominalPowerKw']} label={t('nta.form.dhwNominalPower')} />
         <HotWaterStorageFields draft={draft} change={change} base={base} />
+        <HotWaterCirculationFields draft={draft} change={change} base={base} />
+        <HotWaterSystemExtrasFields draft={draft} change={change} base={base} />
+        <HotWaterExtraGeneratorsFields draft={draft} change={change} base={base} />
         <TextField {...field} path={[...base, 'equipmentReference']} label={t('nta.form.boilerEquipmentSource')} />
         <RemoveButton label={t('nta.form.remove')}
           onClick={() => change(['additionalHotWaterSystems'], systems.filter((__, other) => other !== index))} />
@@ -701,9 +857,9 @@ export function AdditionalHeatingSystemsFields({ draft, change, project }: Secti
 export function MonthlyValues({ draft, change, path, label }: SectionProps & { path: Path; label: string }) {
   const values = list(draft, path) as unknown as Array<number | null>;
   return <fieldset className="nta-form-months"><legend>{label}</legend>
-    {Array.from({ length: 12 }, (_, index) => <input key={index} type="number" step="any" aria-label={`${label} ${index + 1}`}
-      value={typeof values[index] === 'number' ? values[index] as number : ''}
-      onChange={(event) => change([...path, index], event.target.value === '' ? null : Number(event.target.value))} />)}
+    {Array.from({ length: 12 }, (_, index) => <NumberInput key={index} aria-label={`${label} ${index + 1}`}
+      value={typeof values[index] === 'number' ? values[index] as number : null}
+      onChange={(next) => change([...path, index], next ?? null)} />)}
   </fieldset>;
 }
 
@@ -713,7 +869,7 @@ function CollectorObstructionFields({ draft, change, base }: SectionProps & { ba
   const field = { draft, onChange: change };
   const method = read(draft, [...base, 'method']);
   return <>
-    <SelectField {...field} path={[...base, 'method']} label={t('nta.form.obstruction')} options={[
+    <SelectField required {...field} path={[...base, 'method']} label={t('nta.form.obstruction')} options={[
       ['minimal', t('nta.form.obstruction.minimal')], ['side_obstruction', t('nta.form.obstruction.side')],
       ['full', t('nta.form.obstruction.full')], ['roof_edge', t('nta.form.obstruction.roofEdge')],
       ['other', t('nta.form.obstruction.other')], ['declared', t('nta.form.obstruction.declared')]]}
@@ -749,7 +905,7 @@ export function SolarCalculatedFields({ draft, change, base }: SectionProps & { 
     <SelectField {...field} path={at('collectors', 'orientation')} label={t('nta.form.solar.orientation')} options={orientations} />
     <NumberField {...field} path={at('collectors', 'tiltDeg')} label={t('nta.form.tilt')} />
     <CollectorObstructionFields draft={draft} change={change} base={at('collectors', 'obstruction')} />
-    <SelectField {...field} path={at('collectors', 'efficiency', 'method')} label={t('nta.form.solar.efficiency')} options={[
+    <SelectField required {...field} path={at('collectors', 'efficiency', 'method')} label={t('nta.form.solar.efficiency')} options={[
       ['forfait', t('nta.form.solar.efficiency.forfait')], ['declared', t('nta.form.solar.efficiency.declared')]]}
       onChange={(_, value) => change(at('collectors', 'efficiency'), value === 'declared'
         ? { method: 'declared', eta0: null, a1WPerM2K: null, a2WPerM2K2: null, incidenceAngleModifier: null, sourceReference: '' }
@@ -764,7 +920,7 @@ export function SolarCalculatedFields({ draft, change, base }: SectionProps & { 
       ['unglazed_or_unknown', t('nta.form.solar.collector.unglazed')], ['glazed', t('nta.form.solar.collector.glazed')],
       ['evacuated_tube', t('nta.form.solar.collector.tube')]]} />}
     <NumberField {...field} path={at('collectors', 'heatExchangerWPerK')} label={t('nta.form.solar.heatExchanger')} />
-    <SelectField {...field} path={at('collectors', 'loopPipes', 'method')} label={t('nta.form.solar.loop')} options={[
+    <SelectField required {...field} path={at('collectors', 'loopPipes', 'method')} label={t('nta.form.solar.loop')} options={[
       ['forfait', t('nta.form.solar.loop.forfait')], ['declared', t('nta.form.solar.loop.declared')]]}
       onChange={(_, value) => change(at('collectors', 'loopPipes'), value === 'declared'
         ? { method: 'declared', heatLossWPerK: null, sourceReference: '' } : { method: 'forfait' })} />
@@ -802,8 +958,8 @@ export function SolarWaterHeaterFields({ draft, change, base = ['hotWater', 'sol
         <SelectField {...field} path={at('solarUse')} label={t('nta.form.solar.use')} options={[
           ['water_heating', t('nta.form.solar.use.water')], ['combi', t('nta.form.solar.use.combi')],
           ['space_heating', t('nta.form.solar.use.space')]]} />
-        <NumberField {...field} path={at('count')} label={t('nta.form.solar.count')} step="1" />
-        <SelectField {...field} path={at('method', 'method')} label={t('nta.form.solar.method')} options={[
+        <NumberField {...field} path={at('count')} label={t('nta.form.solar.count')} step="1" optional />
+        <SelectField required {...field} path={at('method', 'method')} label={t('nta.form.solar.method')} options={[
           ['calculated', t('nta.form.solar.method.calculated')], ['tested', t('nta.form.solar.method.tested')]]}
           onChange={(_, value) => change(at('method'), value === 'tested' ? testedSolarMethod() : calculatedSolarMethod())} />
         <SelectField {...field} path={at('method', 'solarType')} label={t('nta.form.solar.type')} options={[
@@ -901,7 +1057,7 @@ export function WindowObstructionFields({ draft, change, base = ['windowSolar', 
   const field = { draft, onChange: change };
   const method = read(draft, [...base, 'method']);
   return <>
-    <SelectField {...field} path={[...base, 'method']} label={t('nta.form.obstruction')} options={[
+    <SelectField required {...field} path={[...base, 'method']} label={t('nta.form.obstruction')} options={[
       ['minimal', t('nta.form.obstruction.minimal')], ['parallel_obstruction', t('nta.form.obstruction.parallel')],
       ['overhang', t('nta.form.obstruction.overhang')], ['side_obstruction', t('nta.form.obstruction.side')],
       ['full', t('nta.form.obstruction.full')], ['other', t('nta.form.obstruction.other')],

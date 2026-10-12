@@ -310,7 +310,7 @@ pub fn assess_heating_aux_measured_draft(
             "invalid"
         },
         scope: "public_chapter_9_draft_9_86_9_88_measured_electric_heat_pump_only",
-        draft_source: DRAFT_SOURCE,
+        draft_source: crate::norm_versions::cite(DRAFT_SOURCE),
         target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint: input_fingerprint(&json!(input)),
@@ -442,7 +442,7 @@ pub fn assess_heating_aux_draft(input: &HeatingAuxDraftInput) -> HeatingAuxDraft
             "invalid"
         },
         scope: "public_chapter_9_draft_9_85_measured_coefficients_one_individual_generator_only",
-        draft_source: DRAFT_SOURCE,
+        draft_source: crate::norm_versions::cite(DRAFT_SOURCE),
         target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint: input_fingerprint(&json!(input)),

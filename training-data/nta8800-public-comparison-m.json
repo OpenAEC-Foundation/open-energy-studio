@@ -1,0 +1,795 @@
+{
+  "id": "public-comparison-m",
+  "name": "Vergelijking openbaar rapport M (kleine vrijstaande woning met koeling)",
+  "description": "Fictieve herbouw van een openbaar BENG-rapport (Uniec 3.1.3.1, NTA 8800:2022); niet de echte woning.",
+  "buildingFunction": "residential",
+  "address": "Fictief adres",
+  "city": "Fictief",
+  "zones": [
+    {
+      "id": "z1",
+      "name": "woning",
+      "floorArea": 43.44,
+      "volume": 112.944,
+      "height": 2.6,
+      "surfaces": [
+        {
+          "id": "VG",
+          "name": "Voorgevel",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 19.0,
+          "orientation": "NE",
+          "constructionId": "c-gevel",
+          "zoneId": "z1",
+          "windows": [
+            {
+              "id": "VG-V1-zr",
+              "name": "V1 zijlicht rechts",
+              "area": 2.73,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "NE",
+              "surfaceId": "VG"
+            },
+            {
+              "id": "VG-V1-deur",
+              "name": "V1 terrasdeur",
+              "area": 5.4,
+              "uValue": 1.6,
+              "gValue": 0.6,
+              "orientation": "NE",
+              "surfaceId": "VG"
+            },
+            {
+              "id": "VG-V1-zl",
+              "name": "V1 zijlicht links",
+              "area": 2.73,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "NE",
+              "surfaceId": "VG"
+            },
+            {
+              "id": "VG-V1-top",
+              "name": "V1 topgevel",
+              "area": 6.48,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "NE",
+              "surfaceId": "VG"
+            }
+          ]
+        },
+        {
+          "id": "RG",
+          "name": "Rechtergevel",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 28.45,
+          "orientation": "NW",
+          "constructionId": "c-gevel",
+          "zoneId": "z1",
+          "windows": [
+            {
+              "id": "RG-R1",
+              "name": "R1",
+              "area": 0.59,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "NW",
+              "surfaceId": "RG"
+            },
+            {
+              "id": "RG-R2-z",
+              "name": "R2 zijlicht",
+              "area": 1.26,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "NW",
+              "surfaceId": "RG"
+            },
+            {
+              "id": "RG-R2-deur",
+              "name": "R2 deur volledig dicht",
+              "area": 2.31,
+              "uValue": 2.0,
+              "gValue": 0.0,
+              "orientation": "NW",
+              "surfaceId": "RG"
+            }
+          ]
+        },
+        {
+          "id": "HD-R",
+          "name": "Hellend dak rechtergevel",
+          "type": "roof",
+          "thermalBoundary": "outdoor",
+          "area": 33.16,
+          "orientation": "NW",
+          "constructionId": "c-dak",
+          "zoneId": "z1",
+          "windows": []
+        },
+        {
+          "id": "AG",
+          "name": "Achtergevel",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 19.0,
+          "orientation": "SW",
+          "constructionId": "c-gevel",
+          "zoneId": "z1",
+          "windows": [
+            {
+              "id": "AG-A1-zr",
+              "name": "A1 zijlicht rechts",
+              "area": 2.69,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "SW",
+              "surfaceId": "AG"
+            },
+            {
+              "id": "AG-A1-zl",
+              "name": "A1 zijlicht links",
+              "area": 2.69,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "SW",
+              "surfaceId": "AG"
+            },
+            {
+              "id": "AG-A1-deur",
+              "name": "A1 terrasdeur",
+              "area": 5.31,
+              "uValue": 1.6,
+              "gValue": 0.6,
+              "orientation": "SW",
+              "surfaceId": "AG"
+            },
+            {
+              "id": "AG-A1-paneel",
+              "name": "A1 paneel in kozijn",
+              "area": 1.36,
+              "uValue": 1.5,
+              "gValue": 0.0,
+              "orientation": "SW",
+              "surfaceId": "AG"
+            },
+            {
+              "id": "AG-A1-top",
+              "name": "A1 topgevel",
+              "area": 5.42,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "SW",
+              "surfaceId": "AG"
+            }
+          ]
+        },
+        {
+          "id": "LG",
+          "name": "Linkergevel",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 28.45,
+          "orientation": "SE",
+          "constructionId": "c-gevel",
+          "zoneId": "z1",
+          "windows": []
+        },
+        {
+          "id": "HD-L",
+          "name": "Hellend dak linkergevel",
+          "type": "roof",
+          "thermalBoundary": "outdoor",
+          "area": 33.16,
+          "orientation": "SE",
+          "constructionId": "c-dak",
+          "zoneId": "z1",
+          "windows": []
+        },
+        {
+          "id": "BG",
+          "name": "Beganegrond vloer",
+          "type": "floor",
+          "thermalBoundary": "ground",
+          "area": 42.67,
+          "orientation": "horizontal",
+          "constructionId": "c-vloer",
+          "zoneId": "z1",
+          "windows": []
+        }
+      ],
+      "thermalBridges": [
+        {
+          "id": "tb0",
+          "name": "06 zk kozijn psi 0.09",
+          "psiValue": 0.09,
+          "length": 5.82,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NE"
+          ]
+        },
+        {
+          "id": "tb1",
+          "name": "00 bk kozijn schuin psi 0.5",
+          "psiValue": 0.5,
+          "length": 6.48,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NE"
+          ]
+        },
+        {
+          "id": "tb2",
+          "name": "09 gevelhoek psi 0.14",
+          "psiValue": 0.14,
+          "length": 2.96,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NE"
+          ]
+        },
+        {
+          "id": "tb3",
+          "name": "15 kopgevel dak psi 0.13",
+          "psiValue": 0.13,
+          "length": 6.9,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NE"
+          ]
+        },
+        {
+          "id": "tb4",
+          "name": "05 ok kozijn psi 0.15",
+          "psiValue": 0.15,
+          "length": 1.17,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NW"
+          ]
+        },
+        {
+          "id": "tb5",
+          "name": "06 zk kozijn psi 0.09",
+          "psiValue": 0.09,
+          "length": 5.76,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NW"
+          ]
+        },
+        {
+          "id": "tb6",
+          "name": "07 bk kozijn psi 0.1",
+          "psiValue": 0.1,
+          "length": 2.67,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NW"
+          ]
+        },
+        {
+          "id": "tb7",
+          "name": "09 gevelhoek psi 0.14",
+          "psiValue": 0.14,
+          "length": 2.96,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NW"
+          ]
+        },
+        {
+          "id": "tb8",
+          "name": "13 dakvoet psi 0.16",
+          "psiValue": 0.16,
+          "length": 9.61,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NW"
+          ]
+        },
+        {
+          "id": "tb9",
+          "name": "16 nok psi 0.05",
+          "psiValue": 0.05,
+          "length": 4.81,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NW"
+          ]
+        },
+        {
+          "id": "tb10",
+          "name": "06 zk kozijn psi 0.09",
+          "psiValue": 0.09,
+          "length": 5.93,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "SW"
+          ]
+        },
+        {
+          "id": "tb11",
+          "name": "00 bk kozijn schuin psi 0.5",
+          "psiValue": 0.5,
+          "length": 6.4,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "SW"
+          ]
+        },
+        {
+          "id": "tb12",
+          "name": "09 gevelhoek psi 0.14",
+          "psiValue": 0.14,
+          "length": 2.96,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "SW"
+          ]
+        },
+        {
+          "id": "tb13",
+          "name": "15 kopgevel dak psi 0.13",
+          "psiValue": 0.13,
+          "length": 6.9,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "SW"
+          ]
+        },
+        {
+          "id": "tb14",
+          "name": "09 gevelhoek psi 0.14",
+          "psiValue": 0.14,
+          "length": 2.96,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "SE"
+          ]
+        },
+        {
+          "id": "tb15",
+          "name": "13 dakvoet psi 0.16",
+          "psiValue": 0.16,
+          "length": 9.61,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "SE"
+          ]
+        },
+        {
+          "id": "tb16",
+          "name": "16 nok psi 0.05",
+          "psiValue": 0.05,
+          "length": 4.81,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "SE"
+          ]
+        }
+      ],
+      "pointThermalBridges": [],
+      "pointBridgeInventoryComplete": true,
+      "airTightness": {
+        "qv10": 0.98
+      }
+    }
+  ],
+  "heatingSystems": [],
+  "ventilationSystems": [],
+  "coolingSystems": [],
+  "hotWaterSystems": [],
+  "solarPV": [],
+  "solarThermal": [],
+  "unheatedSpaces": [],
+  "constructions": [
+    {
+      "id": "c-gevel",
+      "name": "Gevel Rc 4,70",
+      "layers": [],
+      "rcValue": 4.7,
+      "uValue": 0.2053
+    },
+    {
+      "id": "c-dak",
+      "name": "Hellend dak Rc 6,30",
+      "layers": [],
+      "rcValue": 6.3,
+      "uValue": 0.1553
+    },
+    {
+      "id": "c-vloer",
+      "name": "Beganegrond vloer Rc 3,70",
+      "layers": [],
+      "rcValue": 3.7,
+      "uValue": 0.2558
+    }
+  ],
+  "ntaCalculation": {
+    "calculationScope": "residential",
+    "constructionYear": 2022,
+    "areaSourceReference": "openbare bron Uniec 3.1.3.1 printout (vrijstaande woning met kap 43,44 m2, 15-09-2022): Ag 43,44 m2",
+    "usageFunction": "residential",
+    "dwellingType": "other",
+    "setpoints": {
+      "heatingC": 20.0,
+      "coolingC": 24.0,
+      "sourceReference": "table 7.13"
+    },
+    "thermalMass": {
+      "floor": "heavy",
+      "wall": "light",
+      "ceiling": "open_or_none",
+      "massKgPerM2": 375.0,
+      "sourceReference": "openbare bron Uniec 3.1.3.1 printout (vrijstaande woning met kap 43,44 m2, 15-09-2022): hsb, sfb of staalskeletbouw met staalbeton of niet-massieve betonnen vloeren (tabel 7.10 rij 250 tot 500 kg/m2)"
+    },
+    "internalGains": {
+      "method": "residential",
+      "dwellingCount": 1,
+      "sourceReference": "one dwelling"
+    },
+    "surfaceTilts": [
+      {
+        "surfaceId": "HD-R",
+        "tiltDeg": 50.0,
+        "sourceReference": "openbare bron Uniec 3.1.3.1 printout (vrijstaande woning met kap 43,44 m2, 15-09-2022)"
+      },
+      {
+        "surfaceId": "HD-L",
+        "tiltDeg": 50.0,
+        "sourceReference": "openbare bron Uniec 3.1.3.1 printout (vrijstaande woning met kap 43,44 m2, 15-09-2022)"
+      }
+    ],
+    "windowSolar": {
+      "frameFraction": 0.25,
+      "obstruction": {
+        "method": "minimal"
+      },
+      "sourceReference": "default F_F; openbare bron Uniec 3.1.3.1 printout (vrijstaande woning met kap 43,44 m2, 15-09-2022): minimale belemmering tenzij per raam anders"
+    },
+    "groundFloors": [
+      {
+        "surfaceId": "BG",
+        "exposedPerimeterM": 28.1,
+        "constructionResistanceM2kPerW": 3.7,
+        "edgeThermalBridges": {
+          "method": "detailed",
+          "bridges": [
+            {
+              "lengthM": 19.68,
+              "psiWPerMk": 0.9,
+              "sourceReference": "openbare bron Uniec 3.1.3.1 printout (vrijstaande woning met kap 43,44 m2, 15-09-2022): 03 fundering - dragende gevel"
+            },
+            {
+              "lengthM": 4.33,
+              "psiWPerMk": 0.5,
+              "sourceReference": "openbare bron Uniec 3.1.3.1 printout (vrijstaande woning met kap 43,44 m2, 15-09-2022): 00 perimeter - dorpel"
+            },
+            {
+              "lengthM": 4.09,
+              "psiWPerMk": 0.68,
+              "sourceReference": "openbare bron Uniec 3.1.3.1 printout (vrijstaande woning met kap 43,44 m2, 15-09-2022): 02 fundering - deur"
+            }
+          ]
+        },
+        "sourceReference": "openbare bron Uniec 3.1.3.1 printout (vrijstaande woning met kap 43,44 m2, 15-09-2022): op/boven mv, boven grond/spouw (z <= 0,3), h 0,05 m; perimeter = lengte van de funderingsaansluitingen (28,10 m)"
+      }
+    ],
+    "ventilationFlows": [],
+    "emission": {
+      "system": "floor_heating",
+      "balancing": "none_or_unknown",
+      "control": "main_room_thermostat",
+      "sourceReference": "openbare bron Uniec 3.1.3.1 printout (vrijstaande woning met kap 43,44 m2, 15-09-2022): vloerverwarming, regeling in hoofdvertrek (2,5 K)"
+    },
+    "distribution": {
+      "method": "calculated",
+      "sourceReference": "openbare bron Uniec 3.1.3.1 printout (vrijstaande woning met kap 43,44 m2, 15-09-2022)"
+    },
+    "distributionSystem": {
+      "designTemperatureClass": "40_35",
+      "installation": "individual",
+      "usageFunction": "residential",
+      "connectedStoreys": 1,
+      "pipeTransmittance": {
+        "method": "forfait",
+        "insulation": {
+          "state": "insulated",
+          "period": "from1995"
+        }
+      },
+      "valvesInsulated": false,
+      "pump": {
+        "method": "included_in_generator_auxiliary"
+      },
+      "sourceReference": "openbare bron Uniec 3.1.3.1 printout (vrijstaande woning met kap 43,44 m2, 15-09-2022): tweepijps 40 C, inregeling onbekend, leidinggegevens onbekend (27,80 m), geisoleerd, kleppen niet geisoleerd, geen aanvullende pomp",
+      "unheatedPipeLengthM": 0.0
+    },
+    "generator": {
+      "kind": "heat_pump_forfait",
+      "forfait": {
+        "generatorId": "wp",
+        "classificationSourceReference": "openbare bron Uniec 3.1.3.1 printout (vrijstaande woning met kap 43,44 m2, 15-09-2022): WP elektrisch forfaitair, buitenlucht, voldoet aan tabel 9.28, COP 3,15",
+        "scope": "residential_at_most25_kw",
+        "source": "outdoor_air",
+        "sink": "hydronic",
+        "designSupplyTemperatureC": 40,
+        "collectiveBuildingInstallation": false,
+        "thermalCapacityKw": 6.0,
+        "capacitySourceReference": "aangenomen 6 kW (niet in het rapport)",
+        "rowVariant": "table_9_28_high_efficiency",
+        "highEfficiencyEvidence": {
+          "productReference": "fictief; rapport: 'voldoet aan tabel 9.28'",
+          "testReportReference": "fictief; het rapport geeft geen meetwaarden",
+          "testStandardEdition": "NEN-EN 14511-2:2007",
+          "points": [
+            {
+              "condition": "a7_wet6_w45",
+              "measuredCop": 2.8
+            },
+            {
+              "condition": "a7_wet6_w35",
+              "measuredCop": 2.9
+            },
+            {
+              "condition": "a_minus7_wet_minus8_w45",
+              "measuredCop": 1.95
+            }
+          ]
+        }
+      },
+      "sourceSystem": "individual",
+      "sourceSystemReference": "buitenlucht"
+    },
+    "heatPumpRenewable": {
+      "sourceBelow20C": true,
+      "exhaustAirSource": false,
+      "sourceReference": "outdoor air"
+    },
+    "bacsFactor": 1.0,
+    "bacsSourceReference": "residential without BACS",
+    "useInventoryComplete": true,
+    "declaredUses": [],
+    "productionInventoryComplete": true,
+    "pvSystems": [
+      {
+        "id": "pv",
+        "peakPower": {
+          "method": "declared_specific",
+          "peakPowerWPerM2": 208.79,
+          "panelAreaM2": 18.2
+        },
+        "azimuthDeg": 135.0,
+        "tiltDeg": 50.0,
+        "mounting": "moderately_ventilated",
+        "obstructionFactors": [
+          1.0
+        ],
+        "sourceReference": "openbare bron Uniec 3.1.3.1 printout (vrijstaande woning met kap 43,44 m2, 15-09-2022): 10 x 380 Wp, 18,20 m2, 208,79 Wp/m2, zuidoost 50 graden, matig geventileerd, minimale belemmering"
+      }
+    ],
+    "demandUsesFixedC1Ventilation": false,
+    "batteryStoragePresent": false,
+    "bblFunction": "other_residential",
+    "activeCooling": {
+      "system": "heat_pump_with_cooling_emitter",
+      "capacity": {
+        "method": "dynamic_cooling_load",
+        "sourceReference": "openbare bron Uniec 3.1.3.1 printout (vrijstaande woning met kap 43,44 m2, 15-09-2022): actieve koeling, TOjuli 0,00"
+      },
+      "sourceReference": "openbare bron Uniec 3.1.3.1 printout (vrijstaande woning met kap 43,44 m2, 15-09-2022)"
+    },
+    "cooling": {
+      "emission": {
+        "emitter": "floor_cooling",
+        "balancing": "none_or_unknown",
+        "control": "unknown_or_other",
+        "sourceReference": "openbare bron Uniec 3.1.3.1 printout (vrijstaande woning met kap 43,44 m2, 15-09-2022): vloerkoeling, regeling in hoofdvertrek (-2,5 K)"
+      },
+      "distribution": {
+        "designTemperature": "t17_to21",
+        "pipe": {
+          "kind": "insulated_from1995"
+        },
+        "fittingsInsulated": false,
+        "pump": {
+          "hydraulicallyBalanced": false,
+          "floorCount": 1,
+          "heatMeter": false,
+          "individualDwellingInstallation": true,
+          "labelPowerKw": 0.033,
+          "energyEfficiencyIndex": 0.23,
+          "sourceReference": "openbare bron Uniec 3.1.3.1 printout (vrijstaande woning met kap 43,44 m2, 15-09-2022): pompvermogen en EEI onbekend, pomp 33 W, EEI 0,23"
+        },
+        "sourceReference": "openbare bron Uniec 3.1.3.1 printout (vrijstaande woning met kap 43,44 m2, 15-09-2022): watergedragen, ontwerptemperatuur onbekend (hele systeem vloerkoeling), inregeling onbekend, leidinggegevens onbekend (27,80 m), geen leidingen buiten de gekoelde zone",
+        "unconditionedPipeLengthM": 0.0
+      },
+      "generators": [
+        {
+          "id": "koel",
+          "generator": {
+            "kind": "compression"
+          },
+          "equipmentReference": "openbare bron Uniec 3.1.3.1 printout (vrijstaande woning met kap 43,44 m2, 15-09-2022): compressiekoeling elektrisch forfaitair, EER 3,00"
+        }
+      ]
+    },
+    "verticalPipes": [
+      {
+        "id": "fictief",
+        "storeys": 1,
+        "insulated": false,
+        "sourceReference": "openbare bron Uniec 3.1.3.1 printout (vrijstaande woning met kap 43,44 m2, 15-09-2022): verticale leidingen door de thermische schil onbekend (7.3.3 fictieve leiding)"
+      }
+    ],
+    "ventilation": {
+      "zoneId": "z1",
+      "usableFloorAreaM2": 43.44,
+      "category": "residential",
+      "functions": [
+        {
+          "function": "residential",
+          "areaM2": 43.44
+        }
+      ],
+      "dwellingCount": 1,
+      "apartmentBuilding": false,
+      "buildingHeightM": 6.05,
+      "constructionYear": 2022,
+      "floorAboveCrawlspace": false,
+      "heatingSetpointC": 20.0,
+      "coolingSetpointC": 24.0,
+      "system": {
+        "kind": "single",
+        "unit": {
+          "variant": "c4c",
+          "ducts": "unknown",
+          "equipmentReference": "Itho Daalderop CVE/CVD ECO Optima 2 GG met CO2-sensoren in woonkamer en hoofdslaapkamer + zr-roosters",
+          "declaredControlFactor": {
+            "value": 0.51,
+            "declarationReference": "BCRG gecontroleerde gelijkwaardigheidsverklaring 20201914GG (20191290GGVNWB), Itho CVE/CVD ECO Optima2 GG, C.4c, f_ctrl 0,51 (bijlage bij de Uniec 3.1.3.1 printout, 15-09-2022)"
+          }
+        }
+      },
+      "installedCapacity": {
+        "totalDm3PerS": 32.1,
+        "sourceReference": "openbare bron Uniec 3.1.3.1 printout (vrijstaande woning met kap 43,44 m2, 15-09-2022): natuurlijke toevoer 32,1 dm3/s"
+      },
+      "flowReduction": {
+        "collective": false
+      },
+      "infiltration": {
+        "method": "reference",
+        "buildingType": "pitched_roof_detached"
+      },
+      "combustionAppliances": [],
+      "fans": {
+        "method": "declared",
+        "fans": [
+          {
+            "id": "f1",
+            "power": {
+              "method": "nominal",
+              "nominalPowerW": 7.2
+            }
+          }
+        ],
+        "control": {
+          "method": "declared",
+          "monthly": [
+            0.155,
+            0.155,
+            0.155,
+            0.155,
+            0.155,
+            0.155,
+            0.155,
+            0.155,
+            0.155,
+            0.155,
+            0.155,
+            0.155
+          ],
+          "sourceReference": "openbare bron Uniec 3.1.3.1 printout (vrijstaande woning met kap 43,44 m2, 15-09-2022): f 0,155"
+        },
+        "sourceReference": "openbare bron Uniec 3.1.3.1 printout (vrijstaande woning met kap 43,44 m2, 15-09-2022): P 7,2 W"
+      },
+      "sourceReference": "openbare bron Uniec 3.1.3.1 printout (vrijstaande woning met kap 43,44 m2, 15-09-2022)"
+    },
+    "hotWater": {
+      "need": {
+        "method": "residential",
+        "dwellingCount": 1,
+        "sourceReference": "one dwelling"
+      },
+      "emission": {
+        "method": "residential",
+        "served": "kitchen_and_bathroom",
+        "kitchenLengthM": 5.0,
+        "bathroomLengthM": 5.0,
+        "sourceReference": "openbare bron Uniec 3.1.3.1 printout (vrijstaande woning met kap 43,44 m2, 15-09-2022): leidinglengte naar badruimte en aanrecht 4 - 6 m, diameter naar aanrecht > 10 mm"
+      },
+      "generator": {
+        "kind": "heat_pump",
+        "exhaustAirSource": false
+      },
+      "equipmentReference": "openbare bron Uniec 3.1.3.1 printout (vrijstaande woning met kap 43,44 m2, 15-09-2022): WP elektrisch forfaitair met geintegreerd voorraadvat, COP 1,40"
+    },
+    "normVersion": "2022",
+    "windowObstructions": [
+      {
+        "windowId": "VG-V1-zr",
+        "obstruction": {
+          "method": "side_obstruction",
+          "side": "right",
+          "relativeWidth": 1.763,
+          "coolingHeightCondition": false
+        },
+        "sourceReference": "openbare bron Uniec 3,1,3,1 printout (vrijstaande woning met kap 43,44 m2, 15-09-2022), raam V1 zijlicht: zijbelemmering rechts, hoogte < 2,5 m, afstand 0,67 m, breedte 0,38 m; b_b = afstand / breedte (2022 p. 673)"
+      },
+      {
+        "windowId": "VG-V1-zl",
+        "obstruction": {
+          "method": "side_obstruction",
+          "side": "left",
+          "relativeWidth": 1.763,
+          "coolingHeightCondition": false
+        },
+        "sourceReference": "openbare bron Uniec 3,1,3,1 printout (vrijstaande woning met kap 43,44 m2, 15-09-2022), raam V1 zijlicht: zijbelemmering links, hoogte < 2,5 m, afstand 0,67 m, breedte 0,38 m; b_b = afstand / breedte (2022 p. 673)"
+      },
+      {
+        "windowId": "RG-R2-z",
+        "obstruction": {
+          "method": "side_obstruction",
+          "side": "right",
+          "relativeWidth": 1.933,
+          "coolingHeightCondition": false
+        },
+        "sourceReference": "openbare bron Uniec 3,1,3,1 printout (vrijstaande woning met kap 43,44 m2, 15-09-2022), raam R2 zijlicht: zijbelemmering rechts, hoogte < 2,5 m, afstand 0,29 m, breedte 0,15 m; b_b = afstand / breedte (2022 p. 673)"
+      },
+      {
+        "windowId": "AG-A1-zr",
+        "obstruction": {
+          "method": "side_obstruction",
+          "side": "right",
+          "relativeWidth": 1.763,
+          "coolingHeightCondition": false
+        },
+        "sourceReference": "openbare bron Uniec 3,1,3,1 printout (vrijstaande woning met kap 43,44 m2, 15-09-2022), raam A1 zijlicht: zijbelemmering rechts, hoogte < 2,5 m, afstand 0,67 m, breedte 0,38 m; b_b = afstand / breedte (2022 p. 673)"
+      },
+      {
+        "windowId": "AG-A1-zl",
+        "obstruction": {
+          "method": "side_obstruction",
+          "side": "left",
+          "relativeWidth": 1.763,
+          "coolingHeightCondition": false
+        },
+        "sourceReference": "openbare bron Uniec 3,1,3,1 printout (vrijstaande woning met kap 43,44 m2, 15-09-2022), raam A1 zijlicht: zijbelemmering links, hoogte < 2,5 m, afstand 0,67 m, breedte 0,38 m; b_b = afstand / breedte (2022 p. 673)"
+      }
+    ]
+  }
+}

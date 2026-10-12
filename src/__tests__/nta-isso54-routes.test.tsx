@@ -10,6 +10,7 @@ import {
   pipeGeometryTemplate,
 } from '../components/NtaPerformancePanel/NtaPipeGeometry';
 import { write, type Draft, type Path } from '../components/NtaPerformancePanel/NtaFormFields';
+import { HotWaterGeneratorFields } from '../components/NtaPerformancePanel/NtaSystemSections';
 import { hasExplicitRoute, routeForPath } from '../core/nta/gapRoutes';
 import { renderWithProviders, userEvent } from './test-utils';
 
@@ -95,5 +96,17 @@ describe('Calculated pipe Ψ, declared 9.85 constants and CHP factors', () => {
     await user.click(screen.getByLabelText(/Conversion factors from a quality declaration/));
     await user.type(screen.getByLabelText('ε_chp;th'), '0.8');
     expect(current().chp.declaredEfficiencies).toMatchObject({ thermal: 0.8 });
+  });
+
+  it('offers the CHP declaration for hot water too (§13.8.4.7.4)', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Harness initial={{ hotWater: { generator: {
+      kind: 'chp', chp: { powerKw: 50, builtAfter2006: true }, method1: null, equipmentReference: '',
+    } } }}>
+      {(draft, change) => <HotWaterGeneratorFields draft={draft} change={change} base={['hotWater', 'generator']} />}
+    </Harness>);
+    await user.click(screen.getByLabelText(/Conversion factors from a quality declaration/));
+    await user.type(screen.getByLabelText('ε_chp;th'), '0.8');
+    expect(current().hotWater.generator.declaredEfficiencies).toMatchObject({ thermal: 0.8 });
   });
 });

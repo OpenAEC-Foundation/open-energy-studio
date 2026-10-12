@@ -322,6 +322,15 @@ export interface ISolarThermal {
 // Project
 // ------------------------------------------------------------
 /** One import of data by the adviser (BRL 9501 §4.3.1 opmerking). */
+/** What an importer filled in or left out (see `src/core/io/importIssues.ts`). */
+export interface ProjectImportIssue {
+  path: string;
+  kind: 'defaulted' | 'invalid' | 'clamped' | 'dropped' | 'unknown_reference' | 'duplicate' | 'multiple';
+  value?: string | number;
+  /** Dutch explanation. */
+  message: string;
+}
+
 export interface ProjectImportRecord {
   /** The tool or format the data came from, e.g. `UNIEC3` or `VABI`. */
   tool: string;
@@ -330,6 +339,12 @@ export interface ProjectImportRecord {
   importedAt?: string;
   /** What the import did not or only partly take over, for the adviser to check (Uniec3). */
   notes?: string[];
+  /** SHA-256 (hex) of the file as read, so the source file can be identified later. */
+  sha256?: string;
+  /** Program and NTA 8800 version the file names (Uniec 3 meta.json, VABI Algemeen); not carried over as the edition. */
+  sourceVersion?: string;
+  /** Values the importer filled in, limited or left out; empty when it copied everything. */
+  issues?: ProjectImportIssue[];
 }
 
 export interface IProject {

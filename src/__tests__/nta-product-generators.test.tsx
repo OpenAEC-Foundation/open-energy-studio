@@ -132,6 +132,13 @@ describe('NTA generators with product data', () => {
     await user.type(screen.getByLabelText('Depth of the floor below ground level z, m'), '2.5');
     await user.type(screen.getByLabelText('R_c of the basement walls, m²K/W'), '3.5');
     expect(current().groundFloors[0]).toMatchObject({ below: null, heatedBasement: { depthM: 2.5, wallResistanceM2kPerW: 3.5 } });
+    // ΣA_T;bw of 8.38 and 6.7.2 (annex K); blank drops the member and the kernel takes z·P.
+    const wallArea = screen.getByLabelText(/Area of the basement walls below ground/);
+    await user.type(wallArea, '130.45');
+    expect(current().groundFloors[0].heatedBasement.wallAreaM2).toBe(130.45);
+    await user.clear(wallArea);
+    await user.tab();
+    expect('wallAreaM2' in current().groundFloors[0].heatedBasement).toBe(false);
   });
 
   it('interpolates a BCRG declaration table through the kernel', { timeout: 60000 }, async () => {

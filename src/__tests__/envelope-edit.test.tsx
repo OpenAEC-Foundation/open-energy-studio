@@ -9,6 +9,7 @@ import { ConstructionEditorDialog } from '../components/dialogs/ConstructionEdit
 import { ZoneEditorDialog } from '../components/dialogs/ZoneEditorDialog/ZoneEditorDialog';
 import { deleteTarget } from '../core/energy/projectItems';
 import { renderWithProviders, userEvent } from './test-utils';
+import { SLOW_UI_TEST_MS } from './timeouts';
 
 function Harness({ properties = false }: { properties?: boolean }) {
   const { state, dispatch } = useEnergy();
@@ -44,7 +45,7 @@ describe('editing existing envelope elements', () => {
     const after = windowsOnSouth();
     expect(after.map((w) => w.id)).toEqual(before);
     expect(after[0]).toMatchObject({ id: 'win-s1', name: 'Raam Zuid HR+++', uValue: 0.8 });
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 
   it('opens the surface editor on double-click and keeps the surface order', async () => {
     const user = userEvent.setup();
@@ -56,7 +57,7 @@ describe('editing existing envelope elements', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Save' }));
     expect(screen.getByTestId('surface-ids').textContent).toBe(ids);
     expect(screen.getByRole('row', { name: /^Gevel Oost/ })).toHaveTextContent('40');
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 
   it('deletes a window only after confirmation', async () => {
     const user = userEvent.setup();
@@ -69,7 +70,7 @@ describe('editing existing envelope elements', () => {
     await user.click(within(row).getByRole('button', { name: 'Delete: Deur Zuid' }));
     await user.click(within(row).getByRole('button', { name: 'Yes, delete' }));
     expect(windowsOnSouth().map((w) => w.id)).toEqual(['win-s1', 'win-s2']);
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 
   it('refuses to delete a construction that surfaces still use', async () => {
     const user = userEvent.setup();
@@ -79,7 +80,7 @@ describe('editing existing envelope elements', () => {
     await user.click(screen.getByRole('button', { name: `Delete: ${name}` }));
     expect(screen.getByRole('alert')).toHaveTextContent(/surface/);
     expect(screen.getByTestId('constructions').textContent).toBe(constructions);
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 
   // The project tree is gone (UI redesign F4): the envelope list selects on click and edits on
   // double-click; the inspector (embedded properties panel) offers edit and delete.
@@ -96,7 +97,7 @@ describe('editing existing envelope elements', () => {
     const panel = document.querySelector('.properties-panel') as HTMLElement;
     await user.click(within(panel).getByRole('button', { name: 'Edit: Raam Zuid 2' }));
     expect(within(screen.getByRole('dialog')).getByLabelText('Name')).toHaveValue('Raam Zuid 2');
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 
   it('maps every item type to a delete action', () => {
     const project = { zones: [], constructions: [], heatingSystems: [{ id: 'h1' }] } as never;
@@ -127,7 +128,7 @@ describe('dialog keyboard handling', () => {
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(screen.getByRole('button', { name: 'Edit: Raam Zuid 2' })).toHaveFocus();
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 
   it('labels every control in the zone, window, surface and construction dialogs', async () => {
     const user = userEvent.setup();
@@ -148,5 +149,5 @@ describe('dialog keyboard handling', () => {
     const construction = JSON.parse(screen.getByTestId('constructions').textContent ?? '[]')[0].name as string;
     await user.click(screen.getByRole('button', { name: `Edit: ${construction}` }));
     check();
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 });

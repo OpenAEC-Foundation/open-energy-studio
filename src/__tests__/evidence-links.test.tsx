@@ -126,7 +126,7 @@ describe('survey takeover', () => {
     expect(next).not.toHaveProperty('transmission');
     expect(next).not.toHaveProperty('totalUsableFloorAreaM2');
     expect(keys).toContain('emission');
-    expect(skipped.map((part) => part.reason)).toEqual(['geometry', 'geometry']);
+    expect(skipped.map((part) => part.reason)).toEqual(['geometry', 'geometry', 'geometry']);
   });
 
   it('leaves the zone demand of a multi-zone survey to the user', () => {

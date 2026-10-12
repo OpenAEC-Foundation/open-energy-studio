@@ -15,6 +15,7 @@ import {
 } from '../components/shell/pages/results/resultsData';
 import { ResultsDashboard } from '../components/shell/pages/results/ResultsDashboard';
 import { renderWithProviders, userEvent } from './test-utils';
+import { SLOW_UI_TEST_MS } from './timeouts';
 
 const kernel = vi.hoisted(() => ({ state: null as KernelState | null }));
 vi.mock('../context/KernelProvider', async (importOriginal) => ({
@@ -107,7 +108,7 @@ describe('results dashboard', () => {
     await user.click(within(chart).getByRole('button', { name: 'Table' }));
     const table = within(chart).getByRole('table');
     expect(within(table).getAllByRole('row')).toHaveLength(14);
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 
   it('says TOjuli does not apply to a utility building', () => {
     kernel.state = state(examples[1][1]);

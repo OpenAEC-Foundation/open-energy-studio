@@ -50,7 +50,7 @@ export function HeatingEmission2023Fields({ draft, change }: { draft: Draft; cha
       {t(`${p}.title`)}
     </label>
     {value != null && <>
-      <SelectField {...field} path={at('kind', 'type')} label={t(`${p}.kind`)} options={options(t, `${p}.kind`, KINDS)}
+      <SelectField required {...field} path={at('kind', 'type')} label={t(`${p}.kind`)} options={options(t, `${p}.kind`, KINDS)}
         onChange={(_, next) => change(at('kind'), KIND_TEMPLATES[String(next)] ?? KIND_TEMPLATES.radiators)} />
       {(kind === 'radiators' || kind === 'surface' || kind === 'dwelling_air') &&
         <SelectField {...field} path={at('kind', 'control')} label={t(`${p}.control`)} options={options(t, `${p}.control`, ['central', 'room'])} />}

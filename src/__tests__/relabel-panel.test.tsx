@@ -3,6 +3,7 @@ import { act, screen, waitFor } from '@testing-library/react';
 import { RelabelPanel } from '../components/MaatwerkadviesPanel/RelabelPanel';
 import { useEnergy } from '../context/EnergyContext';
 import { renderWithProviders, userEvent } from './test-utils';
+import { SLOW_UI_TEST_MS } from './timeouts';
 
 function Harness() {
   const { dispatch } = useEnergy();
@@ -72,5 +73,5 @@ describe('relabel comparison', () => {
     expect(await screen.findByTestId('relabel-outdated')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Remove comparison' }));
     expect(screen.queryByText('Relabelling allowed')).not.toBeInTheDocument();
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 });

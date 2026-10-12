@@ -3,6 +3,7 @@ import { useI18n } from '../../../i18n/i18n';
 import { useEnergy } from '../../../context/EnergyContext';
 import { IZone } from '../../../core/energy/types';
 import { DialogShell } from '../DialogShell';
+import { DecimalInput } from '../../ui';
 
 interface ZoneEditorDialogProps {
   editId?: string | null;
@@ -75,8 +76,7 @@ export function ZoneEditorDialog({ editId, onClose }: ZoneEditorDialogProps) {
 
         <div className="dialog-field">
           <label htmlFor={`${fieldId}-2`}>{t('dialog.zone.floorArea')}</label>
-          <input id={`${fieldId}-2`}
-            type="number"
+          <DecimalInput id={`${fieldId}-2`}
             min={0}
             step={0.1}
             value={floorArea}
@@ -86,8 +86,7 @@ export function ZoneEditorDialog({ editId, onClose }: ZoneEditorDialogProps) {
 
         <div className="dialog-field">
           <label htmlFor={`${fieldId}-3`}>{t('dialog.zone.volume')}</label>
-          <input id={`${fieldId}-3`}
-            type="number"
+          <DecimalInput id={`${fieldId}-3`}
             min={0}
             step={0.1}
             value={volume}
@@ -97,8 +96,7 @@ export function ZoneEditorDialog({ editId, onClose }: ZoneEditorDialogProps) {
 
         <div className="dialog-field">
           <label htmlFor={`${fieldId}-4`}>{t('dialog.zone.height')}</label>
-          <input id={`${fieldId}-4`}
-            type="number"
+          <DecimalInput id={`${fieldId}-4`}
             min={0}
             step={0.01}
             value={height}

@@ -195,10 +195,12 @@ describe('NTA performance panel', () => {
     const finalEnergy = within(screen.getByLabelText('Final energy use'));
     expect(finalEnergy.getByText('6,080.25 kWh/yr')).toBeInTheDocument();
     expect(finalEnergy.getByText('6,330.25 kWh/yr')).toBeInTheDocument();
-    expect(finalEnergy.getByRole('row', { name: 'gas 5,900.00' })).toBeInTheDocument();
-    expect(finalEnergy.getByRole('row', { name: 'el 180.25' })).toBeInTheDocument();
+    expect(finalEnergy.getByRole('row', { name: 'Natural gas (gas) 5,900.00' })).toBeInTheDocument();
+    expect(finalEnergy.getByRole('row', { name: 'Electricity (el) 180.25' })).toBeInTheDocument();
     await user.click(screen.getByText('Energy per energy function (§5.5.3)'));
     const services = within(screen.getByTestId('nta-energy-by-service'));
+    // Carrier columns name the carrier, not only its table 5.2 code.
+    expect(services.getByRole('columnheader', { name: 'Natural gas (gas)' })).toBeInTheDocument();
     expect(services.getByRole('row', { name: 'Space heating 0 5,900 5,900 0' })).toBeInTheDocument();
     expect(services.getByRole('row', { name: 'Auxiliary energy 180 0 261 0' })).toBeInTheDocument();
     expect(services.getByRole('row', { name: 'Domestic hot water 0 0 0 250' })).toBeInTheDocument();
@@ -232,7 +234,9 @@ describe('NTA performance panel', () => {
     fireEvent.change(form.getAllByLabelText('Source')[0], { target: { value: 'table 7.13' } });
     await user.selectOptions(form.getByLabelText('Floors'), 'very_heavy');
     fireEvent.change(form.getByLabelText('Or: ventilation flow incl. infiltration m³/h (H_ve = q·ρ·c/3600)'), { target: { value: '100' } });
-    expect(form.getByLabelText('Ventilation conductance H_ve W/K (all months)')).toHaveValue(100 * 1.205 * 1005 / 3600);
+    // A NumberInput (decimal comma or point) shows the value as text in the UI locale.
+    expect(Number((form.getByLabelText('Ventilation conductance H_ve W/K (all months)') as HTMLInputElement).value))
+      .toBeCloseTo(100 * 1.205 * 1005 / 3600, 8);
     await user.clear(form.getByLabelText('Ventilation conductance H_ve W/K (all months)'));
     fireEvent.change(form.getByLabelText('Ventilation conductance H_ve W/K (all months)'), { target: { value: '42' } });
     await user.selectOptions(form.getByLabelText('Emission system'), 'floor_heating');

@@ -10,6 +10,18 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 
+/// Object members whose explicit `null` the kernel reads differently from an
+/// absent member: a BACS generator's `nominalThermalCapacityKw` is `null`
+/// when the capacity is genuinely undeterminable, and must not be omitted.
+/// Every other null member means the same as an absent one (the input
+/// fingerprint and the project route both follow this rule).
+pub const EXPLICIT_NULL_MEMBERS: &[&str] = &["nominalThermalCapacityKw"];
+
+/// Whether a member's explicit `null` is kept (see [`EXPLICIT_NULL_MEMBERS`]).
+pub fn is_explicit_null_member(key: &str) -> bool {
+    EXPLICIT_NULL_MEMBERS.contains(&key)
+}
+
 pub mod annex_a;
 pub mod annex_aa;
 pub mod annex_b;
@@ -25,12 +37,14 @@ pub mod bbl_requirements;
 pub mod boiler_forfait_draft;
 pub mod building_performance;
 pub mod climate;
+pub mod common_space;
 pub mod constructions;
 pub mod declared_dhw;
 pub mod declared_heating_table;
 pub mod diagnostic_reference;
 pub mod direct_transmission;
 pub mod domestic_hot_water;
+pub mod edition_switch;
 pub mod envelope_elements;
 pub mod epus_draft;
 pub mod final_energy_draft;
@@ -296,8 +310,16 @@ pub struct KernelCapabilities {
     pub kernel_language: &'static str,
     pub kernel_version: &'static str,
     pub target_norm_version: &'static str,
+    /// Whether the legacy `/v1/nta8800/calculate` route (`calculate_beng`)
+    /// calculates; it does not, it validates and refers to the project
+    /// calculation. Kept for older clients; see `project_calculation_available`.
     pub calculation_available: bool,
+    /// Whether the project calculation (`calculate_project_performance`)
+    /// calculates BENG, TOjuli and the indicative label: unverified, no attest.
+    pub project_calculation_available: bool,
     pub attest_status: &'static str,
+    /// The NTA 8800 editions the kernel knows, as `GET /v1/version` lists them.
+    pub supported_norm_versions: Vec<crate::norm_versions::EditionInfo>,
     pub implemented: &'static [&'static str],
 }
 
@@ -307,8 +329,19 @@ pub fn capabilities() -> KernelCapabilities {
         kernel_version: KERNEL_VERSION,
         target_norm_version: crate::norm_versions::current_label(),
         calculation_available: false,
+        project_calculation_available: true,
         attest_status: "unattested",
+        supported_norm_versions: crate::norm_versions::supported_editions(),
         implemented: &[
+            "unverified_project_performance_multi_zone",
+            "unverified_project_performance_editions_2020a1_2022_2023_2024_2025c1",
+            "unverified_isso_75_1_basisopname_utility",
+            "unverified_maatwerkadvies_isso_82_2_75_2",
+            "relabel_comparison_brl_9500_annex_6a_6b",
+            "registration_readiness_brl_9500_omgevingsregeling",
+            "label_data_omgevingsregeling_5_13_5_13a",
+            "unverified_annex_aa_cooling_capacity_per_zone",
+            "reference_case_audit_and_comparison",
             "legacy_project_structural_validation",
             "envelope_geometry_input_audit",
             "diagnostic_direct_outdoor_conductance",
@@ -335,17 +368,16 @@ pub fn capabilities() -> KernelCapabilities {
             "diagnostic_direct_transmission_reference_comparison",
             "unverified_chapter_7_monthly_heating_cooling_need_single_zone",
             "unverified_space_heating_chain_emission_distribution_single_generator",
-            "unverified_single_zone_primary_energy_and_indicators_chapter_5_draft",
+            "unverified_primary_energy_and_indicators_chapter_5",
             "unverified_space_heating_distribution_9_26_to_9_51_and_auxiliary_9_85_9_91",
             "unverified_storage_correction_5_14a_and_co2_emission_5_5_6_1",
             "unverified_pv_yield_chapter_16_tables_16_1_to_16_3",
             "unverified_space_cooling_chapter_10_method_3_with_emission_distribution_priority",
             "indicative_label_class_omgevingsregeling_annex_ix_x",
-            "bbl_4_149_beng_requirement_check_single_function",
+            "bbl_4_149_beng_requirement_check_mixed_use",
             "unverified_tojuli_per_orientation_5_7_with_capacity_evidence",
             "unverified_domestic_hot_water_chapter_13_generators_and_solar_13_7",
             "unverified_utility_lighting_chapter_14",
-            "unverified_project_performance_adapter_single_zone",
             "unverified_ventilation_chapter_11_pressure_balance_and_c1",
             "unverified_humidification_dehumidification_chapter_12",
             "schematisation_checks_6_4_and_6_5_2",
@@ -371,6 +403,10 @@ pub fn assess_json(value: Value) -> Result<InputAssessment, String> {
     Ok(assess_project(&project, input_fingerprint))
 }
 
+/// SHA-256 of the canonical input: object keys sorted, and object members
+/// that are null left out, because a null member means the same as an
+/// absent one (the UI sends the blanks of the NTA block as null to the
+/// project route and leaves them out on the validate route).
 pub(crate) fn input_fingerprint(value: &Value) -> String {
     fn canonical(value: &Value, output: &mut String) {
         match value {
@@ -386,7 +422,11 @@ pub(crate) fn input_fingerprint(value: &Value) -> String {
             }
             Value::Object(fields) => {
                 output.push('{');
-                let mut keys: Vec<_> = fields.keys().collect();
+                let mut keys: Vec<_> = fields
+                    .iter()
+                    .filter(|(key, item)| !item.is_null() || is_explicit_null_member(key))
+                    .map(|(key, _)| key)
+                    .collect();
                 keys.sort();
                 for (index, key) in keys.into_iter().enumerate() {
                     if index > 0 {
@@ -509,7 +549,10 @@ fn assess_project(project: &ProjectInput, input_fingerprint: String) -> InputAss
                     }
                 }
             }
-        } else if construction.get("layers").is_some() {
+        } else if construction
+            .get("layers")
+            .is_some_and(|value| !value.is_null())
+        {
             issues.push(issue(
                 Severity::Error,
                 "construction_layers_invalid",
@@ -971,7 +1014,10 @@ fn assess_project(project: &ProjectInput, input_fingerprint: String) -> InputAss
     for (index, system) in project.heating_systems.iter().enumerate() {
         let system_type = system.get("type").and_then(Value::as_str);
         if !matches!(system_type, Some("heat_pump_air" | "heat_pump_ground")) {
-            if system.get("ntaHeatPump").is_some() {
+            if system
+                .get("ntaHeatPump")
+                .is_some_and(|value| !value.is_null())
+            {
                 issues.push(issue(
                     Severity::Error,
                     "heat_pump_metadata_on_other_system",
@@ -1009,7 +1055,7 @@ fn assess_project(project: &ProjectInput, input_fingerprint: String) -> InputAss
                 "Legacy heat pump coverage fraction must be between zero and one",
             ));
         }
-        let Some(metadata) = system.get("ntaHeatPump") else {
+        let Some(metadata) = system.get("ntaHeatPump").filter(|value| !value.is_null()) else {
             issues.push(issue(
                 Severity::Warning,
                 "heat_pump_route_unclassified",
@@ -1121,7 +1167,9 @@ fn assess_project(project: &ProjectInput, input_fingerprint: String) -> InputAss
     }
     for (index, system) in project.hot_water_systems.iter().enumerate() {
         if system.get("type").and_then(Value::as_str) != Some("heat_pump")
-            && system.get("ntaHeatPump").is_some()
+            && system
+                .get("ntaHeatPump")
+                .is_some_and(|value| !value.is_null())
         {
             issues.push(issue(
                 Severity::Error,
@@ -1133,7 +1181,7 @@ fn assess_project(project: &ProjectInput, input_fingerprint: String) -> InputAss
         if system.get("type").and_then(Value::as_str) == Some("heat_pump") {
             heat_pump_count += 1;
             let path = format!("hotWaterSystems[{index}]");
-            let Some(metadata) = system.get("ntaHeatPump") else {
+            let Some(metadata) = system.get("ntaHeatPump").filter(|value| !value.is_null()) else {
                 issues.push(issue(
                     Severity::Warning,
                     "hot_water_heat_pump_route_unclassified",
@@ -1746,6 +1794,130 @@ pub(crate) fn unheated_zone_input(
     Some(UnheatedTransmissionInput { spaces })
 }
 
+/// 8.4.1 note 5 with C.10 (2025+C1 p. 266 and annex C; 2022 p. 240 and
+/// p. 748): with the forfait treatment of linear thermal bridges an
+/// unheated space counts as outside air (H_U;for = 0) and its partitions
+/// join H_D;for with U_iu;equi = U_C·b_U, where U_C is the project U-value
+/// with R_se 0,04 (not the R_si of 8.4.2.1) and b_U that of the space
+/// (8.4.1). Returns the elements and, per element, whether it is opaque.
+pub(crate) fn forfait_partition_elements(
+    project: &ProjectInput,
+    zone_id: Option<&str>,
+    factors: &HashMap<String, f64>,
+) -> Option<Vec<(DirectElement, bool)>> {
+    let constructions: HashMap<&str, &Value> = project
+        .constructions
+        .iter()
+        .filter_map(|item| Some((item.get("id")?.as_str()?, item)))
+        .collect();
+    let mut out = Vec::new();
+    for zone in project
+        .zones
+        .iter()
+        .filter(|zone| zone_id.map_or(true, |id| zone.id == id))
+    {
+        for surface in &zone.surfaces {
+            let boundary: ThermalBoundary =
+                serde_json::from_value(surface.get("thermalBoundary")?.clone()).ok()?;
+            if boundary != ThermalBoundary::UnheatedSpace {
+                continue;
+            }
+            let space_id = surface.get("unheatedSpaceId")?.as_str()?;
+            let factor = *factors.get(space_id)?;
+            let surface_id = surface.get("id")?.as_str()?;
+            let note = format!(" · b_U {factor:.3} (C.10, 8.4.1 opmerking 5)");
+            let mut window_area = 0.0;
+            // A partition without a `windows` array has no windows.
+            let windows = match surface.get("windows") {
+                None | Some(Value::Null) => &[][..],
+                Some(items) => items.as_array()?.as_slice(),
+            };
+            for window in windows {
+                let window_id = window.get("id")?.as_str()?;
+                let area = window.get("area")?.as_f64()?;
+                let u_value = window.get("uValue")?.as_f64()?;
+                if !area.is_finite() || area <= 0.0 || !u_value.is_finite() || u_value <= 0.0 {
+                    return None;
+                }
+                window_area += area;
+                out.push((
+                    DirectElement {
+                        id: format!("window:{window_id}"),
+                        area_m2: area,
+                        u_value_w_per_m2k: u_value * factor,
+                        source_reference: format!("project:window:{window_id}.uValue{note}"),
+                    },
+                    false,
+                ));
+            }
+            let opaque_area = surface.get("area")?.as_f64()? - window_area;
+            if !opaque_area.is_finite() || opaque_area < -1e-9 {
+                return None;
+            }
+            if opaque_area > 1e-9 {
+                let construction_id = surface.get("constructionId")?.as_str()?;
+                let u_value = constructions
+                    .get(construction_id)?
+                    .get("uValue")?
+                    .as_f64()?;
+                if !u_value.is_finite() || u_value <= 0.0 {
+                    return None;
+                }
+                out.push((
+                    DirectElement {
+                        id: format!("surface:{surface_id}:opaque"),
+                        area_m2: opaque_area,
+                        u_value_w_per_m2k: u_value * factor,
+                        source_reference: format!(
+                            "project:construction:{construction_id}.uValue{note}"
+                        ),
+                    },
+                    true,
+                ));
+            }
+        }
+    }
+    Some(out)
+}
+
+/// b_U (8.4.1), declared or derived, of every project unheated space that a
+/// surface borders; `None` when one of those cannot be determined. A space
+/// no surface refers to plays no part in H_D;for, so it may stay
+/// unresolved, as in the per-zone route of `unheated_zone_input`.
+pub(crate) fn unheated_reduction_factors(project: &ProjectInput) -> Option<HashMap<String, f64>> {
+    let referenced: HashSet<&str> = project
+        .zones
+        .iter()
+        .flat_map(|zone| &zone.surfaces)
+        .filter(|surface| {
+            surface
+                .get("thermalBoundary")
+                .and_then(|value| serde_json::from_value::<ThermalBoundary>(value.clone()).ok())
+                == Some(ThermalBoundary::UnheatedSpace)
+        })
+        .filter_map(|surface| surface.get("unheatedSpaceId").and_then(Value::as_str))
+        .collect();
+    if referenced.is_empty() {
+        return Some(HashMap::new());
+    }
+    let mut bordered = project.clone();
+    bordered
+        .unheated_spaces
+        .retain(|space| referenced.contains(space.id.as_str()));
+    let input = unheated_zone_input(&bordered, None)?;
+    let assessed = unheated_transmission::assess_unheated_transmission(&input);
+    if assessed.status != "input_valid" || assessed.spaces.len() != input.spaces.len() {
+        return None;
+    }
+    Some(
+        assessed
+            .spaces
+            .into_iter()
+            .map(|space| (space.id, space.reduction_factor))
+            .collect(),
+    )
+}
+
 /// Optional `orientations` of a project thermal bridge (project codes
 /// N, NE, …, NW, horizontal) for the TOjuli split of §5.7.2 step 2.
 fn bridge_sides(bridge: &Value) -> Option<Vec<direct_transmission::EnvelopeSide>> {
@@ -1837,7 +2009,11 @@ pub(crate) fn direct_boundary_input_zone(
             }
             let surface_id = surface.get("id")?.as_str()?;
             let gross_area = surface.get("area")?.as_f64()?;
-            let windows = surface.get("windows")?.as_array()?;
+            // A surface without a `windows` array has no windows.
+            let windows = match surface.get("windows") {
+                None | Some(Value::Null) => &[][..],
+                Some(items) => items.as_array()?.as_slice(),
+            };
             // 8.4.2.1 (p. 266): H_D;zi,j;ztu follows 8.2.1 with R_se replaced
             // by the R_si of table C.2 that applies on the unheated side.
             // Project U-values carry R_se = 0,04 (C.1.2 with table C.2).
@@ -2576,6 +2752,26 @@ mod tests {
             .issues
             .iter()
             .any(|item| item.code == "windows_missing"));
+    }
+
+    #[test]
+    fn fingerprint_ignores_null_members() {
+        let base = json!({"id": "x", "name": "A", "buildingFunction": "residential", "zones": [],
+            "ntaCalculation": {"a": 1, "b": [null, 2]}});
+        let mut with_nulls = base.clone();
+        with_nulls["ntaCalculation"]["c"] = Value::Null;
+        with_nulls["ntaCalculation"]["d"] = json!({"e": null});
+        let mut empty_object = base.clone();
+        empty_object["ntaCalculation"]["d"] = json!({});
+        assert_eq!(
+            input_fingerprint(&with_nulls),
+            input_fingerprint(&empty_object)
+        );
+        assert_ne!(input_fingerprint(&with_nulls), input_fingerprint(&base));
+        // A null array element keeps its position.
+        let mut shifted = base.clone();
+        shifted["ntaCalculation"]["b"] = json!([2]);
+        assert_ne!(input_fingerprint(&base), input_fingerprint(&shifted));
     }
 
     #[test]

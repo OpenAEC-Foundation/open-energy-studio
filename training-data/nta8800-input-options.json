@@ -1,0 +1,4340 @@
+[
+  {
+    "kind": "variant",
+    "options": [
+      "residential",
+      "office",
+      "education",
+      "healthcare",
+      "retail",
+      "industrial",
+      "other"
+    ],
+    "path": "/buildingFunction",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "small_window_area",
+      "shaded_glazing"
+    ],
+    "path": "/ntaCalculation/activeCooling/capacity/criterion",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "dynamic_cooling_load",
+      "annex_aa",
+      "solar_limitation"
+    ],
+    "path": "/ntaCalculation/activeCooling/capacity/method",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "compression_table10_29",
+      "absorption_table10_30",
+      "free_cooling_table10_34",
+      "dew_point_cooling_humidified_exhaust",
+      "heat_pump_with_cooling_emitter",
+      "external_cold_with_cooling_emitter",
+      "split_units_in_every_habitable_room",
+      "other_utility"
+    ],
+    "path": "/ntaCalculation/activeCooling/system",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "residential",
+      "utility"
+    ],
+    "path": "/ntaCalculation/additionalHotWaterSystems/[]/emission/method",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "kitchen_and_bathroom",
+      "bathroom_only",
+      "kitchen_only"
+    ],
+    "path": "/ntaCalculation/additionalHotWaterSystems/[]/emission/served",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "gas_appliance",
+      "heat_pump",
+      "heat_pump_en16147",
+      "electric_instantaneous",
+      "electric_boiler",
+      "gas_storage_heater",
+      "large_direct_storage",
+      "indirect_boiler",
+      "biomass_combi",
+      "heat_pump_series",
+      "indirect_heat_pump",
+      "external_heat",
+      "booster_heat_pump",
+      "booster_heat_pump_forfait",
+      "measured_two_profiles",
+      "chp",
+      "heating_system"
+    ],
+    "path": "/ntaCalculation/additionalHotWaterSystems/[]/generator/kind",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "residential",
+      "utility"
+    ],
+    "path": "/ntaCalculation/additionalHotWaterSystems/[]/need/method",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "a_plus",
+      "a",
+      "b",
+      "c",
+      "d",
+      "e",
+      "f",
+      "g"
+    ],
+    "path": "/ntaCalculation/additionalHotWaterSystems/[]/storage/[]/loss/label",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "label",
+      "unknown_label",
+      "measured",
+      "measured_standby"
+    ],
+    "path": "/ntaCalculation/additionalHotWaterSystems/[]/storage/[]/loss/method",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "residential",
+      "utility"
+    ],
+    "path": "/ntaCalculation/bacs/buildingUse",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "heating",
+      "cooling"
+    ],
+    "path": "/ntaCalculation/bacs/systems/[]/service",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "residential_building",
+      "caravan",
+      "floating_building_after2018_berth",
+      "floating_building_other_berth",
+      "other_residential",
+      "assembly_child_care",
+      "other_assembly",
+      "cell",
+      "healthcare_with_beds",
+      "other_healthcare",
+      "office",
+      "lodging_in_lodging_building",
+      "other_lodging",
+      "education",
+      "sport",
+      "retail"
+    ],
+    "path": "/ntaCalculation/bblFunction",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "residential",
+      "utility"
+    ],
+    "path": "/ntaCalculation/calculationScope",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "t6_to12_or_unknown",
+      "t12_to16",
+      "t12_to18",
+      "t17_to21"
+    ],
+    "path": "/ntaCalculation/cooling/distribution/designTemperature",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "insulated_from1995",
+      "insulated1980_to1995",
+      "insulated_before1980_or_unknown_age",
+      "uninsulated",
+      "declared",
+      "calculated"
+    ],
+    "path": "/ntaCalculation/cooling/distribution/pipe/kind",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "none_or_unknown",
+      "static",
+      "dynamic",
+      "not_applicable"
+    ],
+    "path": "/ntaCalculation/cooling/emission/balancing",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "unknown_or_other",
+      "standalone_per_room",
+      "central_with_room_control"
+    ],
+    "path": "/ntaCalculation/cooling/emission/control",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "none_or_unknown",
+      "static_per_emitter",
+      "static_with_group_balancing",
+      "static_with_dynamic_groups",
+      "dynamic_or_direct_expansion"
+    ],
+    "path": "/ntaCalculation/cooling/emission/edition2023/balancing",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "central",
+      "p_before1988",
+      "room"
+    ],
+    "path": "/ntaCalculation/cooling/emission/edition2023/control",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "unknown",
+      "standalone",
+      "standalone_with_manual_override",
+      "network_with_override_and_adaptive"
+    ],
+    "path": "/ntaCalculation/cooling/emission/edition2023/roomAutomation",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "floor_cooling",
+      "wall_cooling",
+      "fan_coil_or_rac_on_outer_wall",
+      "ceiling_cooling",
+      "fan_coil_or_rac_on_ceiling",
+      "other_or_unknown"
+    ],
+    "path": "/ntaCalculation/cooling/emission/emitter",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "compression",
+      "room_air_conditioner",
+      "unknown_collective",
+      "gas_engine_compression",
+      "gas_absorption",
+      "absorption_external_heat",
+      "absorption_chp",
+      "external_cold",
+      "free_cooling"
+    ],
+    "path": "/ntaCalculation/cooling/generators/[]/generator/kind",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "aquifer_from2013",
+      "aquifer_utility_before2013",
+      "aquifer_dwellings_before2013",
+      "surface_water",
+      "closed_ground_loop",
+      "dew_point_cooling"
+    ],
+    "path": "/ntaCalculation/cooling/generators/[]/generator/source",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "el",
+      "gas",
+      "oil"
+    ],
+    "path": "/ntaCalculation/declaredUses/[]/carrier",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "domestic_hot_water",
+      "domestic_hot_water_auxiliary",
+      "ventilation_fans",
+      "space_cooling",
+      "space_cooling_auxiliary",
+      "lighting",
+      "pv_auxiliary",
+      "humidification"
+    ],
+    "path": "/ntaCalculation/declaredUses/[]/service",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "heated_zone_only_space_heating",
+      "declared",
+      "calculated"
+    ],
+    "path": "/ntaCalculation/distribution/method",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "30_27",
+      "35_30",
+      "40_35",
+      "45_40",
+      "50_42",
+      "55_47",
+      "60_50",
+      "65_55",
+      "70_60",
+      "75_65",
+      "80_60",
+      "90_70"
+    ],
+    "path": "/ntaCalculation/distributionSystem/designTemperatureClass",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "individual",
+      "collective"
+    ],
+    "path": "/ntaCalculation/distributionSystem/installation",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "from1995",
+      "from1980_to1995",
+      "before1980_or_unknown"
+    ],
+    "path": "/ntaCalculation/distributionSystem/pipeTransmittance/insulation/period",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "insulated",
+      "uninsulated",
+      "unknown"
+    ],
+    "path": "/ntaCalculation/distributionSystem/pipeTransmittance/insulation/state",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "forfait",
+      "insulated_in_air",
+      "insulated_embedded",
+      "uninsulated"
+    ],
+    "path": "/ntaCalculation/distributionSystem/pipeTransmittance/method",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "included_in_generator_auxiliary",
+      "none_on_site",
+      "calculated"
+    ],
+    "path": "/ntaCalculation/distributionSystem/pump/method",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "residential",
+      "assembly",
+      "cell",
+      "healthcare_with_beds",
+      "healthcare_other",
+      "office",
+      "lodging",
+      "education",
+      "sport",
+      "retail"
+    ],
+    "path": "/ntaCalculation/distributionSystem/usageFunction",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "apartment_building",
+      "other"
+    ],
+    "path": "/ntaCalculation/dwellingType",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "direct",
+      "indirect"
+    ],
+    "path": "/ntaCalculation/emission/airHeaters/kind/kind",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "none_or_unknown",
+      "static",
+      "dynamic",
+      "not_applicable"
+    ],
+    "path": "/ntaCalculation/emission/balancing",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "main_room_thermostat",
+      "central_with_room_valves",
+      "individual_room_thermostats",
+      "other_or_unknown"
+    ],
+    "path": "/ntaCalculation/emission/control",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "none_or_unknown",
+      "static",
+      "static_or_dynamic_with_groups",
+      "dynamic_with_load_control",
+      "dynamic_full"
+    ],
+    "path": "/ntaCalculation/emission/edition2023/balancing",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "not_controlled",
+      "controlled"
+    ],
+    "path": "/ntaCalculation/emission/edition2023/kind/control",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "warm_air_horizontal",
+      "warm_air_horizontal_low_temperature",
+      "warm_air_from_ceiling",
+      "warm_air_from_ceiling_low_temperature",
+      "recirculation_two_step",
+      "recirculation_pi",
+      "dark_radiators",
+      "high_temperature_radiators",
+      "ceiling_panels",
+      "floor_uninsulated_spacing_up_to20_cm",
+      "floor_uninsulated_spacing_above20_cm",
+      "floor_minimal_insulation_up_to10_cm",
+      "floor_minimal_insulation_above10_cm",
+      "floor_thermally_decoupled",
+      "floor_unknown"
+    ],
+    "path": "/ntaCalculation/emission/edition2023/kind/emitter",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "without_insulation",
+      "minimal_insulation",
+      "double_insulation",
+      "unknown"
+    ],
+    "path": "/ntaCalculation/emission/edition2023/kind/insulation",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "mechanical_ventilation",
+      "floor_wet_or_unknown",
+      "floor_dry",
+      "floor_thin_screed",
+      "wall",
+      "ceiling",
+      "unknown"
+    ],
+    "path": "/ntaCalculation/emission/edition2023/kind/system",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "radiators",
+      "surface",
+      "dwelling_air",
+      "electric_air",
+      "ventilation_air",
+      "high_room"
+    ],
+    "path": "/ntaCalculation/emission/edition2023/kind/type",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "one_pipe",
+      "two_pipe",
+      "unknown",
+      "not_hydronic"
+    ],
+    "path": "/ntaCalculation/emission/edition2023/pipeSystem",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "unknown",
+      "individual_per_room",
+      "individual_with_manual_override",
+      "network_with_override_and_adaptive"
+    ],
+    "path": "/ntaCalculation/emission/edition2023/roomAutomation",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "radiators_or_convectors",
+      "floor_heating",
+      "fan_assisted_radiators_or_convectors",
+      "air_heating",
+      "local_heater",
+      "other_or_unknown"
+    ],
+    "path": "/ntaCalculation/emission/system",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "direct",
+      "mixing_with_return_limit",
+      "mixing_without_return_limit"
+    ],
+    "path": "/ntaCalculation/generator/boiler/emissionCircuit",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "conventional",
+      "vr",
+      "hr100",
+      "hr104",
+      "hr107",
+      "unknown"
+    ],
+    "path": "/ntaCalculation/generator/boiler/kind",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "inside_thermal_boundary",
+      "outside_thermal_boundary"
+    ],
+    "path": "/ntaCalculation/generator/boiler/location",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "individual_main",
+      "individual_supplementary",
+      "collective"
+    ],
+    "path": "/ntaCalculation/generator/boiler/role",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "b0_w45",
+      "b0_w35",
+      "w10_w45",
+      "w10_w35",
+      "a7_wet6_w45",
+      "a7_wet6_w35",
+      "a_minus7_wet_minus8_w45"
+    ],
+    "path": "/ntaCalculation/generator/forfait/highEfficiencyEvidence/points/[]/condition",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "base",
+      "table_9_28_high_efficiency"
+    ],
+    "path": "/ntaCalculation/generator/forfait/rowVariant",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "residential_at_most25_kw",
+      "utility_collective_or_over25_kw"
+    ],
+    "path": "/ntaCalculation/generator/forfait/scope",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "hydronic",
+      "indoor_air"
+    ],
+    "path": "/ntaCalculation/generator/forfait/sink",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "ground",
+      "ground_or_groundwater_unknown",
+      "groundwater_below15_c",
+      "outdoor_air",
+      "exhaust_air",
+      "surface_water",
+      "collective15_to20_c",
+      "collective20_to40_c",
+      "collective_at_least40_c"
+    ],
+    "path": "/ntaCalculation/generator/forfait/source",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "gas_boiler",
+      "heat_pump_forfait",
+      "hybrid_heat_pump",
+      "heat_pump_annex_q",
+      "external_heat",
+      "electric_resistance",
+      "biomass",
+      "product_boiler",
+      "local_heater",
+      "forfait_heater",
+      "chp",
+      "gas_heat_pump",
+      "multiple"
+    ],
+    "path": "/ntaCalculation/generator/kind",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "individual",
+      "collective_ground",
+      "collective_groundwater_surface_or_at_least15_c"
+    ],
+    "path": "/ntaCalculation/generator/sourceSystem",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "on_sand",
+      "other"
+    ],
+    "path": "/ntaCalculation/groundFloors/[]/below/depthClass",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "crawlspace",
+      "unheated_basement"
+    ],
+    "path": "/ntaCalculation/groundFloors/[]/below/kind",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "detailed",
+      "forfait"
+    ],
+    "path": "/ntaCalculation/groundFloors/[]/edgeThermalBridges/method",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "residential",
+      "utility"
+    ],
+    "path": "/ntaCalculation/hotWater/emission/method",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "kitchen_and_bathroom",
+      "bathroom_only",
+      "kitchen_only"
+    ],
+    "path": "/ntaCalculation/hotWater/emission/served",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "without_gaskeur",
+      "water_heater_gaskeur",
+      "water_heater_gaskeur_cw",
+      "kitchen_geyser",
+      "combi_gaskeur",
+      "combi_gaskeur_hr_cw",
+      "unknown"
+    ],
+    "path": "/ntaCalculation/hotWater/generator/appliance",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "gas_appliance",
+      "heat_pump",
+      "heat_pump_en16147",
+      "electric_instantaneous",
+      "electric_boiler",
+      "gas_storage_heater",
+      "large_direct_storage",
+      "indirect_boiler",
+      "biomass_combi",
+      "heat_pump_series",
+      "indirect_heat_pump",
+      "external_heat",
+      "booster_heat_pump",
+      "booster_heat_pump_forfait",
+      "measured_two_profiles",
+      "chp",
+      "heating_system"
+    ],
+    "path": "/ntaCalculation/hotWater/generator/kind",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "residential",
+      "office",
+      "assembly_without_day_care",
+      "assembly_with_day_care",
+      "education",
+      "healthcare_without_beds",
+      "healthcare_with_beds",
+      "retail",
+      "sport",
+      "lodging",
+      "cell"
+    ],
+    "path": "/ntaCalculation/hotWater/need/areas/[]/function",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "residential",
+      "utility"
+    ],
+    "path": "/ntaCalculation/hotWater/need/method",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "a_plus",
+      "a",
+      "b",
+      "c",
+      "d",
+      "e",
+      "f",
+      "g"
+    ],
+    "path": "/ntaCalculation/hotWater/storage/[]/loss/label",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "label",
+      "unknown_label",
+      "measured",
+      "measured_standby"
+    ],
+    "path": "/ntaCalculation/hotWater/storage/[]/loss/method",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "electricity",
+      "gas",
+      "gas_or_oil",
+      "oil"
+    ],
+    "path": "/ntaCalculation/humidifiers/[]/humidification/humidifier/carrier",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "atomising",
+      "steam"
+    ],
+    "path": "/ntaCalculation/humidifiers/[]/humidification/humidifier/kind",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "chapter14",
+      "declared",
+      "resolved"
+    ],
+    "path": "/ntaCalculation/internalGains/lighting/method",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "residential",
+      "utility",
+      "declared"
+    ],
+    "path": "/ntaCalculation/internalGains/method",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "residential",
+      "office",
+      "assembly_without_day_care",
+      "assembly_with_day_care",
+      "education",
+      "healthcare_without_beds",
+      "healthcare_with_beds",
+      "retail",
+      "sport",
+      "lodging",
+      "cell"
+    ],
+    "path": "/ntaCalculation/labelFunction",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "residential",
+      "office",
+      "assembly_without_day_care",
+      "assembly_with_day_care",
+      "education",
+      "healthcare_without_beds",
+      "healthcare_with_beds",
+      "retail",
+      "sport",
+      "lodging",
+      "cell"
+    ],
+    "path": "/ntaCalculation/lighting/[]/functions/[]/function",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "none",
+      "sectors",
+      "forfait"
+    ],
+    "path": "/ntaCalculation/lighting/[]/lightingZones/[]/daylight/method",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "manual_or_unknown",
+      "manual_with_sweep",
+      "auto_on_dimmed",
+      "auto_on_auto_off",
+      "manual_on_dimmed",
+      "manual_on_auto_off"
+    ],
+    "path": "/ntaCalculation/lighting/[]/lightingZones/[]/occupancy/control",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "forfait",
+      "installed"
+    ],
+    "path": "/ntaCalculation/lighting/[]/lightingZones/[]/parasitic/method",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "system",
+      "lamps"
+    ],
+    "path": "/ntaCalculation/lighting/[]/lightingZones/[]/power/luminaires/[]/power/method",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "forfait",
+      "installed"
+    ],
+    "path": "/ntaCalculation/lighting/[]/lightingZones/[]/power/method",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "not_ventilated",
+      "moderately_ventilated",
+      "strongly_ventilated",
+      "unknown"
+    ],
+    "path": "/ntaCalculation/pvSystems/[]/mounting",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "table16_1",
+      "declared_specific",
+      "panels"
+    ],
+    "path": "/ntaCalculation/pvSystems/[]/peakPower/method",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "detailed",
+      "forfait"
+    ],
+    "path": "/ntaCalculation/thermalBridgeRoute",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "closed_or_suspended",
+      "open_or_none"
+    ],
+    "path": "/ntaCalculation/thermalMass/ceiling",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "light",
+      "heavy",
+      "very_heavy"
+    ],
+    "path": "/ntaCalculation/thermalMass/floor",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "light",
+      "heavy",
+      "very_heavy"
+    ],
+    "path": "/ntaCalculation/thermalMass/wall",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "assembly_child_care",
+      "other_assembly",
+      "cell",
+      "healthcare_with_beds",
+      "other_healthcare",
+      "office",
+      "lodging",
+      "education",
+      "sport",
+      "retail",
+      "residential"
+    ],
+    "path": "/ntaCalculation/usageFunction",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "residential",
+      "utility"
+    ],
+    "path": "/ntaCalculation/ventilation/category",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "residential_table",
+      "declared",
+      "flow_control"
+    ],
+    "path": "/ntaCalculation/ventilation/fans/control/method",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "ac",
+      "dc"
+    ],
+    "path": "/ntaCalculation/ventilation/fans/current",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "nominal",
+      "motor"
+    ],
+    "path": "/ntaCalculation/ventilation/fans/fans/[]/power/method",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "forfait",
+      "declared"
+    ],
+    "path": "/ntaCalculation/ventilation/fans/method",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "residential",
+      "assembly_child_care",
+      "other_assembly",
+      "cell",
+      "healthcare_bed_area",
+      "other_healthcare",
+      "office",
+      "lodging_building",
+      "education",
+      "sport",
+      "retail"
+    ],
+    "path": "/ntaCalculation/ventilation/functions/[]/function",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "pitched_roof_terraced",
+      "pitched_roof_end_or_corner",
+      "pitched_roof_detached",
+      "pitched_roof_detached_partly_flat",
+      "flat_roof_terraced",
+      "flat_roof_end_or_corner",
+      "flat_roof_detached",
+      "storey_middle_lower_or_intermediate",
+      "storey_end_lower_or_intermediate",
+      "storey_middle_top",
+      "storey_end_top",
+      "multi_storey_whole_building",
+      "multi_storey_whole_top_layer",
+      "multi_storey_whole_intermediate_layer",
+      "multi_storey_whole_bottom_layer"
+    ],
+    "path": "/ntaCalculation/ventilation/infiltration/buildingType",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "measured",
+      "reference"
+    ],
+    "path": "/ntaCalculation/ventilation/infiltration/method",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "single",
+      "combined"
+    ],
+    "path": "/ntaCalculation/ventilation/system/kind",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "none",
+      "situation1",
+      "situation2",
+      "situation3"
+    ],
+    "path": "/ntaCalculation/ventilation/system/unit/airHandlingUnit/supplyDuctsOutside",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "unknown",
+      "luka_a_b_c",
+      "luka_d",
+      "no_ducts"
+    ],
+    "path": "/ntaCalculation/ventilation/system/unit/ducts",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "none",
+      "full",
+      "partial",
+      "unknown"
+    ],
+    "path": "/ntaCalculation/ventilation/system/unit/heatRecovery/bypass/kind",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "none",
+      "run_around_coil_ahu",
+      "plate_or_tube",
+      "cross_flow",
+      "two_element",
+      "heat_pipe",
+      "rotary",
+      "enthalpy",
+      "counter_flow_aluminium",
+      "counter_flow_plastic"
+    ],
+    "path": "/ntaCalculation/ventilation/system/unit/heatRecovery/efficiency/exchanger",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "declared",
+      "table"
+    ],
+    "path": "/ntaCalculation/ventilation/system/unit/heatRecovery/efficiency/method",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "en13141_7",
+      "en13141_8",
+      "en13142",
+      "en13053"
+    ],
+    "path": "/ntaCalculation/ventilation/system/unit/heatRecovery/efficiency/standard",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "central",
+      "decentral"
+    ],
+    "path": "/ntaCalculation/ventilation/system/unit/heatRecovery/layout",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "uninsulated",
+      "insulated",
+      "unknown",
+      "specified"
+    ],
+    "path": "/ntaCalculation/ventilation/system/unit/heatRecovery/supplyDuctInsulation/kind",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "a1",
+      "a2a",
+      "a2b",
+      "a2c",
+      "b1",
+      "b2",
+      "b3",
+      "c1",
+      "c2a",
+      "c2b",
+      "c2c",
+      "c3a",
+      "c3b",
+      "c3c",
+      "c4a",
+      "c4b",
+      "c4c",
+      "c5a",
+      "c5b",
+      "d1",
+      "d2",
+      "d3",
+      "d4a",
+      "d4b",
+      "d5a",
+      "d5b",
+      "d5c"
+    ],
+    "path": "/ntaCalculation/ventilation/system/unit/variant",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "minimal",
+      "parallel_obstruction",
+      "overhang",
+      "side_obstruction",
+      "full",
+      "other",
+      "declared"
+    ],
+    "path": "/ntaCalculation/windowObstructions/[]/obstruction/method",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "left",
+      "right",
+      "both"
+    ],
+    "path": "/ntaCalculation/windowObstructions/[]/obstruction/side",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "manual_residential",
+      "automatic_residential_iso52016",
+      "automatic",
+      "manual_utility_with_glare_protection",
+      "manual_utility_without_glare_protection"
+    ],
+    "path": "/ntaCalculation/windowShadings/[]/movableShading/control",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "dark",
+      "other",
+      "white",
+      "unknown"
+    ],
+    "path": "/ntaCalculation/windowShadings/[]/movableShading/device/colour",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "external_screen",
+      "external_venetian_blind",
+      "external_roller_shutter",
+      "internal_metallised_fabric",
+      "drop_arm_awning",
+      "folding_arm_awning"
+    ],
+    "path": "/ntaCalculation/windowShadings/[]/movableShading/device/kind",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "manual_residential",
+      "automatic_residential_iso52016",
+      "automatic",
+      "manual_utility_with_glare_protection",
+      "manual_utility_without_glare_protection"
+    ],
+    "path": "/ntaCalculation/windowSolar/movableShading/control",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "dark",
+      "other",
+      "white",
+      "unknown"
+    ],
+    "path": "/ntaCalculation/windowSolar/movableShading/device/colour",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "external_screen",
+      "external_venetian_blind",
+      "external_roller_shutter",
+      "internal_metallised_fabric",
+      "drop_arm_awning",
+      "folding_arm_awning"
+    ],
+    "path": "/ntaCalculation/windowSolar/movableShading/device/kind",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "minimal",
+      "parallel_obstruction",
+      "overhang",
+      "side_obstruction",
+      "full",
+      "other",
+      "declared"
+    ],
+    "path": "/ntaCalculation/windowSolar/obstruction/method",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "residential",
+      "utility",
+      "declared"
+    ],
+    "path": "/ntaCalculation/zoneData/[]/internalGains/method",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "closed_or_suspended",
+      "open_or_none"
+    ],
+    "path": "/ntaCalculation/zoneData/[]/thermalMass/ceiling",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "light",
+      "heavy",
+      "very_heavy"
+    ],
+    "path": "/ntaCalculation/zoneData/[]/thermalMass/floor",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "light",
+      "heavy",
+      "very_heavy"
+    ],
+    "path": "/ntaCalculation/zoneData/[]/thermalMass/wall",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "residential",
+      "utility"
+    ],
+    "path": "/ntaCalculation/zoneData/[]/ventilation/category",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "ac",
+      "dc"
+    ],
+    "path": "/ntaCalculation/zoneData/[]/ventilation/fans/current",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "forfait",
+      "declared"
+    ],
+    "path": "/ntaCalculation/zoneData/[]/ventilation/fans/method",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "residential",
+      "assembly_child_care",
+      "other_assembly",
+      "cell",
+      "healthcare_bed_area",
+      "other_healthcare",
+      "office",
+      "lodging_building",
+      "education",
+      "sport",
+      "retail"
+    ],
+    "path": "/ntaCalculation/zoneData/[]/ventilation/functions/[]/function",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "measured",
+      "reference"
+    ],
+    "path": "/ntaCalculation/zoneData/[]/ventilation/infiltration/method",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "single",
+      "combined"
+    ],
+    "path": "/ntaCalculation/zoneData/[]/ventilation/system/kind",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "unknown",
+      "luka_a_b_c",
+      "luka_d",
+      "no_ducts"
+    ],
+    "path": "/ntaCalculation/zoneData/[]/ventilation/system/unit/ducts",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "a1",
+      "a2a",
+      "a2b",
+      "a2c",
+      "b1",
+      "b2",
+      "b3",
+      "c1",
+      "c2a",
+      "c2b",
+      "c2c",
+      "c3a",
+      "c3b",
+      "c3c",
+      "c4a",
+      "c4b",
+      "c4c",
+      "c5a",
+      "c5b",
+      "d1",
+      "d2",
+      "d3",
+      "d4a",
+      "d4b",
+      "d5a",
+      "d5b",
+      "d5c"
+    ],
+    "path": "/ntaCalculation/zoneData/[]/ventilation/system/unit/variant",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "normVersion",
+      "calculationScope",
+      "areaSourceReference",
+      "usageFunction",
+      "dwellingType",
+      "setpoints",
+      "thermalMass",
+      "internalGains",
+      "surfaceTilts",
+      "windowSolar",
+      "dynamicWindows",
+      "windowObstructions",
+      "windowShadings",
+      "windowGlazings",
+      "humidifiers",
+      "sunrooms",
+      "verticalPipes",
+      "groundFloors",
+      "thermalBridgeRoute",
+      "ventilationFlows",
+      "ventilation",
+      "zoneData",
+      "emission",
+      "distribution",
+      "generator",
+      "distributionSystem",
+      "identicalSystems",
+      "collectiveConnection",
+      "heatPumpRenewable",
+      "bacsFactor",
+      "bacsSourceReference",
+      "bacs",
+      "useInventoryComplete",
+      "declaredUses",
+      "declaredRenewableHeat",
+      "productionInventoryComplete",
+      "onSiteProduction",
+      "pvSystems",
+      "hotWater",
+      "additionalHotWaterSystems",
+      "spaceHeatingSolar",
+      "lighting",
+      "cooling",
+      "coolingSystems",
+      "additionalHeatingSystems",
+      "labelFunction",
+      "labelFunctions",
+      "constructionYear",
+      "fossilAppliancesOutsideCalculation",
+      "bblFunction",
+      "zebHeatDeliveryTemperature",
+      "bblFunctions",
+      "activeCooling",
+      "permitApplicationAfter20260529",
+      "demandUsesFixedC1Ventilation",
+      "batteryStoragePresent",
+      "storage",
+      "externalSupply"
+    ],
+    "path": "/ntaCalculation",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "system",
+      "capacity",
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/activeCooling",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/activeCooling/capacity",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "need",
+      "emission",
+      "showerHeatRecovery",
+      "circulation",
+      "storage",
+      "deliverySets",
+      "boilingWaterTap",
+      "generator",
+      "nominalPowerKw",
+      "exhaustAir",
+      "declaredShare",
+      "additionalGenerators",
+      "series",
+      "solar",
+      "collective",
+      "unheatedReductionFactor",
+      "connectedTaps",
+      "equipmentReference"
+    ],
+    "path": "/ntaCalculation/additionalHotWaterSystems/[]",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "bathrooms",
+      "kitchens"
+    ],
+    "path": "/ntaCalculation/additionalHotWaterSystems/[]/connectedTaps",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "served",
+      "kitchenLengthM",
+      "kitchenPipeDiameter",
+      "bathroomLengthM",
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/additionalHotWaterSystems/[]/emission",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "dwellingCount",
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/additionalHotWaterSystems/[]/need",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "id",
+      "volumeL",
+      "loss",
+      "connectionFactor",
+      "electricBoilerInsulatedPipe",
+      "inHeatedZone",
+      "unheatedAmbientC",
+      "notInApplianceTest",
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/additionalHotWaterSystems/[]/storage/[]",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "transmissionWPerK"
+    ],
+    "path": "/ntaCalculation/additionalHotWaterSystems/[]/storage/[]/loss",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "buildingUse",
+      "systemInventoryComplete",
+      "systems",
+      "bacs"
+    ],
+    "path": "/ntaCalculation/bacs",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "id",
+      "service",
+      "sourceReference",
+      "generators",
+      "bacs"
+    ],
+    "path": "/ntaCalculation/bacs/systems/[]",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "id",
+      "nominalThermalCapacityKw",
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/bacs/systems/[]/generators/[]",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "connectedUsableAreaM2",
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/collectiveConnection",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "emission",
+      "distribution",
+      "generators",
+      "boosterHeatPumpExtractionKwh",
+      "collective"
+    ],
+    "path": "/ntaCalculation/cooling",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "designTemperature",
+      "pipe",
+      "fittingsInsulated",
+      "pipeLengthM",
+      "unconditionedPipeLengthM",
+      "unconditionedAmbientC",
+      "pump",
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/cooling/distribution",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "hydraulicallyBalanced",
+      "floorCount",
+      "heatMeter",
+      "individualDwellingInstallation",
+      "labelPowerKw",
+      "energyEfficiencyIndex",
+      "maxPipeLengthM",
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/cooling/distribution/pump",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "emitter",
+      "balancing",
+      "control",
+      "fanCoilCount",
+      "sourceReference",
+      "edition2023"
+    ],
+    "path": "/ntaCalculation/cooling/emission",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "control",
+      "certifiedControl",
+      "balancing",
+      "roomAutomation"
+    ],
+    "path": "/ntaCalculation/cooling/emission/edition2023",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "id",
+      "generator",
+      "capacityKw",
+      "equipmentReference"
+    ],
+    "path": "/ntaCalculation/cooling/generators/[]",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "heatRejection",
+      "declared",
+      "performance"
+    ],
+    "path": "/ntaCalculation/cooling/generators/[]/generator",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "id",
+      "service",
+      "carrier",
+      "monthlyKwh",
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/declaredUses/[]",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/distribution",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "designTemperatureClass",
+      "installation",
+      "usageFunction",
+      "pipesAlsoForHotWater",
+      "collectiveHotWaterDeliverySet",
+      "connectedStoreys",
+      "pipeTransmittance",
+      "unheatedPipeTransmittance",
+      "valvesInsulated",
+      "actualPipeLengthM",
+      "unheatedPipeLengthM",
+      "unheatedAmbientC",
+      "unheatedReductionFactor",
+      "bufferVessel",
+      "uninsulatedPipesInUninsulatedShell",
+      "pump",
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/distributionSystem",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "insulation"
+    ],
+    "path": "/ntaCalculation/distributionSystem/pipeTransmittance",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "period"
+    ],
+    "path": "/ntaCalculation/distributionSystem/pipeTransmittance/insulation",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "heatMeterPresent",
+      "maxPipeLengthM",
+      "designFlowM3PerH",
+      "energyEfficiencyIndex",
+      "electricPowerKw",
+      "onePipeEmitterCount",
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/distributionSystem/pump",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "system",
+      "balancing",
+      "control",
+      "sourceReference",
+      "fans",
+      "airHeaters",
+      "edition2023"
+    ],
+    "path": "/ntaCalculation/emission",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "kind",
+      "count",
+      "further",
+      "designHeatLoadW",
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/emission/airHeaters",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "roomHeightAbove8M",
+      "warmAirReturn",
+      "ecMotor"
+    ],
+    "path": "/ntaCalculation/emission/airHeaters/kind",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "kind",
+      "certifiedControl",
+      "roomAutomation",
+      "pipeSystem",
+      "balancing"
+    ],
+    "path": "/ntaCalculation/emission/edition2023",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "heightM",
+      "emitter",
+      "control",
+      "radiant"
+    ],
+    "path": "/ntaCalculation/emission/edition2023/kind",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "boiler",
+      "auxiliaryMeasurements",
+      "declaredAuxiliaryConstants",
+      "auxiliary"
+    ],
+    "path": "/ntaCalculation/generator",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "generatorId",
+      "role",
+      "location",
+      "kind",
+      "fuel",
+      "averageDesignEmissionTemperatureC",
+      "emissionCircuit",
+      "equipmentReference",
+      "locationReference",
+      "temperatureAndCircuitReference",
+      "pilotFlamePresent",
+      "installationYear",
+      "installationYearReference"
+    ],
+    "path": "/ntaCalculation/generator/boiler",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "generatorId",
+      "classificationSourceReference",
+      "scope",
+      "source",
+      "sink",
+      "designSupplyTemperatureC",
+      "sourceCorrectionFactor",
+      "sourceCorrectionReference",
+      "thermalCapacityKw",
+      "capacitySourceReference",
+      "collectiveBuildingInstallation",
+      "rowVariant",
+      "highEfficiencyEvidence",
+      "sourceTemperatureC",
+      "sourceTemperatureEvidenceReference",
+      "sourceQualityDeclarationReference",
+      "qualityDeclaration",
+      "installationYear",
+      "installationYearReference"
+    ],
+    "path": "/ntaCalculation/generator/forfait",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "productReference",
+      "testReportReference",
+      "testStandardEdition",
+      "points"
+    ],
+    "path": "/ntaCalculation/generator/forfait/highEfficiencyEvidence",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "condition",
+      "measuredCop"
+    ],
+    "path": "/ntaCalculation/generator/forfait/highEfficiencyEvidence/points/[]",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "declarationReference",
+      "generationEfficiency",
+      "energyFraction",
+      "auxiliaryKwhPerYear"
+    ],
+    "path": "/ntaCalculation/generator/forfait/qualityDeclaration",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "surfaceId",
+      "exposedPerimeterM",
+      "constructionResistanceM2kPerW",
+      "edgeThermalBridges",
+      "edgeInsulation",
+      "below",
+      "heatedBasement",
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/groundFloors/[]",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "floorResistanceM2kPerW",
+      "depthClass",
+      "wallResistanceM2kPerW",
+      "wallUValueWPerM2k",
+      "ventilationOpeningM2PerM",
+      "wallHeightAboveGroundM"
+    ],
+    "path": "/ntaCalculation/groundFloors/[]/below",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "bridges"
+    ],
+    "path": "/ntaCalculation/groundFloors/[]/edgeThermalBridges",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "lengthM",
+      "psiWPerMk",
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/groundFloors/[]/edgeThermalBridges/bridges/[]",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "depthM",
+      "wallDepths",
+      "wallResistanceM2kPerW",
+      "forfaitDeltaUWPerM2k",
+      "wallAreaM2"
+    ],
+    "path": "/ntaCalculation/groundFloors/[]/heatedBasement",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "lengthM",
+      "depthM"
+    ],
+    "path": "/ntaCalculation/groundFloors/[]/heatedBasement/wallDepths/[]",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "sourceBelow20C",
+      "exhaustAirSource",
+      "sourceReference",
+      "combinedOutdoorAndExhaustAir",
+      "outdoorAirHeatFraction",
+      "outdoorAirFractionReference"
+    ],
+    "path": "/ntaCalculation/heatPumpRenewable",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "need",
+      "emission",
+      "showerHeatRecovery",
+      "circulation",
+      "storage",
+      "deliverySets",
+      "boilingWaterTap",
+      "generator",
+      "nominalPowerKw",
+      "exhaustAir",
+      "declaredShare",
+      "additionalGenerators",
+      "series",
+      "solar",
+      "collective",
+      "unheatedReductionFactor",
+      "connectedTaps",
+      "equipmentReference"
+    ],
+    "path": "/ntaCalculation/hotWater",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "bathrooms",
+      "kitchens"
+    ],
+    "path": "/ntaCalculation/hotWater/connectedTaps",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "meanLengthM",
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/hotWater/emission",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "appliance",
+      "measuredClass",
+      "kitchenOnly",
+      "declared",
+      "annexT",
+      "annexTConditions"
+    ],
+    "path": "/ntaCalculation/hotWater/generator",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "value",
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/hotWater/generator/declared",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "areas",
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/hotWater/need",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "function",
+      "areaM2"
+    ],
+    "path": "/ntaCalculation/hotWater/need/areas/[]",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "id",
+      "volumeL",
+      "loss",
+      "connectionFactor",
+      "electricBoilerInsulatedPipe",
+      "inHeatedZone",
+      "unheatedAmbientC",
+      "notInApplianceTest",
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/hotWater/storage/[]",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "producedFrom2018"
+    ],
+    "path": "/ntaCalculation/hotWater/storage/[]/loss",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "zoneId",
+      "humidification",
+      "servedAreaM2"
+    ],
+    "path": "/ntaCalculation/humidifiers/[]",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "humidifier",
+      "rotaryWheel",
+      "equipmentReference"
+    ],
+    "path": "/ntaCalculation/humidifiers/[]/humidification",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "carrier"
+    ],
+    "path": "/ntaCalculation/humidifiers/[]/humidification/humidifier",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "lighting",
+      "hotWaterRecoverableKwh",
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/internalGains",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "zoneId",
+      "functions",
+      "lightingZones",
+      "sourceReference",
+      "burningHoursFactor"
+    ],
+    "path": "/ntaCalculation/lighting/[]",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "function",
+      "areaM2"
+    ],
+    "path": "/ntaCalculation/lighting/[]/functions/[]",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "id",
+      "areaM2",
+      "power",
+      "parasitic",
+      "occupancy",
+      "daylight",
+      "extractedLuminaires",
+      "constantIlluminance"
+    ],
+    "path": "/ntaCalculation/lighting/[]/lightingZones/[]",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "control",
+      "centralOnControl",
+      "largeOfficeGroup"
+    ],
+    "path": "/ntaCalculation/lighting/[]/lightingZones/[]/occupancy",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "ledFrom2017"
+    ],
+    "path": "/ntaCalculation/lighting/[]/lightingZones/[]/power",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "count",
+      "power"
+    ],
+    "path": "/ntaCalculation/lighting/[]/lightingZones/[]/power/luminaires/[]",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "powerW"
+    ],
+    "path": "/ntaCalculation/lighting/[]/lightingZones/[]/power/luminaires/[]/power",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "id",
+      "peakPower",
+      "azimuthDeg",
+      "tiltDeg",
+      "mounting",
+      "obstructionFactors",
+      "obstruction",
+      "collective",
+      "pvt",
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/pvSystems/[]",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "panelPeakPowerW",
+      "panelCount"
+    ],
+    "path": "/ntaCalculation/pvSystems/[]/peakPower",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "heatingC",
+      "coolingC",
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/setpoints",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "surfaceId",
+      "tiltDeg",
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/surfaceTilts/[]",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "floor",
+      "wall",
+      "ceiling",
+      "sourceReference",
+      "annexBElements",
+      "massKgPerM2"
+    ],
+    "path": "/ntaCalculation/thermalMass",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "zoneId",
+      "usableFloorAreaM2",
+      "category",
+      "functions",
+      "dwellingCount",
+      "wholeDwellingAreaM2",
+      "apartmentBuilding",
+      "buildingHeightM",
+      "constructionYear",
+      "floorAboveCrawlspace",
+      "heatingSetpointC",
+      "coolingSetpointC",
+      "system",
+      "maximumCapacityForCooling",
+      "installedCapacity",
+      "flowReduction",
+      "infiltration",
+      "combustionAppliances",
+      "overventilation",
+      "practice",
+      "ventilativeCooling",
+      "grillePreheating",
+      "fans",
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/ventilation",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "current",
+      "manufactureYear"
+    ],
+    "path": "/ntaCalculation/ventilation/fans",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "monthly",
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/ventilation/fans/control",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "id",
+      "power"
+    ],
+    "path": "/ntaCalculation/ventilation/fans/fans/[]",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "nominalPowerW"
+    ],
+    "path": "/ntaCalculation/ventilation/fans/fans/[]/power",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "collective",
+      "recirculationPercent",
+      "flowControlPercent",
+      "evidenceReference"
+    ],
+    "path": "/ntaCalculation/ventilation/flowReduction",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "function",
+      "areaM2",
+      "swimmingPool"
+    ],
+    "path": "/ntaCalculation/ventilation/functions/[]",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "qv10DmPerSM2",
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/ventilation/infiltration",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "totalDm3PerS",
+      "naturalSupplyDm3PerS",
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/ventilation/installedCapacity",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "unit"
+    ],
+    "path": "/ntaCalculation/ventilation/system",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "variant",
+      "heatRecovery",
+      "ducts",
+      "airHandlingUnit",
+      "equipmentReference",
+      "declaredControlFactor"
+    ],
+    "path": "/ntaCalculation/ventilation/system/unit",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "insideThermalZone",
+      "supplyDuctsOutside",
+      "heatingCoil",
+      "coolingCoil"
+    ],
+    "path": "/ntaCalculation/ventilation/system/unit/airHandlingUnit",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "value",
+      "declarationReference"
+    ],
+    "path": "/ntaCalculation/ventilation/system/unit/declaredControlFactor",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "efficiency",
+      "bypass",
+      "layout",
+      "constantVolumeControl",
+      "supplyDuctLengthM",
+      "supplyDuctInsulation",
+      "manufactureYear",
+      "equipmentReference"
+    ],
+    "path": "/ntaCalculation/ventilation/system/unit/heatRecovery",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "coldRecoveryEvidence"
+    ],
+    "path": "/ntaCalculation/ventilation/system/unit/heatRecovery/bypass",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "exchanger"
+    ],
+    "path": "/ntaCalculation/ventilation/system/unit/heatRecovery/efficiency",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "id",
+      "sourceReference",
+      "months"
+    ],
+    "path": "/ntaCalculation/ventilationFlows/[]",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "month",
+      "conductanceWPerK",
+      "supplyTemperatureC",
+      "coolingConductanceWPerK",
+      "coolingSupplyTemperatureC"
+    ],
+    "path": "/ntaCalculation/ventilationFlows/[]/months/[]",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "id",
+      "storeys",
+      "buildingHeightM",
+      "areaShare",
+      "insulated",
+      "sharedZones",
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/verticalPipes/[]",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "windowId",
+      "obstruction",
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/windowObstructions/[]",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "relativeHeight"
+    ],
+    "path": "/ntaCalculation/windowObstructions/[]/obstruction",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "windowId",
+      "movableShading",
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/windowShadings/[]",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "reductionFactor",
+      "device",
+      "control",
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/windowShadings/[]/movableShading",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "frameFraction",
+      "obstruction",
+      "movableShading",
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/windowSolar",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "reductionFactor",
+      "device",
+      "control",
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/windowSolar/movableShading",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "zoneId",
+      "functionAreas",
+      "commonSpaces",
+      "sunrooms",
+      "verticalPipes",
+      "ventilationFlows",
+      "ventilation",
+      "internalGains",
+      "usageFunction",
+      "dwellingType",
+      "setpoints",
+      "thermalMass",
+      "emission",
+      "distribution"
+    ],
+    "path": "/ntaCalculation/zoneData/[]",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "dwellingCount",
+      "dwellingShare",
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/zoneData/[]/internalGains",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "id",
+      "glazingGHeating",
+      "glazingGCooling",
+      "exteriorFrameFraction",
+      "reductionFactor",
+      "zoneConductanceWPerK",
+      "distributionFactor",
+      "borderingZones",
+      "surfaces",
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/zoneData/[]/sunrooms/[]",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "areaM2",
+      "absorptance",
+      "azimuthDeg",
+      "tiltDeg"
+    ],
+    "path": "/ntaCalculation/zoneData/[]/sunrooms/[]/surfaces/[]",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "floor",
+      "wall",
+      "ceiling",
+      "sourceReference",
+      "annexBElements",
+      "massKgPerM2"
+    ],
+    "path": "/ntaCalculation/zoneData/[]/thermalMass",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "zoneId",
+      "usableFloorAreaM2",
+      "category",
+      "functions",
+      "dwellingCount",
+      "wholeDwellingAreaM2",
+      "apartmentBuilding",
+      "buildingHeightM",
+      "constructionYear",
+      "floorAboveCrawlspace",
+      "heatingSetpointC",
+      "coolingSetpointC",
+      "system",
+      "maximumCapacityForCooling",
+      "installedCapacity",
+      "flowReduction",
+      "infiltration",
+      "combustionAppliances",
+      "overventilation",
+      "practice",
+      "ventilativeCooling",
+      "grillePreheating",
+      "fans",
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/zoneData/[]/ventilation",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "current",
+      "manufactureYear"
+    ],
+    "path": "/ntaCalculation/zoneData/[]/ventilation/fans",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "collective",
+      "recirculationPercent",
+      "flowControlPercent",
+      "evidenceReference"
+    ],
+    "path": "/ntaCalculation/zoneData/[]/ventilation/flowReduction",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "function",
+      "areaM2",
+      "swimmingPool"
+    ],
+    "path": "/ntaCalculation/zoneData/[]/ventilation/functions/[]",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "qv10DmPerSM2",
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/zoneData/[]/ventilation/infiltration",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "unit"
+    ],
+    "path": "/ntaCalculation/zoneData/[]/ventilation/system",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "variant",
+      "heatRecovery",
+      "ducts",
+      "airHandlingUnit",
+      "equipmentReference",
+      "declaredControlFactor"
+    ],
+    "path": "/ntaCalculation/zoneData/[]/ventilation/system/unit",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "id",
+      "sourceReference",
+      "months"
+    ],
+    "path": "/ntaCalculation/zoneData/[]/ventilationFlows/[]",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "month",
+      "conductanceWPerK",
+      "supplyTemperatureC",
+      "coolingConductanceWPerK",
+      "coolingSupplyTemperatureC"
+    ],
+    "path": "/ntaCalculation/zoneData/[]/ventilationFlows/[]/months/[]",
+    "route": "project"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "id",
+      "storeys",
+      "buildingHeightM",
+      "areaShare",
+      "insulated",
+      "sharedZones",
+      "sourceReference"
+    ],
+    "path": "/ntaCalculation/zoneData/[]/verticalPipes/[]",
+    "route": "project"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "light",
+      "heavy",
+      "very_heavy"
+    ],
+    "path": "/construction/floor",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "light",
+      "heavy",
+      "very_heavy"
+    ],
+    "path": "/construction/wall",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "ground_or_intermediate",
+      "top",
+      "roof_and_floor"
+    ],
+    "path": "/dwelling/floor",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "single_family",
+      "apartment"
+    ],
+    "path": "/dwelling/kind",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "terraced",
+      "end_or_corner",
+      "detached",
+      "unknown"
+    ],
+    "path": "/dwelling/position",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "pitched",
+      "partly_flat",
+      "flat"
+    ],
+    "path": "/dwelling/roofType",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "middle",
+      "end_or_corner",
+      "unknown"
+    ],
+    "path": "/dwelling/side",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "wood_or_plastic",
+      "metal_with_thermal_break",
+      "metal",
+      "none"
+    ],
+    "path": "/envelope/doors/[]/frame",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "triple_hr",
+      "hr_plus_plus",
+      "hr_plus",
+      "hr",
+      "coated_type_unknown",
+      "double",
+      "double_with_coating",
+      "double_with_secondary",
+      "hr_with_secondary",
+      "hr_plus_plus_with_secondary",
+      "secondary_window",
+      "single",
+      "leaded_light",
+      "glass_blocks"
+    ],
+    "path": "/envelope/doors/[]/glass",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "outdoor",
+      "ground",
+      "crawlspace",
+      "unheated_space",
+      "adjacent_heated",
+      "sunroom",
+      "water",
+      "strongly_ventilated",
+      "unheated_cellar"
+    ],
+    "path": "/envelope/surfaces/[]/boundary/kind",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "facade",
+      "roof",
+      "floor"
+    ],
+    "path": "/envelope/surfaces/[]/element",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "none_or_unknown",
+      "present_unknown_thickness",
+      "cavity_filled_unknown_width",
+      "thickness"
+    ],
+    "path": "/envelope/surfaces/[]/insulation/kind",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "north",
+      "north_east",
+      "east",
+      "south_east",
+      "south",
+      "south_west",
+      "west",
+      "north_west"
+    ],
+    "path": "/envelope/surfaces/[]/orientation",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "wood_or_plastic",
+      "metal_with_thermal_break",
+      "metal",
+      "none"
+    ],
+    "path": "/envelope/windows/[]/frame",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "triple_hr",
+      "hr_plus_plus",
+      "hr_plus",
+      "hr",
+      "coated_type_unknown",
+      "double",
+      "double_with_coating",
+      "double_with_secondary",
+      "hr_with_secondary",
+      "hr_plus_plus_with_secondary",
+      "secondary_window",
+      "single",
+      "leaded_light",
+      "glass_blocks"
+    ],
+    "path": "/envelope/windows/[]/glass",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "room_thermostat",
+      "central_with_radiator_valves",
+      "individual_room_control",
+      "unknown"
+    ],
+    "path": "/heating/control",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "c30_27",
+      "c35_30",
+      "c40_35",
+      "c45_40",
+      "c50_42",
+      "c55_47",
+      "c60_45",
+      "c60_50",
+      "c65_55",
+      "c70_50",
+      "c70_60",
+      "c75_65",
+      "c80_60",
+      "c90_70"
+    ],
+    "path": "/heating/designClass",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "radiators",
+      "low_temperature_radiators",
+      "floor_heating",
+      "floor_heating_and_radiators",
+      "air_heating",
+      "local_heaters"
+    ],
+    "path": "/heating/emitters",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "conventional",
+      "vr",
+      "hr100",
+      "hr104",
+      "hr107",
+      "hydrogen",
+      "oil"
+    ],
+    "path": "/heating/generator/boilerType",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "boiler",
+      "heat_pump",
+      "district_heat",
+      "electric",
+      "biomass",
+      "chp",
+      "local_fired",
+      "gas_air_heater",
+      "none_present"
+    ],
+    "path": "/heating/generator/kind",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "outdoor_air",
+      "exhaust_air",
+      "outdoor_and_exhaust_air",
+      "ground",
+      "groundwater",
+      "surface_water",
+      "water_based_unknown",
+      "heat_pump_panel",
+      "high_temperature"
+    ],
+    "path": "/heating/generator/source",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "bath_geyser",
+      "combi",
+      "kitchen_geyser",
+      "unknown"
+    ],
+    "path": "/hotWater/generator/applianceType",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "cw1",
+      "cw2",
+      "cw3",
+      "cw4_to6",
+      "unknown"
+    ],
+    "path": "/hotWater/generator/cwClass",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "none",
+      "gaskeur",
+      "gaskeur_cw",
+      "gaskeur_hr_cw",
+      "unknown"
+    ],
+    "path": "/hotWater/generator/gaskeur",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "none",
+      "gas_appliance",
+      "electric_boiler",
+      "electric_instantaneous",
+      "heat_pump",
+      "district_heat",
+      "collective_unknown",
+      "delivery_set_from_heating"
+    ],
+    "path": "/hotWater/generator/kind",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "kitchen_and_bathroom",
+      "bathroom_only",
+      "kitchen_only"
+    ],
+    "path": "/hotWater/served",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "none",
+      "vertical",
+      "horizontal",
+      "unknown"
+    ],
+    "path": "/hotWater/showerHeatRecovery",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "monocrystalline",
+      "polycrystalline",
+      "amorphous_single_junction",
+      "amorphous_multi_junction",
+      "amorphous_unknown",
+      "cigs",
+      "cd_te",
+      "unknown"
+    ],
+    "path": "/pv/[]/moduleType",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "not_ventilated",
+      "moderately_ventilated",
+      "strongly_ventilated",
+      "unknown"
+    ],
+    "path": "/pv/[]/mounting",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "counter_flow_aluminium",
+      "counter_flow_plastic",
+      "counter_flow_unknown_material",
+      "cross_flow",
+      "plate_or_tube",
+      "rotary",
+      "enthalpy",
+      "heat_pipe",
+      "two_element",
+      "cold_storage_with_ahu",
+      "unknown"
+    ],
+    "path": "/ventilation/heatRecovery",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "natural",
+      "mechanical_supply",
+      "mechanical_extract",
+      "balanced"
+    ],
+    "path": "/ventilation/principle",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "id",
+      "normVersion",
+      "constructionYear",
+      "renovation",
+      "dwelling",
+      "usableFloorAreaM2",
+      "areaSourceReference",
+      "buildingHeightM",
+      "construction",
+      "measuredInfiltration",
+      "storeys",
+      "verticalPipes",
+      "envelope",
+      "heating",
+      "hotWater",
+      "additionalHotWaterSystems",
+      "ventilation",
+      "pv",
+      "storage",
+      "coolingPresent",
+      "cooling",
+      "coolingCollective",
+      "sourceReference",
+      "inklapRedenen"
+    ],
+    "path": "",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "floor",
+      "wall",
+      "lighterCeiling",
+      "closedOrSuspendedCeiling",
+      "sourceReference"
+    ],
+    "path": "/construction",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "position",
+      "roofType"
+    ],
+    "path": "/dwelling",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "surfaces",
+      "windows",
+      "doors",
+      "panels",
+      "unheatedSpaces",
+      "rooflights",
+      "buildingKind"
+    ],
+    "path": "/envelope",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "id",
+      "surfaceId",
+      "areaM2",
+      "insulated",
+      "glassFraction",
+      "glass",
+      "frame",
+      "sourceReference"
+    ],
+    "path": "/envelope/doors/[]",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "id",
+      "element",
+      "boundary",
+      "grossAreaM2",
+      "orientation",
+      "tiltDeg",
+      "cavity",
+      "insulation",
+      "thermalCushions",
+      "reedThicknessMm",
+      "exposedPerimeterM",
+      "crawlspaceBottomInsulated",
+      "floorHeightAboveGroundM",
+      "depthBelowGroundM",
+      "groundFloorId",
+      "renovation",
+      "zoneId",
+      "sourceReference"
+    ],
+    "path": "/envelope/surfaces/[]",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "spaceId"
+    ],
+    "path": "/envelope/surfaces/[]/boundary",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "thicknessMm",
+      "proven"
+    ],
+    "path": "/envelope/surfaces/[]/insulation",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "id",
+      "description"
+    ],
+    "path": "/envelope/unheatedSpaces/[]",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "id",
+      "surfaceId",
+      "areaM2",
+      "glass",
+      "frame",
+      "obstruction",
+      "shading",
+      "solarControl",
+      "sourceReference"
+    ],
+    "path": "/envelope/windows/[]",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "generator",
+      "emitters",
+      "designClass",
+      "heatPumpAbove70Declaration",
+      "balanced",
+      "control",
+      "unheatedPipes",
+      "storeys",
+      "nominalPowerKw",
+      "additionalGenerators",
+      "addedPreferredGenerator",
+      "collective",
+      "airHeating",
+      "distributionType",
+      "pipeInsulation",
+      "sourceReference"
+    ],
+    "path": "/heating",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "boilerType",
+      "pilotFlame",
+      "insideThermalBoundary",
+      "manufactureYear",
+      "installationYear"
+    ],
+    "path": "/heating/generator",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "id",
+      "generator",
+      "served",
+      "kitchenLengthM",
+      "bathroomLengthM",
+      "showers",
+      "showerHeatRecovery",
+      "boilerVessel",
+      "nominalPowerKw",
+      "additionalGenerators",
+      "collective",
+      "solar",
+      "connectedBathrooms",
+      "connectedKitchens",
+      "sourceReference"
+    ],
+    "path": "/hotWater",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "applianceType",
+      "gaskeur",
+      "burnerLoadKw",
+      "cwClass"
+    ],
+    "path": "/hotWater/generator",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "id",
+      "panelAreaM2",
+      "moduleType",
+      "installationYear",
+      "azimuthDeg",
+      "tiltDeg",
+      "mounting",
+      "obstructionFactors",
+      "shading",
+      "sourceReference"
+    ],
+    "path": "/pv/[]",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "principle",
+      "declaredVariant",
+      "selfRegulatingVents",
+      "pressureClass",
+      "installationYear",
+      "heatRecovery",
+      "bypassPresent",
+      "unitManufactureYear",
+      "motor",
+      "passiveCooling",
+      "heatRecoveryLayout",
+      "controls",
+      "combined",
+      "grilleHeatingStrips",
+      "ductAirtightness",
+      "sourceReference"
+    ],
+    "path": "/ventilation",
+    "route": "residentialSurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "single_layer",
+      "multi_layer_whole",
+      "multi_layer_part"
+    ],
+    "path": "/buildingType/kind",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "detached",
+      "end_or_corner",
+      "terraced"
+    ],
+    "path": "/buildingType/position",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "pitched",
+      "partly_flat",
+      "flat"
+    ],
+    "path": "/buildingType/roof",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "light",
+      "heavy",
+      "very_heavy"
+    ],
+    "path": "/construction/floor",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "light",
+      "heavy",
+      "very_heavy"
+    ],
+    "path": "/construction/wall",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "floor_cooling",
+      "concrete_core_activation",
+      "wall_cooling",
+      "ceiling_cooling",
+      "fan_coil_on_outer_wall",
+      "fan_coil_on_ceiling",
+      "split_indoor_units_on_wall",
+      "split_indoor_units_on_ceiling",
+      "other"
+    ],
+    "path": "/cooling/emitter",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "compression",
+      "room_air_conditioner",
+      "gas_absorption",
+      "external_cold",
+      "unknown_collective",
+      "aquifer_before2013",
+      "aquifer_from2013",
+      "aquifer_year_unknown",
+      "surface_water",
+      "closed_ground_loop",
+      "dew_point_cooling",
+      "gas_engine_compression"
+    ],
+    "path": "/cooling/generator",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "wood_or_plastic",
+      "metal_with_thermal_break",
+      "metal",
+      "none"
+    ],
+    "path": "/envelope/doors/[]/frame",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "outdoor",
+      "ground",
+      "crawlspace",
+      "unheated_space",
+      "adjacent_heated",
+      "sunroom",
+      "water",
+      "strongly_ventilated",
+      "unheated_cellar"
+    ],
+    "path": "/envelope/surfaces/[]/boundary/kind",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "facade",
+      "roof",
+      "floor"
+    ],
+    "path": "/envelope/surfaces/[]/element",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "none_or_unknown",
+      "present_unknown_thickness",
+      "cavity_filled_unknown_width",
+      "thickness"
+    ],
+    "path": "/envelope/surfaces/[]/insulation/kind",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "north",
+      "north_east",
+      "east",
+      "south_east",
+      "south",
+      "south_west",
+      "west",
+      "north_west"
+    ],
+    "path": "/envelope/surfaces/[]/orientation",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "wood_or_plastic",
+      "metal_with_thermal_break",
+      "metal",
+      "none"
+    ],
+    "path": "/envelope/windows/[]/frame",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "triple_hr",
+      "hr_plus_plus",
+      "hr_plus",
+      "hr",
+      "coated_type_unknown",
+      "double",
+      "double_with_coating",
+      "double_with_secondary",
+      "hr_with_secondary",
+      "hr_plus_plus_with_secondary",
+      "secondary_window",
+      "single",
+      "leaded_light",
+      "glass_blocks"
+    ],
+    "path": "/envelope/windows/[]/glass",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "residential",
+      "office",
+      "assembly_without_day_care",
+      "assembly_with_day_care",
+      "education",
+      "healthcare_without_beds",
+      "healthcare_with_beds",
+      "retail",
+      "sport",
+      "lodging",
+      "cell"
+    ],
+    "path": "/functions/[]/function",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "room_thermostat",
+      "central_with_radiator_valves",
+      "individual_room_control",
+      "unknown"
+    ],
+    "path": "/heating/control",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "radiators",
+      "low_temperature_radiators",
+      "floor_heating",
+      "floor_heating_and_radiators",
+      "air_heating",
+      "local_heaters"
+    ],
+    "path": "/heating/emitters",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "conventional",
+      "vr",
+      "hr100",
+      "hr104",
+      "hr107",
+      "hydrogen",
+      "oil"
+    ],
+    "path": "/heating/generator/boilerType",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "boiler",
+      "heat_pump",
+      "district_heat",
+      "electric",
+      "biomass",
+      "chp",
+      "local_fired",
+      "gas_air_heater",
+      "none_present"
+    ],
+    "path": "/heating/generator/kind",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "none",
+      "gas_appliance",
+      "electric_boiler",
+      "electric_instantaneous",
+      "heat_pump",
+      "district_heat",
+      "gas_storage_heater",
+      "collective_unknown"
+    ],
+    "path": "/hotWater/generator/kind",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "none",
+      "vertical",
+      "horizontal",
+      "unknown"
+    ],
+    "path": "/hotWater/showerHeatRecovery",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "electric_steam",
+      "non_electric_steam",
+      "adiabatic"
+    ],
+    "path": "/humidification/humidifier",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "none",
+      "switching",
+      "dimming",
+      "unknown"
+    ],
+    "path": "/lighting/[]/daylight",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "t12",
+      "t8_conventional",
+      "t8_high_frequency",
+      "t5",
+      "led_in_luminaire",
+      "cfl_plug_in",
+      "cfl_integrated",
+      "incandescent_or_halogen",
+      "led_lamp",
+      "unknown"
+    ],
+    "path": "/lighting/[]/power/lamps/[]/lampType",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "luminaires",
+      "lamps",
+      "unknown"
+    ],
+    "path": "/lighting/[]/power/method",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "none_or_central_on",
+      "room_switch",
+      "room_switch_with_sweep",
+      "sensors_type_unknown",
+      "auto_on_dimmed",
+      "auto_on_auto_off",
+      "manual_on_dimmed",
+      "manual_on_auto_off"
+    ],
+    "path": "/lighting/[]/presence",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "monocrystalline",
+      "polycrystalline",
+      "amorphous_single_junction",
+      "amorphous_multi_junction",
+      "amorphous_unknown",
+      "cigs",
+      "cd_te",
+      "unknown"
+    ],
+    "path": "/pv/[]/moduleType",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "not_ventilated",
+      "moderately_ventilated",
+      "strongly_ventilated",
+      "unknown"
+    ],
+    "path": "/pv/[]/mounting",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "throttle",
+      "inlet_vane",
+      "blade_pitch",
+      "speed_control",
+      "other"
+    ],
+    "path": "/ventilation/flowControl/method",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "counter_flow_aluminium",
+      "counter_flow_plastic",
+      "counter_flow_unknown_material",
+      "cross_flow",
+      "plate_or_tube",
+      "rotary",
+      "enthalpy",
+      "heat_pipe",
+      "two_element",
+      "cold_storage_with_ahu",
+      "unknown"
+    ],
+    "path": "/ventilation/heatRecovery",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "natural",
+      "mechanical_supply",
+      "mechanical_extract",
+      "balanced"
+    ],
+    "path": "/ventilation/principle",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "variant",
+    "options": [
+      "none",
+      "present_percent_unknown",
+      "unknown"
+    ],
+    "path": "/ventilation/recirculation",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "id",
+      "normVersion",
+      "constructionYear",
+      "renovation",
+      "buildingType",
+      "functions",
+      "areaSourceReference",
+      "buildingHeightM",
+      "storeys",
+      "construction",
+      "measuredInfiltration",
+      "toiletStacks",
+      "verticalPipes",
+      "envelope",
+      "solarControlWindowIds",
+      "heating",
+      "heatingInstallation",
+      "cooling",
+      "ventilation",
+      "humidification",
+      "hotWater",
+      "additionalHotWaterSystems",
+      "lighting",
+      "pv",
+      "bacs",
+      "storage",
+      "fossilFuelOnPlot",
+      "sportHallAreaM2",
+      "swimmingPoolAreaM2",
+      "openlyConnectedResidenceAreas",
+      "zones",
+      "sourceReference",
+      "inklapRedenen"
+    ],
+    "path": "",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "systemPowerKw",
+      "servedAreaM2",
+      "present",
+      "automationClassCOrBetter",
+      "managementClassBOrBetter",
+      "evidenceReference"
+    ],
+    "path": "/bacs",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "position",
+      "roof"
+    ],
+    "path": "/buildingType",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "floor",
+      "wall",
+      "lighterCeiling",
+      "closedOrSuspendedCeiling",
+      "sourceReference"
+    ],
+    "path": "/construction",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "generator",
+      "capacityKw",
+      "emitter",
+      "fanCoilCount",
+      "waterBased",
+      "designTemperature",
+      "balanced",
+      "balancingEvidenceReference",
+      "control",
+      "pipesInsulated",
+      "pipeInsulationYear",
+      "aquiferPermitYear",
+      "heatPumpSource",
+      "groundAboveZeroDemonstrated",
+      "gasEngine",
+      "directExpansion",
+      "fittingsInsulated",
+      "coldMeters",
+      "pipeLengthM",
+      "uncooledPipeLengthM",
+      "maxPipeLengthM",
+      "additionalGenerators",
+      "sourceReference"
+    ],
+    "path": "/cooling",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "surfaces",
+      "windows",
+      "doors",
+      "panels",
+      "unheatedSpaces",
+      "rooflights",
+      "buildingKind"
+    ],
+    "path": "/envelope",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "id",
+      "surfaceId",
+      "areaM2",
+      "insulated",
+      "glassFraction",
+      "glass",
+      "frame",
+      "sourceReference"
+    ],
+    "path": "/envelope/doors/[]",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "id",
+      "element",
+      "boundary",
+      "grossAreaM2",
+      "orientation",
+      "tiltDeg",
+      "cavity",
+      "insulation",
+      "thermalCushions",
+      "reedThicknessMm",
+      "exposedPerimeterM",
+      "crawlspaceBottomInsulated",
+      "floorHeightAboveGroundM",
+      "depthBelowGroundM",
+      "groundFloorId",
+      "renovation",
+      "zoneId",
+      "sourceReference"
+    ],
+    "path": "/envelope/surfaces/[]",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "thicknessMm",
+      "proven"
+    ],
+    "path": "/envelope/surfaces/[]/insulation",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "id",
+      "surfaceId",
+      "areaM2",
+      "glass",
+      "frame",
+      "obstruction",
+      "shading",
+      "solarControl",
+      "sourceReference"
+    ],
+    "path": "/envelope/windows/[]",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "function",
+      "areaM2"
+    ],
+    "path": "/functions/[]",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "generator",
+      "emitters",
+      "designClass",
+      "heatPumpAbove70Declaration",
+      "balanced",
+      "control",
+      "unheatedPipes",
+      "storeys",
+      "nominalPowerKw",
+      "additionalGenerators",
+      "addedPreferredGenerator",
+      "collective",
+      "airHeating",
+      "distributionType",
+      "pipeInsulation",
+      "sourceReference"
+    ],
+    "path": "/heating",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "boilerType",
+      "pilotFlame",
+      "insideThermalBoundary",
+      "manufactureYear",
+      "installationYear"
+    ],
+    "path": "/heating/generator",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "collective",
+      "capacityKw"
+    ],
+    "path": "/heatingInstallation",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "id",
+      "generator",
+      "meanDrawOffLengthM",
+      "circulation",
+      "showers",
+      "showerHeatRecovery",
+      "storage",
+      "solar",
+      "nominalPowerKw",
+      "additionalGenerators",
+      "servedAreas",
+      "sourceReference"
+    ],
+    "path": "/hotWater",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "id",
+      "volumeL",
+      "label",
+      "producedFrom2018",
+      "connection",
+      "inHeatedZone",
+      "sourceReference"
+    ],
+    "path": "/hotWater/storage/[]",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "humidifier",
+      "absorptionWheel",
+      "sourceReference"
+    ],
+    "path": "/humidification",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "id",
+      "areaM2",
+      "power",
+      "presence",
+      "daylight",
+      "largeOfficeGroup",
+      "extractedLuminaires",
+      "zoneId",
+      "sourceReference"
+    ],
+    "path": "/lighting/[]",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "ledFrom2017"
+    ],
+    "path": "/lighting/[]/power",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "count",
+      "lampPowerW",
+      "lampType"
+    ],
+    "path": "/lighting/[]/power/lamps/[]",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "count",
+      "powerW"
+    ],
+    "path": "/lighting/[]/power/luminaires/[]",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "id",
+      "panelAreaM2",
+      "moduleType",
+      "installationYear",
+      "azimuthDeg",
+      "tiltDeg",
+      "mounting",
+      "obstructionFactors",
+      "shading",
+      "sourceReference"
+    ],
+    "path": "/pv/[]",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "principle",
+      "declaredVariant",
+      "selfRegulatingVents",
+      "pressureClass",
+      "installationYear",
+      "heatRecovery",
+      "bypassPresent",
+      "unitManufactureYear",
+      "motor",
+      "ductsLukaAbc",
+      "ahu",
+      "recirculation",
+      "recirculationPercent",
+      "flowControl",
+      "passiveCooling",
+      "ductAirtightness",
+      "combined",
+      "grilleHeatingStrips",
+      "installedCapacityDm3PerS",
+      "heatRecoveryLayout",
+      "supplyDuctInsulation",
+      "supplyDuctLengthM",
+      "constantVolumeControl",
+      "bypassPercent",
+      "sourceReference"
+    ],
+    "path": "/ventilation",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "insideThermalZone",
+      "ductsOutsideThermalZone",
+      "ductLength",
+      "ductsInsulated",
+      "heatingConnected",
+      "coolingConnected"
+    ],
+    "path": "/ventilation/ahu",
+    "route": "utilitySurvey"
+  },
+  {
+    "kind": "field",
+    "options": [
+      "method",
+      "minimumPercent"
+    ],
+    "path": "/ventilation/flowControl",
+    "route": "utilitySurvey"
+  }
+]

@@ -1,12 +1,14 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { KernelCode, KernelDetail } from '../KernelCode/KernelCode';
 import { adviceText } from '../../core/nta/MwaAdviceText';
 import { formatNumber } from '../../i18n/format';
 import { ClipboardList, FileDown, Plus, RefreshCw } from 'lucide-react';
 import { useEnergy } from '../../context/EnergyContext';
+import { useMaatwerkadviesResult, type StoredAssessment } from '../../context/MaatwerkadviesResultProvider';
 import i18next, { useI18n } from '../../i18n/i18n';
 import {
   assessMaatwerkadviesWithRust,
+  buildMaatwerkadviesInput,
   DEFAULT_NORM_VERSION,
   type MaatwerkadviesAssessment,
   type MwaMeasure,
@@ -30,6 +32,7 @@ import {
   LabelPathChart, MeasureCard, PackageComparison, PackageInspector, labelPathBars, measureProblems,
 } from '../shell/pages/existing/MwaViews';
 import '../shell/pages/existing/existing.css';
+import { DecimalInput } from '../ui';
 
 const CATEGORIES: MwaMeasureCategory[] = [
   'insulation', 'glazing', 'airtightness', 'ventilation', 'heat_recovery', 'heating', 'heat_pump',
@@ -248,7 +251,7 @@ function MeasureEditor({ project, measure, onChange, onRemove }: {
         </select>
       </label>
       <label>{t('mwa.measure.investment')}
-        <input type="number" value={measure.investmentEur} onChange={(e) => onChange({ ...measure, investmentEur: Number(e.target.value) })} />
+        <DecimalInput value={measure.investmentEur} onChange={(e) => onChange({ ...measure, investmentEur: Number(e.target.value) })} />
       </label>
       {measure.investmentEur === 0 && <p className="mwa-wide nta-form-note" data-testid={`mwa-investment-zero-${measure.id}`}>
         {t('mwa.measure.investmentZero')}</p>}
@@ -256,13 +259,13 @@ function MeasureEditor({ project, measure, onChange, onRemove }: {
         <input value={measure.costSource} onChange={(e) => onChange({ ...measure, costSource: e.target.value })} />
       </label>
       <label>{t('mwa.measure.lifetime')}
-        <input type="number" value={measure.lifetimeYears} onChange={(e) => onChange({ ...measure, lifetimeYears: Number(e.target.value) })} />
+        <DecimalInput value={measure.lifetimeYears} onChange={(e) => onChange({ ...measure, lifetimeYears: Number(e.target.value) })} />
       </label>
       <label>{t('mwa.measure.maintenance')}
-        <input type="number" value={measure.maintenanceEurPerYear ?? ''} onChange={(e) => onChange({ ...measure, maintenanceEurPerYear: num(e.target.value) })} />
+        <DecimalInput value={measure.maintenanceEurPerYear ?? ''} onChange={(e) => onChange({ ...measure, maintenanceEurPerYear: num(e.target.value) })} />
       </label>
       <label>{t('mwa.measure.phaseYear')}
-        <input type="number" value={measure.phaseYear ?? ''} onChange={(e) => onChange({ ...measure, phaseYear: num(e.target.value) })} />
+        <DecimalInput value={measure.phaseYear ?? ''} onChange={(e) => onChange({ ...measure, phaseYear: num(e.target.value) })} />
       </label>
       <label className="mwa-wide">{t('mwa.measure.specialist')}
         <input value={measure.specialistNote ?? ''} onChange={(e) => onChange({ ...measure, specialistNote: e.target.value || undefined })} />
@@ -290,6 +293,9 @@ export function orderResults(results: MwaVariantResult[], order: ResultOrder): M
   });
 }
 
+/** Columns of the variant table, the same as the report's (MaatwerkadviesReport). */
+const MWA_COLUMNS = 13;
+
 /** A variant row; an invalid variant gets a second row with the kernel's reasons. */
 export function ResultRow({ result, t }: { result: MwaVariantResult; t: (key: string) => string }) {
   const use = result.actualUse;
@@ -300,8 +306,10 @@ export function ResultRow({ result, t }: { result: MwaVariantResult; t: (key: st
       <th scope="row">{name}{!result.valid && <span aria-label={t('mwa.variantInvalid')} title={t('mwa.variantInvalid')}> ⚠</span>}</th>
       <td>{result.label.labelClass ?? '–'}</td>
       <td>{format(result.label.primaryFossilIndicatorKwhPerM2, 1)}</td>
+      <td>{format(result.label.tojuliMaxK, 2)}</td>
       <td>{format(use?.gasM3)}</td>
       <td>{format(use ? use.electricityImportKwh - use.electricityExportKwh : null)}</td>
+      <td>{format(use?.districtHeatKwh)}</td>
       <td>{format(use?.co2Kg)}</td>
       <td>{format(use?.energyCostEur)}</td>
       <td>{format(result.savings?.energyCostEur)}</td>
@@ -311,7 +319,7 @@ export function ResultRow({ result, t }: { result: MwaVariantResult; t: (key: st
     </tr>
     {result.issues.length > 0 && (
       <tr className="mwa-variant-issues" data-testid={`mwa-issues-${result.id}`}>
-        <td colSpan={11}>
+        <td colSpan={MWA_COLUMNS}>
           <ul>{result.issues.map((item, index) => (
             <li key={index}><KernelCode code={item.code} prefixes={['mwa.issue.', 'nta.gap.', 'kernel.issue.']} />
               {item.detail && <> {item.code === 'measure_template_incomplete'
@@ -353,12 +361,27 @@ function MeasureChecks({ label, measures, selected, onChange }: {
 /** Tabs of the Maatwerkadvies step (ontwerp §8): maatregelen & pakketten, gemeten verbruik, woningpas, advies & rapport. */
 export type MwaTab = 'measures' | 'use' | 'passport' | 'advice';
 
+/**
+ * The stored assessment when it was calculated from the project as it is now:
+ * same document and the same kernel input (base project, edition, measures,
+ * packages, use and tariffs). An edit elsewhere (undo, an edition switch,
+ * another document, an edit made while the calculation ran) gives null, so a
+ * result is never shown for input it was not calculated from.
+ */
+export function matchingAssessment(stored: StoredAssessment | null, project: IProject): MaatwerkadviesAssessment | null {
+  if (!stored || !project.maatwerkadvies || stored.projectId !== project.id) return null;
+  if (stored.project === project) return stored.assessment;
+  return JSON.stringify(buildMaatwerkadviesInput(project, project.maatwerkadvies)) === stored.input ? stored.assessment : null;
+}
+
 export function MaatwerkadviesPanel({ tab }: { tab?: MwaTab } = {}) {
   const { state, dispatch } = useEnergy();
   const { t } = useI18n();
   const project = state.project;
   const definition = project.maatwerkadvies;
-  const [assessment, setAssessment] = useState<MaatwerkadviesAssessment | null>(null);
+  // Kept per document across steps; shown only for the input it was made from.
+  const { stored, record, clear } = useMaatwerkadviesResult();
+  const assessment = useMemo(() => matchingAssessment(stored, project), [stored, project]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [order, setOrder] = useState<ResultOrder>('input');
@@ -367,7 +390,7 @@ export function MaatwerkadviesPanel({ tab }: { tab?: MwaTab } = {}) {
 
   const update = (next: NtaMaatwerkadvies) => {
     dispatch({ type: 'SET_MAATWERKADVIES', payload: next });
-    setAssessment(null);
+    clear();
   };
 
   if (!definition) {
@@ -435,7 +458,9 @@ export function MaatwerkadviesPanel({ tab }: { tab?: MwaTab } = {}) {
       // project as it is now.
       const current = regenerateTemplatePatches(project, definition);
       if (JSON.stringify(current) !== JSON.stringify(definition)) dispatch({ type: 'SET_MAATWERKADVIES', payload: current });
-      setAssessment(await assessMaatwerkadviesWithRust(project, current));
+      const input = JSON.stringify(buildMaatwerkadviesInput(project, current));
+      const result = await assessMaatwerkadviesWithRust(project, current);
+      record({ projectId: project.id, project, input, assessment: result });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));
     } finally {
@@ -459,19 +484,19 @@ export function MaatwerkadviesPanel({ tab }: { tab?: MwaTab } = {}) {
         </select>
       </label>
       <label>{t('mwa.occupants')}
-        <input type="number" value={use.occupants ?? ''}
+        <DecimalInput value={use.occupants ?? ''}
           onChange={(e) => update({ ...definition, currentUse: { ...use, occupants: e.target.value === '' ? undefined : Number(e.target.value) } })} />
       </label>
       <label>{t('mwa.heatingSetpoint')}
-        <input type="number" value={use.heatingSetpointC ?? ''}
+        <DecimalInput value={use.heatingSetpointC ?? ''}
           onChange={(e) => update({ ...definition, currentUse: { ...use, heatingSetpointC: e.target.value === '' ? undefined : Number(e.target.value) } })} />
       </label>
       <label>{t('mwa.persons')}
-        <input type="number" value={use.persons ?? ''}
+        <DecimalInput value={use.persons ?? ''}
           onChange={(e) => update({ ...definition, currentUse: { ...use, persons: e.target.value === '' ? undefined : Number(e.target.value) } })} />
       </label>
       <label>{t('mwa.lightingHours')}
-        <input type="number" step="0.05" value={use.lightingHoursFactor ?? ''}
+        <DecimalInput step="0.05" value={use.lightingHoursFactor ?? ''}
           onChange={(e) => update({ ...definition, currentUse: { ...use, lightingHoursFactor: e.target.value === '' ? undefined : Number(e.target.value) } })} />
       </label>
       <label className="mwa-wide">{t('mwa.source')}
@@ -483,23 +508,23 @@ export function MaatwerkadviesPanel({ tab }: { tab?: MwaTab } = {}) {
   const tariffsBlock = block(t('mwa.tariffs'), true, <>
     <div className="mwa-grid">
       <label>{t('mwa.tariff.gas')}
-        <input type="number" step="0.01" value={definition.tariffs.gasEurPerM3}
+        <DecimalInput step="0.01" value={definition.tariffs.gasEurPerM3}
           onChange={(e) => update({ ...definition, tariffs: { ...definition.tariffs, gasEurPerM3: Number(e.target.value) } })} />
       </label>
       <label>{t('mwa.tariff.electricity')}
-        <input type="number" step="0.01" value={definition.tariffs.electricityEurPerKwh}
+        <DecimalInput step="0.01" value={definition.tariffs.electricityEurPerKwh}
           onChange={(e) => update({ ...definition, tariffs: { ...definition.tariffs, electricityEurPerKwh: Number(e.target.value) } })} />
       </label>
       <label>{t('mwa.tariff.export')}
-        <input type="number" step="0.01" value={definition.tariffs.electricityExportEurPerKwh ?? 0}
+        <DecimalInput step="0.01" value={definition.tariffs.electricityExportEurPerKwh ?? 0}
           onChange={(e) => update({ ...definition, tariffs: { ...definition.tariffs, electricityExportEurPerKwh: Number(e.target.value) } })} />
       </label>
       <label>{t('mwa.tariff.heat')}
-        <input type="number" step="0.01" value={definition.tariffs.districtHeatEurPerKwh ?? 0}
+        <DecimalInput step="0.01" value={definition.tariffs.districtHeatEurPerKwh ?? 0}
           onChange={(e) => update({ ...definition, tariffs: { ...definition.tariffs, districtHeatEurPerKwh: Number(e.target.value) } })} />
       </label>
       <label>{t('mwa.discount')}
-        <input type="number" step="0.005" value={definition.economics?.discountRate ?? 0.03}
+        <DecimalInput step="0.005" value={definition.economics?.discountRate ?? 0.03}
           onChange={(e) => update({ ...definition, economics: { ...definition.economics, discountRate: Number(e.target.value) } })} />
       </label>
       <label className="mwa-wide">{t('mwa.source')}
@@ -512,15 +537,15 @@ export function MaatwerkadviesPanel({ tab }: { tab?: MwaTab } = {}) {
   const measuredBlock = block(t('mwa.measured'), false, <>
     <div className="mwa-grid">
       <label>{t('mwa.measured.gas')}
-        <input type="number" value={measuredUse.annualGasM3 ?? ''}
+        <DecimalInput value={measuredUse.annualGasM3 ?? ''}
           onChange={(e) => setMeasured({ annualGasM3: e.target.value === '' ? undefined : Number(e.target.value) })} />
       </label>
       <label>{t('mwa.measured.electricity')}
-        <input type="number" value={measuredUse.annualElectricityKwh ?? ''}
+        <DecimalInput value={measuredUse.annualElectricityKwh ?? ''}
           onChange={(e) => setMeasured({ annualElectricityKwh: e.target.value === '' ? undefined : Number(e.target.value) })} />
       </label>
       <label>{t('mwa.measured.heat')}
-        <input type="number" value={measuredUse.annualHeatKwh ?? ''}
+        <DecimalInput value={measuredUse.annualHeatKwh ?? ''}
           onChange={(e) => setMeasured({ annualHeatKwh: e.target.value === '' ? undefined : Number(e.target.value) })} />
       </label>
       <label className="mwa-wide">{t('mwa.measured.monthlyGas')}
@@ -689,8 +714,8 @@ export function MaatwerkadviesPanel({ tab }: { tab?: MwaTab } = {}) {
       </label>}
       <table className={tab ? 'ui-table mwa-variants' : undefined}>
         <thead><tr>
-          <th>{t('mwa.col.variant')}</th><th>{t('mwa.col.label')}</th><th>EP2</th><th>{t('mwa.col.gas')}</th>
-          <th>{t('mwa.col.electricity')}</th><th>CO₂ [kg]</th><th>{t('mwa.col.cost')}</th><th>{t('mwa.col.saving')}</th>
+          <th>{t('mwa.col.variant')}</th><th>{t('mwa.col.label')}</th><th>EP2</th><th>{t('mwa.col.tojuli')}</th><th>{t('mwa.col.gas')}</th>
+          <th>{t('mwa.col.electricity')}</th><th>{t('mwa.col.heat')}</th><th>CO₂ [kg]</th><th>{t('mwa.col.cost')}</th><th>{t('mwa.col.saving')}</th>
           <th>{t('mwa.col.investment')}</th><th>{t('mwa.col.payback')}</th><th>{t('mwa.col.npv')}</th>
         </tr></thead>
         <tbody>

@@ -1,0 +1,490 @@
+{
+  "id": "public-comparison-j",
+  "name": "Vergelijking openbaar rapport J (winkelruimte onder appartementen)",
+  "description": "Fictieve herbouw van een openbaar BENG-rapport (Uniec 3.0.19.4, NTA 8800:2020+A1); niet het echte gebouw. Een winkelruimte van 89,80 m2 onder appartementen, ventilatiewarmtepomp met vloerverwarming en -koeling, ventilatiesysteem C.4c, 4 PV-panelen.",
+  "buildingFunction": "retail",
+  "address": "Fictief adres",
+  "city": "Fictief",
+  "zones": [
+    {
+      "id": "z1",
+      "name": "Commerciele ruimte",
+      "floorArea": 89.8,
+      "volume": 269.4,
+      "height": 3.0,
+      "surfaces": [
+        {
+          "id": "vg",
+          "name": "Voorgevel",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 18.02,
+          "orientation": "W",
+          "constructionId": "c-gevel",
+          "zoneId": "z1",
+          "windows": [
+            {
+              "id": "vg-1",
+              "name": "Kozijn HR++",
+              "area": 2.79,
+              "uValue": 1.2,
+              "gValue": 0.5,
+              "orientation": "W",
+              "surfaceId": "vg"
+            },
+            {
+              "id": "vg-2",
+              "name": "Kozijn HR++",
+              "area": 2.7,
+              "uValue": 1.2,
+              "gValue": 0.5,
+              "orientation": "W",
+              "surfaceId": "vg"
+            },
+            {
+              "id": "deur-open",
+              "name": "Deur open (HR++ glas)",
+              "area": 3.3,
+              "uValue": 1.1,
+              "gValue": 0.5,
+              "orientation": "W",
+              "surfaceId": "vg"
+            },
+            {
+              "id": "deur-dicht",
+              "name": "Deur dicht",
+              "area": 1.97,
+              "uValue": 1.2,
+              "gValue": 0.0,
+              "orientation": "W",
+              "surfaceId": "vg"
+            }
+          ]
+        },
+        {
+          "id": "rz",
+          "name": "Rechter zijgevel",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 41.62,
+          "orientation": "S",
+          "constructionId": "c-gevel",
+          "zoneId": "z1",
+          "windows": [
+            {
+              "id": "rz-1",
+              "name": "Kozijn HR++",
+              "area": 2.15,
+              "uValue": 1.2,
+              "gValue": 0.5,
+              "orientation": "S",
+              "surfaceId": "rz"
+            },
+            {
+              "id": "rz-2",
+              "name": "Kozijn HR++",
+              "area": 2.15,
+              "uValue": 1.2,
+              "gValue": 0.5,
+              "orientation": "S",
+              "surfaceId": "rz"
+            },
+            {
+              "id": "rz-3",
+              "name": "Kozijn HR++",
+              "area": 2.15,
+              "uValue": 1.2,
+              "gValue": 0.5,
+              "orientation": "S",
+              "surfaceId": "rz"
+            },
+            {
+              "id": "rz-4",
+              "name": "Kozijn HR++",
+              "area": 4.33,
+              "uValue": 1.2,
+              "gValue": 0.5,
+              "orientation": "S",
+              "surfaceId": "rz"
+            }
+          ]
+        },
+        {
+          "id": "ag",
+          "name": "Achtergevel",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 2.2,
+          "orientation": "E",
+          "constructionId": "c-gevel",
+          "zoneId": "z1",
+          "windows": []
+        },
+        {
+          "id": "lz",
+          "name": "Linkerzijgevel",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 36.83,
+          "orientation": "N",
+          "constructionId": "c-gevel",
+          "zoneId": "z1",
+          "windows": []
+        },
+        {
+          "id": "dak",
+          "name": "Plat dak",
+          "type": "roof",
+          "thermalBoundary": "outdoor",
+          "area": 15.21,
+          "orientation": "horizontal",
+          "constructionId": "c-dak",
+          "zoneId": "z1",
+          "windows": []
+        },
+        {
+          "id": "vloer",
+          "name": "Begane grondvloer boven kruipruimte",
+          "type": "floor",
+          "thermalBoundary": "ground",
+          "area": 90.42,
+          "orientation": "horizontal",
+          "constructionId": "c-vloer",
+          "zoneId": "z1",
+          "windows": []
+        }
+      ],
+      "thermalBridges": [],
+      "airTightness": {
+        "qv10": 0.42
+      },
+      "pointThermalBridges": [],
+      "pointBridgeInventoryComplete": true
+    }
+  ],
+  "heatingSystems": [],
+  "ventilationSystems": [],
+  "coolingSystems": [],
+  "hotWaterSystems": [],
+  "solarPV": [],
+  "solarThermal": [],
+  "unheatedSpaces": [],
+  "constructions": [
+    {
+      "id": "c-gevel",
+      "name": "Gevel Rc 4,70",
+      "layers": [],
+      "rcValue": 4.7,
+      "uValue": 0.2053
+    },
+    {
+      "id": "c-dak",
+      "name": "Plat dak Rc 6,30",
+      "layers": [],
+      "rcValue": 6.3,
+      "uValue": 0.1553
+    },
+    {
+      "id": "c-vloer",
+      "name": "Begane grondvloer Rc 4,00",
+      "layers": [],
+      "rcValue": 4.0,
+      "uValue": 0.2398
+    }
+  ],
+  "ntaCalculation": {
+    "calculationScope": "utility",
+    "constructionYear": 2022,
+    "areaSourceReference": "openbare bron Uniec 3.0.19.4 printout (commerciele ruimte 89,80 m2 onder appartementen, 07-04-2022): Ag 89,80 m2 winkelfunctie",
+    "usageFunction": "retail",
+    "setpoints": {
+      "heatingC": 21.0,
+      "coolingC": 24.0,
+      "sourceReference": "tabel 7.13 winkelfunctie"
+    },
+    "thermalMass": {
+      "floor": "very_heavy",
+      "wall": "heavy",
+      "ceiling": "closed_or_suspended",
+      "sourceReference": "openbare bron Uniec 3.0.19.4 printout (commerciele ruimte 89,80 m2 onder appartementen, 07-04-2022): dragend metselwerk met massieve betonnen vloeren, gesloten of verlaagd plafond, 1 bouwlaag; tabel 7.10 rij meer dan 750 kg/m2, 250 kJ/m2K (2020+A1 p. 180); klassen vloer zeer zwaar, wand zwaar (dragend metselwerk)"
+    },
+    "internalGains": {
+      "method": "utility",
+      "lighting": {
+        "method": "chapter14"
+      },
+      "sourceReference": "tabellen 7.2/7.3 winkelfunctie; verlichting uit hoofdstuk 14"
+    },
+    "windowSolar": {
+      "frameFraction": 0.25,
+      "obstruction": {
+        "method": "minimal"
+      },
+      "sourceReference": "default F_F; openbare bron Uniec 3.0.19.4 printout (commerciele ruimte 89,80 m2 onder appartementen, 07-04-2022): minimale belemmering, geen zonwering"
+    },
+    "groundFloors": [
+      {
+        "surfaceId": "vloer",
+        "exposedPerimeterM": 34.99,
+        "constructionResistanceM2kPerW": 4.17,
+        "below": {
+          "kind": "crawlspace",
+          "floorResistanceM2kPerW": 0.0,
+          "depthClass": "other",
+          "wallResistanceM2kPerW": 4.7,
+          "wallUValueWPerM2k": 0.2053,
+          "ventilationOpeningM2PerM": 0.0012,
+          "wallHeightAboveGroundM": 0.0
+        },
+        "edgeThermalBridges": {
+          "method": "forfait"
+        },
+        "sourceReference": "openbare bron Uniec 3.0.19.4 printout (commerciele ruimte 89,80 m2 onder appartementen, 07-04-2022): onder mv, boven kruipruimte, Rc 4,00 + R_si 0,17, P 34,99 m, kruipruimteventilatie 0,0012 m2/m, R_bw 4,70, kruipruimtevloer niet geisoleerd; h van (8.47) niet in de uitdraai, aangenomen 0,00 m; geen lineaire bruggen in de uitdraai, dus forfaitaire toeslag"
+      }
+    ],
+    "ventilationFlows": [],
+    "emission": {
+      "system": "floor_heating",
+      "balancing": "static",
+      "control": "individual_room_thermostats",
+      "sourceReference": "openbare bron Uniec 3.0.19.4 printout (commerciele ruimte 89,80 m2 onder appartementen, 07-04-2022): vloerverwarming nat of droog, minimaal de isolatie van NEN-EN 1264, autom. regeling per ruimte met handmatig overrulen en adaptieve regeling",
+      "edition2023": {
+        "kind": {
+          "type": "surface",
+          "control": "room",
+          "system": "floor_wet_or_unknown",
+          "insulation": "minimal_insulation"
+        },
+        "roomAutomation": "network_with_override_and_adaptive",
+        "pipeSystem": "two_pipe",
+        "balancing": "static_or_dynamic_with_groups"
+      }
+    },
+    "distribution": {
+      "method": "calculated",
+      "sourceReference": "openbare bron Uniec 3.0.19.4 printout (commerciele ruimte 89,80 m2 onder appartementen, 07-04-2022): tweepijpssysteem 35 graden, leidinggegevens onbekend, niet geisoleerd, geen leidingen buiten de verwarmde zone"
+    },
+    "generator": {
+      "kind": "heat_pump_forfait",
+      "forfait": {
+        "generatorId": "wp",
+        "classificationSourceReference": "openbare bron Uniec 3.0.19.4 printout (commerciele ruimte 89,80 m2 onder appartementen, 07-04-2022): elektrische warmtepomp forfaitair, ventilatieretourlucht, COP 4,50",
+        "scope": "utility_collective_or_over25_kw",
+        "source": "exhaust_air",
+        "sink": "hydronic",
+        "designSupplyTemperatureC": 35,
+        "installationYear": 2022,
+        "installationYearReference": "openbare bron Uniec 3.0.19.4 printout (commerciele ruimte 89,80 m2 onder appartementen, 07-04-2022): nieuwbouw, bouwjaar 2022"
+      },
+      "sourceSystem": "individual",
+      "sourceSystemReference": "ventilatieretourlucht"
+    },
+    "bacsFactor": 1.0,
+    "bacsSourceReference": "openbare bron Uniec 3.0.19.4 printout (commerciele ruimte 89,80 m2 onder appartementen, 07-04-2022): geen GBS in de uitdraai",
+    "useInventoryComplete": true,
+    "declaredUses": [],
+    "productionInventoryComplete": true,
+    "pvSystems": [
+      {
+        "id": "pv",
+        "peakPower": {
+          "method": "declared_specific",
+          "peakPowerWPerM2": 200.0,
+          "panelAreaM2": 7.2
+        },
+        "azimuthDeg": 180.0,
+        "tiltDeg": 23.0,
+        "mounting": "moderately_ventilated",
+        "obstructionFactors": [
+          1.0
+        ],
+        "sourceReference": "openbare bron Uniec 3.0.19.4 printout (commerciele ruimte 89,80 m2 onder appartementen, 07-04-2022): 4 panelen van 360 Wp, zuid 23 graden, matig geventileerd, minimale belemmering; paneeloppervlak niet in de uitdraai, aangenomen 1,8 m2 (200 Wp/m2)"
+      }
+    ],
+    "lighting": [
+      {
+        "zoneId": "z1",
+        "functions": [
+          {
+            "function": "retail",
+            "areaM2": 89.8
+          }
+        ],
+        "lightingZones": [
+          {
+            "id": "vz1",
+            "areaM2": 89.8,
+            "power": {
+              "method": "installed",
+              "luminaires": [
+                {
+                  "count": 1,
+                  "power": {
+                    "method": "system",
+                    "powerW": 628.6
+                  }
+                }
+              ],
+              "sourceReference": "openbare bron Uniec 3.0.19.4 printout (commerciele ruimte 89,80 m2 onder appartementen, 07-04-2022): eigen waarde 7,00 W/m2 over 89,80 m2"
+            },
+            "parasitic": {
+              "method": "forfait"
+            },
+            "occupancy": {
+              "control": "manual_or_unknown",
+              "centralOnControl": false,
+              "largeOfficeGroup": false
+            },
+            "daylight": {
+              "method": "none"
+            },
+            "extractedLuminaires": false
+          }
+        ],
+        "sourceReference": "openbare bron Uniec 3.0.19.4 printout (commerciele ruimte 89,80 m2 onder appartementen, 07-04-2022): eigen verlichtingsvermogen 7,00 W/m2, parasitair forfaitair, vertrek hand aan/uit, geen daglichtregeling"
+      }
+    ],
+    "labelFunction": "retail",
+    "demandUsesFixedC1Ventilation": false,
+    "batteryStoragePresent": false,
+    "bblFunction": "retail",
+    "verticalPipes": [
+      {
+        "id": "toiletgroep",
+        "buildingHeightM": 10.6,
+        "insulated": false,
+        "sourceReference": "openbare bron Uniec 3.0.19.4 printout (commerciele ruimte 89,80 m2 onder appartementen, 07-04-2022): verticale leidingen onbekend, 1 toiletgroep"
+      }
+    ],
+    "ventilation": {
+      "zoneId": "z1",
+      "usableFloorAreaM2": 89.8,
+      "category": "utility",
+      "functions": [
+        {
+          "function": "retail",
+          "areaM2": 89.8,
+          "swimmingPool": false
+        }
+      ],
+      "dwellingCount": 0,
+      "apartmentBuilding": false,
+      "buildingHeightM": 10.6,
+      "constructionYear": 2022,
+      "floorAboveCrawlspace": false,
+      "heatingSetpointC": 21.0,
+      "coolingSetpointC": 24.0,
+      "system": {
+        "kind": "single",
+        "unit": {
+          "variant": "c4c",
+          "ducts": "luka_a_b_c",
+          "equipmentReference": "openbare bron Uniec 3.0.19.4 printout (commerciele ruimte 89,80 m2 onder appartementen, 07-04-2022): C.4c ZR-roosters, CO2-sturing op afvoer per verblijfsruimte, zonder zonering, forfaitair (f_ctrl 0,82)"
+        }
+      },
+      "flowReduction": {
+        "collective": false
+      },
+      "infiltration": {
+        "method": "measured",
+        "qv10DmPerSM2": 0.42,
+        "sourceReference": "openbare bron Uniec 3.0.19.4 printout (commerciele ruimte 89,80 m2 onder appartementen, 07-04-2022): geen meetwaarde; q_v10;lea;ref 0,42 uit de uitdraai overgenomen"
+      },
+      "combustionAppliances": [],
+      "fans": {
+        "method": "forfait",
+        "current": "dc",
+        "manufactureYear": 2022
+      },
+      "sourceReference": "openbare bron Uniec 3.0.19.4 printout (commerciele ruimte 89,80 m2 onder appartementen, 07-04-2022): C natuurlijke toevoer en mechanische afvoer, forfaitaire ventilator"
+    },
+    "hotWater": {
+      "need": {
+        "method": "utility",
+        "areas": [
+          {
+            "function": "retail",
+            "areaM2": 89.8
+          }
+        ],
+        "sourceReference": "openbare bron Uniec 3.0.19.4 printout (commerciele ruimte 89,80 m2 onder appartementen, 07-04-2022): tabel 13.1 winkelfunctie"
+      },
+      "emission": {
+        "method": "utility",
+        "meanLengthM": 2.0,
+        "sourceReference": "openbare bron Uniec 3.0.19.4 printout (commerciele ruimte 89,80 m2 onder appartementen, 07-04-2022): uittapleidingen <= 3 m"
+      },
+      "storage": [],
+      "generator": {
+        "kind": "heat_pump",
+        "exhaustAirSource": true
+      },
+      "nominalPowerKw": 0.6,
+      "exhaustAir": {
+        "ventilationSuitable": true,
+        "heatingTimeFraction": []
+      },
+      "equipmentReference": "openbare bron Uniec 3.0.19.4 printout (commerciele ruimte 89,80 m2 onder appartementen, 07-04-2022): ventilatiewarmtepomp met geintegreerd voorraadvat, 0,6 kW, COP 1,40"
+    },
+    "normVersion": "2020+A1",
+    "distributionSystem": {
+      "designTemperatureClass": "35_30",
+      "installation": "individual",
+      "usageFunction": "retail",
+      "connectedStoreys": 1,
+      "pipeTransmittance": {
+        "method": "forfait",
+        "insulation": {
+          "state": "uninsulated",
+          "period": "before1980_or_unknown"
+        }
+      },
+      "valvesInsulated": false,
+      "pump": {
+        "method": "included_in_generator_auxiliary"
+      },
+      "sourceReference": "openbare bron Uniec 3.0.19.4 printout (commerciele ruimte 89,80 m2 onder appartementen, 07-04-2022): aanvullende distributiepomp niet aanwezig",
+      "unheatedPipeLengthM": 0.0
+    },
+    "heatPumpRenewable": {
+      "sourceBelow20C": false,
+      "exhaustAirSource": true,
+      "sourceReference": "ventilatieretourlucht (5.37)"
+    },
+    "cooling": {
+      "emission": {
+        "emitter": "floor_cooling",
+        "balancing": "static",
+        "control": "standalone_per_room",
+        "sourceReference": "openbare bron Uniec 3.0.19.4 printout (commerciele ruimte 89,80 m2 onder appartementen, 07-04-2022): vloerkoeling, autom. regeling per ruimte met handmatig overrulen en adaptieve regeling"
+      },
+      "distribution": {
+        "designTemperature": "t17_to21",
+        "pipe": {
+          "kind": "uninsulated"
+        },
+        "fittingsInsulated": false,
+        "pump": {
+          "hydraulicallyBalanced": true,
+          "floorCount": 1,
+          "heatMeter": false,
+          "individualDwellingInstallation": false,
+          "labelPowerKw": 0.033,
+          "energyEfficiencyIndex": 0.23,
+          "sourceReference": "openbare bron Uniec 3.0.19.4 printout (commerciele ruimte 89,80 m2 onder appartementen, 07-04-2022): pomp 33 W, EEI 0,23, 1 bouwlaag"
+        },
+        "sourceReference": "openbare bron Uniec 3.0.19.4 printout (commerciele ruimte 89,80 m2 onder appartementen, 07-04-2022): watergedragen 17/21, statisch ingeregeld met groepen, leidinggegevens onbekend, niet geisoleerd, geen leidingen buiten de gekoelde zone",
+        "unconditionedPipeLengthM": 0.0
+      },
+      "generators": [
+        {
+          "id": "koel",
+          "generator": {
+            "kind": "compression"
+          },
+          "equipmentReference": "openbare bron Uniec 3.0.19.4 printout (commerciele ruimte 89,80 m2 onder appartementen, 07-04-2022): compressiekoeling forfaitair, EER 3,00"
+        }
+      ]
+    }
+  }
+}

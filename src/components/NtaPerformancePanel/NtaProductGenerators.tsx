@@ -42,6 +42,10 @@ export function BoilerForfaitFields({ draft, change, base }: SectionProps & { ba
   const field = { draft, onChange: change };
   const at = (...rest: Path): Path => [...base, ...rest];
   return <>
+    <SelectField {...field} path={at('role')} label={t('nta.form.boilerRole')} options={[
+      ['individual_main', t('nta.form.boilerRole.individual_main')],
+      ['individual_supplementary', t('nta.form.boilerRole.individual_supplementary')],
+      ['collective', t('nta.form.boilerRole.collective')]]} />
     <SelectField {...field} path={at('kind')} label={t('nta.form.boilerKind')} options={[
       ['hr107', 'HR107'], ['hr104', 'HR104'], ['hr100', 'HR100'], ['vr', 'VR'], ['conventional', t('nta.form.boiler.conventional')]]} />
     <SelectField {...field} path={at('location')} label={t('nta.form.boilerLocation')} options={[
@@ -320,6 +324,9 @@ export function GroundFloorDetailFields({ draft, change, base }: SectionProps & 
   const at = (...rest: Path): Path => [...base, ...rest];
   const below = read(draft, at('below', 'kind'));
   const basement = read(draft, at('heatedBasement')) != null;
+  const basementBlock = (read(draft, at('heatedBasement')) ?? {}) as Draft;
+  // 8.42/D.12: the depth z_j per wall part instead of one depth z.
+  const wallParts = list(draft, at('heatedBasement', 'wallDepths'));
   const edges = list(draft, at('edgeInsulation'));
   return <>
     <label>{t('nta.form.ground.below')}
@@ -351,10 +358,35 @@ export function GroundFloorDetailFields({ draft, change, base }: SectionProps & 
       {t('nta.form.ground.heatedBasement')}
     </label>
     {basement && <>
-      <NumberField {...field} path={at('heatedBasement', 'depthM')} label={t('nta.form.ground.basementDepth')} />
+      {wallParts.length === 0
+        ? <NumberField {...field} path={at('heatedBasement', 'depthM')} label={t('nta.form.ground.basementDepth')} />
+        : <p className="nta-form-note">{t('nta.form.ground.wallPartsNote')}</p>}
+      {wallParts.map((_, index) => <div key={index} className="nta-form-row" role="group"
+        aria-label={`${t('nta.form.ground.wallPart')} ${index + 1}`}>
+        <NumberField {...field} path={at('heatedBasement', 'wallDepths', index, 'lengthM')} label={t('nta.form.ground.wallPartLength')} />
+        <NumberField {...field} path={at('heatedBasement', 'wallDepths', index, 'depthM')} label={t('nta.form.ground.wallPartDepth')} />
+        <RemoveButton label={t('nta.form.remove')} onClick={() => {
+          const rest = wallParts.filter((__, item) => item !== index);
+          // The last part removed: the single depth z comes back (8.42).
+          // The last part removed: the single depth z comes back (8.42),
+          // with that part's depth so nothing entered is lost.
+          const { wallDepths: _parts, ...single } = basementBlock;
+          const lastDepth = (wallParts[index] as Draft | undefined)?.depthM;
+          change(at('heatedBasement'), rest.length > 0 ? { ...basementBlock, wallDepths: rest }
+            : { ...single, depthM: typeof lastDepth === 'number' ? lastDepth : null });
+        }} />
+      </div>)}
+      <button type="button" className="btn" onClick={() => {
+        // The first part starts from the single depth z already entered.
+        const { depthM: depth, ...parts } = basementBlock;
+        const start = wallParts.length === 0 && typeof depth === 'number' ? depth : null;
+        change(at('heatedBasement'), { ...parts, wallDepths: [...wallParts, { lengthM: null, depthM: start }] });
+      }}>{t('nta.form.ground.addWallPart')}</button>
       <NumberField {...field} path={at('heatedBasement', 'wallResistanceM2kPerW')} label={t('nta.form.ground.basementWallResistance')} />
+      <NumberField {...field} path={at('heatedBasement', 'wallAreaM2')} label={t('nta.form.ground.basementWallArea')} optional />
     </>}
-    {edges.map((_, index) => <div key={index} className="nta-form-row">
+    {edges.map((_, index) => <div key={index} className="nta-form-row" role="group"
+      aria-label={`${t('nta.form.ground.edgeInsulation')} ${index + 1}`}>
       <SelectField {...field} path={at('edgeInsulation', index, 'kind')} label={t('nta.form.ground.edgeInsulation')} options={[
         ['horizontal', t('nta.form.ground.edge.horizontal')], ['vertical', t('nta.form.ground.edge.vertical')]]} />
       <NumberField {...field} path={at('edgeInsulation', index, 'resistanceM2kPerW')} label={t('nta.form.ground.edgeResistance')} />

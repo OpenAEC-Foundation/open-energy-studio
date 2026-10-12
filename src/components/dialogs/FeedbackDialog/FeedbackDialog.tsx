@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useId } from 'react';
 import { DialogShell } from '../DialogShell';
 import { useI18n } from '../../../i18n/i18n';
 import { version } from '../../../../package.json';
@@ -18,6 +18,7 @@ interface FeedbackDialogProps {
 }
 
 export function FeedbackDialog({ onClose }: FeedbackDialogProps) {
+  const fieldId = useId();
   const { t } = useI18n();
 
   const [email, setEmail] = useState(() => localStorage.getItem('feedback-email') || '');
@@ -191,8 +192,8 @@ export function FeedbackDialog({ onClose }: FeedbackDialogProps) {
           {/* Email & Name */}
           <div className="feedback-section">
             <div className="dialog-field">
-              <label>{t('feedback.email')} <span className="feedback-required">*</span></label>
-              <input
+              <label htmlFor={`${fieldId}-a1`}>{t('feedback.email')} <span className="feedback-required">*</span></label>
+              <input id={`${fieldId}-a1`}
                 type="email"
                 placeholder={t('feedback.emailPlaceholder')}
                 value={email}
@@ -200,8 +201,8 @@ export function FeedbackDialog({ onClose }: FeedbackDialogProps) {
               />
             </div>
             <div className="dialog-field">
-              <label>{t('feedback.fullName')}</label>
-              <input
+              <label htmlFor={`${fieldId}-a2`}>{t('feedback.fullName')}</label>
+              <input id={`${fieldId}-a2`}
                 type="text"
                 placeholder={t('feedback.fullNamePlaceholder')}
                 value={fullName}
@@ -217,6 +218,7 @@ export function FeedbackDialog({ onClose }: FeedbackDialogProps) {
                 <button
                   key={cat.key}
                   className={`feedback-category-btn${category === cat.key ? ' active' : ''}`}
+                  aria-pressed={category === cat.key}
                   onClick={() => setCategory(cat.key)}
                 >
                   {cat.label}
@@ -230,6 +232,7 @@ export function FeedbackDialog({ onClose }: FeedbackDialogProps) {
             <div className="dialog-field">
               <textarea
                 className="feedback-message"
+                aria-label={t('feedback.message')}
                 placeholder={t('feedback.messagePlaceholder')}
                 maxLength={MAX_MESSAGE}
                 value={message}
@@ -264,6 +267,7 @@ export function FeedbackDialog({ onClose }: FeedbackDialogProps) {
               accept="image/*"
               multiple
               style={{ display: 'none' }}
+              aria-label={t('feedback.attachImages')}
               onChange={handleFileChange}
             />
             <div className="feedback-hint">{t('feedback.imageLimit')}</div>

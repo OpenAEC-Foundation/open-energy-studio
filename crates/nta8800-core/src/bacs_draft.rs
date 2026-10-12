@@ -10,6 +10,23 @@ use crate::final_energy_draft::{as_f64, decimal};
 
 /// Final-edition citation of §5.5.8.
 const DRAFT_SOURCE: &str = "NTA 8800:2025+C1:2026, §5.5.8 (p. 99–101)";
+
+/// The citation in the active edition; an edition without f_BACS says so.
+fn draft_source() -> &'static str {
+    use crate::norm_versions::{cite, current, leak_once, profile};
+    if profile().bacs_factor_route {
+        return cite(DRAFT_SOURCE);
+    }
+    let version = current();
+    leak_once(
+        version,
+        DRAFT_SOURCE,
+        format!(
+            "{} kent geen f_BACS (5.5.8 is nieuw in 2025+C1)",
+            version.label()
+        ),
+    )
+}
 use crate::{input_fingerprint, KERNEL_VERSION};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
@@ -292,7 +309,7 @@ pub fn assess_bacs_draft(input: &BacsDraftInput) -> BacsDraftAssessment {
     BacsDraftAssessment {
         status,
         scope: "nta8800_5_5_8_bacs_factor",
-        draft_source: DRAFT_SOURCE,
+        draft_source: draft_source(),
         target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint: input_fingerprint(&json!(input)),

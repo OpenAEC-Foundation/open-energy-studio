@@ -68,8 +68,8 @@ describe('draft heat-pump auxiliary UI', () => {
     expect(screen.queryByText('315.60 kWh/year')).not.toBeInTheDocument();
     view.unmount();
     renderWithProviders(<HeatPumpAuxDiagnosticPanel pump={{ ...pump, heatingAuxMeasuredDraft: input }} />);
-    expect(screen.getByLabelText('Electronics standby power (W)')).toHaveValue(10);
-    expect(screen.getByLabelText('Month 12')).toHaveValue(100);
+    expect(screen.getByLabelText('Electronics standby power (W)')).toHaveValue('10');
+    expect(screen.getByLabelText('Month 12')).toHaveValue('100');
     expect(screen.getByText(/Measured inputs saved in this project/)).toBeInTheDocument();
 
   });

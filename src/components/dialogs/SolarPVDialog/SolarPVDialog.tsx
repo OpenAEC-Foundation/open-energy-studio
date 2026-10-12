@@ -3,6 +3,7 @@ import { useI18n } from '../../../i18n/i18n';
 import { useEnergy } from '../../../context/EnergyContext';
 import { ISolarPV, Orientation } from '../../../core/energy/types';
 import { DialogShell } from '../DialogShell';
+import { DecimalInput } from '../../ui';
 
 interface SolarPVDialogProps {
   editId?: string | null;
@@ -67,8 +68,7 @@ export function SolarPVDialog({ editId, onClose }: SolarPVDialogProps) {
 
         <div className="dialog-field">
           <label htmlFor={`${fieldId}-2`}>{t('dialog.solarPV.peakPower')}</label>
-          <input id={`${fieldId}-2`}
-            type="number"
+          <DecimalInput id={`${fieldId}-2`}
             min={0}
             step={0.1}
             value={peakPower}
@@ -89,8 +89,7 @@ export function SolarPVDialog({ editId, onClose }: SolarPVDialogProps) {
 
         <div className="dialog-field">
           <label htmlFor={`${fieldId}-4`}>{t('dialog.solarPV.tilt')}</label>
-          <input id={`${fieldId}-4`}
-            type="number"
+          <DecimalInput id={`${fieldId}-4`}
             min={0}
             max={90}
             step={1}
@@ -101,8 +100,7 @@ export function SolarPVDialog({ editId, onClose }: SolarPVDialogProps) {
 
         <div className="dialog-field">
           <label htmlFor={`${fieldId}-5`}>{t('dialog.solarPV.area')}</label>
-          <input id={`${fieldId}-5`}
-            type="number"
+          <DecimalInput id={`${fieldId}-5`}
             min={0}
             step={0.1}
             value={area}

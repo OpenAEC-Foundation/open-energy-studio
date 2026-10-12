@@ -39,8 +39,15 @@ export function isUniec3Export(files: Record<string, Uint8Array>): boolean {
   if (meta.includes('input draft')) return false;
   const relations = Object.keys(files).find((path) => /^buildings\/[^/]+\/relations\.json$/.test(path));
   if (!relations) return false;
-  const parsed = JSON.parse(strFromU8(files[relations])) as unknown[];
-  return parsed.length === 0 || (typeof parsed[0] === 'object' && parsed[0] !== null && 'ParentId' in parsed[0]);
+  let parsed: unknown[];
+  try {
+    parsed = JSON.parse(strFromU8(files[relations])) as unknown[];
+  } catch {
+    return false;
+  }
+  if (!Array.isArray(parsed)) return false;
+  // Only relations with ParentId/ChildId mark a file Uniec3 wrote; an empty list is no proof (the draft reader reports it).
+  return parsed.length > 0 && typeof parsed[0] === 'object' && parsed[0] !== null && 'ParentId' in parsed[0];
 }
 
 /** Entities with status 4 or 6 are present in the form but not applicable. */

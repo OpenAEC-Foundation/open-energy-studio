@@ -135,10 +135,58 @@ impl AirHeaterKind {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct AirHeaterAuxiliary {
     pub kind: AirHeaterKind,
+    /// Number of heaters of `kind`; absent means every heater in the zone
+    /// is of this type, so it is required as soon as `further` names other
+    /// types (n_H,aux of 9.23 counts every heater in the zone).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub count: Option<u32>,
+    /// Heaters of other table 9.12/9.13 types in the same zone.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub further: Vec<AirHeaterUnit>,
     /// Q_h;b per EN 12831-1, W; absent means the table 9.12 estimate.
     #[serde(default)]
     pub design_heat_load_w: Option<f64>,
     pub source_reference: String,
+}
+
+/// Heaters of one table 9.12/9.13 type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct AirHeaterUnit {
+    pub kind: AirHeaterKind,
+    pub count: u32,
+}
+
+impl AirHeaterAuxiliary {
+    /// Σ P_H,aux;i·n_H,aux;i / Q_h;b of 9.23 (2025+C1 p. 286; 2022 p. 282).
+    /// Table 9.12/9.13 give P_H,aux = factor·Q_h;b/n_H,aux with n_H,aux the
+    /// number of heaters in the zone, so heaters of several types weigh
+    /// their factors by their share of that number; one type alone gives
+    /// its factor. `None` when a count is 0, or when other types are given
+    /// without the count of `kind`.
+    pub fn factor(&self) -> Option<f64> {
+        if self.further.is_empty() {
+            return (self.count != Some(0)).then(|| self.kind.factor());
+        }
+        let first = AirHeaterUnit {
+            kind: self.kind,
+            count: self.count?,
+        };
+        let units: Vec<AirHeaterUnit> = std::iter::once(first)
+            .chain(self.further.iter().copied())
+            .collect();
+        if units.iter().any(|unit| unit.count == 0) {
+            return None;
+        }
+        let total: f64 = units.iter().map(|unit| f64::from(unit.count)).sum();
+        Some(
+            units
+                .iter()
+                .map(|unit| unit.kind.factor() * f64::from(unit.count))
+                .sum::<f64>()
+                / total,
+        )
+    }
 }
 
 /// Table 9.12 estimate of Q_h;b: Q_H;ht of January over t_jan scaled from

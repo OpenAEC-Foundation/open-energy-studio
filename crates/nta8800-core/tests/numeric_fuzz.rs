@@ -60,15 +60,22 @@ fn fixtures() -> Vec<(&'static str, Value)> {
     .into_iter()
     .map(|(name, json)| (name, serde_json::from_str(json).unwrap()))
     .chain(std::iter::once(declared_window_shading()))
+    .chain(std::iter::once(sunken_crawlspace_floor()))
+    .chain(std::iter::once(common_space_input()))
     .chain(isso54_routes())
+    // Review 55: the routes of reviews 40–54 (shared sunroom, collective
+    // delivery set, forfait bridges without a ground floor, oil steam, a
+    // boiler over 500 m², TOjuli method 3 in 2024, basement wall parts).
+    .chain(support::new_inputs::new_input_projects())
     .collect()
 }
 
 /// The routes added for ISSO 54 v2.0, with the test's own values, so their
 /// numeric leaves are fuzzed too: 7.41 per window (EP-W011a), declared 9.85
 /// constants (EP-W203j), a calculated Ψ of an embedded hot-water pipe
-/// (13.28, EP-W402f), declared CHP factors (EP-W204h) and a calculated Ψ of
-/// an embedded cooling pipe (10.25, EP-W302e).
+/// (13.28, EP-W402f), declared CHP factors (EP-W204h), a calculated Ψ of
+/// an embedded cooling pipe (10.25, EP-W302e), and a declared F_D;dayl
+/// (NEN-EN 15193-1 annex F, EP-U602g).
 fn isso54_routes() -> Vec<(&'static str, Value)> {
     let embedded = serde_json::json!({
         "method": "insulated_embedded", "pipeOuterDiameterM": 0.02, "insulatedDiameterM": 0.04,
@@ -101,6 +108,15 @@ fn isso54_routes() -> Vec<(&'static str, Value)> {
         "auxiliary": {"electricallyConnectedDevices": 1, "nominalPowerKw": 5.0, "sourceReference": "plate"},
         "equipmentReference": "micro-CHP"
     });
+    // The same declaration on the hot-water side (§13.8.4.7.4 references
+    // table 9.31, which a §9.1 declaration replaces).
+    chp["ntaCalculation"]["hotWater"]["generator"] = serde_json::json!({
+        "kind": "chp",
+        "chp": {"powerKw": 1.0, "builtAfter2006": true, "hreDeclared": true},
+        "declaredEfficiencies": {"thermal": 0.8, "electric": 0.12, "declarationReference": "EP-W204h"},
+        "alsoSpaceHeating": true,
+        "equipmentReference": "micro-CHP"
+    });
     // A CHP's 9.91 auxiliary energy excludes the pump; the pipes are
     // embedded in the construction (9.34, EP-W202e).
     let mut embedded_heating = embedded.clone();
@@ -120,14 +136,140 @@ fn isso54_routes() -> Vec<(&'static str, Value)> {
     cooling["ntaCalculation"]["cooling"]["distribution"]["pipe"] = serde_json::json!({
         "kind": "calculated", "geometry": embedded, "sourceReference": "EP-W302e"
     });
+    // EP-U602g: installed lamp power with a daylight sector whose F_D;dayl
+    // comes from NEN-EN 15193-1 annex F (2025+C1 p. 672).
+    let mut daylight: Value = serde_json::from_str(include_str!(
+        "../../../training-data/nta8800-example-office.json"
+    ))
+    .unwrap();
+    let zone = &mut daylight["ntaCalculation"]["lighting"][0]["lightingZones"][0];
+    zone["power"] = serde_json::json!({
+        "method": "installed", "sourceReference": "EP-U602g",
+        "luminaires": [{"count": 1, "power": {"method": "system", "powerW": 3200.0}}]
+    });
+    zone["daylight"] = serde_json::json!({
+        "method": "sectors", "sourceReference": "EP-U602g",
+        "sectors": [{"kind": "declared", "areaM2": 200.0, "daylightDependencyFactor": 0.781,
+            "sourceReference": "NEN-EN 15193-1:2017 bijlage F"}]
+    });
     vec![
         (
             "example-terraced-dwelling (ISSO 54 glazing, boiler, circulation)",
             boiler,
         ),
+        ("example-office (declared daylight sector)", daylight),
         ("example-terraced-dwelling (ISSO 54 declared CHP)", chp),
         ("public-comparison-c (calculated cooling-pipe Ψ)", cooling),
     ]
+}
+
+/// Case H with its 49,20 m² common space as input, allocated by the kernel
+/// (6.6.4), so the common-space leaves are fuzzed too.
+fn common_space_input() -> (&'static str, Value) {
+    let mut value: Value = serde_json::from_str(include_str!(
+        "../../../training-data/nta8800-public-comparison-h.json"
+    ))
+    .unwrap();
+    let rz1 = &mut value["ntaCalculation"]["zoneData"][0];
+    rz1["functionAreas"] = serde_json::json!([
+        {"function": "office", "areaM2": 14.70},
+        {"function": "other_assembly", "areaM2": 26.30},
+        {"function": "other_healthcare", "areaM2": 27.60}
+    ]);
+    rz1["commonSpaces"] = serde_json::json!([{
+        "areaM2": 49.20, "sourceReference": "printout: gemeenschappelijke ruimte"
+    }]);
+    rz1["ventilation"]["functions"] = serde_json::json!([]);
+    let nta = &mut value["ntaCalculation"];
+    nta.as_object_mut().unwrap().remove("bblFunctions");
+    // Review 25: the hot-water and lighting lists come from the split too,
+    // so the fuzzed common-space areas reach the filled lists (case H as
+    // entered by hand covers the entered lists).
+    nta["hotWater"]["need"]["areas"] = serde_json::json!([]);
+    for lighting in nta["lighting"].as_array_mut().unwrap() {
+        lighting.as_object_mut().unwrap().remove("functions");
+    }
+    (
+        "public-comparison-h (common space allocated by the kernel)",
+        value,
+    )
+}
+
+/// Case C with its floor above the crawlspace 0,5 m below ground level
+/// (8.39 with 8.43 and U_x;T = 0, ISSO 54 EP-W006f), so the two-part ground
+/// route and its numeric leaves are fuzzed too.
+fn sunken_crawlspace_floor() -> (&'static str, Value) {
+    let mut value: Value = serde_json::from_str(include_str!(
+        "../../../training-data/nta8800-public-comparison-c.json"
+    ))
+    .unwrap();
+    value["ntaCalculation"]["groundFloors"][0]["heatedBasement"] =
+        serde_json::json!({"depthM": 0.5, "wallResistanceM2kPerW": 5.32});
+    (
+        "public-comparison-c (floor below ground above crawlspace)",
+        value,
+    )
+}
+
+/// The largest number under `key` anywhere in `value`.
+fn find_number(value: &Value, key: &str) -> Option<f64> {
+    let mut found: Option<f64> = None;
+    let mut visit = |number: f64| found = Some(found.map_or(number, |max| max.max(number)));
+    fn walk(value: &Value, key: &str, visit: &mut dyn FnMut(f64)) {
+        match value {
+            Value::Object(map) => {
+                if let Some(number) = map.get(key).and_then(Value::as_f64) {
+                    visit(number);
+                }
+                map.values().for_each(|item| walk(item, key, visit));
+            }
+            Value::Array(items) => items.iter().for_each(|item| walk(item, key, visit)),
+            _ => {}
+        }
+    }
+    walk(value, key, &mut visit);
+    found
+}
+
+/// The sunken crawlspace floor calculates in every edition where case C
+/// does, and loses more to the ground than the same floor at ground level.
+#[test]
+fn sunken_crawlspace_floor_calculates() {
+    let base: Value = serde_json::from_str(include_str!(
+        "../../../training-data/nta8800-public-comparison-c.json"
+    ))
+    .unwrap();
+    let (_, sunken) = sunken_crawlspace_floor();
+    let mut checked = 0;
+    for edition in ["2025+C1", "2024", "2023", "2022", "2020+A1"] {
+        let run = |value: &Value| {
+            let mut input = value.clone();
+            input["ntaCalculation"]["normVersion"] = Value::from(edition);
+            serde_json::to_value(
+                nta8800_core::project_performance::assess_project_performance(&input),
+            )
+            .unwrap()
+        };
+        let plain = run(&base);
+        if !plain["status"].as_str().unwrap().starts_with("calculated") {
+            continue;
+        }
+        let result = run(&sunken);
+        assert!(
+            result["status"].as_str().unwrap().starts_with("calculated"),
+            "{edition}: {} {}",
+            result["status"],
+            result["gaps"]
+        );
+        let key = "groundSteadyConductanceWPerK";
+        let (plain, sunken) = (
+            find_number(&plain, key).unwrap(),
+            find_number(&result, key).unwrap(),
+        );
+        assert!(sunken > plain, "{edition}: {sunken} <= {plain}");
+        checked += 1;
+    }
+    assert!(checked >= 1);
 }
 
 /// Case G with its roof-window screen given as a declared `F_c` instead of
@@ -670,9 +812,14 @@ fn every_number_at_its_edges_calculates_plausibly_or_refuses_with_a_routed_gap()
         "/ntaCalculation/windowGlazings/*/glazing/diffusing/gAltitude45",
         "/ntaCalculation/generator/declaredAuxiliaryConstants/c",
         "/ntaCalculation/generator/declaredEfficiencies/thermal",
+        "/ntaCalculation/hotWater/generator/declaredEfficiencies/thermal",
         "/ntaCalculation/hotWater/circulation/calculatedPsi/depthM",
         "/ntaCalculation/cooling/distribution/pipe/geometry/depthM",
         "/ntaCalculation/distributionSystem/pipeTransmittance/depthM",
+        "/ntaCalculation/groundFloors/*/heatedBasement/depthM",
+        "/ntaCalculation/groundFloors/*/heatedBasement/wallAreaM2",
+        "/ntaCalculation/zoneData/*/commonSpaces/*/areaM2",
+        "/ntaCalculation/lighting/*/lightingZones/*/daylight/sectors/*/daylightDependencyFactor",
     ] {
         assert!(
             occurrences.contains_key(required),

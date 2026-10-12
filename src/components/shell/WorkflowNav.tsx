@@ -206,11 +206,11 @@ export interface WorkflowNavProps {
     | 'exportVABI' | 'importVABI' | 'exportModelIFC'>;
 }
 
-/** Screen-reader text of a step status, e.g. "2 aandachtspunt(en)". */
-export function stepStateText(t: (key: string, params?: Record<string, string>) => string, status: StepStatus): string {
+/** Screen-reader text of a step status, e.g. "2 aandachtspunten" (plural forms via `count`). */
+export function stepStateText(t: (key: string, params?: Record<string, string | number>) => string, status: StepStatus): string {
   switch (status.state) {
-    case 'errors': return t('nav.state.errors', { count: String(status.errors) });
-    case 'warnings': return t('nav.state.warnings', { count: String(status.warnings) });
+    case 'errors': return t('nav.state.errors', { count: status.errors });
+    case 'warnings': return t('nav.state.warnings', { count: status.warnings });
     case 'complete': return t('nav.state.complete');
     case 'dimmed': return t('nav.state.dimmed');
     default: return t('nav.state.todo');

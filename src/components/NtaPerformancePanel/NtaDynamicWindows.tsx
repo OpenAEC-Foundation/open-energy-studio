@@ -1,4 +1,5 @@
 import type { IProject } from '../../core/energy/types';
+import { NumberInput } from '../ui/Field';
 import { useI18n } from '../../i18n/i18n';
 import { NumberField, read, SelectField, TextField, type Draft, type Path } from './NtaFormFields';
 
@@ -47,9 +48,9 @@ function WeightGrid({ draft, change, path, states, label }: SectionProps & { pat
     {Array.from({ length: MONTHS }, (_, month) => <div key={month} className="nta-form-row">
       {states.map((state, column) => {
         const value = rows[month]?.[column];
-        return <input key={column} type="number" step="any" aria-label={`${label} ${month + 1} ${String(state.id ?? column + 1)}`}
-          value={typeof value === 'number' ? value : ''}
-          onChange={(event) => change([...path, month, column], event.target.value === '' ? null : Number(event.target.value))} />;
+        return <NumberInput key={column} aria-label={`${label} ${month + 1} ${String(state.id ?? column + 1)}`}
+          value={typeof value === 'number' ? value : null}
+          onChange={(next) => change([...path, month, column], next ?? null)} />;
       })}
     </div>)}
   </fieldset>;
@@ -58,9 +59,9 @@ function WeightGrid({ draft, change, path, states, label }: SectionProps & { pat
 function MonthlyFactors({ draft, change, path, label }: SectionProps & { path: Path; label: string }) {
   const values = (read(draft, path) as Array<number | null> | undefined) ?? [];
   return <fieldset className="nta-form-months"><legend>{label}</legend>
-    {Array.from({ length: MONTHS }, (_, index) => <input key={index} type="number" step="any" aria-label={`${label} ${index + 1}`}
-      value={typeof values[index] === 'number' ? values[index] as number : ''}
-      onChange={(event) => change([...path, index], event.target.value === '' ? null : Number(event.target.value))} />)}
+    {Array.from({ length: MONTHS }, (_, index) => <NumberInput key={index} aria-label={`${label} ${index + 1}`}
+      value={typeof values[index] === 'number' ? values[index] as number : null}
+      onChange={(next) => change([...path, index], next ?? null)} />)}
   </fieldset>;
 }
 
@@ -87,7 +88,7 @@ function DynamicWindowFields({ draft, change, base, windowName }: SectionProps &
     change(dynamic, { ...value, states: next, solarWeights: map(value.solarWeights), temperatureWeights: map(value.temperatureWeights) });
   };
   return <fieldset className="nta-form-group"><legend>{windowName}</legend>
-    <SelectField {...field} path={[...dynamic, 'method']} label={t('nta.form.dynamic.method')} options={[
+    <SelectField required {...field} path={[...dynamic, 'method']} label={t('nta.form.dynamic.method')} options={[
       ['single_state', t('nta.form.dynamic.methodB')], ['weighted_states', t('nta.form.dynamic.methodA')]]}
       onChange={(_, value) => setMethod(value)} />
     {method === 'single_state' && <StateFields draft={draft} change={change} base={[...dynamic, 'state']} />}

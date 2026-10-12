@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { useI18n } from '../../../i18n/i18n';
 import { useEnergy } from '../../../context/EnergyContext';
 import { generateReportHTML } from '../../../core/report/ReportTemplate';
+import { REPORT_FRAME_SANDBOX, REPORT_PRINT_SANDBOX } from '../../../core/report/reportFrame';
 import { useKernelQuery } from '../../../context/KernelProvider';
 import { DialogShell } from '../DialogShell';
 import './PrintPreviewDialog.css';
@@ -248,6 +249,9 @@ body{margin:0!important;padding:0!important}
   const handlePrint = useCallback(() => {
     const frame = document.createElement('iframe');
     frame.style.cssText = 'position:absolute;left:-9999px;width:0;height:0';
+    // Report HTML runs no scripts: same origin so this code can write into
+    // the frame, modals only for the print dialog (REPORT_FRAME_SANDBOX).
+    frame.setAttribute('sandbox', REPORT_PRINT_SANDBOX);
     document.body.appendChild(frame);
     const doc = frame.contentDocument;
     if (!doc) return;
@@ -470,6 +474,7 @@ body{margin:0!important;padding:0!important}
         {/* Hidden iframe for measuring total content height */}
         <iframe
           ref={measureRef}
+          sandbox={REPORT_FRAME_SANDBOX}
           style={{ position: 'absolute', left: '-9999px', visibility: 'hidden', height: '99999px' }}
           title="Measurement"
           aria-hidden="true"
@@ -488,6 +493,7 @@ body{margin:0!important;padding:0!important}
               }}
             >
               <iframe
+                sandbox={REPORT_FRAME_SANDBOX}
                 srcDoc={getPageHTML(i)}
                 className="pp-iframe"
                 title={`Page ${i + 1}`}

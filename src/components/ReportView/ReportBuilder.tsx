@@ -10,6 +10,8 @@ import {
 import { downloadEnergyPerformanceReportHTML, printEnergyPerformanceReport } from '../../core/report/ReportGenerator';
 import { currentResult, useSurveyAssessment } from '../../core/survey/surveyAssessment';
 import type { StoredSurvey } from '../../core/nta/SurveyTemplates';
+import { REPORT_FRAME_SANDBOX } from '../../core/report/reportFrame';
+import { TechnicalDetails } from '../ui/Display';
 
 const STORAGE_KEY = 'oes-energy-report-options';
 const LEVELS: ReportLevel[] = ['summary', 'standard', 'detailed'];
@@ -79,6 +81,9 @@ export function ReportBuilder({ project, assessment, pending }: {
     action().catch((reason: unknown) => setError(reason instanceof Error ? reason.message : String(reason))).finally(() => setBusy(false));
   };
   const detailed = choice.level === 'detailed';
+  // Without a kernel result the report cannot be composed: export and print wait for it
+  // (UX finding 3). The input dossier on the same page does not need a result.
+  const noResult = !assessment;
 
   return (
     <section className="report-builder" aria-labelledby={`${id}-title`}>
@@ -112,23 +117,28 @@ export function ReportBuilder({ project, assessment, pending }: {
         </div>
       </fieldset>
       <div className="report-builder-actions">
-        <button type="button" className="btn btn-primary" disabled={busy} onClick={() => run(() => downloadEnergyPerformanceReportHTML(project, options))}>
+        <button type="button" className="btn btn-primary" disabled={busy || noResult}
+          aria-describedby={noResult ? `${id}-no-result` : undefined}
+          onClick={() => run(() => downloadEnergyPerformanceReportHTML(project, options))}>
           {t('report.builder.export')}
         </button>
-        <button type="button" className="btn" disabled={busy} onClick={() => run(() => printEnergyPerformanceReport(project, options))}>
+        <button type="button" className="btn" disabled={busy || noResult}
+          aria-describedby={noResult ? `${id}-no-result` : undefined}
+          onClick={() => run(() => printEnergyPerformanceReport(project, options))}>
           {t('report.builder.print')}
         </button>
         <button type="button" className="btn" aria-expanded={previewOpen} onClick={() => setPreviewOpen(!previewOpen)}>
           {t(previewOpen ? 'report.builder.hidePreview' : 'report.builder.showPreview')}
         </button>
       </div>
-      {error && <p role="alert">{error}</p>}
-      {previewOpen && (
-        pending && !preview
-          ? <p role="status">{t('report.builder.pending')}</p>
-          : preview
-            ? <iframe className="report-builder-preview" title={t('report.builder.previewTitle')} srcDoc={preview} data-testid="report-builder-preview" />
-            : <p role="status">{t('report.builder.noKernel')}</p>
+      {noResult && <p id={`${id}-no-result`} className="report-builder-note" role="status">
+        {t(pending ? 'report.builder.pending' : 'report.builder.waitForResult')}</p>}
+      {error && <div role="alert">{t('report.builder.exportFailed')}<TechnicalDetails>{error}</TechnicalDetails></div>}
+      {previewOpen && !noResult && (
+        preview
+          ? <iframe className="report-builder-preview" title={t('report.builder.previewTitle')} srcDoc={preview}
+            sandbox={REPORT_FRAME_SANDBOX} data-testid="report-builder-preview" />
+          : <p role="status">{t('report.builder.pending')}</p>
       )}
     </section>
   );

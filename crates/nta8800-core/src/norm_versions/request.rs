@@ -111,12 +111,22 @@ pub fn stamp(result: &mut Value, version: NormVersion) {
         .entry("targetNormVersion")
         .or_insert_with(|| json!(version.label()));
     if !version.registration_eligible() {
-        if object.get("status").and_then(Value::as_str) == Some("calculated_unverified") {
-            object.insert("status".into(), json!("calculated_legacy_edition"));
+        mark_legacy(object);
+        // The project and survey routes nest the building assessment under
+        // `performance`; it gets the same legacy status, so a reader of the
+        // nested block alone cannot take it for a registrable result.
+        if let Some(performance) = object.get_mut("performance").and_then(Value::as_object_mut) {
+            mark_legacy(performance);
         }
-        if object.contains_key("registrationEligible") {
-            object.insert("registrationEligible".into(), json!(false));
-        }
+    }
+}
+
+fn mark_legacy(object: &mut serde_json::Map<String, Value>) {
+    if object.get("status").and_then(Value::as_str) == Some("calculated_unverified") {
+        object.insert("status".into(), json!("calculated_legacy_edition"));
+    }
+    if object.contains_key("registrationEligible") {
+        object.insert("registrationEligible".into(), json!(false));
     }
 }
 
@@ -167,5 +177,26 @@ mod tests {
         let mut error = json!({ "error": { "code": "x" } });
         stamp(&mut error, NormVersion::V2022);
         assert!(error.get("normVersion").is_none());
+    }
+
+    #[test]
+    fn nested_performance_is_stamped_legacy_too() {
+        let mut result = json!({
+            "status": "calculated_unverified",
+            "performance": { "status": "calculated_unverified", "registrationEligible": true }
+        });
+        stamp(&mut result, NormVersion::V2022);
+        assert_eq!(result["status"], "calculated_legacy_edition");
+        assert_eq!(result["performance"]["status"], "calculated_legacy_edition");
+        assert_eq!(result["performance"]["registrationEligible"], false);
+        let mut current = json!({
+            "status": "calculated_unverified",
+            "performance": { "status": "calculated_unverified" }
+        });
+        stamp(&mut current, NormVersion::V2025C1);
+        assert_eq!(current["performance"]["status"], "calculated_unverified");
+        let mut incomplete = json!({ "performance": { "status": "invalid" } });
+        stamp(&mut incomplete, NormVersion::V2023);
+        assert_eq!(incomplete["performance"]["status"], "invalid");
     }
 }

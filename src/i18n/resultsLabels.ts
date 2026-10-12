@@ -14,7 +14,7 @@ export const resultsLabelsNl: Record<string, string> = {
   'results.dash.errorText': 'De rekenkern was niet bereikbaar. Probeer Herberekenen.',
   'results.dash.stale': 'Deze uitkomst hoort bij de vorige invoer; de nieuwe berekening loopt.',
   'results.dash.unverifiedTitle': 'Onverifieerde berekening.',
-  'results.dash.unverifiedText': 'Uitkomst van de Rust-kern; geen attest volgens BRL 9501 en geen geregistreerd energielabel.',
+  'results.dash.unverifiedText': 'Uitkomst van de rekenkern; geen attest volgens BRL 9501 en geen geregistreerd energielabel.',
   'results.dash.label': 'Energielabel',
   'results.dash.indicative': 'Indicatief',
   'results.dash.labelBasis': 'labelwaarde',

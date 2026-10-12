@@ -1,4 +1,4 @@
-import { createContext, useContext, type ReactNode } from 'react';
+import { createContext, useContext, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { NumberInput } from '../ui/Field';
 import { formatKernelPath } from '../../core/nta/pathUtil';
 
@@ -77,20 +77,22 @@ export function TextField({ draft, path, label, onChange }: FieldProps) {
 /**
  * A choice from `options`. With `fallback`, an absent value shows the option the kernel applies
  * when the field is left out (for example the designated edition) instead of "—", and there is
- * no empty option.
+ * no empty option. With `required` (the tag of a choice whose handler writes the members of the
+ * chosen variant) there is no "—" once a value is chosen: the handler would turn it into one of
+ * the options anyway (review 58).
  */
-export function SelectField({ draft, path, label, onChange, options, disabled = false, fallback }:
-  FieldProps & { options: Array<[string, string]>; disabled?: boolean; fallback?: string }) {
+export function SelectField({ draft, path, label, onChange, options, disabled = false, fallback, required = false }:
+  FieldProps & { options: Array<[string, string]>; disabled?: boolean; fallback?: string; required?: boolean }) {
   const stored = read(draft, path);
   const value = stored ?? fallback;
   const kernelPath = useFieldPath(path);
   const selected = options.find(([key]) => key === String(value))?.[1];
   // Long option texts get two grid columns, and the full text as tooltip, so they are not cut off.
-  const wide = options.some(([, text]) => text.length > 34);
+  const wide = options.some(([, text]) => text.length > WIDE_SELECT_CHARS);
   return <label className={wide ? 'nta-form-wide' : undefined} data-path={kernelPath ?? undefined}>{label}
     <select value={value == null ? '' : String(value)} title={selected} disabled={disabled}
       onChange={(event) => onChange(path, event.target.value || null)}>
-      {fallback == null && <option value="">—</option>}
+      {fallback == null && (!required || value == null) && <option value="">—</option>}
       {options.map(([key, text]) => <option key={key} value={key}>{text}</option>)}
     </select>
   </label>;
@@ -118,10 +120,44 @@ export function TriStateField({ draft, path, label, onChange, yes, no }: FieldPr
   </label>;
 }
 
+/**
+ * Option texts longer than this are cut off in one grid column (minimum
+ * 200 px, about 26 characters after the padding and the arrow), so the field
+ * takes two columns.
+ */
+export const WIDE_SELECT_CHARS = 26;
+
+/**
+ * Marks the label of every select whose longest option text is longer than
+ * WIDE_SELECT_CHARS with `data-wide-select`, so CSS gives it two grid
+ * columns. Done on the DOM after each render because many sections build
+ * their own selects; selects in table cells keep their column.
+ */
+export function markWideSelects(root: HTMLElement | null) {
+  if (!root) return;
+  for (const select of Array.from(root.querySelectorAll('select'))) {
+    const label = select.closest('label');
+    if (!label || !root.contains(label) || select.closest('td, th')) continue;
+    const longest = Math.max(0, ...Array.from(select.options).map((option) => (option.textContent ?? '').trim().length));
+    label.toggleAttribute('data-wide-select', longest > WIDE_SELECT_CHARS);
+  }
+}
+
 export function Section({ title, children, path, extraPaths }: {
   title: string; children: ReactNode; path?: string; extraPaths?: string[];
 }) {
-  return <fieldset className="nta-form-section" data-path={path} data-paths={extraPaths?.length ? extraPaths.join(' ') : undefined}>
+  const ref = useRef<HTMLFieldSetElement>(null);
+  useLayoutEffect(() => markWideSelects(ref.current));
+  // Lists inside a section can add selects, or change option texts, without a render of the
+  // section itself.
+  useLayoutEffect(() => {
+    const root = ref.current;
+    if (!root || typeof MutationObserver === 'undefined') return undefined;
+    const observer = new MutationObserver(() => markWideSelects(root));
+    observer.observe(root, { childList: true, characterData: true, subtree: true });
+    return () => observer.disconnect();
+  }, []);
+  return <fieldset ref={ref} className="nta-form-section" data-path={path} data-paths={extraPaths?.length ? extraPaths.join(' ') : undefined}>
     <legend>{title}</legend><div className="nta-form-grid">{children}</div>
   </fieldset>;
 }

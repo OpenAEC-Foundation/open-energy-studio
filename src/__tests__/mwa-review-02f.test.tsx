@@ -8,6 +8,7 @@ import type { IProject } from '../core/energy/types';
 import { MaatwerkadviesPanel } from '../components/MaatwerkadviesPanel/MaatwerkadviesPanel';
 import { NtaLightingSection } from '../components/NtaPerformancePanel/NtaExtraSections';
 import { renderWithProviders, userEvent } from './test-utils';
+import { SLOW_UI_TEST_MS } from './timeouts';
 
 const dwelling = JSON.parse(readFileSync(resolve(process.cwd(), 'training-data/nta8800-example-terraced-dwelling.json'), 'utf8')) as IProject;
 
@@ -30,7 +31,7 @@ describe('maatwerkadvies editor review fixes (merge 02fafc5)', () => {
     await user.clear(screen.getByLabelText('Investment [€]'));
     await user.type(screen.getByLabelText('Investment [€]'), '5000');
     expect(screen.queryByTestId('mwa-investment-zero-m1')).toBeNull();
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 
   it('disables daylight under forfait power and notes central on-switching (14.16/14.17, 14.24)', () => {
     const draft = {

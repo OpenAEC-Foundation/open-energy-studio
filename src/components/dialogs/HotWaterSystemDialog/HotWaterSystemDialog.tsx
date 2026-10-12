@@ -5,6 +5,7 @@ import { IHotWaterSystem, HotWaterSystemType } from '../../../core/energy/types'
 import { fractionFromPercent, heatPumpDraftOf } from '../dialogValues';
 import { DialogShell } from '../DialogShell';
 import { defaultHeatPumpDraft, hasDhwDeclarationMismatch, hasElectricCarrierMismatch, hasIncompleteRegistryRecord, hasOperatingLimitEvidenceMismatch, HeatPumpMetadataFields, type HeatPumpDraft } from '../HeatPumpMetadataFields/HeatPumpMetadataFields';
+import { DecimalInput } from '../../ui';
 
 interface HotWaterSystemDialogProps {
   editId?: string | null;
@@ -124,8 +125,7 @@ export function HotWaterSystemDialog({ editId, onClose }: HotWaterSystemDialogPr
 
         <div className="dialog-field">
           <label htmlFor={`${fieldId}-3`}>{t('dialog.hotWater.efficiency')}</label>
-          <input id={`${fieldId}-3`}
-            type="number"
+          <DecimalInput id={`${fieldId}-3`}
             min={0}
             max={5}
             step={0.01}
@@ -149,8 +149,7 @@ export function HotWaterSystemDialog({ editId, onClose }: HotWaterSystemDialogPr
         {hasSolarBoiler && (
           <div className="dialog-field">
             <label htmlFor={`${fieldId}-4`}>{t('dialog.hotWater.solarFraction')}</label>
-            <input id={`${fieldId}-4`}
-              type="number"
+            <DecimalInput id={`${fieldId}-4`}
               min={0}
               max={100}
               step={1}

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { HeatPumpForfaitDiagnosticPanel } from '../components/HeatPumpForfaitDiagnosticPanel/HeatPumpForfaitDiagnosticPanel';
 import type { INtaHeatPumpInput } from '../core/energy/types';
+import { heatPumpHighTestStandard } from '../core/nta/KernelClient';
 import { renderWithProviders, userEvent } from './test-utils';
 
 const pump: INtaHeatPumpInput = {
@@ -11,6 +12,18 @@ const pump: INtaHeatPumpInput = {
 };
 
 afterEach(() => vi.unstubAllGlobals());
+
+describe('table 9.28 test standard per edition', () => {
+  // Edition-delta audit (10 October 2026): the panel wrote :2022 for every
+  // edition, which NTA 8800:2020+A1 and 2022 refuse (they name :2007).
+  it('follows the edition', () => {
+    expect(heatPumpHighTestStandard('2020+A1')).toBe('NEN-EN 14511-2:2007');
+    expect(heatPumpHighTestStandard('2022')).toBe('NEN-EN 14511-2:2007');
+    expect(heatPumpHighTestStandard('2023')).toBe('NEN-EN 14511-2:2022');
+    expect(heatPumpHighTestStandard('2025+C1')).toBe('NEN-EN 14511-2:2022');
+    expect(heatPumpHighTestStandard(null)).toBe('NEN-EN 14511-2:2022');
+  });
+});
 
 describe('draft COP table UI', () => {
   it('requires evidence, uses the Rust lookup and restores saved table input', async () => {
@@ -50,7 +63,7 @@ describe('draft COP table UI', () => {
     view.unmount();
     renderWithProviders(<HeatPumpForfaitDiagnosticPanel pump={{ ...pump, forfaitHeatPumpDraft: input }}
       buildingFunction="residential" onSave={vi.fn()} />);
-    expect(screen.getByLabelText('Design supply temperature (°C)')).toHaveValue(35);
+    expect(screen.getByLabelText('Design supply temperature (°C)')).toHaveValue('35');
     expect(screen.getByText(/Table input saved in this project/)).toBeInTheDocument();
   });
 
@@ -116,7 +129,7 @@ describe('draft COP table UI', () => {
     fireEvent.change(screen.getByLabelText('Thermal capacity evidence'), { target: { value: 'datasheet' } });
     await user.selectOptions(screen.getByLabelText('Building installation'), 'false');
     fireEvent.change(screen.getByLabelText('Tested product or combination'), { target: { value: 'model A' } });
-    fireEvent.change(screen.getByLabelText('NEN-EN 14511-2:2022 test report'), { target: { value: 'lab report p4' } });
+    fireEvent.change(screen.getByLabelText('NEN-EN 14511-2 test report (table 9.28)'), { target: { value: 'lab report p4' } });
     fireEvent.change(screen.getByLabelText('A7(6)/W45 · COP > 2.75'), { target: { value: '2.75' } });
     fireEvent.change(screen.getByLabelText('A7(6)/W35 · COP > 2.85'), { target: { value: '2.86' } });
     fireEvent.change(screen.getByLabelText('A−7(−8)/W45 · COP > 1.9'), { target: { value: '1.91' } });

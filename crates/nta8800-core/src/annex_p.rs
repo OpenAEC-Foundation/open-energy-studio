@@ -1293,8 +1293,9 @@ pub enum PipeCorrection {
     OldSlidingSystem,
     /// Surface-mounted or recessed: 0,90.
     SurfaceOrRecessed,
-    /// One pipe in a trench without rigid connections: 1,00. Deviating:
-    /// table P.1 has no single-pipe case; it takes the neutral factor.
+    /// One pipe in a trench without rigid connections: 1,00 (table P.1 of
+    /// 2025+C1, p. 963). The 2024 and 2023 tables have no such row; the
+    /// kernel uses the same neutral factor there.
     SinglePipeInTrench,
 }
 
@@ -1795,6 +1796,7 @@ pub const INTERPRETATIONS: &[&str] = &[
     "P.27 has no MAX(0); a CHP on a renewable fuel gives a negative K_CO2;gen, kept as printed with a warning",
     "P.13–P.18 for a cold network count heat gains in every month with a water temperature; months without cold delivery give a warning and should have no water temperature",
     "P.6.8.4.3 (p. 1009): the 10 W/kW source pump of a heat pump with a declared efficiency is 0 when the declaration includes it (sourcePumpIncluded)",
+    "5.3.1.2/5.3.1.3 (p. 72–74) with 9.6.8.1.1.2.3 (p. 362): a collective heat-pump source below 20 °C keeps its declared f_P;del;dh, f_Pren;dh and K_CO2 in the whole EMGforf run, so RERPrenTot;EMGforf uses the same EPTot as EwePTot;EMGforf; 5.3.1.3 names no such exception for f_Pren (question 10 to NEN)",
 ];
 
 fn reference(value: &str, path: String, issues: &mut Vec<AnnexPIssue>) {
@@ -5274,6 +5276,15 @@ mod tests {
         let (factors, _) = source_factors(&warm, "s").unwrap();
         close(factors.declared.primary_factor, 0.3);
         assert_eq!(factors.forfait, HEAT_FORFAIT);
+        // Question 10 to NEN: below 20 °C the EMGforf run keeps the whole
+        // declaration, f_Pren;dh included (5.3.1.3 names no exception).
+        let declared_cold = CollectiveHeatPumpSource {
+            temperature_class: SourceTemperatureClass::Below20C,
+            ..warm
+        };
+        let (factors, _) = source_factors(&declared_cold, "s").unwrap();
+        assert_eq!(factors.declared, factors.forfait);
+        close(factors.forfait.renewable_factor, 0.5);
     }
 
     #[test]

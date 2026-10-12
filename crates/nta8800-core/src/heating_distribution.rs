@@ -302,6 +302,48 @@ impl PipeTransmittance {
         matches!(self, Self::Forfait { .. })
     }
 
+    /// The 9.33–9.35 geometry, `None` for the table 9.16 forfait.
+    pub fn geometry(&self) -> Option<PipeGeometry> {
+        match *self {
+            Self::Forfait { .. } => None,
+            Self::InsulatedInAir {
+                pipe_outer_diameter_m,
+                insulated_diameter_m,
+                insulation_lambda,
+                surface_coefficient,
+            } => Some(PipeGeometry::InsulatedInAir {
+                pipe_outer_diameter_m,
+                insulated_diameter_m,
+                insulation_lambda,
+                surface_coefficient,
+            }),
+            Self::InsulatedEmbedded {
+                pipe_outer_diameter_m,
+                insulated_diameter_m,
+                insulation_lambda,
+                embedding_lambda,
+                depth_m,
+            } => Some(PipeGeometry::InsulatedEmbedded {
+                pipe_outer_diameter_m,
+                insulated_diameter_m,
+                insulation_lambda,
+                embedding_lambda,
+                depth_m,
+            }),
+            Self::Uninsulated {
+                inner_diameter_m,
+                outer_diameter_m,
+                pipe_lambda,
+                surface_coefficient,
+            } => Some(PipeGeometry::Uninsulated {
+                inner_diameter_m,
+                outer_diameter_m,
+                pipe_lambda,
+                surface_coefficient,
+            }),
+        }
+    }
+
     /// `Ψ` in W/(m·K); `connected_area_m2` is the usable area of the whole
     /// building on the system, `shared_with_hot_water` selects the collective
     /// heating-and-hot-water rows of table 9.16. `None` for invalid geometry.
@@ -418,10 +460,57 @@ pub enum PipeGeometry {
 }
 
 impl PipeGeometry {
+    /// Diameters and depths are in metres; a value above 1 m is almost
+    /// certainly entered in millimetres. The formulas mostly depend on
+    /// diameter ratios, so such input would otherwise give a plausible Ψ.
+    pub const MAX_DIMENSION_M: f64 = 1.0;
+
+    /// A diameter or the depth exceeds [`Self::MAX_DIMENSION_M`].
+    pub fn dimension_above_one_metre(&self) -> bool {
+        let lengths: Vec<f64> = match *self {
+            Self::InsulatedInAir {
+                pipe_outer_diameter_m,
+                insulated_diameter_m,
+                ..
+            } => vec![pipe_outer_diameter_m, insulated_diameter_m],
+            Self::InsulatedEmbedded {
+                pipe_outer_diameter_m,
+                insulated_diameter_m,
+                depth_m,
+                ..
+            } => vec![pipe_outer_diameter_m, insulated_diameter_m, depth_m],
+            Self::Uninsulated {
+                inner_diameter_m,
+                outer_diameter_m,
+                ..
+            } => vec![inner_diameter_m, outer_diameter_m],
+        };
+        lengths.iter().any(|value| *value > Self::MAX_DIMENSION_M)
+    }
+
+    /// The surface coefficient h_a when one is given instead of the default.
+    pub fn surface_coefficient(&self) -> Option<f64> {
+        match self {
+            Self::InsulatedInAir {
+                surface_coefficient,
+                ..
+            }
+            | Self::Uninsulated {
+                surface_coefficient,
+                ..
+            } => *surface_coefficient,
+            Self::InsulatedEmbedded { .. } => None,
+        }
+    }
+
     /// `Ψ` in W/(m·K); `None` for invalid geometry (non-positive values,
-    /// an outer diameter below the inner one, or for 9.34 a depth with
-    /// `4·z ≤ d_a`, where the logarithm would not be positive).
+    /// an outer diameter below the inner one, a diameter or depth above
+    /// 1 m, or for 9.34 a depth with `4·z ≤ d_a`, where the logarithm
+    /// would not be positive).
     pub fn psi(&self) -> Option<f64> {
+        if self.dimension_above_one_metre() {
+            return None;
+        }
         let positive =
             |values: &[f64]| values.iter().all(|value| value.is_finite() && *value > 0.0);
         match *self {

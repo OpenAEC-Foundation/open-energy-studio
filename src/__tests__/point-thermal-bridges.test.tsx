@@ -4,6 +4,7 @@ import { useEnergy } from '../context/EnergyContext';
 import { EnvelopeView } from '../components/EnvelopeView/EnvelopeView';
 import { PointBridgeDialog } from '../components/dialogs/PointBridgeDialog/PointBridgeDialog';
 import { renderWithProviders, userEvent } from './test-utils';
+import { SLOW_UI_TEST_MS } from './timeouts';
 
 function PointBridgeEditor() {
   const { state, dispatch } = useEnergy();
@@ -46,5 +47,5 @@ describe('point thermal bridge inventory', () => {
     await user.click(screen.getByRole('button', { name: 'Yes, delete' }));
     expect(screen.getByTestId('point-bridges')).toHaveTextContent('[]');
     expect(screen.getByTestId('inventory-complete')).toHaveTextContent('false');
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 });

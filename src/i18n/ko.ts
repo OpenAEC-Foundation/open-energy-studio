@@ -67,22 +67,17 @@ export const ko: Record<string, string> = {
   'ribbon.exportReport': '보고서 내보내기',
 
   // Project Browser
-  'browser.project': '프로젝트',
   'browser.zones': '구역',
-  'browser.zone': '구역',
   'browser.surfaces': '면',
   'browser.windows': '창',
   'browser.thermalBridges': '열교',
   'browser.constructions': '구조',
-  'browser.installations': '설비',
   'browser.heating': '난방',
   'browser.ventilation': '환기',
   'browser.cooling': '냉방',
   'browser.hotWater': '급탕',
-  'browser.renewables': '신재생에너지',
   'browser.solarPV': '태양광',
   'browser.solarThermal': '태양열',
-  'browser.airTightness': '기밀성',
 
   // Properties Panel
   'properties.title': '속성',
@@ -109,7 +104,6 @@ export const ko: Record<string, string> = {
   'dialog.save': '저장',
   'dialog.cancel': '취소',
   'dialog.delete': '삭제',
-  'dialog.add': '추가',
   'dialog.edit': '편집',
   'dialog.close': '닫기',
 
@@ -417,7 +411,6 @@ export const ko: Record<string, string> = {
   'theme.system': '시스템 (자동 감지)',
   'theme.dark': '다크',
   'theme.light': '라이트',
-  'theme.blue': '블루',
   'theme.highContrast': '고대비',
   'settings.general.autoSave': '자동 저장',
   'settings.general.autoSaveDesc': '프로젝트를 정기적으로 자동 저장',
@@ -440,7 +433,6 @@ export const ko: Record<string, string> = {
 
   // Feedback dialog
   'feedback.title': 'Send Feedback',
-  'feedback.sendFeedback': 'Send Feedback',
   'feedback.email': 'Email',
   'feedback.emailPlaceholder': 'your@email.com',
   'feedback.fullName': 'Full Name',

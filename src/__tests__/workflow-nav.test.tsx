@@ -16,6 +16,7 @@ import { stepStatuses } from '../core/nta/stepStatus';
 import type { Route } from '../core/navigation/routes';
 import { en } from '../i18n/en';
 import { nl } from '../i18n/nl';
+import { SLOW_UI_TEST_MS } from './timeouts';
 
 function makeActions(overrides: Partial<ShellActions> = {}): ShellActions {
   return {
@@ -112,7 +113,7 @@ describe('WorkflowNav', () => {
     expect(actions.exportModelIFC).toHaveBeenCalledOnce();
     await user.click(within(await menu()).getByRole('menuitem', { name: 'Send feedback' }));
     expect(actions.openFeedback).toHaveBeenCalledOnce();
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 
   it('closes the Tools menu on Escape and returns focus to its button', async () => {
     const user = userEvent.setup();
@@ -238,7 +239,7 @@ describe('Step pages keep the ribbon actions', () => {
     expect(actions.exportVABI).toHaveBeenCalledOnce();
     await user.click(within(body).getByRole('button', { name: 'IFC 3D Model' }));
     expect(actions.exportModelIFC).toHaveBeenCalledOnce();
-  }, 30000);
+  }, SLOW_UI_TEST_MS);
 
   it('Report: the BRL 9500 checklist shows every status, the evidence and the EP-Online overview', async () => {
     const user = userEvent.setup();
@@ -253,7 +254,7 @@ describe('Step pages keep the ribbon actions', () => {
     expect(screen.getByTestId('ep-online-overview')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Edit in Registration' }));
     expect(actions.navigate).toHaveBeenCalledWith({ step: 'registration', focusPath: 'registration.evidence' });
-  }, 30000);
+  }, SLOW_UI_TEST_MS);
 
   it('3D model: exports the IFC model', async () => {
     const user = userEvent.setup();
@@ -261,7 +262,7 @@ describe('Step pages keep the ribbon actions', () => {
     renderWithProviders(<Shell actions={actions} route={{ step: 'building', sub: 'model3d' }} />);
     await user.click(within(document.querySelector('.page-actions') as HTMLElement).getByRole('button', { name: 'IFC 3D Model' }));
     expect(actions.exportModelIFC).toHaveBeenCalledOnce();
-  }, 30000);
+  }, SLOW_UI_TEST_MS);
 });
 
 describe('ribbon action inventory', () => {

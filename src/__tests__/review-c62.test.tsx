@@ -12,6 +12,7 @@ import { deleteTarget } from '../core/energy/projectItems';
 import { buildTemplatePatch } from '../core/nta/MwaTemplates';
 import { checkDossierCompleteness } from '../core/report/ProjectDossier';
 import { DialogShell } from '../components/dialogs/DialogShell';
+import { SLOW_UI_TEST_MS } from './timeouts';
 
 type Block = Record<string, unknown>;
 
@@ -198,7 +199,7 @@ describe('dialog stack keyboard handling', () => {
     expect(outer.contains(document.activeElement)).toBe(true);
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).toBeNull();
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 });
 
 describe('dossier checklist while the kernel runs', () => {

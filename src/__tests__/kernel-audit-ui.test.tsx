@@ -98,7 +98,7 @@ describe('Rust kernel audit in the UI', () => {
   it('reports when the Rust service cannot be reached', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('connection refused')));
     renderWithProviders(<KernelAuditPanel project={createDefaultProject()} />);
-    expect(await screen.findByRole('alert')).toHaveTextContent(/Rust input validation is currently unavailable/i);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/calculation kernel is not reachable/i);
     expect(screen.getByRole('alert')).toHaveTextContent('connection refused');
   });
 

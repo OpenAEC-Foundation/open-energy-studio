@@ -44,7 +44,7 @@ describe('gas heat pump draft COP UI', () => {
     view.unmount();
     renderWithProviders(<GasHeatPumpForfaitPanel pump={{ ...pump, gasHeatPumpForfaitDraft: onSave.mock.calls[0][0] }}
       buildingFunction="office" onSave={vi.fn()} />);
-    expect(screen.getByLabelText('Design supply temperature (°C)')).toHaveValue(40);
+    expect(screen.getByLabelText('Design supply temperature (°C)')).toHaveValue('40');
     expect(screen.getByText(/Gas table input saved in this project/)).toBeInTheDocument();
   });
 

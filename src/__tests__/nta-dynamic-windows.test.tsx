@@ -5,6 +5,7 @@ import type { IProject } from '../core/energy/types';
 import { DynamicWindowsFields } from '../components/NtaPerformancePanel/NtaDynamicWindows';
 import { write, type Draft, type Path } from '../components/NtaPerformancePanel/NtaFormFields';
 import { renderWithProviders, userEvent } from './test-utils';
+import { SLOW_UI_TEST_MS } from './timeouts';
 
 const project = {
   id: 'p', name: 'p', description: '', buildingFunction: 'residential', address: '', city: '',
@@ -68,5 +69,5 @@ describe('Annex A dynamic windows form', () => {
 
     await user.click(screen.getByRole('button', { name: 'Remove dynamic window' }));
     expect(current().dynamicWindows).toEqual([]);
-  }, 60_000);
+  }, SLOW_UI_TEST_MS);
 });

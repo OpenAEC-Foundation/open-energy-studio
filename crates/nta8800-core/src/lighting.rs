@@ -23,6 +23,7 @@ pub const INTERPRETATIONS: &[&str] = &[
     "table 14.7 below D = 0,13 % keeps the first value 0,12 (the norm gives no extrapolation); above 18 % the last value 0,91",
     "the 7.28 internal gain uses W_t = W_L + W_P (see docs/nta8800-maandbehoefte.md)",
     "§14.5.1 (p. 664): the office group rule (F_o;D = 1 above 30 m²) belongs to an office function; elsewhere it only gives the least favourable F_o;D, so it is a warning (lighting_large_office_group_without_office)",
+    "the F_D;dayl;i of NEN-EN 15193-1 annex F (2022 p. 648; 2025+C1 p. 672) is rounded down to two significant digits (0,781 → 0,78), not to a table X.1 class: where the norm means the classes it says \"volgens bijlage X\" or names table X.1 (P_n, p. 660), and this paragraph does neither; table X.1 is meant for installation powers (X.1, p. 1129)",
     "annex A τ_vis (p. 767) has no input in chapter 14: 14.38 has no transmittance term and 14.41 fixes τ_D65 = 0,6, so a dynamic window's τ_vis does not change the daylight factor",
 ];
 
@@ -342,6 +343,17 @@ pub enum DaylightSector {
         rooflight: Option<TiltedRooflight>,
         control: DaylightControl,
     },
+    /// The alternative below table 14.7 (2022 p. 648; 2025+C1 p. 672):
+    /// `F_D;dayl;i` determined with annex F of NEN-EN 15193-1:2017 and
+    /// rounded down to two significant figures. The sector area `A_D;i`
+    /// still follows 14.27–14.35.
+    #[serde(rename_all = "camelCase")]
+    Declared {
+        area_m2: f64,
+        /// `F_D;dayl;i` before rounding, 0–1.
+        daylight_dependency_factor: f64,
+        source_reference: String,
+    },
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -510,6 +522,8 @@ pub struct UseArea {
 pub struct ZoneLighting {
     pub zone_id: String,
     /// Use functions in the zone (weights for tables 14.1, 14.3, 14.4).
+    /// Empty with common spaces: filled from the 6.6.4 within-zone split.
+    #[serde(default)]
     pub functions: Vec<UseArea>,
     pub lighting_zones: Vec<LightingZone>,
     pub source_reference: String,
@@ -750,6 +764,17 @@ pub fn validate_lighting(zone: &ZoneLighting, zone_area_m2: f64, path: &str) -> 
             let mut sector_area = 0.0;
             for (sector_index, sector) in sectors.iter().enumerate() {
                 let sector_path = format!("{base}.daylight.sectors[{sector_index}]");
+                if let DaylightSector::Declared {
+                    source_reference, ..
+                } = sector
+                {
+                    if source_reference.trim().is_empty() {
+                        push(
+                            "source_reference_required",
+                            format!("{sector_path}.sourceReference"),
+                        );
+                    }
+                }
                 match sector_geometry(sector) {
                     Some((area, _)) => sector_area += area,
                     None => push("lighting_daylight_sector_invalid", sector_path),
@@ -836,9 +861,32 @@ pub fn rooflight_supply(daylight_factor_percent: f64) -> f64 {
     }
 }
 
+/// Rounds a value in (0, 1] down to two significant digits; 0 stays 0.
+fn floor_two_digits(value: f64) -> f64 {
+    if value <= 0.0 {
+        return 0.0;
+    }
+    let exponent = value.log10().floor() as i32 - 1;
+    let scale = 10f64.powi(-exponent);
+    (value * scale + 1e-9).floor() / scale
+}
+
 /// Sector area `A_D;i` and `F_D;dayl;i`; `None` for invalid geometry.
 fn sector_geometry(sector: &DaylightSector) -> Option<(f64, f64)> {
     match sector {
+        DaylightSector::Declared {
+            area_m2,
+            daylight_dependency_factor,
+            ..
+        } => {
+            if !positive(*area_m2)
+                || !daylight_dependency_factor.is_finite()
+                || !(0.0..=1.0).contains(daylight_dependency_factor)
+            {
+                return None;
+            }
+            Some((*area_m2, floor_two_digits(*daylight_dependency_factor)))
+        }
         DaylightSector::TiltedWindow {
             tilt_deg,
             window_length_m,
@@ -1432,6 +1480,124 @@ mod tests {
             control,
         };
         assert_eq!(sector_geometry(&tilted), Some((0.0, 1.0)));
+    }
+
+    #[test]
+    fn declared_sector_takes_the_15193_annex_f_factor_rounded_down() {
+        // ISSO 54 EP-U602g: 48 m² of 96 m² with F_D;dayl = 0,781, rounded
+        // down to 0,78: F_D = (48·0,78 + 48)/96 = 0,89.
+        let mut zone = forfait_zone(96.0);
+        zone.power = InstalledPower::Installed {
+            luminaires: vec![LuminaireGroup {
+                count: 1,
+                power: LuminairePower::System { power_w: 768.0 },
+            }],
+            dynamic_factor: None,
+            source_reference: "test".into(),
+        };
+        zone.daylight = Daylight::Sectors {
+            sectors: vec![DaylightSector::Declared {
+                area_m2: 48.0,
+                daylight_dependency_factor: 0.781,
+                source_reference: "NEN-EN 15193-1:2017 bijlage F, berekening".into(),
+            }],
+            source_reference: "plattegrond".into(),
+        };
+        let input = office_of(96.0, zone.clone());
+        assert!(validate_lighting(&input, 96.0, "lighting").is_empty());
+        let result = assess_zone_lighting(&input, 96.0, context()).unwrap();
+        assert!((result.lighting_zones[0].daylight_factor - 0.89).abs() < 1e-12);
+        for (value, expected) in [
+            (0.781, 0.78),
+            (0.5036, 0.5),
+            (0.5, 0.5),
+            (1.0, 1.0),
+            (0.0947, 0.094),
+            (0.0, 0.0),
+        ] {
+            assert!(
+                (floor_two_digits(value) - expected).abs() < 1e-12,
+                "{value}"
+            );
+        }
+
+        // Out of range, a blank evidence reference and a zero area are refused.
+        for (factor, area, reference, code) in [
+            (1.2, 48.0, "x", "lighting_daylight_sector_invalid"),
+            (0.5, 0.0, "x", "lighting_daylight_sector_invalid"),
+            (0.5, 48.0, " ", "source_reference_required"),
+        ] {
+            zone.daylight = Daylight::Sectors {
+                sectors: vec![DaylightSector::Declared {
+                    area_m2: area,
+                    daylight_dependency_factor: factor,
+                    source_reference: reference.into(),
+                }],
+                source_reference: "plattegrond".into(),
+            };
+            let issues = validate_lighting(&office_of(96.0, zone.clone()), 96.0, "lighting");
+            assert!(
+                issues.iter().any(|issue| issue.code == code),
+                "{code} missing in {issues:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn isso54_u602h_rooflight_sector_gives_the_unrounded_14_36_factor() {
+        // ISSO 54 EP-U602h, upper zone: F_D;S 0,68 is the table 14.8 value
+        // (2025+C1 p. 674; 14.9 in 2022, p. 650)
+        // for 2 % <= D < 4 %, so 14.36 gives 1 - 0,73 x 0,68 = 0,5036 and
+        // F_D = (24 x 0,5036 + 24)/48 = 0,7518, without the two-digit
+        // rounding of the 15193-1 route (which would give 0,75).
+        let sector = DaylightSector::Rooflights {
+            rooflight_depth_m: 2.0,
+            rooflight_width_m: 4.0,
+            clear_height_m: 2.75,
+            wall_distances_m: [0.0, 6.0, 0.0, 2.0],
+            opening_area_m2: 3.0,
+            room_length_m: 8.0,
+            room_width_m: 6.0,
+            luminaire_height_m: 2.0,
+            control: DaylightControl::AutomaticDimming,
+        };
+        let (area, factor) = sector_geometry(&sector).unwrap();
+        assert!((area - 24.0).abs() < 1e-12);
+        assert!((factor - 0.5036).abs() < 1e-12);
+        let mut zone = forfait_zone(48.0);
+        zone.power = InstalledPower::Installed {
+            luminaires: vec![LuminaireGroup {
+                count: 1,
+                power: LuminairePower::System { power_w: 384.0 },
+            }],
+            dynamic_factor: None,
+            source_reference: "test".into(),
+        };
+        zone.daylight = Daylight::Sectors {
+            sectors: vec![sector],
+            source_reference: "plattegrond".into(),
+        };
+        let input = office_of(48.0, zone);
+        assert!(validate_lighting(&input, 48.0, "lighting").is_empty());
+        let result = assess_zone_lighting(&input, 48.0, context()).unwrap();
+        assert!((result.lighting_zones[0].daylight_factor - 0.7518).abs() < 1e-12);
+    }
+
+    #[test]
+    fn declared_sector_takes_no_daylight_control() {
+        // The 15193-1 F_D;dayl already holds the control (14.36), so a
+        // control on a declared sector is refused rather than ignored.
+        let parsed = serde_json::from_value::<DaylightSector>(serde_json::json!({
+            "kind": "declared", "areaM2": 24.0, "daylightDependencyFactor": 0.5,
+            "sourceReference": "x", "control": "automatic_dimming"
+        }));
+        assert!(parsed.is_err());
+    }
+
+    fn office_of(area: f64, zone: LightingZone) -> ZoneLighting {
+        let mut input = office(vec![zone]);
+        input.functions[0].area_m2 = area;
+        input
     }
 
     #[test]

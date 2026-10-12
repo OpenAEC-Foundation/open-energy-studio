@@ -5,6 +5,12 @@
 //! force 29-05-2026) §3.1 (p. 13), §3.2 renovation passport (p. 14), §4.2.5
 //! (p. 21) and §4.2.8 registration (p. 23).
 //!
+//! Unverified: the 24-03-2026 BRL 9500-MWA-W/U text is not among the
+//! licensed sources here (only MWA-W/U 19-06-2024 and the 26-06-2024
+//! wijzigingsblad). The section and page references to the 2026 version
+//! above and in this module have not been checked against it; see
+//! docs/nta8800-brl9501-gereedheid.md (sources to obtain).
+//!
 //! - Current-use layer (ISSO 82.2/75.2 §2.5, table 2.2): standard user
 //!   profiles (82.2 tables 2.3–2.6, p. 36–38; 75.2 tables 2.3–2.5, p. 42–43)
 //!   or free input for setpoints, reduced heating, `f_mod;sp`, occupants,
@@ -262,7 +268,11 @@ pub struct Economics {
     /// Annual change of energy prices (fraction).
     #[serde(default)]
     pub energy_price_change: f64,
-    /// Horizon in years; defaults to the longest lifetime in the variant.
+    /// Horizon in years. Without it every variant and package uses one
+    /// common horizon: the longest lifetime among all measures of the
+    /// advice, so their NCWs (and the automatic highest-NCW choice) are
+    /// compared over the same period. No source prescribes the horizon
+    /// (ISSO 82.2 §6.2.4 p. 82); the report states the one used.
     #[serde(default)]
     pub horizon_years: Option<f64>,
     /// Calendar year of t = 0; with it, a measure's `phaseYear` delays its
@@ -302,7 +312,8 @@ impl Default for Economics {
 pub struct MeasuredUse {
     #[serde(default)]
     pub annual_gas_m3: Option<f64>,
-    /// Delivered (imported) electricity, kWh/year.
+    /// Net delivered electricity on the main meter (delivered minus
+    /// returned), kWh/year (ISSO 82.2 Bijlage C.1 p. 105, C.3 p. 107).
     #[serde(default)]
     pub annual_electricity_kwh: Option<f64>,
     #[serde(default)]
@@ -310,8 +321,9 @@ pub struct MeasuredUse {
     /// Monthly gas readings, m³ (January–December); `null` for no reading.
     #[serde(default)]
     pub monthly_gas_m3: Vec<Option<f64>>,
-    /// Monthly delivered electricity, kWh (§3.2: monthly readings, e.g.
-    /// smart meter); `null` for no reading.
+    /// Monthly net delivered electricity (delivered minus returned), kWh
+    /// (§3.2: monthly readings, e.g. smart meter; C.3 p. 107); `null` for
+    /// no reading.
     #[serde(default)]
     pub monthly_electricity_kwh: Vec<Option<f64>>,
     /// Monthly delivered heat (external heat), kWh.
@@ -471,6 +483,9 @@ pub struct LabelResult {
     /// (dwellings), kWh/m²·yr.
     pub heating_need_kwh_per_m2: Option<f64>,
     pub standard_insulation_kwh_per_m2: Option<f64>,
+    /// §5.3.2 with the values "na 1945" (ISSO 82.2 §1.10.2 p. 22).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub standard_insulation_post_1945_kwh_per_m2: Option<f64>,
     /// §5.3.1.2 table 5.7: renovation standard EP2 (utility), kWh/m²·yr.
     pub renovation_standard_kwh_per_m2: Option<f64>,
 }
@@ -876,7 +891,17 @@ fn utility_profile(profile: UserProfile, demand: &MonthlyDemandInput) -> Resolve
 
 fn resolve_use(profile: &UsageProfile, input: &BuildingPerformanceInput) -> ResolvedUse {
     let residential = matches!(input.calculation_scope, CalculationScope::Residential);
-    let demand = &input.space_heating.demand;
+    resolve_use_for(profile, residential, &input.space_heating.demand)
+}
+
+/// The profile for one zone. ISSO 75.2 tables 2.3 (p. 42) and 2.4 (p. 43)
+/// set the utility profiles relative to the zone's own NTA 8800 values
+/// (tables 7.13–7.15), so every utility zone resolves its own.
+fn resolve_use_for(
+    profile: &UsageProfile,
+    residential: bool,
+    demand: &MonthlyDemandInput,
+) -> ResolvedUse {
     let mut resolved = if residential {
         residential_profile(
             profile.profile,
@@ -952,6 +977,13 @@ fn apply_use(input: &mut BuildingPerformanceInput, profile: &UsageProfile) {
         .filter_map(zone_occupants)
         .sum();
     let fit_zone = |demand: &mut MonthlyDemandInput| {
+        let zone_resolved;
+        let resolved = if residential {
+            &resolved
+        } else {
+            zone_resolved = resolve_use_for(profile, false, demand);
+            &zone_resolved
+        };
         if let Some(value) = resolved.heating_setpoint_c {
             demand.setpoints.heating_c = value;
         }
@@ -1132,6 +1164,10 @@ fn label_result(result: &BuildingPerformanceAssessment) -> LabelResult {
             .chapter5
             .as_ref()
             .and_then(|item| item.standard_insulation_kwh_per_m2),
+        standard_insulation_post_1945_kwh_per_m2: result
+            .chapter5
+            .as_ref()
+            .and_then(|item| item.standard_insulation_post_1945_kwh_per_m2),
         renovation_standard_kwh_per_m2: result
             .chapter5
             .as_ref()
@@ -1577,6 +1613,62 @@ fn phasing(measures: &[&Measure]) -> Vec<PhaseStep> {
         .collect()
 }
 
+/// The NCW horizon shared by all variants and packages: the given one, or
+/// the longest lifetime among all measures of the advice.
+fn common_horizon_years(input: &MaatwerkadviesInput) -> f64 {
+    input.economics.horizon_years.unwrap_or_else(|| {
+        input
+            .measures
+            .iter()
+            .map(|m| m.lifetime_years)
+            .fold(0.0_f64, f64::max)
+    })
+}
+
+/// Step 1 of the renovation passport, residential (MWA-W §3.2 item 1):
+/// the Standaard voor Woningisolatie. Without a statement by the adviser
+/// the kernel compares the step-1 heat need E_H;nd with the standard "na
+/// 1945" (ISSO 82.2 §1.10.2 p. 22, §4.4.2 p. 75); the pre-war standard only
+/// with `prewarStandard` (item 1a). An explicit limit is also compared with
+/// E_H;nd (NTA 8800 §5.3.2 Opmerking 2, p. 75).
+fn insulation_standard_check(
+    passport: &RenovationPassportInput,
+    label: &LabelResult,
+) -> (Option<bool>, Option<String>) {
+    match passport.insulation_standard_max_need_kwh_per_m2 {
+        // NTA 8800 §5.3.2 Opmerking 2 (p. 75): the standard is a limit on
+        // the heat need E_H;nd, not on E_H+C;nd.
+        Some(limit) => (
+            label.heating_need_kwh_per_m2.map(|need| need <= limit + 1e-9),
+            Some(format!(
+                "step 1 heat need {:?} kWh/m2 against {limit} kWh/m2",
+                label.heating_need_kwh_per_m2
+            )),
+        ),
+        // ISSO 82.2 §1.10.2 (p. 22) and §4.4.2 (p. 75): the standard
+        // "na 1945"; the pre-war one only when motivated (item 1a).
+        None => match (
+            passport.insulation_standard_met,
+            label.heating_need_kwh_per_m2,
+            if passport.prewar_standard {
+                label.standard_insulation_kwh_per_m2
+            } else {
+                label.standard_insulation_post_1945_kwh_per_m2
+            },
+        ) {
+            (Some(met), _, _) => (Some(met), None),
+            // §5.3.2: the kernel's own comparison when no statement is given.
+            (None, Some(need), Some(standard)) => (
+                Some(need <= standard + 1e-9),
+                Some(format!(
+                    "step 1 heat need {need} kWh/m2 against the standard {standard} kWh/m2 (NTA 8800 §5.3.2)"
+                )),
+            ),
+            _ => (None, None),
+        },
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn variant_result(
     input: &MaatwerkadviesInput,
@@ -1590,12 +1682,7 @@ fn variant_result(
     let outcome = run_variant(input, measures, usage);
     let investment: f64 = measures.iter().map(|m| m.investment_eur).sum();
     let maintenance: f64 = measures.iter().map(|m| m.maintenance_eur_per_year).sum();
-    let horizon = input.economics.horizon_years.unwrap_or_else(|| {
-        measures
-            .iter()
-            .map(|m| m.lifetime_years)
-            .fold(0.0_f64, f64::max)
-    });
+    let horizon = common_horizon_years(input);
     let savings = match (current, &outcome.actual) {
         (Some(current), Some(actual)) => Some(savings(current, actual)),
         _ => None,
@@ -1821,31 +1908,7 @@ fn renovation_passport(
         // Step 1: at least the Standaard voor Woningisolatie (MWA-W §3.2 item
         // 1); pre-war standard with motivation when façade insulation is
         // technically impossible (1a); overheating measures (1b).
-        let label = &steps[0].label;
-        let (insulation, detail) = match passport.insulation_standard_max_need_kwh_per_m2 {
-            Some(limit) => (
-                label.need_indicator_kwh_per_m2.map(|need| need <= limit + 1e-9),
-                Some(format!(
-                    "step 1 net heat need {:?} kWh/m2 against {limit} kWh/m2",
-                    label.need_indicator_kwh_per_m2
-                )),
-            ),
-            None => match (
-                passport.insulation_standard_met,
-                label.heating_need_kwh_per_m2,
-                label.standard_insulation_kwh_per_m2,
-            ) {
-                (Some(met), _, _) => (Some(met), None),
-                // §5.3.2: the kernel's own comparison when no statement is given.
-                (None, Some(need), Some(standard)) => (
-                    Some(need <= standard + 1e-9),
-                    Some(format!(
-                        "step 1 heat need {need} kWh/m2 against the standard {standard} kWh/m2 (NTA 8800 §5.3.2)"
-                    )),
-                ),
-                _ => (None, None),
-            },
-        };
+        let (insulation, detail) = insulation_standard_check(passport, &steps[0].label);
         require("insulation_standard", insulation, detail);
         if passport.prewar_standard {
             require(
@@ -2333,7 +2396,6 @@ fn assess_unchecked(input: &MaatwerkadviesInput) -> MaatwerkadviesAssessment {
             |values: &[f64]| -> Vec<Option<f64>> { values.iter().map(|v| Some(*v)).collect() };
         let calculated_gas = wrap(&current_use.monthly_gas_m3);
         let calculated_heat = wrap(&current_use.monthly_heat_kwh);
-        let calculated_el = wrap(&current_use.monthly_electricity_import_kwh);
         let local = &measured.monthly_outdoor_temperature_c;
         // C.3: electricity is compared as the monthly net delivery.
         let calculated_net: Vec<Option<f64>> = (0..12)
@@ -2367,8 +2429,9 @@ fn assess_unchecked(input: &MaatwerkadviesInput) -> MaatwerkadviesAssessment {
                 current_use.gas_m3,
                 annual(measured.annual_gas_m3, &measured.monthly_gas_m3),
             ),
+            // C.3 (p. 107): net delivery, the same quantity as the fit.
             electricity_deviation_percent: deviation(
-                current_use.electricity_import_kwh,
+                current_use.electricity_import_kwh - current_use.electricity_export_kwh,
                 annual(
                     measured.annual_electricity_kwh,
                     &measured.monthly_electricity_kwh,
@@ -2408,7 +2471,8 @@ fn assess_unchecked(input: &MaatwerkadviesInput) -> MaatwerkadviesAssessment {
             monthly_electricity_deviation_percent: (0..12)
                 .map(|index| {
                     deviation(
-                        current_use.monthly_electricity_import_kwh[index],
+                        current_use.monthly_electricity_import_kwh[index]
+                            - current_use.monthly_electricity_export_kwh[index],
                         measured
                             .monthly_electricity_kwh
                             .get(index)
@@ -2418,7 +2482,7 @@ fn assess_unchecked(input: &MaatwerkadviesInput) -> MaatwerkadviesAssessment {
                 })
                 .collect(),
             measured_electricity_monthly_mean_kwh: mean_of(&measured.monthly_electricity_kwh),
-            calculated_electricity_monthly_mean_kwh: mean_of(&calculated_el),
+            calculated_electricity_monthly_mean_kwh: mean_of(&calculated_net),
         }
     });
 
@@ -2977,6 +3041,164 @@ mod tests {
             ventilation_practice: None,
             source_reference: "gesprek".into(),
         }
+    }
+
+    /// ISSO 75.2 tables 2.3 (p. 42) and 2.4 (p. 43): the standard profiles
+    /// are relative to each zone's own NTA tables 7.13–7.15, so a second
+    /// zone with another use function does not take the main zone's values.
+    #[test]
+    fn utility_profiles_resolve_per_zone() {
+        use crate::space_heating_chain::ChainZone;
+        let mut building: BuildingPerformanceInput = serde_json::from_value(building()).unwrap();
+        building.calculation_scope = CalculationScope::Utility;
+        building.space_heating.demand.usage_function = crate::monthly_demand::UsageFunction::Office;
+        building.space_heating.demand.function_areas.clear();
+        let mut care = building.space_heating.demand.clone();
+        care.usage_function = crate::monthly_demand::UsageFunction::HealthcareWithBeds;
+        building.space_heating.additional_zones.push(ChainZone {
+            demand: care.clone(),
+            emission: building.space_heating.emission.clone(),
+            distribution: building.space_heating.distribution.clone(),
+        });
+        let office_base = crate::monthly_demand::function_profile(&building.space_heating.demand);
+        let care_base = crate::monthly_demand::function_profile(&care);
+        assert_ne!(
+            office_base.heating_setpoint_c, care_base.heating_setpoint_c,
+            "the fixture needs two zones with different NTA setpoints"
+        );
+        let mut fitted = building.clone();
+        apply_use(&mut fitted, &profile(UserProfile::EnergyConscious));
+        // Energy-conscious: 2 K below the zone's own NTA setpoint.
+        assert_eq!(
+            fitted.space_heating.demand.setpoints.heating_c,
+            office_base.heating_setpoint_c - 2.0
+        );
+        let zone = &fitted.space_heating.additional_zones[0].demand;
+        assert_eq!(zone.setpoints.heating_c, care_base.heating_setpoint_c - 2.0);
+        let fit = zone.usage_fit.as_ref().unwrap();
+        assert_eq!(
+            fit.day_reduction_h,
+            Some((care_base.day_reduction_h * 1.2).clamp(0.0, 24.0))
+        );
+        assert_eq!(
+            fit.weekend_reduction_h,
+            Some((care_base.weekend_reduction_h + 24.0).clamp(0.0, 48.0))
+        );
+    }
+
+    /// MWA-W §3.2 item 1 via ISSO 82.2 §1.10.2 (p. 22) and §4.4.2 (p. 75):
+    /// without a statement the step-1 heat need is held against the
+    /// standard "na 1945"; the pre-war standard only when claimed. An
+    /// explicit limit is compared with E_H;nd, not E_H+C;nd (NTA 8800
+    /// §5.3.2 Opmerking 2, p. 75).
+    #[test]
+    fn insulation_step_uses_the_post_1945_standard_and_the_heat_need() {
+        // A 1930 dwelling: the pre-war standard would be 60, the post-1945
+        // one 43; the step-1 heat need is 50.
+        let label = LabelResult {
+            need_indicator_kwh_per_m2: Some(70.0),
+            heating_need_kwh_per_m2: Some(50.0),
+            standard_insulation_kwh_per_m2: Some(60.0),
+            standard_insulation_post_1945_kwh_per_m2: Some(43.0),
+            ..LabelResult::default()
+        };
+        let mut passport = RenovationPassportInput::default();
+        assert_eq!(insulation_standard_check(&passport, &label).0, Some(false));
+        passport.prewar_standard = true;
+        assert_eq!(insulation_standard_check(&passport, &label).0, Some(true));
+        // An explicit limit of 55 compares the heat need 50, not E_H+C;nd 70.
+        let explicit = RenovationPassportInput {
+            insulation_standard_max_need_kwh_per_m2: Some(55.0),
+            ..RenovationPassportInput::default()
+        };
+        assert_eq!(insulation_standard_check(&explicit, &label).0, Some(true));
+        // The chapter 5 value "na 1945" for a 1930 dwelling.
+        assert_eq!(
+            crate::building_performance::standard_insulation(false, 1946, 80.0, 100.0),
+            Some(43.0)
+        );
+        assert_eq!(
+            crate::building_performance::standard_insulation(false, 1930, 80.0, 100.0),
+            Some(60.0)
+        );
+    }
+
+    /// ISSO 82.2 Bijlage C.1 (p. 105) and C.3 (p. 107): electricity is the
+    /// net delivery on the main meter. The reported deviation uses the same
+    /// net quantity as the fit, so a dwelling that matches its measured net
+    /// delivery reports 0 %.
+    #[test]
+    fn electricity_deviation_is_net_like_the_fit() {
+        let base = building();
+        let plain = assess_maatwerkadvies(&mwa(base.clone()));
+        let current = plain.current.unwrap().actual_use.unwrap();
+        // The fixture must export, otherwise net and gross coincide.
+        assert!(current.electricity_export_kwh > 0.0);
+        let net = |index: usize| {
+            current.monthly_electricity_import_kwh[index]
+                - current.monthly_electricity_export_kwh[index]
+        };
+        // A positive measurement (net delivery plus 200 kWh a month), so
+        // the percentage is defined.
+        let measured: Vec<Option<f64>> = (0..12).map(|index| Some(net(index) + 200.0)).collect();
+        let mut input = mwa(base);
+        input.measured = Some(MeasuredUse {
+            monthly_electricity_kwh: measured.clone(),
+            source_reference: "slimme meter".into(),
+            ..MeasuredUse::default()
+        });
+        let check = assess_maatwerkadvies(&input).fit_check.unwrap();
+        let calculated_net = current.electricity_import_kwh - current.electricity_export_kwh;
+        let measured_total = calculated_net + 2400.0;
+        let expected = (calculated_net - measured_total) / measured_total * 100.0;
+        let annual = check.electricity_deviation_percent.unwrap();
+        assert!((annual - expected).abs() < 1e-9, "{annual} vs {expected}");
+        for (index, value) in check
+            .monthly_electricity_deviation_percent
+            .iter()
+            .enumerate()
+        {
+            let measured = measured[index].unwrap();
+            if measured > 0.0 {
+                let expected = (net(index) - measured) / measured * 100.0;
+                assert!((value.unwrap() - expected).abs() < 1e-9, "month {index}");
+            }
+        }
+        let mean: f64 = (0..12).map(net).sum::<f64>() / 12.0;
+        assert!((check.calculated_electricity_monthly_mean_kwh.unwrap() - mean).abs() < 1e-9);
+    }
+
+    /// Without a horizon every variant and package uses one common horizon
+    /// (the longest lifetime of all measures), so the automatic choice
+    /// compares NCWs over the same period.
+    #[test]
+    fn variants_share_one_horizon() {
+        let mut input = mwa(building());
+        let measure = |id: &str, lifetime: f64| Measure {
+            id: id.into(),
+            name: id.into(),
+            category: MeasureCategory::Other,
+            target: PatchTarget::Building,
+            patch: vec![PatchOperation::Replace {
+                path: "/areaSourceReference".into(),
+                value: json!(id),
+            }],
+            investment_eur: 1000.0,
+            cost_source: "offerte".into(),
+            lifetime_years: lifetime,
+            maintenance_eur_per_year: 0.0,
+            phase_year: None,
+            specialist_note: None,
+            template: None,
+            incomplete: Vec::new(),
+        };
+        input.measures = vec![measure("short", 15.0), measure("long", 40.0)];
+        assert_eq!(common_horizon_years(&input), 40.0);
+        let result = assess_maatwerkadvies(&input);
+        let horizons: Vec<f64> = result.measures.iter().map(|m| m.horizon_years).collect();
+        assert_eq!(horizons, vec![40.0, 40.0]);
+        input.economics.horizon_years = Some(20.0);
+        assert_eq!(common_horizon_years(&input), 20.0);
     }
 
     #[test]

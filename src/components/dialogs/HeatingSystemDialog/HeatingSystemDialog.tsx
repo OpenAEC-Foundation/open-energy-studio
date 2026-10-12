@@ -5,6 +5,7 @@ import { IHeatingSystem, HeatingSystemType } from '../../../core/energy/types';
 import { fractionFromPercent, heatPumpDraftOf } from '../dialogValues';
 import { DialogShell } from '../DialogShell';
 import { defaultHeatPumpDraft, hasDhwDeclarationMismatch, hasElectricCarrierMismatch, hasIncompleteRegistryRecord, hasOperatingLimitEvidenceMismatch, HeatPumpMetadataFields, type HeatPumpDraft } from '../HeatPumpMetadataFields/HeatPumpMetadataFields';
+import { DecimalInput } from '../../ui';
 
 interface HeatingSystemDialogProps {
   editId?: string | null;
@@ -133,8 +134,7 @@ export function HeatingSystemDialog({ editId, onClose }: HeatingSystemDialogProp
 
         <div className="dialog-field">
           <label htmlFor={`${fieldId}-3`}>{t('dialog.heating.cop')}</label>
-          <input id={`${fieldId}-3`}
-            type="number"
+          <DecimalInput id={`${fieldId}-3`}
             min={0}
             step={0.01}
             value={cop}
@@ -144,8 +144,7 @@ export function HeatingSystemDialog({ editId, onClose }: HeatingSystemDialogProp
 
         <div className="dialog-field">
           <label htmlFor={`${fieldId}-4`}>{t('dialog.heating.coverage')}</label>
-          <input id={`${fieldId}-4`}
-            type="number"
+          <DecimalInput id={`${fieldId}-4`}
             min={0}
             max={100}
             step={1}

@@ -43,6 +43,36 @@ function focusFirst(dialog: HTMLElement) {
   (first ?? dialog).focus();
 }
 
+const LINKED = 'data-linked-error';
+let errorIds = 0;
+
+/**
+ * Links the error text of a dialog field (`.field-error-text` in a `.dialog-field`) to its control:
+ * the control gets `aria-invalid` and the error's id in `aria-describedby`, so a screen reader
+ * announces why the field is wrong. Marks that no longer apply are removed again.
+ */
+export function linkFieldErrors(root: HTMLElement) {
+  for (const field of Array.from(root.querySelectorAll<HTMLElement>('.dialog-field'))) {
+    const control = field.querySelector<HTMLElement>('input:not([type="hidden"]):not([type="file"]), select, textarea');
+    if (!control) continue;
+    const error = field.querySelector<HTMLElement>('.field-error-text');
+    const previous = control.getAttribute(LINKED);
+    const describedBy = (control.getAttribute('aria-describedby') ?? '').split(/\s+/).filter((id) => id && id !== previous);
+    if (error && error.textContent?.trim()) {
+      if (!error.id) error.id = `dialog-field-error-${++errorIds}`;
+      if (previous === error.id && control.getAttribute('aria-invalid') === 'true') continue;
+      control.setAttribute('aria-describedby', [...describedBy, error.id].join(' '));
+      control.setAttribute('aria-invalid', 'true');
+      control.setAttribute(LINKED, error.id);
+    } else if (previous !== null) {
+      if (describedBy.length > 0) control.setAttribute('aria-describedby', describedBy.join(' '));
+      else control.removeAttribute('aria-describedby');
+      control.removeAttribute('aria-invalid');
+      control.removeAttribute(LINKED);
+    }
+  }
+}
+
 interface DialogShellProps {
   title: string;
   onClose: () => void;
@@ -163,6 +193,16 @@ export function DialogShell({
       if (index >= 0) dialogStack.splice(index, 1);
       if (trigger && trigger.isConnected) trigger.focus();
     };
+  }, []);
+
+  // ── Field errors: keep each error text linked to its control while the dialog is open ──
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    linkFieldErrors(dialog);
+    const observer = new MutationObserver(() => linkFieldErrors(dialog));
+    observer.observe(dialog, { childList: true, subtree: true, characterData: true });
+    return () => observer.disconnect();
   }, []);
 
   const [shake, setShake] = useState(false);

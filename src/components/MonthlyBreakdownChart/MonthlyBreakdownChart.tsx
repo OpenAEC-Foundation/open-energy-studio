@@ -1,4 +1,5 @@
 import { useI18n } from '../../i18n/i18n';
+import { formatNumber } from '../../i18n/format';
 import type { IMonthlyBreakdown } from '../../core/energy/types';
 import './MonthlyBreakdownChart.css';
 
@@ -15,7 +16,7 @@ const MONTH_KEYS = [
 const MONTH_SHORT = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
 export function MonthlyBreakdownChart({ monthly }: MonthlyBreakdownChartProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
 
   // Calculate max for scaling the stacked bars
   const maxDemand = Math.max(
@@ -40,14 +41,14 @@ export function MonthlyBreakdownChart({ monthly }: MonthlyBreakdownChartProps) {
                   <div
                     className="monthly-chart-stack-bar cooling"
                     style={{ height: `${coolPct}%` }}
-                    title={`${t('results.coolingDemand')}: ${m.coolingDemand.toFixed(0)} kWh`}
+                    title={`${t('results.coolingDemand')}: ${formatNumber(m.coolingDemand, locale, 0)} kWh`}
                   />
                 )}
                 {m.heatingDemand > 0 && (
                   <div
                     className="monthly-chart-stack-bar heating"
                     style={{ height: `${heatPct}%` }}
-                    title={`${t('results.heatingDemand')}: ${m.heatingDemand.toFixed(0)} kWh`}
+                    title={`${t('results.heatingDemand')}: ${formatNumber(m.heatingDemand, locale, 0)} kWh`}
                   />
                 )}
               </div>
@@ -85,18 +86,18 @@ export function MonthlyBreakdownChart({ monthly }: MonthlyBreakdownChartProps) {
             {monthly.map((m, i) => (
               <tr key={i}>
                 <td>{t(MONTH_KEYS[i])}</td>
-                <td>{m.heatingDemand.toFixed(0)}</td>
-                <td>{m.coolingDemand.toFixed(0)}</td>
-                <td>{m.solarGain.toFixed(0)}</td>
-                <td>{m.transmissionLoss.toFixed(0)}</td>
+                <td>{formatNumber(m.heatingDemand, locale, 0)}</td>
+                <td>{formatNumber(m.coolingDemand, locale, 0)}</td>
+                <td>{formatNumber(m.solarGain, locale, 0)}</td>
+                <td>{formatNumber(m.transmissionLoss, locale, 0)}</td>
               </tr>
             ))}
             <tr>
               <td>{t('preview.total')}</td>
-              <td>{monthly.reduce((s, m) => s + m.heatingDemand, 0).toFixed(0)}</td>
-              <td>{monthly.reduce((s, m) => s + m.coolingDemand, 0).toFixed(0)}</td>
-              <td>{monthly.reduce((s, m) => s + m.solarGain, 0).toFixed(0)}</td>
-              <td>{monthly.reduce((s, m) => s + m.transmissionLoss, 0).toFixed(0)}</td>
+              <td>{formatNumber(monthly.reduce((s, m) => s + m.heatingDemand, 0), locale, 0)}</td>
+              <td>{formatNumber(monthly.reduce((s, m) => s + m.coolingDemand, 0), locale, 0)}</td>
+              <td>{formatNumber(monthly.reduce((s, m) => s + m.solarGain, 0), locale, 0)}</td>
+              <td>{formatNumber(monthly.reduce((s, m) => s + m.transmissionLoss, 0), locale, 0)}</td>
             </tr>
           </tbody>
         </table>

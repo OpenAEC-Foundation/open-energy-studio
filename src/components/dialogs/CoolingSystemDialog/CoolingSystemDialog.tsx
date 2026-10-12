@@ -3,6 +3,7 @@ import { useI18n } from '../../../i18n/i18n';
 import { useEnergy } from '../../../context/EnergyContext';
 import { ICoolingSystem, CoolingSystemType } from '../../../core/energy/types';
 import { DialogShell } from '../DialogShell';
+import { DecimalInput } from '../../ui';
 
 interface CoolingSystemDialogProps {
   editId?: string | null;
@@ -80,8 +81,7 @@ export function CoolingSystemDialog({ editId, onClose }: CoolingSystemDialogProp
 
         <div className="dialog-field">
           <label htmlFor={`${fieldId}-3`}>{t('dialog.cooling.eer')}</label>
-          <input id={`${fieldId}-3`}
-            type="number"
+          <DecimalInput id={`${fieldId}-3`}
             min={0}
             step={0.1}
             value={eer}

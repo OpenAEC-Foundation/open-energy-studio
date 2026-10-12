@@ -137,6 +137,7 @@
 }
 
 .tb-field input[type="number"],
+.tb-field input.decimal-input,
 .tb-field select {
   padding: 6px 8px;
   background: var(--bg-primary);
@@ -150,6 +151,7 @@
 }
 
 .tb-field input[type="number"]:focus,
+.tb-field input.decimal-input:focus,
 .tb-field select:focus {
   border-color: var(--accent);
   box-shadow: var(--focus-ring);

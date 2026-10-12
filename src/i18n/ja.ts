@@ -67,22 +67,17 @@ export const ja: Record<string, string> = {
   'ribbon.exportReport': 'レポート出力',
 
   // Project Browser
-  'browser.project': 'プロジェクト',
   'browser.zones': 'ゾーン',
-  'browser.zone': 'ゾーン',
   'browser.surfaces': '面',
   'browser.windows': '窓',
   'browser.thermalBridges': '熱橋',
   'browser.constructions': '構造',
-  'browser.installations': '設備',
   'browser.heating': '暖房',
   'browser.ventilation': '換気',
   'browser.cooling': '冷房',
   'browser.hotWater': '給湯',
-  'browser.renewables': '再生可能エネルギー',
   'browser.solarPV': '太陽光発電',
   'browser.solarThermal': '太陽熱',
-  'browser.airTightness': '気密性',
 
   // Properties Panel
   'properties.title': 'プロパティ',
@@ -109,7 +104,6 @@ export const ja: Record<string, string> = {
   'dialog.save': '保存',
   'dialog.cancel': 'キャンセル',
   'dialog.delete': '削除',
-  'dialog.add': '追加',
   'dialog.edit': '編集',
   'dialog.close': '閉じる',
 
@@ -417,7 +411,6 @@ export const ja: Record<string, string> = {
   'theme.system': 'システム (自動検出)',
   'theme.dark': 'ダーク',
   'theme.light': 'ライト',
-  'theme.blue': 'ブルー',
   'theme.highContrast': 'ハイコントラスト',
   'settings.general.autoSave': '自動保存',
   'settings.general.autoSaveDesc': 'プロジェクトを定期的に自動保存',
@@ -440,7 +433,6 @@ export const ja: Record<string, string> = {
 
   // Feedback dialog
   'feedback.title': 'Send Feedback',
-  'feedback.sendFeedback': 'Send Feedback',
   'feedback.email': 'Email',
   'feedback.emailPlaceholder': 'your@email.com',
   'feedback.fullName': 'Full Name',

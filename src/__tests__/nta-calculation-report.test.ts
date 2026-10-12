@@ -142,4 +142,21 @@ describe('NTA calculation report', () => {
     expect(html).not.toContain('BENG 2');
     expect(html).toContain('232,8');
   });
+  // Review 25: the 6.6.4 allocation and the lists the kernel filled from it are in the report.
+  it('traces the common-space split and the lists the kernel filled', () => {
+    const assessment = calculated();
+    expect(generateNtaCalculationReportHTML(createDefaultProject(), assessment)).not.toContain('Gemeenschappelijke ruimten');
+    assessment.commonSpaces = {
+      source: 'NTA 8800 6.6.4',
+      spaces: [{ zoneId: 'rz1', id: 'hal', areaM2: 49.2,
+        withinZone: [{ function: 'office', areaM2: 10.54 }], building: [{ function: 'sport', areaM2: 44.35 }] }],
+      zones: [], building: [{ function: 'sport', areaM2: 670.35 }], withinZones: [{ function: 'office', areaM2: 25.24 }],
+      filled: ['bblFunctions', 'lighting[0].functions', 'hotWater.need.areas'],
+    } as unknown as ProjectPerformanceAssessment['commonSpaces'];
+    const html = generateNtaCalculationReportHTML(createDefaultProject(), assessment);
+    expect(html).toContain('Gemeenschappelijke ruimten (6.6.4)');
+    expect(html).toContain('office 10,54 m²');
+    expect(html).toContain('sport 670,35 m²');
+    expect(html).toContain('bblFunctions, lighting[0].functions, hotWater.need.areas');
+  });
 });

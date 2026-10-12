@@ -4,6 +4,7 @@ import { useEnergy } from '../../../context/EnergyContext';
 import { IVentilationSystem, VentilationType } from '../../../core/energy/types';
 import { fractionFromPercent } from '../dialogValues';
 import { DialogShell } from '../DialogShell';
+import { DecimalInput } from '../../ui';
 
 interface VentilationSystemDialogProps {
   editId?: string | null;
@@ -87,8 +88,7 @@ export function VentilationSystemDialog({ editId, onClose }: VentilationSystemDi
 
         <div className="dialog-field">
           <label htmlFor={`${fieldId}-3`}>{t('dialog.ventilation.heatRecovery')}</label>
-          <input id={`${fieldId}-3`}
-            type="number"
+          <DecimalInput id={`${fieldId}-3`}
             min={0}
             max={100}
             step={1}
@@ -99,8 +99,7 @@ export function VentilationSystemDialog({ editId, onClose }: VentilationSystemDi
 
         <div className="dialog-field">
           <label htmlFor={`${fieldId}-4`}>{t('dialog.ventilation.sfp')}</label>
-          <input id={`${fieldId}-4`}
-            type="number"
+          <DecimalInput id={`${fieldId}-4`}
             min={0}
             step={0.1}
             value={sfp}

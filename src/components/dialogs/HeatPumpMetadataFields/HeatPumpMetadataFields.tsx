@@ -3,6 +3,7 @@ import type { INtaHeatPumpAuxiliaryComponent, INtaHeatPumpDhwTestPoint, INtaHeat
 import { useEnergy } from '../../../context/EnergyContext';
 import { useI18n } from '../../../i18n/i18n';
 import './HeatPumpMetadataFields.css';
+import { DecimalInput } from '../../ui';
 
 export type HeatPumpDraft = Omit<INtaHeatPumpInput, 'id'>;
 
@@ -427,7 +428,7 @@ export function HeatPumpMetadataFields({
           {(['minimumOperatingCop', 'maximumSupplyTemperatureC'] as const).map((field) =>
             <div className="dialog-field" key={field}>
               <label htmlFor={`hp-limit-${field}`}>{t(`kernel.operatingLimits.${field}`)}</label>
-              <input id={`hp-limit-${field}`} type="number" step="any" value={operatingLimitDraft[field]}
+              <DecimalInput id={`hp-limit-${field}`} step="any" value={operatingLimitDraft[field]}
                 onChange={(event) => setOperatingLimitDraft({ ...operatingLimitDraft, [field]: event.target.value })} />
             </div>)}
           <div className="dialog-field"><label htmlFor="hp-limit-norm">{t('kernel.operatingLimits.normVersion')}</label>
@@ -466,7 +467,7 @@ export function HeatPumpMetadataFields({
             </select></div>
           {(['sourceTemperatureC', 'sinkTemperatureC', 'usefulCapacityKw', 'inputPowerKw'] as const).map((field) =>
             <div className="dialog-field" key={field}><label htmlFor={`hp-point-${field}`}>{t(`kernel.points.${field}`)}</label>
-              <input id={`hp-point-${field}`} type="number" step="any" value={pointDraft[field]}
+              <DecimalInput id={`hp-point-${field}`} step="any" value={pointDraft[field]}
                 onChange={(event) => setPointDraft({ ...pointDraft, [field]: event.target.value })} />
             </div>)}
           <div className="dialog-field"><label htmlFor="hp-point-carrier">{t('kernel.points.carrier')}</label>
@@ -508,13 +509,13 @@ export function HeatPumpMetadataFields({
           {(['usefulEnergyKwhPerDay', 'inputEnergyKwhPerDay', 'nominalCapacityKw', 'practiceFactor',
             'testSetpointC', 'designSetpointC'] as const).map((field) => <div className="dialog-field" key={field}>
               <label htmlFor={`hp-dhw-${field}`}>{t(`kernel.dhwTest.${field}`)}</label>
-              <input id={`hp-dhw-${field}`} type="number" step="any" value={dhwDraft[field]}
+              <DecimalInput id={`hp-dhw-${field}`} step="any" value={dhwDraft[field]}
                 onChange={(event) => setDhwDraft({ ...dhwDraft, [field]: event.target.value })} />
             </div>)}
           {(['sourceAirFlowM3PerHour', 'sourceAirDryBulbC', 'sourceAirWetBulbC'] as const).map((field) =>
             <div className="dialog-field" key={field}>
               <label htmlFor={`hp-dhw-${field}`}>{t(`kernel.dhwTest.${field}`)}</label>
-              <input id={`hp-dhw-${field}`} type="number" step="any" value={dhwDraft[field]}
+              <DecimalInput id={`hp-dhw-${field}`} step="any" value={dhwDraft[field]}
                 onChange={(event) => setDhwDraft({ ...dhwDraft, [field]: event.target.value })} />
             </div>)}
           <div className="dialog-field"><label htmlFor="hp-dhw-norm">{t('kernel.dhwTest.normVersion')}</label>
@@ -556,7 +557,7 @@ export function HeatPumpMetadataFields({
               {services.map((service) => <option key={service} value={service}>{t(`kernel.points.service.${service}`)}</option>)}
             </select></div>
           <div className="dialog-field"><label htmlFor="hp-aux-power">{t('kernel.auxiliary.power')}</label>
-            <input id="hp-aux-power" type="number" step="any" value={auxiliaryDraft.nominalPowerW}
+            <DecimalInput id="hp-aux-power" step="any" value={auxiliaryDraft.nominalPowerW}
               onChange={(event) => setAuxiliaryDraft({ ...auxiliaryDraft, nominalPowerW: event.target.value })} />
           </div>
           <div className="dialog-field"><label htmlFor="hp-aux-carrier">{t('kernel.points.carrier')}</label>

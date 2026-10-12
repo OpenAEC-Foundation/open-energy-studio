@@ -54,6 +54,9 @@ fn other_threads_keep_the_default() {
 fn profile_values_per_edition() {
     let p25 = NormVersion::V2025C1.profile();
     let p24 = NormVersion::V2024.profile();
+    // 5.7.1 method 3: shading of tables 7.5/7.6 (2024 p. 106), fixed louvres
+    // of tables 7.4a/7.4b (2025+C1 p. 114).
+    assert!(p24.solar_limitation_movable_shading && !p25.solar_limitation_movable_shading);
     // Table 5.3: 2025 p. 96–98, 2024 p. 94–95.
     assert_eq!(
         (p25.k_co2_electricity, p24.k_co2_electricity),
@@ -324,7 +327,7 @@ mod switch_points_2023 {
         assert!(p23.geothermal_efficiency_fixed && !p24.geothermal_efficiency_fixed);
         // 5.7.1 (2023 p. 103–104) without annex AA; table 5.7 (2024 p. 74)
         // absent in 2023.
-        assert!(!p23.annex_aa_route && p24.annex_aa_route);
+        assert!(!p23.cooling_capacity_methods_route && p24.cooling_capacity_methods_route);
         assert!(!p23.renovation_standard && p24.renovation_standard);
         assert!(p23.kitchen_diameter_rows && !p24.kitchen_diameter_rows);
         // Table 14.3 (2023 p. 648, 2024 p. 646) and (8.17)/(8.18) (2023

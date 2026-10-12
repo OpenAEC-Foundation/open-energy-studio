@@ -214,7 +214,7 @@ pub fn assess_gas_heat_pump_forfait_draft(
     GasHeatPumpForfaitDraftAssessment {
         status: if valid { "diagnostic_valid" } else { "invalid" },
         scope: "public_chapter_9_draft_tables_9_27_9_29_gas_engine_or_absorption_lookup_only",
-        consultation_source: DRAFT_SOURCE,
+        consultation_source: crate::norm_versions::cite(DRAFT_SOURCE),
         target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint: input_fingerprint(&json!(input)),

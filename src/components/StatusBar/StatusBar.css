@@ -63,6 +63,11 @@ button.status-chip:focus-visible { outline: none; box-shadow: var(--focus-ring);
   font-size: var(--fs-2xs);
 }
 
+.status-version { flex: none; }
+.status-version-short { display: none; }
+
 @media (max-width: 1359px) {
   .status-bar .status-optional { display: none; }
+  .status-version-long { display: none; }
+  .status-version-short { display: inline; }
 }

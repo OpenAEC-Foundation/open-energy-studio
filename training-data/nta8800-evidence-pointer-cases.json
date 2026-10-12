@@ -1,0 +1,36 @@
+{
+  "description": "Evidence links (registration.evidence[].linkedPaths) and their position form. Resolved by resolvePointer in src/core/nta/EvidenceLinks.ts and resolve_evidence_pointer in crates/nta8800-core/src/registration.rs; both must give the same result (null = dangling link).",
+  "root": {
+    "zones": [
+      {
+        "id": "z1",
+        "surfaces": [
+          { "id": "wall-1", "windows": [{ "id": "win-a" }, { "id": "win-b" }] },
+          { "id": "wall-2", "windows": [] },
+          { "id": "dup" },
+          { "id": "dup" },
+          { "name": "no id" }
+        ]
+      },
+      { "id": "z2", "surfaces": [] }
+    ],
+    "basisopname": { "survey": { "pv": [{ "id": "pv-1" }] } },
+    "a/b": { "c~d": 1 }
+  },
+  "cases": [
+    { "pointer": "/zones/@z1", "resolved": "/zones/0" },
+    { "pointer": "/zones/@z1/surfaces/@wall-1", "resolved": "/zones/0/surfaces/0" },
+    { "pointer": "/zones/@z1/surfaces/@wall-1/windows/@win-b", "resolved": "/zones/0/surfaces/0/windows/1" },
+    { "pointer": "/zones/@z2", "resolved": "/zones/1" },
+    { "pointer": "/zones/0/surfaces/1", "resolved": "/zones/0/surfaces/1" },
+    { "pointer": "/zones/0/surfaces/4", "resolved": "/zones/0/surfaces/4" },
+    { "pointer": "/basisopname/survey/pv/@pv-1", "resolved": "/basisopname/survey/pv/0" },
+    { "pointer": "/a~1b/c~0d", "resolved": "/a~1b/c~0d" },
+    { "pointer": "/zones/@z9", "resolved": null },
+    { "pointer": "/zones/@z1/surfaces/@dup", "resolved": null },
+    { "pointer": "/zones/0/surfaces/7", "resolved": null },
+    { "pointer": "/zones/@z1/surfaces/@wall-1/windows/@win-c", "resolved": null },
+    { "pointer": "/basisopname/@pv-1", "resolved": null },
+    { "pointer": "zones/0", "resolved": null }
+  ]
+}

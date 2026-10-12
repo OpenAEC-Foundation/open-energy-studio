@@ -120,8 +120,26 @@ const IGNORED_KEYS: &[&str] = &[
     "color",
     "visible",
     "selected",
-    "label",
 ];
+
+/// `label` is display text, except the energy label of a storage or buffer
+/// vessel (`hotWater.storage[].loss.label`, `distributionSystem.bufferVessel.label`):
+/// it sets the standing loss (13.9) and is label input, a one-to-one
+/// replacement under hot water or heating (6a, W p. 67, U p. 58).
+const LABEL_INPUT_PARENTS: &[&str] = &["loss", "bufferVessel"];
+
+/// One-to-one replacements of a generator that Bijlage A names explicitly:
+/// a gas-fired water heater replaced by an electric boiler (ISSO 82.1
+/// cluster 1, p. 209; ISSO 75.1 cluster 1, p. 215). Other changes of a
+/// generator kind stay a system change (cluster 6, p. 210 / p. 216; 6b).
+const ONE_TO_ONE_HOT_WATER_SWAPS: &[(&str, &str)] = &[
+    ("gas_appliance", "electric_boiler"),
+    ("gas_storage_heater", "electric_boiler"),
+];
+
+/// Cluster of a named one-to-one generator replacement.
+const HOT_WATER_SWAP_CLUSTER: &str =
+    "one-to-one replacement: gas-fired water heater by an electric boiler (ISSO 82.1/75.1 Bijlage A cluster 1)";
 
 const GEOMETRY_KEYS: &[&str] = &[
     "area",
@@ -161,6 +179,7 @@ const LAYOUT_ARRAYS: &[&str] = &[
     "rooms",
     "functions",
     "functionAreas",
+    "commonSpaces",
     "unheatedSpaces",
 ];
 
@@ -295,12 +314,69 @@ const SHARE_MARKERS: &[&str] = &["fraction", "coverage", "share"];
 /// solar thermal); such relabels need photos with shading and proof that
 /// the panels serve this building (BRL 9500-W p. 23, U p. 19).
 pub fn is_production_path(path: &str) -> bool {
-    let lower = path.to_ascii_lowercase();
-    lower.contains("solar")
-        || segments(path).iter().any(|segment| {
-            let segment = segment.to_ascii_lowercase();
-            segment == "pv" || segment.starts_with("pvsystem") || segment == "onsiteproduction"
+    segments(path).iter().any(|segment| {
+        let segment = segment.to_ascii_lowercase();
+        // `windowSolar` holds the solar properties of the windows, not
+        // production.
+        (segment.contains("solar") && !segment.starts_with("window"))
+            || segment == "pv"
+            || segment.starts_with("pvsystem")
+            || segment == "onsiteproduction"
+    })
+}
+
+/// Whether a change path is part of the installation. Per segment, so
+/// `windowSolar` (window properties) is not taken for solar production.
+fn is_installation_path(path: &str) -> bool {
+    segments(path).iter().any(|segment| {
+        let segment = segment.to_ascii_lowercase();
+        INSTALLATION_MARKERS.iter().any(|marker| {
+            segment.contains(marker) && !(*marker == "solar" && segment.starts_with("window"))
         })
+    })
+}
+
+/// Airtightness and infiltration (`qv10`): not listed in Bijlage 6a or 6b
+/// (W p. 67–68, U p. 58–60), so not an installation property that a
+/// one-to-one replacement covers.
+fn is_airtightness_path(path: &str) -> bool {
+    segments(path).iter().any(|segment| {
+        let segment = segment.to_ascii_lowercase();
+        segment.contains("infiltration")
+            || segment.contains("airtightness")
+            || segment.starts_with("qv10")
+    })
+}
+
+/// Paths of the cooling service: the NTA cooling blocks and the project's
+/// cooling systems.
+fn is_cooling_service_path(path: &str) -> bool {
+    let parts = segments(path);
+    match parts.first().map(String::as_str) {
+        Some("coolingSystems") => true,
+        Some("ntaCalculation") => matches!(
+            parts.get(1).map(String::as_str),
+            Some("cooling" | "coolingSystems" | "activeCooling")
+        ),
+        _ => false,
+    }
+}
+
+/// Whether a project has cooling: an NTA cooling block, active cooling for
+/// TOjuli, or a cooling system in the project.
+fn has_cooling(project: &Value) -> bool {
+    [
+        "/ntaCalculation/cooling",
+        "/ntaCalculation/coolingSystems",
+        "/ntaCalculation/activeCooling",
+        "/coolingSystems",
+    ]
+    .iter()
+    .any(|pointer| match project.pointer(pointer) {
+        None | Some(Value::Null) => false,
+        Some(Value::Array(items)) => !items.is_empty(),
+        Some(_) => true,
+    })
 }
 
 /// Service of a subsystem change, from the path.
@@ -370,6 +446,14 @@ fn classify(
     let last_is_index = parts
         .last()
         .is_some_and(|last| last.parse::<usize>().is_ok());
+    // The member that holds `key`: `loss` for a storage loss method.
+    let parent = parts
+        .iter()
+        .rev()
+        .filter(|segment| segment.parse::<usize>().is_err())
+        .nth(1)
+        .cloned()
+        .unwrap_or_default();
     let element_added_or_removed = before.is_none() || after.is_none();
     let change = |verdict, cluster, note| RelabelChange {
         path: path.to_string(),
@@ -445,6 +529,13 @@ fn classify(
             None,
         );
     }
+    if is_airtightness_path(path) {
+        return change(
+            RelabelVerdict::Review,
+            "airtightness or infiltration",
+            Some("not listed in Bijlage 6a or 6b (W p. 67–68, U p. 58–60); the adviser decides, with the measurement report as evidence"),
+        );
+    }
     if contains_any(path, SHADING_MARKERS) {
         return match scheme {
             RelabelScheme::W => change(
@@ -504,8 +595,10 @@ fn classify(
     }
     let is_text =
         matches!(before, Some(Value::String(_))) || matches!(after, Some(Value::String(_)));
-    if contains_any(path, INSTALLATION_MARKERS) {
-        if SYSTEM_KEYS.contains(&key.as_str()) && is_text {
+    if is_installation_path(path) {
+        // How a storage loss is determined (label, measurement) is a
+        // property of the vessel, not a system.
+        if SYSTEM_KEYS.contains(&key.as_str()) && is_text && parent != "loss" {
             return change(
                 RelabelVerdict::NotAllowed,
                 "installation: system change",
@@ -546,6 +639,16 @@ fn classify(
     )
 }
 
+/// Whether `label` under `parent` is calculation input (a vessel's energy
+/// label) rather than display text.
+fn label_is_input(parent: &str) -> bool {
+    segments(parent)
+        .iter()
+        .rev()
+        .find(|segment| segment.parse::<usize>().is_err())
+        .is_some_and(|segment| LABEL_INPUT_PARENTS.contains(&segment.as_str()))
+}
+
 fn diff(
     scheme: RelabelScheme,
     path: &str,
@@ -560,6 +663,7 @@ fn diff(
             keys.dedup();
             for key in keys {
                 if IGNORED_KEYS.contains(&key.as_str())
+                    || (key == "label" && !label_is_input(path))
                     || key.ends_with("Reference")
                     || (path.is_empty() && NON_LABEL_BLOCKS.contains(&key.as_str()))
                 {
@@ -596,7 +700,7 @@ fn review_shares_next_to_added_generators(changes: &mut [RelabelChange]) {
         .iter()
         .filter(|change| {
             (change.before.is_none() || change.after.is_none())
-                && contains_any(&change.path, INSTALLATION_MARKERS)
+                && is_installation_path(&change.path)
         })
         .map(|change| top(&change.path))
         .collect();
@@ -618,6 +722,80 @@ fn review_shares_next_to_added_generators(changes: &mut [RelabelChange]) {
             change.note =
                 Some("follows the added generator, a system change (6b); the adviser decides");
         }
+    }
+}
+
+/// A hot-water generator kind replaced by a swap Bijlage A names as
+/// one-to-one: the kind change and the generator members that come and go
+/// with it are allowed (6a, W p. 67, U p. 58).
+fn allow_named_hot_water_swaps(changes: &mut [RelabelChange]) {
+    let swaps: Vec<String> = changes
+        .iter()
+        .filter(|change| {
+            let parts = segments(&change.path);
+            let in_hot_water = parts
+                .iter()
+                .any(|segment| segment == "hotWater" || segment == "additionalHotWaterSystems");
+            in_hot_water
+                && parts.len() >= 2
+                && parts[parts.len() - 1] == "kind"
+                && parts[parts.len() - 2] == "generator"
+                && match (&change.before, &change.after) {
+                    (Some(Value::String(from)), Some(Value::String(to))) => {
+                        ONE_TO_ONE_HOT_WATER_SWAPS
+                            .iter()
+                            .any(|(a, b)| a == from && b == to)
+                    }
+                    _ => false,
+                }
+        })
+        .map(|change| change.path.trim_end_matches("/kind").to_string())
+        .collect();
+    for change in changes.iter_mut() {
+        let Some(generator) = swaps.iter().find(|generator| {
+            change.path == format!("{generator}/kind")
+                || change.path.starts_with(&format!("{generator}/"))
+        }) else {
+            continue;
+        };
+        if change.path == format!("{generator}/kind") || change.verdict == RelabelVerdict::Review {
+            change.verdict = RelabelVerdict::Allowed;
+            change.cluster = HOT_WATER_SWAP_CLUSTER;
+            change.note = None;
+        }
+    }
+}
+
+/// Cooling that appears or disappears is a system change: "het aanbrengen
+/// van koeling" (ISSO 82.1 Bijlage A cluster 6, p. 210; ISSO 75.1 p. 216;
+/// 6b, W p. 68, U p. 59–60).
+fn reject_cooling_added_or_removed(
+    original: &Value,
+    current: &Value,
+    changes: &mut Vec<RelabelChange>,
+) {
+    if has_cooling(original) == has_cooling(current) {
+        return;
+    }
+    const CLUSTER: &str = "installation: cooling added or removed, a system change";
+    let mut marked = false;
+    for change in changes.iter_mut() {
+        if is_cooling_service_path(&change.path) {
+            change.verdict = RelabelVerdict::NotAllowed;
+            change.cluster = CLUSTER;
+            change.note = None;
+            marked = true;
+        }
+    }
+    if !marked {
+        changes.push(RelabelChange {
+            path: "/ntaCalculation/cooling".into(),
+            before: None,
+            after: None,
+            verdict: RelabelVerdict::NotAllowed,
+            cluster: CLUSTER,
+            note: None,
+        });
     }
 }
 
@@ -660,6 +838,8 @@ fn assess_relabel_in_edition(original: &Value, current: &Value) -> RelabelAssess
         );
     }
     review_shares_next_to_added_generators(&mut changes);
+    allow_named_hot_water_swaps(&mut changes);
+    reject_cooling_added_or_removed(original, current, &mut changes);
     // The edition is compared as an edition (absent is 2025+C1), not as
     // text: the method of the original survey applies.
     changes.retain(|change| change.path != NORM_VERSION_PATH);
@@ -1369,5 +1549,154 @@ mod tests {
         let result = assess_relabel(&plain, &explicit);
         assert!(result.changes.is_empty(), "{:?}", result.changes);
         assert_eq!(result.norm_version, NormVersion::V2025C1);
+    }
+
+    fn terraced() -> Value {
+        serde_json::from_str(include_str!(
+            "../../../training-data/nta8800-example-terraced-dwelling.json"
+        ))
+        .unwrap()
+    }
+
+    #[test]
+    fn vessel_labels_are_label_input_and_display_labels_are_not() {
+        // A better energy label on the storage or buffer vessel is a
+        // one-to-one replacement under hot water or heating (6a, W p. 67,
+        // U p. 58); a display label of a zone says nothing about the
+        // building.
+        let mut original = terraced();
+        original["ntaCalculation"]["hotWater"]["storage"] = json!([{
+            "id": "vat", "volumeL": 120, "loss": {"method": "label", "label": "c"}
+        }]);
+        original["ntaCalculation"]["distributionSystem"] =
+            json!({"bufferVessel": {"volumeL": 100, "label": "c"}});
+        original["zones"][0]["label"] = json!("Begane grond");
+        let mut current = original.clone();
+        current["ntaCalculation"]["hotWater"]["storage"][0]["loss"]["label"] = json!("a");
+        current["ntaCalculation"]["distributionSystem"]["bufferVessel"]["label"] = json!("b");
+        current["zones"][0]["label"] = json!("Woonlaag");
+        let result = assess_relabel(&original, &current);
+        assert!(result.allowed, "{:?}", result.changes);
+        assert_eq!(
+            verdict(&result, "/ntaCalculation/hotWater/storage/0/loss/label"),
+            RelabelVerdict::Allowed
+        );
+        assert_eq!(
+            verdict(
+                &result,
+                "/ntaCalculation/distributionSystem/bufferVessel/label"
+            ),
+            RelabelVerdict::Allowed
+        );
+        assert!(result
+            .changes
+            .iter()
+            .all(|change| change.path != "/zones/0/label"));
+
+        // How the loss is determined is a property of the vessel, not a
+        // system change.
+        let mut measured = original.clone();
+        measured["ntaCalculation"]["hotWater"]["storage"][0]["loss"] =
+            json!({"method": "measured", "standbyLossKwhPerDay": 1.2});
+        let result = assess_relabel(&original, &measured);
+        assert_eq!(
+            verdict(&result, "/ntaCalculation/hotWater/storage/0/loss/method"),
+            RelabelVerdict::Allowed
+        );
+    }
+
+    #[test]
+    fn gas_water_heater_to_electric_boiler_is_one_to_one() {
+        // ISSO 82.1 Bijlage A cluster 1 (p. 209) and ISSO 75.1 (p. 215)
+        // name "het vervangen van een gasgestookt warmwatertoestel naar een
+        // elektrische boiler" as a one-to-one change.
+        let original = terraced();
+        let mut current = original.clone();
+        current["ntaCalculation"]["hotWater"]["generator"] = json!({"kind": "electric_boiler"});
+        let result = assess_relabel(&original, &current);
+        assert!(result.allowed, "{:?}", result.changes);
+        assert_eq!(
+            verdict(&result, "/ntaCalculation/hotWater/generator/kind"),
+            RelabelVerdict::Allowed
+        );
+        assert_eq!(
+            verdict(&result, "/ntaCalculation/hotWater/generator/appliance"),
+            RelabelVerdict::Allowed
+        );
+        // A gas appliance replaced by a heat pump stays a system change
+        // (cluster 6, p. 210; 6b W p. 68).
+        let mut heat_pump = original.clone();
+        heat_pump["ntaCalculation"]["hotWater"]["generator"] = json!({"kind": "heat_pump"});
+        let result = assess_relabel(&original, &heat_pump);
+        assert!(!result.allowed);
+        assert_eq!(
+            verdict(&result, "/ntaCalculation/hotWater/generator/kind"),
+            RelabelVerdict::NotAllowed
+        );
+    }
+
+    #[test]
+    fn airtightness_change_needs_review() {
+        // 6a and 6b do not list airtightness or infiltration (W p. 67–68,
+        // U p. 58–60): not an allowed installation change.
+        let original = terraced();
+        let mut current = original.clone();
+        current["ntaCalculation"]["ventilation"]["infiltration"]["qv10DmPerSM2"] = json!(0.2);
+        current["zones"][0]["airTightness"]["qv10"] = json!(0.2);
+        let result = assess_relabel(&original, &current);
+        assert!(result.allowed);
+        assert!(result.needs_review);
+        for path in [
+            "/ntaCalculation/ventilation/infiltration/qv10DmPerSM2",
+            "/zones/0/airTightness/qv10",
+        ] {
+            assert_eq!(verdict(&result, path), RelabelVerdict::Review, "{path}");
+        }
+    }
+
+    #[test]
+    fn cooling_added_or_removed_is_a_system_change() {
+        // "het aanbrengen van koeling" is a change of installation (ISSO
+        // 82.1 Bijlage A cluster 6, p. 210); system changes are 6b (W p. 68).
+        let original = terraced();
+        let mut current = original.clone();
+        current["ntaCalculation"]["cooling"] = json!({"generators": []});
+        let result = assess_relabel(&original, &current);
+        assert!(!result.allowed);
+        assert_eq!(
+            verdict(&result, "/ntaCalculation/cooling"),
+            RelabelVerdict::NotAllowed
+        );
+        let removed = assess_relabel(&current, &original);
+        assert!(!removed.allowed);
+
+        let mut legacy = original.clone();
+        legacy["coolingSystems"] = json!([{"id": "airco", "type": "split"}]);
+        let result = assess_relabel(&original, &legacy);
+        assert!(!result.allowed);
+        assert_eq!(
+            verdict(&result, "/coolingSystems/0"),
+            RelabelVerdict::NotAllowed
+        );
+
+        // A property of an existing cooling system is not a system change.
+        let mut cooled = original.clone();
+        cooled["coolingSystems"] = json!([{"id": "airco", "type": "split", "eer": 3.0}]);
+        let mut better = cooled.clone();
+        better["coolingSystems"][0]["eer"] = json!(4.0);
+        let result = assess_relabel(&cooled, &better);
+        assert!(result.allowed, "{:?}", result.changes);
+    }
+
+    #[test]
+    fn window_solar_is_not_production() {
+        assert!(!is_production_path(
+            "/ntaCalculation/windowSolar/frameFraction"
+        ));
+        assert!(!is_installation_path(
+            "/ntaCalculation/windowSolar/frameFraction"
+        ));
+        assert!(is_production_path("/ntaCalculation/pvSystems/0/tiltDeg"));
+        assert!(is_production_path("/ntaCalculation/spaceHeatingSolar/0"));
     }
 }

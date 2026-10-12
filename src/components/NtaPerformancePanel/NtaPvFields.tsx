@@ -1,5 +1,6 @@
 import { useI18n } from '../../i18n/i18n';
 import { NumberField, read, SelectField, TextField, type Draft, type Path } from './NtaFormFields';
+import { CollectivePvField } from './NtaCollectiveShare';
 
 // §16 PV system fields (16.2–16.4b, tables 16.1/16.2), shared by the
 // building's own PV systems and annex P area electricity (P.7/P.71).
@@ -30,7 +31,7 @@ export function PvSystemFields({ draft, change, base, label }: {
   const at = (...rest: Path): Path => [...base, ...rest];
   const method = read(draft, at('peakPower', 'method'));
   return <>
-    <SelectField {...field} path={at('peakPower', 'method')} label={`${label} — ${t('nta.form.pvPeak')}`}
+    <SelectField required {...field} path={at('peakPower', 'method')} label={`${label} — ${t('nta.form.pvPeak')}`}
       options={[['panels', t('nta.form.pvPeak.panels')], ['declared_specific', t('nta.form.pvPeak.declared')], ['table16_1', t('nta.form.pvPeak.table')]]}
       onChange={(_, value) => change(at('peakPower'), peakPowerTemplate(String(value ?? 'panels')))} />
     {method === 'panels' ? <>
@@ -44,11 +45,14 @@ export function PvSystemFields({ draft, change, base, label }: {
     </>}
     <NumberField {...field} path={at('azimuthDeg')} label={t('nta.form.pvAzimuth')} />
     <NumberField {...field} path={at('tiltDeg')} label={t('nta.form.tilt')} />
-    <SelectField {...field} path={at('mounting')} label={t('nta.form.pvPerformance')}
+    <SelectField {...field} path={at('mounting')} label={t('nta.form.pvPerformance')} fallback="unknown"
       options={[['unknown', t('nta.form.pvMount.unknown')], ['not_ventilated', '0,76'], ['moderately_ventilated', '0,80'], ['strongly_ventilated', '0,82']]} />
-    {/* Optional (16.2): clearing drops the factor instead of leaving a blank. */}
+    {/* §17.3: the factor or an obstruction situation. With a situation, clearing drops the factor;
+        without one the kernel needs it, so clearing leaves a blank at this field (review 58). */}
     <NumberField {...field} path={at('obstructionFactors', 0)} label={t('nta.form.obstruction')}
-      onChange={(path, value) => change(value == null ? at('obstructionFactors') : path, value == null ? [] : value)} />
+      onChange={(path, value) => change(value == null && read(draft, at('obstruction')) != null ? at('obstructionFactors') : path,
+        value == null && read(draft, at('obstruction')) != null ? [] : value)} />
+    <CollectivePvField draft={draft} change={change} base={base} />
     <TextField {...field} path={at('sourceReference')} label={t('nta.form.source')} />
   </>;
 }

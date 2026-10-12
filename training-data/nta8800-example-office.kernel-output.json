@@ -151,7 +151,7 @@
       "method": "chapter14"
      },
      "method": "utility",
-     "sourceReference": "NTA tables 7.2/7.3; lighting from chapter 14"
+     "sourceReference": "NTA-tabellen 7.2/7.3; verlichting uit hoofdstuk 14"
     },
     "opaqueElements": [
      {
@@ -204,7 +204,7 @@
     "setpoints": {
      "coolingC": 24.0,
      "heatingC": 21.0,
-     "sourceReference": "NTA 8800 table 7.13 office"
+     "sourceReference": "NTA 8800 tabel 7.13 kantoorfunctie"
     },
     "thermalMass": {
      "ceiling": "closed_or_suspended",

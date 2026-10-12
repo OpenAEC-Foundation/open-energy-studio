@@ -8,7 +8,7 @@ use axum::{
 };
 use nta8800_service::{
     app, app_with, openapi_document,
-    operations::{operations, Method},
+    operations::{operations, Method, ERROR_CODES},
     HttpConfig,
 };
 use serde_json::{json, Value};
@@ -170,6 +170,49 @@ async fn health_and_version_identify_the_build() {
         .unwrap();
     assert_eq!(v2020["implemented"], true);
     assert_eq!(v2020["registrationEligible"], false);
+}
+
+#[tokio::test]
+async fn edition_comparison_lists_the_changes_and_keeps_the_request() {
+    let project = without_nulls(fixture("nta8800-example-office.json"));
+    let (status, result) = post(
+        "/v1/nta8800/project/editions/compare",
+        json!({ "project": project, "normVersion": "2020+A1" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{result}");
+    assert_eq!(result["fromNormVersion"], "2025+C1");
+    assert_eq!(result["toNormVersion"], "2020+A1");
+    assert_eq!(
+        result["adjustedProject"]["ntaCalculation"]["normVersion"],
+        "2020+A1"
+    );
+    let items = result["items"].as_array().unwrap();
+    let panel = items
+        .iter()
+        .find(|item| item["path"].as_str().unwrap().ends_with("panelPeakPowerW"))
+        .expect("PV panel route listed");
+    assert_eq!(panel["points"], json!(["68"]));
+    assert!(result["switchPoints"].as_array().unwrap().len() > 10);
+    // Without a target the comparison is with the default edition.
+    let mut legacy = project.clone();
+    legacy["ntaCalculation"]["normVersion"] = json!("2024");
+    let (status, result) = post(
+        "/v1/nta8800/project/editions/compare",
+        json!({ "project": legacy }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{result}");
+    assert_eq!(result["fromNormVersion"], "2024");
+    assert_eq!(result["toNormVersion"], "2025+C1");
+    // A project without an NTA block cannot change edition.
+    let (status, body) = post(
+        "/v1/nta8800/project/editions/compare",
+        json!({ "project": { "id": "x" } }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_envelope(&body, "invalid_project_shape");
 }
 
 #[tokio::test]
@@ -395,8 +438,23 @@ async fn cors_is_off_by_default_and_configurable() {
         .header(header::ORIGIN, "http://evil.example")
         .body(Body::empty())
         .unwrap();
-    let (_, headers, _) = send(app_with(config), other).await;
+    let (_, headers, _) = send(app_with(config.clone()), other).await;
     assert!(headers.get(header::ACCESS_CONTROL_ALLOW_ORIGIN).is_none());
+    assert_eq!(headers[header::VARY], "Origin");
+
+    // A refused preflight also varies on Origin, so a cache cannot hand it
+    // to an allowed origin.
+    let refused = Request::builder()
+        .method("OPTIONS")
+        .uri("/v1/nta8800/project/performance")
+        .header(header::ORIGIN, "http://evil.example")
+        .header(header::ACCESS_CONTROL_REQUEST_METHOD, "POST")
+        .body(Body::empty())
+        .unwrap();
+    let (status, headers, _) = send(app_with(config), refused).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    assert!(headers.get(header::ACCESS_CONTROL_ALLOW_ORIGIN).is_none());
+    assert_eq!(headers[header::VARY], "Origin");
 }
 
 /// A route the edition lacks is refused with 422 and a project gap at the
@@ -594,6 +652,221 @@ async fn full_queue_is_refused_before_the_body_is_read() {
     assert!(second.1.contains_key(header::RETRY_AFTER));
 }
 
+/// A body with more JSON values than the cap is refused before it is
+/// parsed, whatever its byte size (a 16 MiB array of zeros is 8 million
+/// values); a realistic project stays far below the default cap.
+#[tokio::test]
+async fn too_many_json_values_are_refused_before_parsing() {
+    let small_cap = app_with(HttpConfig {
+        max_json_values: 1_000,
+        ..HttpConfig::default()
+    });
+    let body = json!({ "project": { "values": vec![0; 2_000] } });
+    let (status, _, body) = send(
+        small_cap,
+        Request::post("/v1/nta8800/relabel/label-input-hash")
+            .header("content-type", "application/json")
+            .body(Body::from(body.to_string()))
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
+    assert_envelope(&body, "payload_too_large");
+    assert_eq!(body["details"]["maxJsonValues"], 1_000);
+    let (status, body) = post(
+        "/v1/nta8800/project/performance",
+        json!({ "project": without_nulls(fixture("nta8800-public-comparison-h.json")) }),
+    )
+    .await;
+    assert_ne!(status, StatusCode::PAYLOAD_TOO_LARGE, "{body}");
+}
+
+/// A misspelled or unknown top-level member is refused, not ignored: a
+/// `normversion` would otherwise calculate silently in the default edition.
+#[tokio::test]
+async fn unknown_request_members_are_refused() {
+    let project = without_nulls(fixture("nta8800-example-office.json"));
+    let (status, body) = post(
+        "/v1/nta8800/project/performance",
+        json!({ "project": project, "normversion": "2024" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_envelope(&body, "invalid_request_shape");
+    assert_eq!(body["path"], "normversion");
+    // Every request schema says so.
+    let document = openapi_document();
+    for op in operations().iter().filter(|op| op.method == Method::Post) {
+        let schema = &document["paths"][op.path]["post"]["requestBody"]["content"]
+            ["application/json"]["schema"];
+        assert_eq!(schema["additionalProperties"], false, "{}", op.name);
+    }
+}
+
+/// Relabel and the label-input hash need project objects.
+#[tokio::test]
+async fn relabel_and_hash_refuse_non_projects() {
+    let (status, body) = post(
+        "/v1/nta8800/relabel/assess",
+        json!({ "original": 1, "current": 2 }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_envelope(&body, "invalid_project_shape");
+    assert_eq!(body["path"], "original");
+    let (status, body) = post(
+        "/v1/nta8800/relabel/assess",
+        json!({ "original": {}, "current": "x" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(body["path"], "current");
+    let (status, body) = post(
+        "/v1/nta8800/relabel/label-input-hash",
+        json!({ "project": "x" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_envelope(&body, "invalid_project_shape");
+    assert_eq!(body["path"], "project");
+}
+
+/// A reference case is compared, and stamped, in its own edition.
+#[tokio::test]
+async fn reference_case_is_stamped_with_its_own_edition() {
+    let case = json!({
+        "caseId": "edition-2024", "normVersion": "2024",
+        "project": {"id":"house", "name":"House", "buildingFunction":"residential",
+            "ntaCalculation": {"normVersion": "2024"},
+            "zones":[{"id":"z", "floorArea":100, "volume":250,
+                "surfaces":[{"id":"s", "area":50, "zoneId":"z", "windows":[]}]}]},
+        "source": {"publisher":"synthetic", "documentId":"internal-1", "edition":"test",
+            "usePermission":"internal", "independentReviewer":"test"},
+        "expected": [{"path":"beng2", "value":1, "unit":"kWh/m2.year",
+            "normReference":"internal test", "absoluteTolerance":0}]
+    });
+    let label_2024 = nta8800_core::norm_versions::NormVersion::V2024.label();
+    for route in [
+        "/v1/nta8800/reference/compare",
+        "/v1/nta8800/reference/audit",
+    ] {
+        let (_, body) = post(route, json!({ "case": case })).await;
+        assert_eq!(body["normVersion"], "2024", "{route}: {body}");
+        assert_eq!(body["targetNormVersion"], label_2024, "{route}: {body}");
+        // The same edition asked for explicitly is accepted.
+        let (status, body) = post(route, json!({ "case": case, "normVersion": "2024" })).await;
+        assert_ne!(status, StatusCode::BAD_REQUEST, "{route}: {body}");
+    }
+}
+
+/// Capabilities name the calculations the kernel has, multi-zone, and the
+/// editions, consistent with /v1/version.
+#[tokio::test]
+async fn capabilities_list_the_current_scope_and_editions() {
+    let (_, capabilities) = get("/v1/nta8800/capabilities").await;
+    let (_, version) = get("/v1/version").await;
+    assert_eq!(capabilities["projectCalculationAvailable"], true);
+    assert_eq!(
+        capabilities["supportedNormVersions"],
+        version["supportedNormVersions"]
+    );
+    let implemented: Vec<&str> = capabilities["implemented"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(Value::as_str)
+        .collect();
+    for scope in [
+        "unverified_project_performance_multi_zone",
+        "unverified_isso_75_1_basisopname_utility",
+        "unverified_maatwerkadvies_isso_82_2_75_2",
+        "relabel_comparison_brl_9500_annex_6a_6b",
+        "registration_readiness_brl_9500_omgevingsregeling",
+    ] {
+        assert!(implemented.contains(&scope), "{scope}");
+    }
+    assert!(!implemented
+        .iter()
+        .any(|scope| scope.contains("adapter_single_zone")));
+}
+
+/// The energy-by-service projection keeps the identity and status fields
+/// of the other projections.
+#[tokio::test]
+async fn energy_by_service_keeps_identity_fields() {
+    let project = without_nulls(fixture("nta8800-example-office.json"));
+    let (status, body) = post(
+        "/v1/nta8800/project/energy-by-service",
+        json!({ "project": project }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    for key in [
+        "status",
+        "kernelVersion",
+        "normVersion",
+        "targetNormVersion",
+        "registrationEligible",
+        "attestStatus",
+        "warnings",
+        "inputFingerprint",
+        "energyByService",
+    ] {
+        assert!(body.get(key).is_some(), "{key}: {body}");
+    }
+}
+
+/// On a loopback service only the loopback host names are answered, so a
+/// page that rebinds its own DNS name to 127.0.0.1 is refused.
+#[tokio::test]
+async fn host_check_refuses_rebound_names() {
+    let config = HttpConfig {
+        allowed_hosts: nta8800_service::http::LOOPBACK_HOSTS
+            .iter()
+            .map(|host| host.to_string())
+            .collect(),
+        ..HttpConfig::default()
+    };
+    let with_host = |host: &str| {
+        Request::get("/health")
+            .header(header::HOST, host)
+            .body(Body::empty())
+            .unwrap()
+    };
+    for host in [
+        "127.0.0.1:3007",
+        "localhost",
+        "[::1]:3007",
+        "LOCALHOST:3007",
+    ] {
+        let (status, _, _) = send(app_with(config.clone()), with_host(host)).await;
+        assert_eq!(status, StatusCode::OK, "{host}");
+    }
+    let (status, _, body) = send(app_with(config), with_host("evil.example:3007")).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert_envelope(&body, "host_not_allowed");
+}
+
+/// The OpenAPI document lists 422 only where an operation can answer it,
+/// and serves itself relative to the service.
+#[test]
+fn openapi_lists_reachable_statuses_only() {
+    let document = openapi_document();
+    assert_eq!(document["servers"][0]["url"], "/");
+    for (path, refuses) in [
+        ("/v1/nta8800/validate", false),
+        ("/v1/nta8800/relabel/assess", false),
+        ("/v1/nta8800/relabel/label-input-hash", false),
+        ("/v1/nta8800/reference/audit", false),
+        ("/v1/nta8800/project/performance", true),
+        ("/v1/nta8800/calculate", true),
+    ] {
+        let responses = &document["paths"][path]["post"]["responses"];
+        assert_eq!(responses.get("422").is_some(), refuses, "{path}");
+        assert!(responses.get("403").is_some(), "{path}");
+    }
+}
+
 /// The queue wait and the calculation have their own timeouts: a request
 /// that cannot get a slot within the queue timeout is refused with
 /// `server_busy` and starts no calculation; the one that has the slot gets
@@ -615,4 +888,184 @@ async fn queue_timeout_is_separate_from_the_calculation_timeout() {
     assert_eq!(second.0, StatusCode::SERVICE_UNAVAILABLE, "{}", second.2);
     assert_envelope(&second.2, "server_busy");
     assert!(second.1.contains_key(header::RETRY_AFTER));
+}
+
+// ------------------------------------------------------------ contract probe
+
+/// The machine codes the OpenAPI document lists for the error envelope.
+fn documented_codes(document: &Value) -> Vec<String> {
+    let description = document["components"]["schemas"]["Error"]["properties"]["code"]
+        ["description"]
+        .as_str()
+        .unwrap();
+    description
+        .split(|c: char| !(c.is_ascii_lowercase() || c == '_'))
+        .filter(|word| word.contains('_'))
+        .map(str::to_string)
+        .collect()
+}
+
+/// Checks one answer against the operation's documented responses: the
+/// status is listed, an error envelope carries a listed code, a 200 has the
+/// result schema's required members, and no message leaks a panic or a
+/// source path.
+fn assert_within_contract(
+    document: &Value,
+    path: &str,
+    method: &str,
+    probe: &str,
+    status: StatusCode,
+    body: &Value,
+) {
+    let responses = &document["paths"][path][method]["responses"];
+    assert!(
+        responses.get(status.as_str()).is_some(),
+        "{method} {path} ({probe}) answered {status}, not documented: {body}"
+    );
+    let text = body.to_string();
+    for leak in ["panicked", "/home/", "src/", ".rs:", "RUST_BACKTRACE"] {
+        assert!(
+            !text.contains(leak),
+            "{path} ({probe}) leaks {leak}: {body}"
+        );
+    }
+    if status == StatusCode::OK {
+        let schema = &responses["200"]["content"]["application/json"]["schema"];
+        let kind = if body.is_array() { "array" } else { "object" };
+        assert!(
+            body.is_object() || body.is_array(),
+            "{path} ({probe}): {body}"
+        );
+        assert_eq!(schema["type"], kind, "{path} ({probe}) result type");
+        for key in schema["required"].as_array().into_iter().flatten() {
+            let key = key.as_str().unwrap();
+            assert!(body.get(key).is_some(), "{path} ({probe}) lacks {key}");
+        }
+        return;
+    }
+    if status == StatusCode::UNPROCESSABLE_ENTITY && body.get("code").is_none() {
+        // A kernel assessment, not an envelope.
+        assert!(body["status"].is_string(), "{path} ({probe}): {body}");
+        return;
+    }
+    let code = body["code"].as_str().unwrap_or("?").to_string();
+    assert_envelope(body, &code);
+    assert!(
+        documented_codes(document).contains(&code),
+        "{path} ({probe}) answered code {code}, not listed in the OpenAPI Error schema"
+    );
+}
+
+/// Every code the service sources put in an error envelope (an
+/// `error_body("…"` call or an edition refusal's `code: "…"`) is one of
+/// [`ERROR_CODES`], so the OpenAPI list cannot fall behind the code.
+#[test]
+fn every_emitted_error_code_is_listed() {
+    let root = env!("CARGO_MANIFEST_DIR");
+    let sources = [
+        "src/operations.rs",
+        "src/http.rs",
+        "src/bin/mcp.rs",
+        "../nta8800-core/src/norm_versions/request.rs",
+    ];
+    let mut found = Vec::new();
+    for source in sources {
+        let text = std::fs::read_to_string(format!("{root}/{source}")).unwrap();
+        for marker in ["error_body(", "code: "] {
+            for (at, _) in text.match_indices(marker) {
+                let rest = text[at + marker.len()..].trim_start();
+                if let Some(literal) = rest.strip_prefix('"') {
+                    let code = literal.split('"').next().unwrap();
+                    found.push((source, code.to_string()));
+                }
+            }
+        }
+    }
+    assert!(found.len() > 15, "{found:?}");
+    for (source, code) in found {
+        assert!(
+            ERROR_CODES.contains(&code.as_str()),
+            "{source} emits {code}, not in ERROR_CODES"
+        );
+    }
+    let listed = documented_codes(&openapi_document());
+    for code in ERROR_CODES {
+        assert!(listed.iter().any(|item| item == code), "{code}");
+    }
+}
+
+/// Every documented operation, probed in process with malformed and
+/// edge-case requests, answers only the statuses and error codes its OpenAPI
+/// entry lists.
+#[tokio::test]
+async fn every_operation_answers_within_its_documented_contract() {
+    let document = openapi_document();
+    let office = without_nulls(fixture("nta8800-example-office.json"));
+    let survey = fixture("nta8800-opname-1930-terraced.json");
+    for op in operations() {
+        let path = op.path;
+        if op.method == Method::Get {
+            let (status, body) = get(path).await;
+            assert_within_contract(&document, path, "get", "get", status, &body);
+            let (status, body) = post(path, json!({})).await;
+            assert_within_contract(&document, path, "get", "post on get", status, &body);
+            continue;
+        }
+        let key = op.input.unwrap().key;
+        let mut probes: Vec<(&str, Value)> = vec![
+            ("empty", json!({})),
+            ("unknown member", json!({ key: {}, "normversion": "2022" })),
+            ("bad edition", json!({ key: {}, "normVersion": "1999" })),
+            ("edition number", json!({ key: {}, "normVersion": 2022 })),
+            ("older edition", json!({ key: {}, "normVersion": "2022" })),
+        ];
+        for (name, value) in [
+            ("null", Value::Null),
+            ("number", json!(1)),
+            ("string", json!("x")),
+            ("array", json!([])),
+            ("object", json!({})),
+            (
+                "null members",
+                json!({ "ntaCalculation": null, "normVersion": null }),
+            ),
+        ] {
+            let mut body = json!({ key: value });
+            if op.name == "assess_relabel" {
+                body["current"] = body[key].clone();
+            }
+            probes.push((name, body));
+        }
+        if key == "project" {
+            probes.push(("example office", json!({ "project": office.clone() })));
+            probes.push((
+                "example office 2022",
+                json!({ "project": office.clone(), "normVersion": "2022" }),
+            ));
+        }
+        if op.name == "assess_relabel" {
+            probes.push((
+                "example office pair",
+                json!({ "original": office.clone(), "current": office.clone() }),
+            ));
+        }
+        if key == "survey" {
+            probes.push(("survey fixture", json!({ "survey": survey.clone() })));
+        }
+        for (probe, body) in probes {
+            let (status, answer) = post(path, body).await;
+            assert_within_contract(&document, path, "post", probe, status, &answer);
+        }
+        let (status, _, answer) = send(
+            app(),
+            Request::post(path)
+                .header("content-type", "text/plain")
+                .body(Body::from("{}"))
+                .unwrap(),
+        )
+        .await;
+        assert_within_contract(&document, path, "post", "text/plain", status, &answer);
+        let (status, answer) = get(path).await;
+        assert_within_contract(&document, path, "post", "get on post", status, &answer);
+    }
 }

@@ -1,6 +1,6 @@
 {
   "suiteId": "openbare-gevallen",
-  "description": "Herbouwde openbare BENG-rapporten A–H. Verwacht is de vastgelegde uitkomst van deze rekenkern (regressie, banden als in crates/nta8800-core/tests/public_comparison.rs); de gepubliceerde waarden staan er ter vergelijking bij en beslissen niets. Geen officiële referentietoets.",
+  "description": "Herbouwde openbare BENG-rapporten A–O. Verwacht is de vastgelegde uitkomst van deze rekenkern (regressie, banden als in crates/nta8800-core/tests/public_comparison.rs); de gepubliceerde waarden staan er ter vergelijking bij en beslissen niets. Geen officiële referentietoets.",
   "cases": [
     {
       "caseId": "openbaar-a-2025c1",
@@ -468,21 +468,21 @@
       "expected": [
         {
           "path": "beng1",
-          "value": 65.42,
+          "value": 65.07,
           "unit": "kWh/m2.year",
           "normReference": "BENG 1, energiebehoefte (5.3)",
           "absoluteTolerance": 0.05
         },
         {
           "path": "beng2",
-          "value": 29.71,
+          "value": 29.31,
           "unit": "kWh/m2.year",
           "normReference": "BENG 2, primair fossiel energiegebruik (5.2)",
           "absoluteTolerance": 0.05
         },
         {
           "path": "beng3",
-          "value": 72.1,
+          "value": 72.5,
           "unit": "%",
           "normReference": "BENG 3, aandeel hernieuwbare energie (5.4)",
           "absoluteTolerance": 0.15
@@ -520,21 +520,21 @@
       "expected": [
         {
           "path": "beng1",
-          "value": 27.29,
+          "value": 30.2,
           "unit": "kWh/m2.year",
           "normReference": "BENG 1, energiebehoefte (5.3)",
           "absoluteTolerance": 0.05
         },
         {
           "path": "beng2",
-          "value": 80.63,
+          "value": 81.86,
           "unit": "kWh/m2.year",
           "normReference": "BENG 2, primair fossiel energiegebruik (5.2)",
           "absoluteTolerance": 0.05
         },
         {
           "path": "beng3",
-          "value": 29.7,
+          "value": 30.0,
           "unit": "%",
           "normReference": "BENG 3, aandeel hernieuwbare energie (5.4)",
           "absoluteTolerance": 0.15
@@ -555,6 +555,370 @@
           "path": "beng3",
           "value": 30.5,
           "source": "rapport H (Uniec 3.2.9.2, 29-05-2024, NTA 8800:2023)"
+        }
+      ]
+    },
+    {
+      "caseId": "openbaar-i-2020a1",
+      "normVersion": "2020+A1",
+      "projectFile": "../nta8800-public-comparison-i.json",
+      "source": {
+        "publisher": "openbaar BENG-rapport I (utiliteitsgebouw), bijlage bij een vergunning",
+        "documentId": "https://www.noord-beveland.nl/sites/noord_beveland/files/2022-02/Rapportage_BENG_berekening_Geredigeerd_0.pdf",
+        "edition": "Uniec 3.0.9.3, 01-04-2021",
+        "usePermission": "openbaar gepubliceerd; alleen getallen overgenomen, geen rapporttekst",
+        "independentReviewer": "geen: regressie op de eigen uitkomst van de rekenkern (docs/nta8800-vergelijking-openbare-rapporten.md)"
+      },
+      "expected": [
+        {
+          "path": "beng1",
+          "value": 75.51,
+          "unit": "kWh/m2.year",
+          "normReference": "BENG 1, energiebehoefte (5.3)",
+          "absoluteTolerance": 0.05
+        },
+        {
+          "path": "beng2",
+          "value": -19.41,
+          "unit": "kWh/m2.year",
+          "normReference": "BENG 2, primair fossiel energiegebruik (5.2)",
+          "absoluteTolerance": 0.05
+        },
+        {
+          "path": "beng3",
+          "value": 119.4,
+          "unit": "%",
+          "normReference": "BENG 3, aandeel hernieuwbare energie (5.4)",
+          "absoluteTolerance": 0.15
+        }
+      ],
+      "published": [
+        {
+          "path": "beng1",
+          "value": 75.26,
+          "source": "rapport I (Uniec 3.0.9.3, 01-04-2021, NTA 8800:2020+A1)"
+        },
+        {
+          "path": "beng2",
+          "value": -36.81,
+          "source": "rapport I (Uniec 3.0.9.3, 01-04-2021, NTA 8800:2020+A1)"
+        },
+        {
+          "path": "beng3",
+          "value": 143.8,
+          "source": "rapport I (Uniec 3.0.9.3, 01-04-2021, NTA 8800:2020+A1)"
+        }
+      ]
+    },
+    {
+      "caseId": "openbaar-j-2020a1",
+      "normVersion": "2020+A1",
+      "projectFile": "../nta8800-public-comparison-j.json",
+      "source": {
+        "publisher": "openbaar BENG-rapport J (winkelruimte onder appartementen), bijlage bij een vergunning",
+        "documentId": "https://www.krimpenerwaard.nl/sites/default/files/2024-10/15.%202022068_beng_svds_a0_pdf%20(geanonimiseerd)_0.pdf",
+        "edition": "Uniec 3.0.19.4, 07-04-2022",
+        "usePermission": "openbaar gepubliceerd; alleen getallen overgenomen, geen rapporttekst",
+        "independentReviewer": "geen: regressie op de eigen uitkomst van de rekenkern (docs/nta8800-vergelijking-openbare-rapporten.md)"
+      },
+      "expected": [
+        {
+          "path": "beng1",
+          "value": 63.75,
+          "unit": "kWh/m2.year",
+          "normReference": "BENG 1, energiebehoefte (5.3)",
+          "absoluteTolerance": 0.05
+        },
+        {
+          "path": "beng2",
+          "value": 51.46,
+          "unit": "kWh/m2.year",
+          "normReference": "BENG 2, primair fossiel energiegebruik (5.2)",
+          "absoluteTolerance": 0.05
+        },
+        {
+          "path": "beng3",
+          "value": 27.9,
+          "unit": "%",
+          "normReference": "BENG 3, aandeel hernieuwbare energie (5.4)",
+          "absoluteTolerance": 0.15
+        }
+      ],
+      "published": [
+        {
+          "path": "beng1",
+          "value": 63.92,
+          "source": "rapport J (Uniec 3.0.19.4, 07-04-2022, NTA 8800:2020+A1)"
+        },
+        {
+          "path": "beng2",
+          "value": 46.11,
+          "source": "rapport J (Uniec 3.0.19.4, 07-04-2022, NTA 8800:2020+A1)"
+        },
+        {
+          "path": "beng3",
+          "value": 30.1,
+          "source": "rapport J (Uniec 3.0.19.4, 07-04-2022, NTA 8800:2020+A1)"
+        }
+      ]
+    },
+    {
+      "caseId": "openbaar-k-2022",
+      "normVersion": "2022",
+      "projectFile": "../nta8800-public-comparison-k.json",
+      "source": {
+        "publisher": "openbaar BENG-rapport K (sporthal met kantoor en bijeenkomstfunctie), bijlage bij een ter-inzage-legging",
+        "documentId": "https://repository.officiele-overheidspublicaties.nl/Bijlagen/TerInzageLegging/2024/til-2024-19434/1/bijlage/Bijlage_17_2022-4978_Rapportage_BENG_pro_formapdf_fc10d433-2427-ef11-844c-005056a12c84.pdf",
+        "edition": "Uniec 3.1.5.0, 11-12-2022",
+        "usePermission": "openbaar gepubliceerd; alleen getallen overgenomen, geen rapporttekst",
+        "independentReviewer": "geen: regressie op de eigen uitkomst van de rekenkern (docs/nta8800-vergelijking-openbare-rapporten.md)"
+      },
+      "expected": [
+        {
+          "path": "beng1",
+          "value": 29.57,
+          "unit": "kWh/m2.year",
+          "normReference": "BENG 1, energiebehoefte (5.3)",
+          "absoluteTolerance": 0.05
+        },
+        {
+          "path": "beng2",
+          "value": -0.9,
+          "unit": "kWh/m2.year",
+          "normReference": "BENG 2, primair fossiel energiegebruik (5.2)",
+          "absoluteTolerance": 0.05
+        },
+        {
+          "path": "beng3",
+          "value": 101.1,
+          "unit": "%",
+          "normReference": "BENG 3, aandeel hernieuwbare energie (5.4)",
+          "absoluteTolerance": 0.15
+        }
+      ],
+      "published": [
+        {
+          "path": "beng1",
+          "value": 29.68,
+          "source": "rapport K (Uniec 3.1.5.0, 11-12-2022, NTA 8800:2022)"
+        },
+        {
+          "path": "beng2",
+          "value": -0.79,
+          "source": "rapport K (Uniec 3.1.5.0, 11-12-2022, NTA 8800:2022)"
+        },
+        {
+          "path": "beng3",
+          "value": 101.0,
+          "source": "rapport K (Uniec 3.1.5.0, 11-12-2022, NTA 8800:2022)"
+        }
+      ]
+    },
+    {
+      "caseId": "openbaar-l-2022",
+      "normVersion": "2022",
+      "projectFile": "../nta8800-public-comparison-l.json",
+      "source": {
+        "publisher": "openbaar BENG-rapport L (basisschool met gymzaal), bijlage bij een raadsstuk",
+        "documentId": "https://www.centraledorpenraad.nl/wp/wp-content/uploads/B48-uniec3-18363-OBS-De-Weidevogel.pdf",
+        "edition": "Uniec 3.1.5.0, 02-01-2023",
+        "usePermission": "openbaar gepubliceerd; alleen getallen overgenomen, geen rapporttekst",
+        "independentReviewer": "geen: regressie op de eigen uitkomst van de rekenkern (docs/nta8800-vergelijking-openbare-rapporten.md)"
+      },
+      "expected": [
+        {
+          "path": "beng1",
+          "value": 111.44,
+          "unit": "kWh/m2.year",
+          "normReference": "BENG 1, energiebehoefte (5.3)",
+          "absoluteTolerance": 0.05
+        },
+        {
+          "path": "beng2",
+          "value": 18.63,
+          "unit": "kWh/m2.year",
+          "normReference": "BENG 2, primair fossiel energiegebruik (5.2)",
+          "absoluteTolerance": 0.05
+        },
+        {
+          "path": "beng3",
+          "value": 80.2,
+          "unit": "%",
+          "normReference": "BENG 3, aandeel hernieuwbare energie (5.4)",
+          "absoluteTolerance": 0.15
+        }
+      ],
+      "published": [
+        {
+          "path": "beng1",
+          "value": 111.52,
+          "source": "rapport L (Uniec 3.1.5.0, 02-01-2023, NTA 8800:2022)"
+        },
+        {
+          "path": "beng2",
+          "value": 25.36,
+          "source": "rapport L (Uniec 3.1.5.0, 02-01-2023, NTA 8800:2022)"
+        },
+        {
+          "path": "beng3",
+          "value": 76.9,
+          "source": "rapport L (Uniec 3.1.5.0, 02-01-2023, NTA 8800:2022)"
+        }
+      ]
+    },
+    {
+      "caseId": "openbaar-m-2022",
+      "normVersion": "2022",
+      "projectFile": "../nta8800-public-comparison-m.json",
+      "source": {
+        "publisher": "openbaar BENG-rapport M (kleine vrijstaande woning met kap en koeling), bijlage bij een ter-inzage-legging",
+        "documentId": "https://repository.officiele-overheidspublicaties.nl/Bijlagen/TerInzageLegging/2024/til-2024-20303/1/bijlage/BS_7192605_1664526905911_PR18758_-_Parklaan_104a_te_Soest_-_BENG.pdf.pdf",
+        "edition": "Uniec 3.1.3.1, 15-09-2022",
+        "usePermission": "openbaar gepubliceerd; alleen getallen overgenomen, geen rapporttekst",
+        "independentReviewer": "geen: regressie op de eigen uitkomst van de rekenkern (docs/nta8800-vergelijking-openbare-rapporten.md)"
+      },
+      "expected": [
+        {
+          "path": "beng1",
+          "value": 170.87,
+          "unit": "kWh/m2.year",
+          "normReference": "BENG 1, energiebehoefte (5.3)",
+          "absoluteTolerance": 0.05
+        },
+        {
+          "path": "beng2",
+          "value": 47.85,
+          "unit": "kWh/m2.year",
+          "normReference": "BENG 2, primair fossiel energiegebruik (5.2)",
+          "absoluteTolerance": 0.05
+        },
+        {
+          "path": "beng3",
+          "value": 80.6,
+          "unit": "%",
+          "normReference": "BENG 3, aandeel hernieuwbare energie (5.4)",
+          "absoluteTolerance": 0.15
+        }
+      ],
+      "published": [
+        {
+          "path": "beng1",
+          "value": 171.29,
+          "source": "rapport M (Uniec 3.1.3.1, 15-09-2022, NTA 8800:2022)"
+        },
+        {
+          "path": "beng2",
+          "value": 26.25,
+          "source": "rapport M (Uniec 3.1.3.1, 15-09-2022, NTA 8800:2022)"
+        },
+        {
+          "path": "beng3",
+          "value": 88.3,
+          "source": "rapport M (Uniec 3.1.3.1, 15-09-2022, NTA 8800:2022)"
+        }
+      ]
+    },
+    {
+      "caseId": "openbaar-n-2020a1",
+      "normVersion": "2020+A1",
+      "projectFile": "../nta8800-public-comparison-n.json",
+      "source": {
+        "publisher": "openbaar BENG-rapport N (supermarkt met parkeerkelder), bijlage bij een ter-inzage-legging",
+        "documentId": "https://repository.officiele-overheidspublicaties.nl/Bijlagen/TerInzageLegging/2025/til-2025-22714/1/bijlage/07.Stoks15_Lidl-Dutilhweg_2feb2021_Volledig.pdf",
+        "edition": "Uniec 3.0.7.1, 02-02-2021",
+        "usePermission": "openbaar gepubliceerd; alleen getallen overgenomen, geen rapporttekst",
+        "independentReviewer": "geen: regressie op de eigen uitkomst van de rekenkern (docs/nta8800-vergelijking-openbare-rapporten.md)"
+      },
+      "expected": [
+        {
+          "path": "beng1",
+          "value": 54.57,
+          "unit": "kWh/m2.year",
+          "normReference": "BENG 1, energiebehoefte (5.3)",
+          "absoluteTolerance": 0.05
+        },
+        {
+          "path": "beng2",
+          "value": -24.31,
+          "unit": "kWh/m2.year",
+          "normReference": "BENG 2, primair fossiel energiegebruik (5.2)",
+          "absoluteTolerance": 0.05
+        },
+        {
+          "path": "beng3",
+          "value": 122.6,
+          "unit": "%",
+          "normReference": "BENG 3, aandeel hernieuwbare energie (5.4)",
+          "absoluteTolerance": 0.15
+        }
+      ],
+      "published": [
+        {
+          "path": "beng1",
+          "value": 55.98,
+          "source": "rapport N (Uniec 3.0.7.1, 02-02-2021, NTA 8800:2020+A1)"
+        },
+        {
+          "path": "beng2",
+          "value": -27.18,
+          "source": "rapport N (Uniec 3.0.7.1, 02-02-2021, NTA 8800:2020+A1)"
+        },
+        {
+          "path": "beng3",
+          "value": 126.9,
+          "source": "rapport N (Uniec 3.0.7.1, 02-02-2021, NTA 8800:2020+A1)"
+        }
+      ]
+    },
+    {
+      "caseId": "openbaar-o-2022",
+      "normVersion": "2022",
+      "projectFile": "../nta8800-public-comparison-o.json",
+      "source": {
+        "publisher": "openbaar BENG-rapport O (gezondheidszorgfunctie op een warmtenet), bijlage bij een ter-inzage-legging",
+        "documentId": "https://repository.officiele-overheidspublicaties.nl/Bijlagen/TerInzageLegging/2024/til-2024-13830/1/bijlage/62.4617.151.ur.nbu_OVB-K4_BENG_MPG.pdf",
+        "edition": "Uniec 3.1.5.0, 24-02-2023",
+        "usePermission": "openbaar gepubliceerd; alleen getallen overgenomen, geen rapporttekst",
+        "independentReviewer": "geen: regressie op de eigen uitkomst van de rekenkern (docs/nta8800-vergelijking-openbare-rapporten.md)"
+      },
+      "expected": [
+        {
+          "path": "beng1",
+          "value": 88.25,
+          "unit": "kWh/m2.year",
+          "normReference": "BENG 1, energiebehoefte (5.3)",
+          "absoluteTolerance": 0.05
+        },
+        {
+          "path": "beng2",
+          "value": 47.75,
+          "unit": "kWh/m2.year",
+          "normReference": "BENG 2, primair fossiel energiegebruik (5.2)",
+          "absoluteTolerance": 0.05
+        },
+        {
+          "path": "beng3",
+          "value": 44.2,
+          "unit": "%",
+          "normReference": "BENG 3, aandeel hernieuwbare energie (5.4)",
+          "absoluteTolerance": 0.15
+        }
+      ],
+      "published": [
+        {
+          "path": "beng1",
+          "value": 87.26,
+          "source": "rapport O (Uniec 3.1.5.0, 24-02-2023, NTA 8800:2022)"
+        },
+        {
+          "path": "beng2",
+          "value": 49.49,
+          "source": "rapport O (Uniec 3.1.5.0, 24-02-2023, NTA 8800:2022)"
+        },
+        {
+          "path": "beng3",
+          "value": 45.1,
+          "source": "rapport O (Uniec 3.1.5.0, 24-02-2023, NTA 8800:2022)"
         }
       ]
     }

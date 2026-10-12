@@ -3,6 +3,7 @@ import { useI18n } from '../../i18n/i18n';
 import { formatNumber } from '../../i18n/format';
 import { Plus, Trash2, Copy, Check, GripVertical, ChevronUp, ChevronDown } from 'lucide-react';
 import './UValueCalculator.css';
+import { DecimalInput } from '../ui';
 
 // ============================================================
 // Types
@@ -314,10 +315,9 @@ export function UValueCalculator() {
                   </select>
                 </td>
                 <td>
-                  <input
+                  <DecimalInput
                     className="uvalue-input uvalue-input-num"
                     aria-label={`${t('uvalue.thickness')} (mm) ${index + 1}`}
-                    type="number"
                     min={0}
                     step={1}
                     value={Math.round(layer.thickness * 1000)}
@@ -333,10 +333,9 @@ export function UValueCalculator() {
                       Rc={n(layer.fixedRc, 2)}
                     </span>
                   ) : (
-                    <input
+                    <DecimalInput
                       className="uvalue-input uvalue-input-num"
                       aria-label={`λ (W/mK) ${index + 1}`}
-                      type="number"
                       min={0.001}
                       step={0.001}
                       value={layer.lambda}

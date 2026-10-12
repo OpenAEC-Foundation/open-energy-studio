@@ -33,7 +33,7 @@ pub(super) const PROFILE: NormProfile = NormProfile {
     // Table 13.18 (p. 617), as 2024.
     table_13_18: Table1318Lookup::LowerColumn,
     motor_efficiency_free_choice: false,
-    // Unused: annex AA is no route in 2023 (`annex_aa_route`).
+    // Unused: annex AA is no route in 2023 (`cooling_capacity_methods_route`).
     annex_aa: AnnexAaVariant::Monthly2024,
     annex_aa_requirement_floor: false,
     // Table E.5 (p. 785).
@@ -83,8 +83,11 @@ pub(super) const PROFILE: NormProfile = NormProfile {
     // P.6.5.4.8 (p. 960): forfait 20.
     geothermal_efficiency_fixed: true,
     // 5.7.1 (p. 103–104): active cooling counts as meeting TOjuli; no
-    // annex AA.
-    annex_aa_route: false,
+    // capacity methods (no annex AA, no toets op beperking van de
+    // zoninstraling).
+    cooling_capacity_methods_route: false,
+    // Unused without method 3; as 2024.
+    solar_limitation_movable_shading: true,
     // No renovatiestandaard and no table 5.7 in chapter 5 (5.3.1, p. 70–72).
     renovation_standard: false,
     // Table 14.3 (p. 648): one column, no LED value.

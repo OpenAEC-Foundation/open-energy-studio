@@ -13,28 +13,46 @@ import { Camera, Paperclip, X } from 'lucide-react';
 import { useI18n } from '../../i18n/i18n';
 import { useEnergy } from '../../context/EnergyContext';
 import type { NtaEvidenceItem } from '../../core/nta/KernelClient';
-import { createEvidenceItem, loadEvidenceBytes } from '../../core/nta/Evidence';
+import {
+  checkEvidenceFile, createEvidenceItem, EVIDENCE_ACCEPT, EvidenceImportError, loadEvidenceBytes, releaseEvidenceIds,
+} from '../../core/nta/Evidence';
 import {
   evidenceForPointer, evidenceIdsIn, isImageFile, linkEvidence, stablePointer, unlinkEvidence, withEvidenceReference,
 } from '../../core/nta/EvidenceLinks';
 import { FileButton } from '../ui';
 import './EvidenceLink.css';
 
-/** The evidence register of the open project and a setter for it. */
-export function useEvidenceRegister(): [NtaEvidenceItem[], (next: NtaEvidenceItem[]) => void] {
+/**
+ * The evidence register of the open project, a setter for it and an adder.
+ * The adder appends to the register as it is when it runs, so files read
+ * slowly never overwrite entries or registration edits made meanwhile.
+ */
+export function useEvidenceRegister(): [
+  NtaEvidenceItem[], (next: NtaEvidenceItem[]) => void, (added: NtaEvidenceItem[]) => void,
+] {
   const { state, dispatch } = useEnergy();
   const registration = state.project.registration;
   const evidence = registration?.evidence ?? [];
   const set = (next: NtaEvidenceItem[]) =>
     dispatch({ type: 'UPDATE_PROJECT_INFO', payload: { registration: { ...(registration ?? {}), evidence: next } } });
-  return [evidence, set];
+  const add = (added: NtaEvidenceItem[]) => {
+    dispatch({ type: 'ADD_EVIDENCE', payload: added });
+    releaseEvidenceIds(added.map((item) => item.id));
+  };
+  return [evidence, set, add];
 }
 
-/** Reads files the user chose into new register entries (hashed, kept for the dossier). */
+/**
+ * Reads files the user chose into new register entries (hashed, kept for
+ * the dossier). Size and type are checked before a file is read, so a
+ * multi-GB video is refused without loading it.
+ */
 async function addFiles(files: FileList | null, evidence: NtaEvidenceItem[], photo: boolean): Promise<NtaEvidenceItem[]> {
+  const chosen = Array.from(files ?? []);
+  for (const file of chosen) checkEvidenceFile({ name: file.name, size: file.size });
   let next = [...evidence];
   const added: NtaEvidenceItem[] = [];
-  for (const file of Array.from(files ?? [])) {
+  for (const file of chosen) {
     const bytes = new Uint8Array(await file.arrayBuffer());
     const item = await createEvidenceItem({ name: file.name, bytes, lastModified: file.lastModified }, next);
     const entry = photo && isImageFile(file.name) && item.kind === 'other' ? { ...item, kind: 'photo_detail' as const } : item;
@@ -42,6 +60,14 @@ async function addFiles(files: FileList | null, evidence: NtaEvidenceItem[], pho
     added.push(entry);
   }
   return added;
+}
+
+/** The user-facing message for a refused or failed file. */
+export function evidenceErrorText(reason: unknown, t: (key: string, params?: Record<string, string | number>) => string): string {
+  if (reason instanceof EvidenceImportError) {
+    return t(`evidence.error.${reason.code}`, { name: reason.fileName, max: 200 });
+  }
+  return t('evidenceLink.failed');
 }
 
 /** A small preview of an image file in the register (when its bytes are on this machine). */
@@ -61,8 +87,11 @@ function Thumbnail({ item }: { item: NtaEvidenceItem }) {
       if (created) URL.revokeObjectURL(created);
     };
   }, [item]);
-  if (!url) return <Paperclip className="evidence-link__icon" aria-hidden="true" />;
-  return <img className="evidence-link__thumb" src={url} alt="" />;
+  // HEIC and TIFF photos (phones, scanners) are kept as they are, but most browsers cannot draw
+  // them: the icon replaces a broken image.
+  const [broken, setBroken] = useState(false);
+  if (!url || broken) return <Paperclip className="evidence-link__icon" aria-hidden="true" />;
+  return <img className="evidence-link__thumb" src={url} alt="" onError={() => setBroken(true)} />;
 }
 
 function ItemRow({ item, onUnlink }: { item: NtaEvidenceItem; onUnlink: () => void }) {
@@ -100,7 +129,7 @@ export function EvidenceAttach({ pointer, title, hint, photo = false }: {
 }) {
   const { t } = useI18n();
   const { state: { project } } = useEnergy();
-  const [evidence, setEvidence] = useEvidenceRegister();
+  const [evidence, setEvidence, addEvidence] = useEvidenceRegister();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Stored by element id where the element has one, so the link follows it.
@@ -115,9 +144,9 @@ export function EvidenceAttach({ pointer, title, hint, photo = false }: {
     setError(null);
     try {
       const added = await addFiles(files, evidence, photo);
-      setEvidence([...evidence, ...added.map((item) => ({ ...item, linkedPaths: [stable] }))]);
-    } catch {
-      setError(t('evidenceLink.failed'));
+      addEvidence(added.map((item) => ({ ...item, linkedPaths: [stable] })));
+    } catch (reason) {
+      setError(evidenceErrorText(reason, t));
     } finally {
       setBusy(false);
     }
@@ -138,7 +167,7 @@ export function EvidenceAttach({ pointer, title, hint, photo = false }: {
         </ul>}
       <div className="evidence-link__actions">
         <FileButton label={photo ? t('evidenceLink.addPhoto') : t('evidenceLink.add')} status={busy ? t('evidenceLink.busy') : ''}
-          accept={photo ? 'image/*' : 'application/pdf,image/*'} multiple disabled={busy}
+          accept={photo ? 'image/*' : EVIDENCE_ACCEPT} multiple disabled={busy}
           {...(photo ? { capture: 'environment' as const } : {})}
           aria-label={`${photo ? t('evidenceLink.addPhoto') : t('evidenceLink.add')} ${pointer}`}
           onChange={(event) => {
@@ -161,8 +190,9 @@ export function EvidenceReferencePicker({ path, value, onChange }: {
   path: string; value: unknown; onChange: (next: string) => void;
 }) {
   const { t } = useI18n();
-  const [evidence, setEvidence] = useEvidenceRegister();
+  const [evidence, , addEvidence] = useEvidenceRegister();
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const ids = evidenceIdsIn(value);
   const byId = useMemo(() => new Map(evidence.map((item) => [item.id, item])), [evidence]);
   const label = t('evidenceLink.reference', { path });
@@ -170,10 +200,15 @@ export function EvidenceReferencePicker({ path, value, onChange }: {
   const onFiles = async (files: FileList | null) => {
     if (!files?.length) return;
     setBusy(true);
+    setError(null);
     try {
       const added = await addFiles(files, evidence, false);
-      setEvidence([...evidence, ...added]);
+      // Ids were reserved while reading, so `added[0].id` is the id the
+      // register keeps even if another addition finished meanwhile.
+      addEvidence(added);
       if (added[0]) onChange(withEvidenceReference(value, added[0].id));
+    } catch (reason) {
+      setError(evidenceErrorText(reason, t));
     } finally {
       setBusy(false);
     }
@@ -189,12 +224,13 @@ export function EvidenceReferencePicker({ path, value, onChange }: {
       })}
       <LinkExisting options={evidence.filter((item) => !ids.includes(item.id))} label={label}
         onLink={(id) => onChange(withEvidenceReference(value, id))} />
-      <FileButton label={t('evidenceLink.add')} status={busy ? t('evidenceLink.busy') : ''} accept="application/pdf,image/*"
+      <FileButton label={t('evidenceLink.add')} status={busy ? t('evidenceLink.busy') : ''} accept={EVIDENCE_ACCEPT}
         disabled={busy} aria-label={`${t('evidenceLink.add')}: ${path}`}
         onChange={(event) => {
           const input = event.currentTarget;
           void onFiles(input.files).then(() => { input.value = ''; });
         }} />
+      {error && <span className="evidence-link__error" role="alert">{error}</span>}
     </span>
   );
 }

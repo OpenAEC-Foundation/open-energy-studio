@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { AlertCircle, CheckCircle2, CircleHelp, ShieldCheck } from 'lucide-react';
 import { useI18n } from '../../i18n/i18n';
-import { formatNumber } from '../../i18n/format';
+import { formatNumber, kernelCodeLabel } from '../../i18n/format';
 import type { IProject } from '../../core/energy/types';
 import { assessProjectWithRust, type KernelAssessment } from '../../core/nta/KernelClient';
 import { KernelDetail } from '../KernelCode/KernelCode';
 import './KernelAuditPanel.css';
+import { TechnicalDetails } from '../ui/Display';
 
 type AuditQuery =
   | { project: IProject; kind: 'loading' }
@@ -52,7 +53,7 @@ export function KernelAuditPanel({ project }: { project: IProject }) {
       {!loading && error && (
         <div className="kernel-audit-unavailable" role="alert">
           <CircleHelp size={18} />
-          <span>{t('kernel.unavailable')} <small>{error}</small></span>
+          <div>{t('kernel.unavailable')}<TechnicalDetails>{error}</TechnicalDetails></div>
         </div>
       )}
       {!loading && assessment && <>
@@ -164,10 +165,10 @@ export function KernelAuditPanel({ project }: { project: IProject }) {
           </details>}
         {assessment.issues.length > 0 && <ul className="kernel-audit-issues">
           {assessment.issues.map((item, index) => {
-            const translated = t(`kernel.issue.${item.code}`);
+            const label = kernelCodeLabel(t, item.code, ['kernel.issue.']);
             return <li key={`${item.path}-${item.code}-${index}`} className={`kernel-audit-issue ${item.severity}`}>
               <span className="kernel-audit-path">{item.path}</span>
-              <span>{translated === `kernel.issue.${item.code}` ? item.message : translated}</span>
+              <span>{label.known ? label.text : item.message}</span>
               <KernelDetail detail={item.detail} />
             </li>;
           })}

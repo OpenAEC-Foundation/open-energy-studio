@@ -73,4 +73,14 @@ describe('NTA form models', () => {
       element: 'roof', building: { kind: 'regular' }, constructionYear: 1975,
       insulation: { kind: 'known_thickness', thicknessMm: 60 }, cavity: false } });
   });
+
+  it('sends a weakly ventilated narrow air layer of table F.1 to the kernel', () => {
+    const draft = constructionDraft({ layers: [] });
+    draft.layers.push({ kind: 'narrow_cavity', name: 'luchtlaag', thicknessMm: 10, widthMm: 5, weaklyVentilated: true });
+    const element = envelopeFromLayers('wall', draft).elements[0].element;
+    if (element.kind !== 'opaque' || element.construction.build.kind !== 'homogeneous') throw new Error('shape');
+    expect(element.construction.build.layers).toEqual([
+      { kind: 'narrow_cavity', thicknessMm: 10, widthMm: 5, weaklyVentilated: true },
+    ]);
+  });
 });

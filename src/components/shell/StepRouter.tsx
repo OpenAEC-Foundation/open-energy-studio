@@ -8,6 +8,7 @@ import { Box, Download, FileDown, Printer } from 'lucide-react';
 import { useI18n } from '../../i18n/i18n';
 import { useEnergy } from '../../context/EnergyContext';
 import { useKernel } from '../../context/KernelProvider';
+import { openPointsEmptyText } from './openPointsEmpty';
 import { routeForPath } from '../../core/nta/gapRoutes';
 import { kernelIssues, type StepStatus } from '../../core/nta/stepStatus';
 import type { Route, StepId } from '../../core/navigation/routes';
@@ -176,7 +177,7 @@ export function StepRouter({ project, route, statuses, actions }: StepRouterProp
         <div className="page-body">
           {route.sub === 'overview' && <>
             <Card title={t('overview.openPoints')} subtitle={t('overview.openPointsHint')} level={2} flush>
-              <IssueList empty={t('overview.noIssues')}
+              <IssueList empty={openPointsEmptyText(t, kernel)}
                 issues={issues.map((issue) => ({
                   code: issue.code, severity: issue.kind, path: issue.path, detail: issue.detail,
                   location: routeLabel(t, routeForPath(issue.path)),

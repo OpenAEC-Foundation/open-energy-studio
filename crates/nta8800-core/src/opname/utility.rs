@@ -4387,12 +4387,31 @@ fn derive_utility_input_cited(survey: &UtilitySurvey, recorder: &mut Recorder) -
         .iter()
         .map(|item| derive_pv(item, year, recorder))
         .collect();
-    let (bacs, bacs_reference) = bacs_factor(
+    let (mut bacs, mut bacs_reference) = bacs_factor(
         &survey.bacs,
         &surveyed_system_powers(survey),
         area,
         recorder,
     );
+    // f_BACS of 5.5.8 exists from NTA 8800:2025+C1 only; an older edition
+    // has no such factor (the kernel refuses anything but 1,0 there).
+    if !crate::norm_versions::profile().bacs_factor_route && (bacs - 1.0).abs() > 1e-9 {
+        recorder.record(
+            "bacs_factor_not_in_edition",
+            "bacs",
+            format!("f_BACS 1,0 instead of {bacs} (no 5.5.8 in this NTA 8800 edition)"),
+            {
+                let version = crate::norm_versions::current();
+                crate::norm_versions::leak_once(
+                    version,
+                    "bacs_factor_not_in_edition",
+                    format!("{}: no f_BACS (5.5.8 is new in 2025+C1)", version.label()),
+                )
+            },
+        );
+        bacs = 1.0;
+        bacs_reference = format!("{bacs_reference}; not in this NTA 8800 edition, 1,0");
+    }
     let (storage_present, storage) =
         super::production::derive_storage(survey.storage.as_ref(), !survey.pv.is_empty(), recorder);
     // Table 7.8 (p. 68): one uninsulated pipe per toilet group through all
@@ -4590,8 +4609,9 @@ fn humidifier_value(survey: &UtilitySurvey, zone_id: &str) -> Option<Value> {
         HumidifierAnswer::ElectricSteam => Humidifier::Steam {
             carrier: SteamCarrier::Electricity,
         },
+        // The survey does not ask gas or oil; booked as natural gas.
         HumidifierAnswer::NonElectricSteam => Humidifier::Steam {
-            carrier: SteamCarrier::GasOrOil,
+            carrier: SteamCarrier::Gas,
         },
         HumidifierAnswer::Adiabatic => Humidifier::Atomising,
     };

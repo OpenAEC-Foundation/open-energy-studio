@@ -8,6 +8,8 @@
 //! | `--port PORT` | `OES_API_PORT` | `3007` |
 //! | `--cors-origin ORIGIN` (repeatable, `*` for any) | `OES_API_CORS_ORIGINS` (comma separated) | none |
 //! | `--body-limit-mb N` | `OES_API_BODY_LIMIT_MB` | `16` |
+//! | `--max-json-values N` | `OES_API_MAX_JSON_VALUES` | `500000` |
+//! | `--allowed-host HOST` (repeatable) | `OES_API_ALLOWED_HOSTS` (comma separated) | on a loopback address: `localhost`, `127.0.0.1`, `::1` |
 //! | `--max-calculations N` | `OES_API_MAX_CALCULATIONS` | number of cores (at most 1024) |
 //! | `--max-waiting N` | `OES_API_MAX_WAITING` | twice the calculations |
 //! | `--queue-timeout-s N` | `OES_API_QUEUE_TIMEOUT_S` | `30` |
@@ -27,7 +29,19 @@ struct Options {
     http: HttpConfig,
 }
 
-const USAGE: &str = "usage: api [--bind ADDR] [--port PORT] [--cors-origin ORIGIN]... [--body-limit-mb N] [--max-calculations N] [--max-waiting N] [--queue-timeout-s N] [--calculation-timeout-s N] [--log|--no-log] [--version]";
+const USAGE: &str = "usage: api [--bind ADDR] [--port PORT] [--cors-origin ORIGIN]... [--allowed-host HOST]... [--body-limit-mb N] [--max-json-values N] [--max-calculations N] [--max-waiting N] [--queue-timeout-s N] [--calculation-timeout-s N] [--log|--no-log] [--version]";
+
+/// Splits a comma-separated environment list.
+fn list(value: Option<String>) -> Vec<String> {
+    value
+        .map(|list| {
+            list.split(',')
+                .map(|item| item.trim().to_string())
+                .filter(|item| !item.is_empty())
+                .collect()
+        })
+        .unwrap_or_default()
+}
 
 fn parse(args: Vec<String>) -> Result<Options, String> {
     let env = |key: &str| {
@@ -37,15 +51,11 @@ fn parse(args: Vec<String>) -> Result<Options, String> {
     };
     let mut bind = env("OES_API_BIND").unwrap_or_else(|| "127.0.0.1".into());
     let mut port = env("OES_API_PORT").unwrap_or_else(|| "3007".into());
-    let mut origins: Vec<String> = env("OES_API_CORS_ORIGINS")
-        .map(|list| {
-            list.split(',')
-                .map(|item| item.trim().to_string())
-                .filter(|item| !item.is_empty())
-                .collect()
-        })
-        .unwrap_or_default();
+    let mut origins = list(env("OES_API_CORS_ORIGINS"));
+    let mut hosts = list(env("OES_API_ALLOWED_HOSTS"));
     let mut limit = env("OES_API_BODY_LIMIT_MB").unwrap_or_else(|| "16".into());
+    let mut values = env("OES_API_MAX_JSON_VALUES")
+        .unwrap_or_else(|| nta8800_service::http::DEFAULT_MAX_JSON_VALUES.to_string());
     let mut calculations = env("OES_API_MAX_CALCULATIONS").unwrap_or_else(|| {
         nta8800_service::http::default_max_concurrent_calculations().to_string()
     });
@@ -60,7 +70,9 @@ fn parse(args: Vec<String>) -> Result<Options, String> {
             "--bind" => bind = value("--bind")?,
             "--port" => port = value("--port")?,
             "--cors-origin" => origins.push(value("--cors-origin")?),
+            "--allowed-host" => hosts.push(value("--allowed-host")?),
             "--body-limit-mb" => limit = value("--body-limit-mb")?,
+            "--max-json-values" => values = value("--max-json-values")?,
             "--max-calculations" => calculations = value("--max-calculations")?,
             "--max-waiting" => waiting = Some(value("--max-waiting")?),
             "--queue-timeout-s" => queue_timeout = value("--queue-timeout-s")?,
@@ -80,6 +92,23 @@ fn parse(args: Vec<String>) -> Result<Options, String> {
         .ok()
         .filter(|mb: &usize| (1..=1024).contains(mb))
         .ok_or(format!("invalid body limit {limit} (1–1024 MB)"))?;
+    let values: usize = values
+        .parse()
+        .ok()
+        .filter(|n: &usize| (1_000..=100_000_000).contains(n))
+        .ok_or(format!(
+            "invalid JSON value limit {values} (1000–100000000)"
+        ))?;
+    // On a loopback address only the loopback names are served (DNS
+    // rebinding); extra names come from --allowed-host. On any other
+    // address only the configured names are checked, if any.
+    if bind.is_loopback() {
+        for host in nta8800_service::http::LOOPBACK_HOSTS {
+            if !hosts.iter().any(|item| item == host) {
+                hosts.push(host.to_string());
+            }
+        }
+    }
     let calculations: usize = calculations
         .parse()
         .ok()
@@ -112,7 +141,9 @@ fn parse(args: Vec<String>) -> Result<Options, String> {
         port,
         http: HttpConfig {
             body_limit_bytes: limit * 1024 * 1024,
+            max_json_values: values,
             cors_origins: origins,
+            allowed_hosts: hosts,
             log_requests: log,
             max_concurrent_calculations: calculations,
             max_waiting_requests: waiting,
@@ -258,5 +289,33 @@ mod tests {
         assert!(parse(vec!["--queue-timeout-s".into(), "0".into()]).is_err());
         assert!(parse(vec!["--max-waiting".into(), "-1".into()]).is_err());
         assert!(parse(vec!["--max-waiting".into(), "70000".into()]).is_err());
+        assert!(parse(vec!["--max-json-values".into(), "10".into()]).is_err());
+    }
+
+    #[test]
+    fn json_value_cap_and_hosts() {
+        let options = parse(vec![
+            "--max-json-values".into(),
+            "2000".into(),
+            "--allowed-host".into(),
+            "oes.local".into(),
+        ])
+        .unwrap();
+        assert_eq!(options.http.max_json_values, 2000);
+        // Loopback: the loopback names plus the configured one.
+        assert!(options.bind.is_loopback());
+        for host in ["localhost", "127.0.0.1", "::1", "oes.local"] {
+            assert!(
+                options.http.allowed_hosts.iter().any(|item| item == host),
+                "{host}"
+            );
+        }
+        // A non-loopback address checks only configured names.
+        let open = parse(vec!["--bind".into(), "0.0.0.0".into()]).unwrap();
+        assert!(open.http.allowed_hosts.is_empty());
+        assert_eq!(
+            open.http.max_json_values,
+            nta8800_service::http::DEFAULT_MAX_JSON_VALUES
+        );
     }
 }

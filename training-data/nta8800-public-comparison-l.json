@@ -1,0 +1,1951 @@
+{
+  "id": "public-comparison-l",
+  "name": "Vergelijking openbaar rapport L (basisschool met gymzaal)",
+  "description": "Fictieve herbouw van een openbaar BENG-rapport (Uniec 3.1.5.0, NTA 8800:2022); niet het echte gebouw. Twee rekenzones: onderwijs met kantoor, bijeenkomstfunctie en twee gemeenschappelijke ruimten, en een gymzaal; bodemwarmtepomp met vloerverwarming en plafondstraling, koudeopslag met vloerkoeling, luchtbehandelingskast D.5a met roterende WTW, elektrische boilers en een doorstroomtoestel, 203 m2 PV.",
+  "buildingFunction": "education",
+  "address": "Fictief adres",
+  "city": "Fictief",
+  "zones": [
+    {
+      "id": "rz1",
+      "name": "Rekenzone onderwijs",
+      "floorArea": 1149.8,
+      "volume": 4024.3,
+      "height": 3.5,
+      "surfaces": [
+        {
+          "id": "rz1-vloer",
+          "name": "Vloer boven kruipruimte",
+          "type": "floor",
+          "thermalBoundary": "ground",
+          "area": 688.74,
+          "orientation": "horizontal",
+          "constructionId": "c-vloer",
+          "zoneId": "rz1",
+          "windows": []
+        },
+        {
+          "id": "rz1-vg",
+          "name": "Voorgevel",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 255.0,
+          "orientation": "N",
+          "constructionId": "c-gevel",
+          "zoneId": "rz1",
+          "windows": [
+            {
+              "id": "rz1-vg-entreehal",
+              "name": "entreehal",
+              "area": 46.72,
+              "uValue": 1.7,
+              "gValue": 0.6,
+              "orientation": "N",
+              "surfaceId": "rz1-vg"
+            },
+            {
+              "id": "rz1-vg-kantoortuin-a",
+              "name": "kantoortuin-a",
+              "area": 2.87,
+              "uValue": 1.7,
+              "gValue": 0.6,
+              "orientation": "N",
+              "surfaceId": "rz1-vg"
+            },
+            {
+              "id": "rz1-vg-spreekkamer1-B",
+              "name": "spreekkamer1-B",
+              "area": 4.78,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "N",
+              "surfaceId": "rz1-vg"
+            },
+            {
+              "id": "rz1-vg-spreekkamer2-A",
+              "name": "spreekkamer2-A",
+              "area": 3.3,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "N",
+              "surfaceId": "rz1-vg"
+            },
+            {
+              "id": "rz1-vg-entree-school",
+              "name": "entree-school",
+              "area": 4.61,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "N",
+              "surfaceId": "rz1-vg"
+            },
+            {
+              "id": "rz1-vg-groeplokaal4-B",
+              "name": "groeplokaal4-B",
+              "area": 4.78,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "N",
+              "surfaceId": "rz1-vg"
+            },
+            {
+              "id": "rz1-vg-leerplein-a",
+              "name": "leerplein-a",
+              "area": 19.14,
+              "uValue": 1.7,
+              "gValue": 0.6,
+              "orientation": "N",
+              "surfaceId": "rz1-vg"
+            },
+            {
+              "id": "rz1-vg-personeelskamer",
+              "name": "personeelskamer",
+              "area": 4.81,
+              "uValue": 1.7,
+              "gValue": 0.6,
+              "orientation": "N",
+              "surfaceId": "rz1-vg"
+            },
+            {
+              "id": "rz1-vg-spreekkamer-A",
+              "name": "spreekkamer-A",
+              "area": 3.3,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "N",
+              "surfaceId": "rz1-vg"
+            },
+            {
+              "id": "rz1-vg-leerplein-v1-B",
+              "name": "leerplein-v1-B",
+              "area": 4.78,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "N",
+              "surfaceId": "rz1-vg"
+            },
+            {
+              "id": "rz1-vg-groeplokaal-BB-A",
+              "name": "groeplokaal-BB-A",
+              "area": 3.3,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "N",
+              "surfaceId": "rz1-vg"
+            }
+          ]
+        },
+        {
+          "id": "rz1-ag",
+          "name": "Achtergevel",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 154.12,
+          "orientation": "S",
+          "constructionId": "c-gevel",
+          "zoneId": "rz1",
+          "windows": [
+            {
+              "id": "rz1-ag-groeplokaal1-B",
+              "name": "groeplokaal1-B",
+              "area": 4.78,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "S",
+              "surfaceId": "rz1-ag"
+            },
+            {
+              "id": "rz1-ag-groeplokaal2-B",
+              "name": "groeplokaal2-B",
+              "area": 4.78,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "S",
+              "surfaceId": "rz1-ag"
+            },
+            {
+              "id": "rz1-ag-VVE-A",
+              "name": "VVE-A",
+              "area": 3.3,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "S",
+              "surfaceId": "rz1-ag"
+            },
+            {
+              "id": "rz1-ag-VVE-C",
+              "name": "VVE-C",
+              "area": 8.13,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "S",
+              "surfaceId": "rz1-ag"
+            },
+            {
+              "id": "rz1-ag-groeplokaal-BB-A",
+              "name": "groeplokaal-BB-A",
+              "area": 3.3,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "S",
+              "surfaceId": "rz1-ag"
+            },
+            {
+              "id": "rz1-ag-groeplokaal-BB-B1",
+              "name": "groeplokaal-BB-B1",
+              "area": 4.78,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "S",
+              "surfaceId": "rz1-ag"
+            },
+            {
+              "id": "rz1-ag-deur-leerplein",
+              "name": "deur-leerplein",
+              "area": 2.64,
+              "uValue": 1.4,
+              "gValue": 0.0,
+              "orientation": "S",
+              "surfaceId": "rz1-ag"
+            },
+            {
+              "id": "rz1-ag-leerplein-A",
+              "name": "leerplein-A",
+              "area": 3.3,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "S",
+              "surfaceId": "rz1-ag"
+            },
+            {
+              "id": "rz1-ag-groeplokaal-BB-B2",
+              "name": "groeplokaal-BB-B2",
+              "area": 4.78,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "S",
+              "surfaceId": "rz1-ag"
+            }
+          ]
+        },
+        {
+          "id": "rz1-lz",
+          "name": "Zijgevel links",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 58.65,
+          "orientation": "E",
+          "constructionId": "c-gevel",
+          "zoneId": "rz1",
+          "windows": [
+            {
+              "id": "rz1-lz-aula",
+              "name": "aula",
+              "area": 27.48,
+              "uValue": 1.7,
+              "gValue": 0.6,
+              "orientation": "E",
+              "surfaceId": "rz1-lz"
+            }
+          ]
+        },
+        {
+          "id": "rz1-rz",
+          "name": "Zijgevel rechts",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 186.36,
+          "orientation": "W",
+          "constructionId": "c-gevel",
+          "zoneId": "rz1",
+          "windows": [
+            {
+              "id": "rz1-rz-leerplein-b",
+              "name": "leerplein-b",
+              "area": 19.86,
+              "uValue": 1.7,
+              "gValue": 0.6,
+              "orientation": "W",
+              "surfaceId": "rz1-rz"
+            },
+            {
+              "id": "rz1-rz-kantoortuin-b",
+              "name": "kantoortuin-b",
+              "area": 2.6,
+              "uValue": 1.7,
+              "gValue": 0.6,
+              "orientation": "W",
+              "surfaceId": "rz1-rz"
+            },
+            {
+              "id": "rz1-rz-groeplokaal3-B",
+              "name": "groeplokaal3-B",
+              "area": 4.78,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "W",
+              "surfaceId": "rz1-rz"
+            },
+            {
+              "id": "rz1-rz-leerplein-A1",
+              "name": "leerplein-A1",
+              "area": 3.3,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "W",
+              "surfaceId": "rz1-rz"
+            },
+            {
+              "id": "rz1-rz-leerplein-D",
+              "name": "leerplein-D",
+              "area": 8.13,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "W",
+              "surfaceId": "rz1-rz"
+            },
+            {
+              "id": "rz1-rz-groeplokaal4-A",
+              "name": "groeplokaal4-A",
+              "area": 3.3,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "W",
+              "surfaceId": "rz1-rz"
+            },
+            {
+              "id": "rz1-rz-leerplein-E1",
+              "name": "leerplein-E1",
+              "area": 2.83,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "W",
+              "surfaceId": "rz1-rz"
+            },
+            {
+              "id": "rz1-rz-leerplein-E2",
+              "name": "leerplein-E2",
+              "area": 2.83,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "W",
+              "surfaceId": "rz1-rz"
+            },
+            {
+              "id": "rz1-rz-groeplokaal-BB-B1",
+              "name": "groeplokaal-BB-B1",
+              "area": 4.78,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "W",
+              "surfaceId": "rz1-rz"
+            },
+            {
+              "id": "rz1-rz-groeplokaal-BB-B2",
+              "name": "groeplokaal-BB-B2",
+              "area": 4.78,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "W",
+              "surfaceId": "rz1-rz"
+            },
+            {
+              "id": "rz1-rz-leerplein-A2",
+              "name": "leerplein-A2",
+              "area": 3.3,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "W",
+              "surfaceId": "rz1-rz"
+            }
+          ]
+        },
+        {
+          "id": "rz1-dak-o",
+          "name": "Hellend dak links",
+          "type": "roof",
+          "thermalBoundary": "outdoor",
+          "area": 378.02,
+          "orientation": "E",
+          "constructionId": "c-dak",
+          "zoneId": "rz1",
+          "windows": [
+            {
+              "id": "rz1-dak-o-dakraam-1",
+              "name": "dakraam-1",
+              "area": 2.56,
+              "uValue": 1.7,
+              "gValue": 0.6,
+              "orientation": "E",
+              "surfaceId": "rz1-dak-o"
+            },
+            {
+              "id": "rz1-dak-o-dakraam-2",
+              "name": "dakraam-2",
+              "area": 2.56,
+              "uValue": 1.7,
+              "gValue": 0.6,
+              "orientation": "E",
+              "surfaceId": "rz1-dak-o"
+            }
+          ]
+        },
+        {
+          "id": "rz1-dak-w",
+          "name": "Hellend dak rechts",
+          "type": "roof",
+          "thermalBoundary": "outdoor",
+          "area": 405.13,
+          "orientation": "W",
+          "constructionId": "c-dak",
+          "zoneId": "rz1",
+          "windows": [
+            {
+              "id": "rz1-dak-w-dakraam-1",
+              "name": "dakraam-1",
+              "area": 2.56,
+              "uValue": 1.7,
+              "gValue": 0.6,
+              "orientation": "W",
+              "surfaceId": "rz1-dak-w"
+            },
+            {
+              "id": "rz1-dak-w-dakraam-2",
+              "name": "dakraam-2",
+              "area": 2.56,
+              "uValue": 1.7,
+              "gValue": 0.6,
+              "orientation": "W",
+              "surfaceId": "rz1-dak-w"
+            },
+            {
+              "id": "rz1-dak-w-dakraam-3",
+              "name": "dakraam-3",
+              "area": 2.56,
+              "uValue": 1.7,
+              "gValue": 0.6,
+              "orientation": "W",
+              "surfaceId": "rz1-dak-w"
+            }
+          ]
+        },
+        {
+          "id": "rz1-aula-vloer",
+          "name": "Vloer gemeenschappelijk naast aula",
+          "type": "floor",
+          "thermalBoundary": "ground",
+          "area": 37.38,
+          "orientation": "horizontal",
+          "constructionId": "c-vloer",
+          "zoneId": "rz1",
+          "windows": []
+        },
+        {
+          "id": "rz1-entree-vloer",
+          "name": "Vloer hoofdentree",
+          "type": "floor",
+          "thermalBoundary": "ground",
+          "area": 8.43,
+          "orientation": "horizontal",
+          "constructionId": "c-vloer",
+          "zoneId": "rz1",
+          "windows": []
+        },
+        {
+          "id": "rz1-entree-vg",
+          "name": "Voorgevel hoofdentree",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 9.43,
+          "orientation": "N",
+          "constructionId": "c-gevel",
+          "zoneId": "rz1",
+          "windows": [
+            {
+              "id": "rz1-entree-vg-deur-hoofdentree",
+              "name": "deur-hoofdentree",
+              "area": 1.41,
+              "uValue": 1.4,
+              "gValue": 0.0,
+              "orientation": "N",
+              "surfaceId": "rz1-entree-vg"
+            },
+            {
+              "id": "rz1-entree-vg-entree-sport",
+              "name": "entree-sport",
+              "area": 4.63,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "N",
+              "surfaceId": "rz1-entree-vg"
+            }
+          ]
+        }
+      ],
+      "thermalBridges": [],
+      "airTightness": {
+        "qv10": 0.42
+      },
+      "pointThermalBridges": [],
+      "pointBridgeInventoryComplete": true
+    },
+    {
+      "id": "rz2",
+      "name": "Rekenzone sport",
+      "floorArea": 504.17,
+      "volume": 3529.19,
+      "height": 7.0,
+      "surfaces": [
+        {
+          "id": "rz2-vloer-kr",
+          "name": "Vloer boven kruipruimte",
+          "type": "floor",
+          "thermalBoundary": "ground",
+          "area": 217.37,
+          "orientation": "horizontal",
+          "constructionId": "c-vloer",
+          "zoneId": "rz2",
+          "windows": []
+        },
+        {
+          "id": "rz2-vloer-zand",
+          "name": "Vloer op zand",
+          "type": "floor",
+          "thermalBoundary": "ground",
+          "area": 325.72,
+          "orientation": "horizontal",
+          "constructionId": "c-vloer",
+          "zoneId": "rz2",
+          "windows": []
+        },
+        {
+          "id": "rz2-vg",
+          "name": "Voorgevel",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 31.48,
+          "orientation": "N",
+          "constructionId": "c-gevel",
+          "zoneId": "rz2",
+          "windows": [
+            {
+              "id": "rz2-vg-entree-sport",
+              "name": "entree-sport",
+              "area": 4.63,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "N",
+              "surfaceId": "rz2-vg"
+            }
+          ]
+        },
+        {
+          "id": "rz2-ag",
+          "name": "Achtergevel",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 141.79,
+          "orientation": "S",
+          "constructionId": "c-gevel",
+          "zoneId": "rz2",
+          "windows": [
+            {
+              "id": "rz2-ag-gymzaal-C",
+              "name": "gymzaal-C",
+              "area": 8.13,
+              "uValue": 1.4,
+              "gValue": 0.6,
+              "orientation": "S",
+              "surfaceId": "rz2-ag"
+            }
+          ]
+        },
+        {
+          "id": "rz2-lz",
+          "name": "Zijgevel links",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 142.77,
+          "orientation": "E",
+          "constructionId": "c-gevel",
+          "zoneId": "rz2",
+          "windows": [
+            {
+              "id": "rz2-lz-deur-leerplein",
+              "name": "deur-leerplein",
+              "area": 2.64,
+              "uValue": 1.4,
+              "gValue": 0.0,
+              "orientation": "E",
+              "surfaceId": "rz2-lz"
+            }
+          ]
+        },
+        {
+          "id": "rz2-rz",
+          "name": "Zijgevel rechts",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 14.8,
+          "orientation": "W",
+          "constructionId": "c-gevel",
+          "zoneId": "rz2",
+          "windows": []
+        },
+        {
+          "id": "rz2-dak-o",
+          "name": "Hellend dak links",
+          "type": "roof",
+          "thermalBoundary": "outdoor",
+          "area": 316.36,
+          "orientation": "E",
+          "constructionId": "c-dak",
+          "zoneId": "rz2",
+          "windows": [
+            {
+              "id": "rz2-dak-o-dakraam-1",
+              "name": "dakraam-1",
+              "area": 2.56,
+              "uValue": 1.7,
+              "gValue": 0.6,
+              "orientation": "E",
+              "surfaceId": "rz2-dak-o"
+            },
+            {
+              "id": "rz2-dak-o-dakraam-2",
+              "name": "dakraam-2",
+              "area": 2.56,
+              "uValue": 1.7,
+              "gValue": 0.6,
+              "orientation": "E",
+              "surfaceId": "rz2-dak-o"
+            }
+          ]
+        },
+        {
+          "id": "rz2-dak-w",
+          "name": "Hellend dak rechts",
+          "type": "roof",
+          "thermalBoundary": "outdoor",
+          "area": 253.74,
+          "orientation": "W",
+          "constructionId": "c-dak",
+          "zoneId": "rz2",
+          "windows": []
+        }
+      ],
+      "thermalBridges": [],
+      "airTightness": {
+        "qv10": 0.42
+      },
+      "pointThermalBridges": [],
+      "pointBridgeInventoryComplete": true
+    }
+  ],
+  "heatingSystems": [],
+  "ventilationSystems": [],
+  "coolingSystems": [],
+  "hotWaterSystems": [],
+  "solarPV": [],
+  "solarThermal": [],
+  "unheatedSpaces": [],
+  "constructions": [
+    {
+      "id": "c-gevel",
+      "name": "Gevel Rc 4,70",
+      "layers": [],
+      "rcValue": 4.7,
+      "uValue": 0.2053
+    },
+    {
+      "id": "c-dak",
+      "name": "Dak Rc 6,30",
+      "layers": [],
+      "rcValue": 6.3,
+      "uValue": 0.1553
+    },
+    {
+      "id": "c-vloer",
+      "name": "Vloer Rc 3,70",
+      "layers": [],
+      "rcValue": 3.7,
+      "uValue": 0.2558
+    }
+  ],
+  "ntaCalculation": {
+    "normVersion": "2022",
+    "calculationScope": "utility",
+    "constructionYear": 2021,
+    "areaSourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): Ag 1653,96 m2: onderwijs 978,28, kantoor 23,16 en bijeenkomst overig 107,71 (rekenzone onderwijs), sport 501,55 (rekenzone sport); gemeenschappelijk naast aula 34,85 naar rato over de drie functies van de rekenzone onderwijs, hoofdentree 8,41 naar rato over alle vier (geometrie bij de rekenzone onderwijs)",
+    "usageFunction": "education",
+    "setpoints": {
+      "heatingC": 21.0,
+      "coolingC": 24.0,
+      "sourceReference": "table 7.13"
+    },
+    "thermalMass": {
+      "floor": "heavy",
+      "wall": "heavy",
+      "ceiling": "closed_or_suspended",
+      "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): betonnen kolom-ligger skeletbouw met niet-massieve betonnen vloeren, gesloten of verlaagd plafond; tabel 7.10 rij 500 tot 750 kg/m2 (2022 p. 181)"
+    },
+    "internalGains": {
+      "method": "utility",
+      "lighting": {
+        "method": "chapter14"
+      },
+      "sourceReference": "tabellen 7.2/7.3 per functie; verlichting uit hoofdstuk 14"
+    },
+    "zoneData": [
+      {
+        "zoneId": "rz1",
+        "functionAreas": [
+          {
+            "function": "education",
+            "areaM2": 1014.13
+          },
+          {
+            "function": "office",
+            "areaM2": 24.01
+          },
+          {
+            "function": "other_assembly",
+            "areaM2": 111.66
+          }
+        ],
+        "usageFunction": "education",
+        "setpoints": {
+          "heatingC": 21.0,
+          "coolingC": 24.0,
+          "sourceReference": "6.5.3: tabel 7.13, onderwijs, kantoor en bijeenkomst 21/24"
+        },
+        "verticalPipes": [
+          {
+            "id": "rz1-toiletgroep-1",
+            "storeys": 0,
+            "buildingHeightM": 9.28,
+            "areaShare": 0.6952,
+            "insulated": false,
+            "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): verticale leidingen door de thermische schil onbekend, 7 niet boven elkaar gelegen toiletgroepen, gebouwhoogte 9,28 m; 7.17a naar rato van A_g over de rekenzones"
+          },
+          {
+            "id": "rz1-toiletgroep-2",
+            "storeys": 0,
+            "buildingHeightM": 9.28,
+            "areaShare": 0.6952,
+            "insulated": false,
+            "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): verticale leidingen door de thermische schil onbekend, 7 niet boven elkaar gelegen toiletgroepen, gebouwhoogte 9,28 m; 7.17a naar rato van A_g over de rekenzones"
+          },
+          {
+            "id": "rz1-toiletgroep-3",
+            "storeys": 0,
+            "buildingHeightM": 9.28,
+            "areaShare": 0.6952,
+            "insulated": false,
+            "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): verticale leidingen door de thermische schil onbekend, 7 niet boven elkaar gelegen toiletgroepen, gebouwhoogte 9,28 m; 7.17a naar rato van A_g over de rekenzones"
+          },
+          {
+            "id": "rz1-toiletgroep-4",
+            "storeys": 0,
+            "buildingHeightM": 9.28,
+            "areaShare": 0.6952,
+            "insulated": false,
+            "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): verticale leidingen door de thermische schil onbekend, 7 niet boven elkaar gelegen toiletgroepen, gebouwhoogte 9,28 m; 7.17a naar rato van A_g over de rekenzones"
+          },
+          {
+            "id": "rz1-toiletgroep-5",
+            "storeys": 0,
+            "buildingHeightM": 9.28,
+            "areaShare": 0.6952,
+            "insulated": false,
+            "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): verticale leidingen door de thermische schil onbekend, 7 niet boven elkaar gelegen toiletgroepen, gebouwhoogte 9,28 m; 7.17a naar rato van A_g over de rekenzones"
+          },
+          {
+            "id": "rz1-toiletgroep-6",
+            "storeys": 0,
+            "buildingHeightM": 9.28,
+            "areaShare": 0.6952,
+            "insulated": false,
+            "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): verticale leidingen door de thermische schil onbekend, 7 niet boven elkaar gelegen toiletgroepen, gebouwhoogte 9,28 m; 7.17a naar rato van A_g over de rekenzones"
+          },
+          {
+            "id": "rz1-toiletgroep-7",
+            "storeys": 0,
+            "buildingHeightM": 9.28,
+            "areaShare": 0.6952,
+            "insulated": false,
+            "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): verticale leidingen door de thermische schil onbekend, 7 niet boven elkaar gelegen toiletgroepen, gebouwhoogte 9,28 m; 7.17a naar rato van A_g over de rekenzones"
+          }
+        ],
+        "ventilationFlows": [],
+        "ventilation": {
+          "zoneId": "rz1",
+          "usableFloorAreaM2": 1149.8,
+          "category": "utility",
+          "functions": [
+            {
+              "function": "education",
+              "areaM2": 1014.13,
+              "swimmingPool": false
+            },
+            {
+              "function": "office",
+              "areaM2": 24.01,
+              "swimmingPool": false
+            },
+            {
+              "function": "other_assembly",
+              "areaM2": 111.66,
+              "swimmingPool": false
+            }
+          ],
+          "dwellingCount": 0,
+          "apartmentBuilding": false,
+          "buildingHeightM": 9.28,
+          "constructionYear": 2021,
+          "floorAboveCrawlspace": false,
+          "heatingSetpointC": 21.0,
+          "coolingSetpointC": 24.0,
+          "system": {
+            "kind": "single",
+            "unit": {
+              "variant": "d5a",
+              "ducts": "luka_a_b_c",
+              "heatRecovery": {
+                "efficiency": {
+                  "method": "table",
+                  "exchanger": "rotary"
+                },
+                "bypass": {
+                  "kind": "full"
+                },
+                "layout": "central",
+                "constantVolumeControl": false,
+                "supplyDuctInsulation": {
+                  "kind": "insulated"
+                },
+                "equipmentReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): langzaam roterende warmtewisselaar 0,700, 100 % bypass, toevoerkanaal geisoleerd, lengte onbekend"
+              },
+              "airHandlingUnit": {
+                "insideThermalZone": false,
+                "supplyDuctsOutside": "situation1",
+                "heatingCoil": true,
+                "coolingCoil": true
+              },
+              "equipmentReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): Dc centraal met luchtbehandelingskast buiten de thermische zone, D.5a centrale WTW met CO2-meting per verblijfsruimte, f_ctrl 0,67, verwarmings- en koelbatterij, kanalen buiten de zone <= 20 m en geisoleerd (situatie 1)"
+            }
+          },
+          "installedCapacity": {
+            "totalDm3PerS": 2761.9,
+            "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): werkelijk geinstalleerde ventilatiecapaciteit, mechanische toevoer voorbehandeld"
+          },
+          "flowReduction": {
+            "collective": true,
+            "flowControlPercent": 40,
+            "evidenceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): terugregeling tot 40 % van het ventilatiedebiet, geen recirculatie"
+          },
+          "infiltration": {
+            "method": "measured",
+            "qv10DmPerSM2": 0.42,
+            "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): geen meetwaarde; q_v10;lea;ref 0,42 uit de uitdraai overgenomen"
+          },
+          "combustionAppliances": [],
+          "fans": {
+            "method": "forfait",
+            "current": "dc",
+            "manufactureYear": 2021
+          },
+          "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): forfaitair ventilatorvermogen, zonder constant-volumeregeling, LUKA A/B/C"
+        },
+        "internalGains": {
+          "method": "utility",
+          "lighting": {
+            "method": "chapter14"
+          },
+          "sourceReference": "tabellen 7.2/7.3 per functie; verlichting uit hoofdstuk 14"
+        },
+        "thermalMass": {
+          "floor": "heavy",
+          "wall": "heavy",
+          "ceiling": "closed_or_suspended",
+          "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): betonnen kolom-ligger skeletbouw met niet-massieve betonnen vloeren, gesloten of verlaagd plafond; tabel 7.10 rij 500 tot 750 kg/m2 (2022 p. 181)"
+        },
+        "emission": {
+          "system": "floor_heating",
+          "balancing": "dynamic",
+          "control": "individual_room_thermostats",
+          "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): vloerverwarming, vertrekhoogte > 8 m, isolatie onbekend systeem, autom. temperatuurregeling per ruimte met handmatig overrulen (2,5 K / -1,0 K), inregeling dynamisch gebalanceerd per paneel",
+          "edition2023": {
+            "kind": {
+              "type": "high_room",
+              "heightM": 9.28,
+              "emitter": "floor_unknown",
+              "control": "controlled"
+            },
+            "roomAutomation": "individual_with_manual_override",
+            "pipeSystem": "two_pipe",
+            "balancing": "dynamic_full"
+          }
+        }
+      },
+      {
+        "zoneId": "rz2",
+        "functionAreas": [
+          {
+            "function": "sport",
+            "areaM2": 504.17
+          }
+        ],
+        "usageFunction": "sport",
+        "setpoints": {
+          "heatingC": 16.0,
+          "coolingC": 24.0,
+          "sourceReference": "6.5.3: tabel 7.13, sport 16/24"
+        },
+        "verticalPipes": [
+          {
+            "id": "rz2-toiletgroep-1",
+            "storeys": 0,
+            "buildingHeightM": 9.28,
+            "areaShare": 0.3048,
+            "insulated": false,
+            "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): verticale leidingen door de thermische schil onbekend, 7 niet boven elkaar gelegen toiletgroepen, gebouwhoogte 9,28 m; 7.17a naar rato van A_g over de rekenzones"
+          },
+          {
+            "id": "rz2-toiletgroep-2",
+            "storeys": 0,
+            "buildingHeightM": 9.28,
+            "areaShare": 0.3048,
+            "insulated": false,
+            "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): verticale leidingen door de thermische schil onbekend, 7 niet boven elkaar gelegen toiletgroepen, gebouwhoogte 9,28 m; 7.17a naar rato van A_g over de rekenzones"
+          },
+          {
+            "id": "rz2-toiletgroep-3",
+            "storeys": 0,
+            "buildingHeightM": 9.28,
+            "areaShare": 0.3048,
+            "insulated": false,
+            "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): verticale leidingen door de thermische schil onbekend, 7 niet boven elkaar gelegen toiletgroepen, gebouwhoogte 9,28 m; 7.17a naar rato van A_g over de rekenzones"
+          },
+          {
+            "id": "rz2-toiletgroep-4",
+            "storeys": 0,
+            "buildingHeightM": 9.28,
+            "areaShare": 0.3048,
+            "insulated": false,
+            "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): verticale leidingen door de thermische schil onbekend, 7 niet boven elkaar gelegen toiletgroepen, gebouwhoogte 9,28 m; 7.17a naar rato van A_g over de rekenzones"
+          },
+          {
+            "id": "rz2-toiletgroep-5",
+            "storeys": 0,
+            "buildingHeightM": 9.28,
+            "areaShare": 0.3048,
+            "insulated": false,
+            "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): verticale leidingen door de thermische schil onbekend, 7 niet boven elkaar gelegen toiletgroepen, gebouwhoogte 9,28 m; 7.17a naar rato van A_g over de rekenzones"
+          },
+          {
+            "id": "rz2-toiletgroep-6",
+            "storeys": 0,
+            "buildingHeightM": 9.28,
+            "areaShare": 0.3048,
+            "insulated": false,
+            "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): verticale leidingen door de thermische schil onbekend, 7 niet boven elkaar gelegen toiletgroepen, gebouwhoogte 9,28 m; 7.17a naar rato van A_g over de rekenzones"
+          },
+          {
+            "id": "rz2-toiletgroep-7",
+            "storeys": 0,
+            "buildingHeightM": 9.28,
+            "areaShare": 0.3048,
+            "insulated": false,
+            "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): verticale leidingen door de thermische schil onbekend, 7 niet boven elkaar gelegen toiletgroepen, gebouwhoogte 9,28 m; 7.17a naar rato van A_g over de rekenzones"
+          }
+        ],
+        "ventilationFlows": [],
+        "ventilation": {
+          "zoneId": "rz2",
+          "usableFloorAreaM2": 504.17,
+          "category": "utility",
+          "functions": [
+            {
+              "function": "sport",
+              "areaM2": 504.17,
+              "swimmingPool": false
+            }
+          ],
+          "dwellingCount": 0,
+          "apartmentBuilding": false,
+          "buildingHeightM": 9.28,
+          "constructionYear": 2021,
+          "floorAboveCrawlspace": false,
+          "heatingSetpointC": 16.0,
+          "coolingSetpointC": 24.0,
+          "system": {
+            "kind": "single",
+            "unit": {
+              "variant": "d5a",
+              "ducts": "luka_a_b_c",
+              "heatRecovery": {
+                "efficiency": {
+                  "method": "table",
+                  "exchanger": "rotary"
+                },
+                "bypass": {
+                  "kind": "full"
+                },
+                "layout": "central",
+                "constantVolumeControl": false,
+                "supplyDuctInsulation": {
+                  "kind": "insulated"
+                },
+                "equipmentReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): langzaam roterende warmtewisselaar 0,700, 100 % bypass, toevoerkanaal geisoleerd, lengte onbekend"
+              },
+              "airHandlingUnit": {
+                "insideThermalZone": false,
+                "supplyDuctsOutside": "situation1",
+                "heatingCoil": true,
+                "coolingCoil": true
+              },
+              "equipmentReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): Dc centraal met luchtbehandelingskast buiten de thermische zone, D.5a centrale WTW met CO2-meting per verblijfsruimte, f_ctrl 0,67, verwarmings- en koelbatterij, kanalen buiten de zone <= 20 m en geisoleerd (situatie 1)"
+            }
+          },
+          "installedCapacity": {
+            "totalDm3PerS": 361.1,
+            "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): werkelijk geinstalleerde ventilatiecapaciteit, mechanische toevoer voorbehandeld"
+          },
+          "flowReduction": {
+            "collective": true,
+            "flowControlPercent": 40,
+            "evidenceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): terugregeling tot 40 % van het ventilatiedebiet, geen recirculatie"
+          },
+          "infiltration": {
+            "method": "measured",
+            "qv10DmPerSM2": 0.42,
+            "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): geen meetwaarde; q_v10;lea;ref 0,42 uit de uitdraai overgenomen"
+          },
+          "combustionAppliances": [],
+          "fans": {
+            "method": "forfait",
+            "current": "dc",
+            "manufactureYear": 2021
+          },
+          "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): forfaitair ventilatorvermogen, zonder constant-volumeregeling, LUKA A/B/C"
+        },
+        "internalGains": {
+          "method": "utility",
+          "lighting": {
+            "method": "chapter14"
+          },
+          "sourceReference": "tabellen 7.2/7.3 per functie; verlichting uit hoofdstuk 14"
+        },
+        "thermalMass": {
+          "floor": "heavy",
+          "wall": "heavy",
+          "ceiling": "closed_or_suspended",
+          "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): betonnen kolom-ligger skeletbouw met niet-massieve betonnen vloeren, gesloten of verlaagd plafond; tabel 7.10 rij 500 tot 750 kg/m2 (2022 p. 181)"
+        },
+        "emission": {
+          "system": "other_or_unknown",
+          "balancing": "dynamic",
+          "control": "individual_room_thermostats",
+          "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): stralingsverwarming, verwarmingselementen aan plafond zonder aanvullende recirculatie, vertrekhoogte > 8 m, autom. temperatuurregeling per ruimte met handmatig overrulen (2,5 K / -1,0 K), inregeling dynamisch gebalanceerd per paneel",
+          "edition2023": {
+            "kind": {
+              "type": "high_room",
+              "heightM": 9.28,
+              "emitter": "ceiling_panels",
+              "control": "controlled"
+            },
+            "roomAutomation": "individual_with_manual_override",
+            "pipeSystem": "two_pipe",
+            "balancing": "dynamic_full"
+          }
+        }
+      }
+    ],
+    "windowSolar": {
+      "frameFraction": 0.25,
+      "obstruction": {
+        "method": "minimal"
+      },
+      "sourceReference": "default F_F; openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): minimale belemmering tenzij per raam anders (windowObstructions)"
+    },
+    "windowObstructions": [
+      {
+        "windowId": "rz1-vg-spreekkamer1-B",
+        "obstruction": {
+          "method": "side_obstruction",
+          "side": "right",
+          "relativeWidth": 2.056,
+          "coolingHeightCondition": true
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023), rz1-vg-spreekkamer1-B: zijbelemmering rechts, hoogte >= 2,5 m, afstand 3,70 m, breedte 1,80 m, hoek 64 graden; b_b = afstand / breedte"
+      },
+      {
+        "windowId": "rz1-vg-entree-school",
+        "obstruction": {
+          "method": "side_obstruction",
+          "side": "left",
+          "relativeWidth": 0.606,
+          "coolingHeightCondition": false
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023), rz1-vg-entree-school: zijbelemmering links, hoogte < 2,5 m, afstand 1,00 m, breedte 1,65 m, hoek 31 graden; b_b = afstand / breedte"
+      },
+      {
+        "windowId": "rz1-vg-leerplein-a",
+        "obstruction": {
+          "method": "side_obstruction",
+          "side": "right",
+          "relativeWidth": 0.368,
+          "coolingHeightCondition": true
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023), rz1-vg-leerplein-a: zijbelemmering rechts, hoogte >= 2,5 m, afstand 2,85 m, breedte 7,75 m, hoek 20 graden; b_b = afstand / breedte"
+      },
+      {
+        "windowId": "rz1-vg-spreekkamer-A",
+        "obstruction": {
+          "method": "side_obstruction",
+          "side": "right",
+          "relativeWidth": 0.699,
+          "coolingHeightCondition": false
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023), rz1-vg-spreekkamer-A: zijbelemmering rechts, hoogte < 2,5 m, afstand 2,55 m, breedte 3,65 m, hoek 35 graden; b_b = afstand / breedte"
+      },
+      {
+        "windowId": "rz1-vg-groeplokaal-BB-A",
+        "obstruction": {
+          "method": "side_obstruction",
+          "side": "right",
+          "relativeWidth": 0.48,
+          "coolingHeightCondition": false
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023), rz1-vg-groeplokaal-BB-A: zijbelemmering rechts, hoogte < 2,5 m, afstand 4,56 m, breedte 9,50 m, hoek 26 graden; b_b = afstand / breedte"
+      },
+      {
+        "windowId": "rz1-ag-groeplokaal-BB-B2",
+        "obstruction": {
+          "method": "side_obstruction",
+          "side": "left",
+          "relativeWidth": 1.143,
+          "coolingHeightCondition": false
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023), rz1-ag-groeplokaal-BB-B2: zijbelemmering links, hoogte < 2,5 m, afstand 2,80 m, breedte 2,45 m, hoek 49 graden; b_b = afstand / breedte"
+      },
+      {
+        "windowId": "rz1-lz-aula",
+        "obstruction": {
+          "method": "side_obstruction",
+          "side": "right",
+          "relativeWidth": 0.591,
+          "coolingHeightCondition": true
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023), rz1-lz-aula: zijbelemmering rechts, hoogte >= 2,5 m, afstand 5,32 m, breedte 9,00 m, hoek 31 graden; b_b = afstand / breedte"
+      },
+      {
+        "windowId": "rz1-rz-kantoortuin-b",
+        "obstruction": {
+          "method": "side_obstruction",
+          "side": "left",
+          "relativeWidth": 0.171,
+          "coolingHeightCondition": true
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023), rz1-rz-kantoortuin-b: zijbelemmering links, hoogte >= 2,5 m, afstand 1,66 m, breedte 9,70 m, hoek 10 graden; b_b = afstand / breedte"
+      },
+      {
+        "windowId": "rz1-rz-groeplokaal3-B",
+        "obstruction": {
+          "method": "side_obstruction",
+          "side": "left",
+          "relativeWidth": 0.238,
+          "coolingHeightCondition": false
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023), rz1-rz-groeplokaal3-B: zijbelemmering links, hoogte < 2,5 m, afstand 1,45 m, breedte 6,10 m, hoek 13 graden; b_b = afstand / breedte"
+      },
+      {
+        "windowId": "rz2-vg-entree-sport",
+        "obstruction": {
+          "method": "side_obstruction",
+          "side": "left",
+          "relativeWidth": 0.162,
+          "coolingHeightCondition": true
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023), rz2-vg-entree-sport: zijbelemmering links, hoogte >= 2,5 m, afstand 1,25 m, breedte 7,70 m, hoek 9 graden; b_b = afstand / breedte"
+      }
+    ],
+    "windowShadings": [
+      {
+        "windowId": "rz1-ag-groeplokaal1-B",
+        "movableShading": {
+          "device": {
+            "kind": "external_screen",
+            "colour": "other"
+          },
+          "control": "automatic",
+          "sourceReference": "screens (buiten), overige kleuren, automatisch geregeld (tabel 7.5, 7.9)"
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): zonwering per raam"
+      },
+      {
+        "windowId": "rz1-ag-groeplokaal2-B",
+        "movableShading": {
+          "device": {
+            "kind": "external_screen",
+            "colour": "other"
+          },
+          "control": "automatic",
+          "sourceReference": "screens (buiten), overige kleuren, automatisch geregeld (tabel 7.5, 7.9)"
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): zonwering per raam"
+      },
+      {
+        "windowId": "rz1-ag-VVE-A",
+        "movableShading": {
+          "device": {
+            "kind": "external_screen",
+            "colour": "other"
+          },
+          "control": "automatic",
+          "sourceReference": "screens (buiten), overige kleuren, automatisch geregeld (tabel 7.5, 7.9)"
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): zonwering per raam"
+      },
+      {
+        "windowId": "rz1-ag-VVE-C",
+        "movableShading": {
+          "device": {
+            "kind": "external_screen",
+            "colour": "other"
+          },
+          "control": "automatic",
+          "sourceReference": "screens (buiten), overige kleuren, automatisch geregeld (tabel 7.5, 7.9)"
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): zonwering per raam"
+      },
+      {
+        "windowId": "rz1-ag-groeplokaal-BB-A",
+        "movableShading": {
+          "device": {
+            "kind": "external_screen",
+            "colour": "other"
+          },
+          "control": "automatic",
+          "sourceReference": "screens (buiten), overige kleuren, automatisch geregeld (tabel 7.5, 7.9)"
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): zonwering per raam"
+      },
+      {
+        "windowId": "rz1-ag-groeplokaal-BB-B1",
+        "movableShading": {
+          "device": {
+            "kind": "external_screen",
+            "colour": "other"
+          },
+          "control": "automatic",
+          "sourceReference": "screens (buiten), overige kleuren, automatisch geregeld (tabel 7.5, 7.9)"
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): zonwering per raam"
+      },
+      {
+        "windowId": "rz1-ag-leerplein-A",
+        "movableShading": {
+          "device": {
+            "kind": "external_screen",
+            "colour": "other"
+          },
+          "control": "automatic",
+          "sourceReference": "screens (buiten), overige kleuren, automatisch geregeld (tabel 7.5, 7.9)"
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): zonwering per raam"
+      },
+      {
+        "windowId": "rz1-ag-groeplokaal-BB-B2",
+        "movableShading": {
+          "device": {
+            "kind": "external_screen",
+            "colour": "other"
+          },
+          "control": "automatic",
+          "sourceReference": "screens (buiten), overige kleuren, automatisch geregeld (tabel 7.5, 7.9)"
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): zonwering per raam"
+      },
+      {
+        "windowId": "rz1-rz-groeplokaal3-B",
+        "movableShading": {
+          "device": {
+            "kind": "external_screen",
+            "colour": "other"
+          },
+          "control": "automatic",
+          "sourceReference": "screens (buiten), overige kleuren, automatisch geregeld (tabel 7.5, 7.9)"
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): zonwering per raam"
+      },
+      {
+        "windowId": "rz1-rz-leerplein-A1",
+        "movableShading": {
+          "device": {
+            "kind": "external_screen",
+            "colour": "other"
+          },
+          "control": "automatic",
+          "sourceReference": "screens (buiten), overige kleuren, automatisch geregeld (tabel 7.5, 7.9)"
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): zonwering per raam"
+      },
+      {
+        "windowId": "rz1-rz-leerplein-D",
+        "movableShading": {
+          "device": {
+            "kind": "external_screen",
+            "colour": "other"
+          },
+          "control": "automatic",
+          "sourceReference": "screens (buiten), overige kleuren, automatisch geregeld (tabel 7.5, 7.9)"
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): zonwering per raam"
+      },
+      {
+        "windowId": "rz1-rz-groeplokaal4-A",
+        "movableShading": {
+          "device": {
+            "kind": "external_screen",
+            "colour": "other"
+          },
+          "control": "automatic",
+          "sourceReference": "screens (buiten), overige kleuren, automatisch geregeld (tabel 7.5, 7.9)"
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): zonwering per raam"
+      },
+      {
+        "windowId": "rz1-rz-leerplein-E1",
+        "movableShading": {
+          "device": {
+            "kind": "external_screen",
+            "colour": "other"
+          },
+          "control": "automatic",
+          "sourceReference": "screens (buiten), overige kleuren, automatisch geregeld (tabel 7.5, 7.9)"
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): zonwering per raam"
+      },
+      {
+        "windowId": "rz1-rz-leerplein-E2",
+        "movableShading": {
+          "device": {
+            "kind": "external_screen",
+            "colour": "other"
+          },
+          "control": "automatic",
+          "sourceReference": "screens (buiten), overige kleuren, automatisch geregeld (tabel 7.5, 7.9)"
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): zonwering per raam"
+      },
+      {
+        "windowId": "rz1-rz-groeplokaal-BB-B1",
+        "movableShading": {
+          "device": {
+            "kind": "external_screen",
+            "colour": "other"
+          },
+          "control": "automatic",
+          "sourceReference": "screens (buiten), overige kleuren, automatisch geregeld (tabel 7.5, 7.9)"
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): zonwering per raam"
+      },
+      {
+        "windowId": "rz1-rz-groeplokaal-BB-B2",
+        "movableShading": {
+          "device": {
+            "kind": "external_screen",
+            "colour": "other"
+          },
+          "control": "automatic",
+          "sourceReference": "screens (buiten), overige kleuren, automatisch geregeld (tabel 7.5, 7.9)"
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): zonwering per raam"
+      },
+      {
+        "windowId": "rz1-rz-leerplein-A2",
+        "movableShading": {
+          "device": {
+            "kind": "external_screen",
+            "colour": "other"
+          },
+          "control": "automatic",
+          "sourceReference": "screens (buiten), overige kleuren, automatisch geregeld (tabel 7.5, 7.9)"
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): zonwering per raam"
+      },
+      {
+        "windowId": "rz2-ag-gymzaal-C",
+        "movableShading": {
+          "device": {
+            "kind": "external_screen",
+            "colour": "other"
+          },
+          "control": "automatic",
+          "sourceReference": "screens (buiten), overige kleuren, automatisch geregeld (tabel 7.5, 7.9)"
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): zonwering per raam"
+      }
+    ],
+    "surfaceTilts": [
+      {
+        "surfaceId": "rz1-dak-o",
+        "tiltDeg": 20.0,
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): hellend dak 20 graden"
+      },
+      {
+        "surfaceId": "rz1-dak-w",
+        "tiltDeg": 20.0,
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): hellend dak 20 graden"
+      },
+      {
+        "surfaceId": "rz2-dak-o",
+        "tiltDeg": 20.0,
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): hellend dak 20 graden"
+      },
+      {
+        "surfaceId": "rz2-dak-w",
+        "tiltDeg": 20.0,
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): hellend dak 20 graden"
+      }
+    ],
+    "groundFloors": [
+      {
+        "surfaceId": "rz1-vloer",
+        "exposedPerimeterM": 99.98,
+        "constructionResistanceM2kPerW": 3.87,
+        "below": {
+          "kind": "crawlspace",
+          "floorResistanceM2kPerW": 0.0,
+          "depthClass": "other",
+          "wallResistanceM2kPerW": 4.7,
+          "wallUValueWPerM2k": 0.2053,
+          "ventilationOpeningM2PerM": 0.0012,
+          "wallHeightAboveGroundM": 0.05
+        },
+        "edgeThermalBridges": {
+          "method": "forfait"
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): rekenzone onderwijs: op/boven mv boven kruipruimte, Rc 3,70 + R_si 0,17, h 0,05 m, P 99.98 m, kruipruimteventilatie 0,0012 m2/m, R_bw 4,70, kruipruimtevloer niet geisoleerd; geen lineaire bruggen in de uitdraai, dus forfaitaire toeslag"
+      },
+      {
+        "surfaceId": "rz1-aula-vloer",
+        "exposedPerimeterM": 0.01,
+        "constructionResistanceM2kPerW": 3.87,
+        "below": {
+          "kind": "crawlspace",
+          "floorResistanceM2kPerW": 0.0,
+          "depthClass": "other",
+          "wallResistanceM2kPerW": 4.7,
+          "wallUValueWPerM2k": 0.2053,
+          "ventilationOpeningM2PerM": 0.0012,
+          "wallHeightAboveGroundM": 0.05
+        },
+        "edgeThermalBridges": {
+          "method": "forfait"
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): gemeenschappelijk naast aula: op/boven mv boven kruipruimte, Rc 3,70 + R_si 0,17, h 0,05 m, P 0.01 m, kruipruimteventilatie 0,0012 m2/m, R_bw 4,70, kruipruimtevloer niet geisoleerd; geen lineaire bruggen in de uitdraai, dus forfaitaire toeslag"
+      },
+      {
+        "surfaceId": "rz1-entree-vloer",
+        "exposedPerimeterM": 2.62,
+        "constructionResistanceM2kPerW": 3.87,
+        "below": {
+          "kind": "crawlspace",
+          "floorResistanceM2kPerW": 0.0,
+          "depthClass": "other",
+          "wallResistanceM2kPerW": 4.7,
+          "wallUValueWPerM2k": 0.2053,
+          "ventilationOpeningM2PerM": 0.0012,
+          "wallHeightAboveGroundM": 0.05
+        },
+        "edgeThermalBridges": {
+          "method": "forfait"
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): hoofdentree: op/boven mv boven kruipruimte, Rc 3,70 + R_si 0,17, h 0,05 m, P 2.62 m, kruipruimteventilatie 0,0012 m2/m, R_bw 4,70, kruipruimtevloer niet geisoleerd; geen lineaire bruggen in de uitdraai, dus forfaitaire toeslag"
+      },
+      {
+        "surfaceId": "rz2-vloer-kr",
+        "exposedPerimeterM": 42.2,
+        "constructionResistanceM2kPerW": 3.87,
+        "below": {
+          "kind": "crawlspace",
+          "floorResistanceM2kPerW": 0.0,
+          "depthClass": "other",
+          "wallResistanceM2kPerW": 4.7,
+          "wallUValueWPerM2k": 0.2053,
+          "ventilationOpeningM2PerM": 0.0012,
+          "wallHeightAboveGroundM": 0.05
+        },
+        "edgeThermalBridges": {
+          "method": "forfait"
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): rekenzone sport: op/boven mv boven kruipruimte, Rc 3,70 + R_si 0,17, h 0,05 m, P 42.2 m, kruipruimteventilatie 0,0012 m2/m, R_bw 4,70, kruipruimtevloer niet geisoleerd; geen lineaire bruggen in de uitdraai, dus forfaitaire toeslag"
+      },
+      {
+        "surfaceId": "rz2-vloer-zand",
+        "exposedPerimeterM": 18.89,
+        "constructionResistanceM2kPerW": 3.87,
+        "edgeThermalBridges": {
+          "method": "forfait"
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): vloer op zand, op/boven mv, z <= 0,3, h 0,05 m, P 18,89 m, Rc 3,70 + R_si 0,17; forfaitaire toeslag"
+      }
+    ],
+    "ventilationFlows": [],
+    "emission": {
+      "system": "floor_heating",
+      "balancing": "dynamic",
+      "control": "individual_room_thermostats",
+      "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023)"
+    },
+    "distribution": {
+      "method": "calculated",
+      "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023)"
+    },
+    "distributionSystem": {
+      "designTemperatureClass": "45_40",
+      "installation": "individual",
+      "usageFunction": "education",
+      "connectedStoreys": 2,
+      "pipeTransmittance": {
+        "method": "forfait",
+        "insulation": {
+          "state": "insulated",
+          "period": "from1995"
+        }
+      },
+      "valvesInsulated": true,
+      "pump": {
+        "method": "calculated",
+        "heatMeterPresent": false,
+        "energyEfficiencyIndex": 0.23,
+        "electricPowerKw": 0.363,
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): aanvullende distributiepomp 363 W, EEI 0,23"
+      },
+      "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): tweepijps 45 C, leidinggegevens onbekend (binnen 899,75 m, buiten de verwarmde zone 158,78 m = forfait 9.36 en 15 %), geisoleerd, kleppen en beugels geisoleerd, 2 bouwlagen"
+    },
+    "generator": {
+      "kind": "heat_pump_forfait",
+      "forfait": {
+        "generatorId": "hp",
+        "classificationSourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): WP elektrisch forfaitair, bodem standaard brine gevuld, niet-gemeenschappelijk, COP 3,10",
+        "scope": "utility_collective_or_over25_kw",
+        "source": "ground",
+        "sink": "hydronic",
+        "designSupplyTemperatureC": 45
+      },
+      "sourceSystem": "individual",
+      "sourceSystemReference": "bodem, gesloten bron"
+    },
+    "heatPumpRenewable": {
+      "sourceBelow20C": true,
+      "exhaustAirSource": false,
+      "sourceReference": "ground"
+    },
+    "bacsFactor": 1.0,
+    "bacsSourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): geen GBS in de uitdraai",
+    "useInventoryComplete": true,
+    "declaredUses": [],
+    "productionInventoryComplete": true,
+    "pvSystems": [
+      {
+        "id": "pv",
+        "peakPower": {
+          "method": "declared_specific",
+          "peakPowerWPerM2": 310.0,
+          "panelAreaM2": 203.0
+        },
+        "azimuthDeg": 270.0,
+        "tiltDeg": 20.0,
+        "mounting": "moderately_ventilated",
+        "obstructionFactors": [
+          1.0
+        ],
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): 203 m2, eigen waarde 310 Wp/m2, west 20 graden, matig geventileerd, minimale belemmering"
+      }
+    ],
+    "lighting": [
+      {
+        "zoneId": "rz1",
+        "functions": [
+          {
+            "function": "education",
+            "areaM2": 1014.13
+          },
+          {
+            "function": "office",
+            "areaM2": 24.01
+          },
+          {
+            "function": "assembly_without_day_care",
+            "areaM2": 111.66
+          }
+        ],
+        "lightingZones": [
+          {
+            "id": "rz1-onderwijs",
+            "areaM2": 1109.15,
+            "power": {
+              "method": "installed",
+              "luminaires": [
+                {
+                  "count": 1,
+                  "power": {
+                    "method": "system",
+                    "powerW": 6100.33
+                  }
+                }
+              ],
+              "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): eigen waarde 5,50 W/m2 over 1109.15 m2"
+            },
+            "parasitic": {
+              "method": "forfait"
+            },
+            "occupancy": {
+              "control": "manual_or_unknown",
+              "centralOnControl": false,
+              "largeOfficeGroup": false
+            },
+            "daylight": {
+              "method": "none"
+            },
+            "extractedLuminaires": false,
+            "constantIlluminance": "led_l80"
+          },
+          {
+            "id": "rz1-aula",
+            "areaM2": 34.85,
+            "power": {
+              "method": "installed",
+              "luminaires": [
+                {
+                  "count": 1,
+                  "power": {
+                    "method": "system",
+                    "powerW": 191.68
+                  }
+                }
+              ],
+              "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): eigen waarde 5,50 W/m2 over 34.85 m2"
+            },
+            "parasitic": {
+              "method": "forfait"
+            },
+            "occupancy": {
+              "control": "manual_or_unknown",
+              "centralOnControl": false,
+              "largeOfficeGroup": false
+            },
+            "daylight": {
+              "method": "none"
+            },
+            "extractedLuminaires": false,
+            "constantIlluminance": "led_l80"
+          },
+          {
+            "id": "rz1-entree",
+            "areaM2": 5.8,
+            "power": {
+              "method": "installed",
+              "luminaires": [
+                {
+                  "count": 1,
+                  "power": {
+                    "method": "system",
+                    "powerW": 31.9
+                  }
+                }
+              ],
+              "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): eigen waarde 5,50 W/m2 over 5.8 m2"
+            },
+            "parasitic": {
+              "method": "forfait"
+            },
+            "occupancy": {
+              "control": "manual_or_unknown",
+              "centralOnControl": false,
+              "largeOfficeGroup": false
+            },
+            "daylight": {
+              "method": "none"
+            },
+            "extractedLuminaires": false,
+            "constantIlluminance": "led_l80"
+          }
+        ],
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): eigen verlichtingsvermogen 5,50 W/m2, led (L80) met nieuwwaardecompensatie, parasitair forfaitair, vertrekschakeling met onbekende regeling, geen daglichtregeling"
+      },
+      {
+        "zoneId": "rz2",
+        "functions": [
+          {
+            "function": "sport",
+            "areaM2": 504.17
+          }
+        ],
+        "lightingZones": [
+          {
+            "id": "rz2-sport",
+            "areaM2": 501.55,
+            "power": {
+              "method": "installed",
+              "luminaires": [
+                {
+                  "count": 1,
+                  "power": {
+                    "method": "system",
+                    "powerW": 2758.53
+                  }
+                }
+              ],
+              "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): eigen waarde 5,50 W/m2 over 501.55 m2"
+            },
+            "parasitic": {
+              "method": "forfait"
+            },
+            "occupancy": {
+              "control": "manual_or_unknown",
+              "centralOnControl": false,
+              "largeOfficeGroup": false
+            },
+            "daylight": {
+              "method": "none"
+            },
+            "extractedLuminaires": false,
+            "constantIlluminance": "led_l80"
+          },
+          {
+            "id": "rz2-entree",
+            "areaM2": 2.62,
+            "power": {
+              "method": "installed",
+              "luminaires": [
+                {
+                  "count": 1,
+                  "power": {
+                    "method": "system",
+                    "powerW": 14.41
+                  }
+                }
+              ],
+              "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): eigen waarde 5,50 W/m2 over 2.62 m2"
+            },
+            "parasitic": {
+              "method": "forfait"
+            },
+            "occupancy": {
+              "control": "manual_or_unknown",
+              "centralOnControl": false,
+              "largeOfficeGroup": false
+            },
+            "daylight": {
+              "method": "none"
+            },
+            "extractedLuminaires": false,
+            "constantIlluminance": "led_l80"
+          }
+        ],
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): eigen verlichtingsvermogen 5,50 W/m2, led (L80) met nieuwwaardecompensatie"
+      }
+    ],
+    "labelFunction": "education",
+    "demandUsesFixedC1Ventilation": false,
+    "batteryStoragePresent": false,
+    "bblFunction": "education",
+    "bblFunctions": [
+      {
+        "function": "education",
+        "areaM2": 1014.13
+      },
+      {
+        "function": "office",
+        "areaM2": 24.01
+      },
+      {
+        "function": "other_assembly",
+        "areaM2": 111.66
+      },
+      {
+        "function": "sport",
+        "areaM2": 504.17
+      }
+    ],
+    "coolingSystems": [
+      {
+        "zoneIds": [
+          "rz1"
+        ],
+        "system": {
+          "emission": {
+            "emitter": "floor_cooling",
+            "balancing": "dynamic",
+            "control": "standalone_per_room",
+            "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): vloerkoeling, autom. regeling per ruimte met handmatig overrulen (-2,5 K / 1,0 K), inregeling dynamisch",
+            "edition2023": {
+              "control": "room",
+              "balancing": "dynamic_or_direct_expansion",
+              "roomAutomation": "standalone_with_manual_override"
+            }
+          },
+          "distribution": {
+            "designTemperature": "t17_to21",
+            "pipe": {
+              "kind": "insulated_from1995"
+            },
+            "fittingsInsulated": true,
+            "pump": {
+              "hydraulicallyBalanced": true,
+              "floorCount": 2,
+              "heatMeter": false,
+              "individualDwellingInstallation": false,
+              "labelPowerKw": 0.033,
+              "energyEfficiencyIndex": 0.23,
+              "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): pomp 33 W, EEI 0,23, 2 bouwlagen"
+            },
+            "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): watergedragen 17/21, leidinggegevens onbekend (binnen 625,49 m, buiten de gekoelde zone 110,38 m = forfait 10.27 en 15 %), geisoleerd"
+          },
+          "generators": [
+            {
+              "id": "wko",
+              "generator": {
+                "kind": "free_cooling",
+                "source": "closed_ground_loop",
+                "heatPumpSource": true,
+                "groundAboveZeroDemonstrated": false
+              },
+              "equipmentReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): koudeopslag bodem forfaitair, EER 10,00, brontemperatuur niet aantoonbaar > 0 C"
+            }
+          ]
+        }
+      }
+    ],
+    "hotWater": {
+      "need": {
+        "method": "utility",
+        "areas": [
+          {
+            "function": "education",
+            "areaM2": 1014.13
+          },
+          {
+            "function": "office",
+            "areaM2": 24.01
+          },
+          {
+            "function": "assembly_without_day_care",
+            "areaM2": 111.66
+          },
+          {
+            "function": "sport",
+            "areaM2": 313.7
+          }
+        ],
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): tabel 13.1 per functie; systeem 1: rekenzone onderwijs en 312,07 m2 van de sportfunctie"
+      },
+      "emission": {
+        "method": "utility",
+        "meanLengthM": 2.0,
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): uittapleidingen <= 3 m"
+      },
+      "storage": [
+        {
+          "id": "vat-1",
+          "volumeL": 10.0,
+          "loss": {
+            "method": "label",
+            "label": "a_plus"
+          },
+          "connectionFactor": 2,
+          "inHeatedZone": true,
+          "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): 6 vaten van 10 l, vanaf 2018, label A+, warme aansluiting ongeisoleerd (elektroboiler zonder geisoleerde leidingen: f_sto;dis;ls 2, 2022 p. 550)"
+        },
+        {
+          "id": "vat-2",
+          "volumeL": 10.0,
+          "loss": {
+            "method": "label",
+            "label": "a_plus"
+          },
+          "connectionFactor": 2,
+          "inHeatedZone": true,
+          "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): 6 vaten van 10 l, vanaf 2018, label A+, warme aansluiting ongeisoleerd (elektroboiler zonder geisoleerde leidingen: f_sto;dis;ls 2, 2022 p. 550)"
+        },
+        {
+          "id": "vat-3",
+          "volumeL": 10.0,
+          "loss": {
+            "method": "label",
+            "label": "a_plus"
+          },
+          "connectionFactor": 2,
+          "inHeatedZone": true,
+          "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): 6 vaten van 10 l, vanaf 2018, label A+, warme aansluiting ongeisoleerd (elektroboiler zonder geisoleerde leidingen: f_sto;dis;ls 2, 2022 p. 550)"
+        },
+        {
+          "id": "vat-4",
+          "volumeL": 10.0,
+          "loss": {
+            "method": "label",
+            "label": "a_plus"
+          },
+          "connectionFactor": 2,
+          "inHeatedZone": true,
+          "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): 6 vaten van 10 l, vanaf 2018, label A+, warme aansluiting ongeisoleerd (elektroboiler zonder geisoleerde leidingen: f_sto;dis;ls 2, 2022 p. 550)"
+        },
+        {
+          "id": "vat-5",
+          "volumeL": 10.0,
+          "loss": {
+            "method": "label",
+            "label": "a_plus"
+          },
+          "connectionFactor": 2,
+          "inHeatedZone": true,
+          "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): 6 vaten van 10 l, vanaf 2018, label A+, warme aansluiting ongeisoleerd (elektroboiler zonder geisoleerde leidingen: f_sto;dis;ls 2, 2022 p. 550)"
+        },
+        {
+          "id": "vat-6",
+          "volumeL": 10.0,
+          "loss": {
+            "method": "label",
+            "label": "a_plus"
+          },
+          "connectionFactor": 2,
+          "inHeatedZone": true,
+          "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): 6 vaten van 10 l, vanaf 2018, label A+, warme aansluiting ongeisoleerd (elektroboiler zonder geisoleerde leidingen: f_sto;dis;ls 2, 2022 p. 550)"
+        }
+      ],
+      "generator": {
+        "kind": "electric_boiler"
+      },
+      "equipmentReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): elektrische boilers forfaitair, COP 1,00, geen circulatieleiding"
+    },
+    "additionalHotWaterSystems": [
+      {
+        "need": {
+          "method": "utility",
+          "areas": [
+            {
+              "function": "sport",
+              "areaM2": 190.47
+            }
+          ],
+          "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): tabel 13.1 per functie; systeem 2: 189,48 m2 van de sportfunctie"
+        },
+        "emission": {
+          "method": "utility",
+          "meanLengthM": 5.0,
+          "sourceReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): uittapleidingen > 3 m"
+        },
+        "storage": [],
+        "generator": {
+          "kind": "electric_instantaneous"
+        },
+        "equipmentReference": "openbare bron Uniec 3.1.5.0 printout (basisschool met gymzaal 1653,96 m2, 02-01-2023): elektrisch doorstroomtoestel forfaitair, COP 0,95"
+      }
+    ]
+  }
+}

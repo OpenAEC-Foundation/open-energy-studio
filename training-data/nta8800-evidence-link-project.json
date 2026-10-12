@@ -1,0 +1,337 @@
+{
+  "id": "voorbeeld-bewijskoppeling",
+  "name": "Voorbeeld tussenwoning",
+  "description": "Fictief voorbeeldproject: tussenwoning 100 m2, HR107-ketel, mechanische afzuiging, 6 PV-panelen.",
+  "buildingFunction": "residential",
+  "address": "",
+  "city": "Voorbeeldstad",
+  "zones": [
+    {
+      "id": "z1",
+      "name": "Woning",
+      "floorArea": 100,
+      "volume": 260,
+      "height": 2.6,
+      "surfaces": [
+        {
+          "id": "wall-N",
+          "name": "Gevel N",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 30,
+          "orientation": "N",
+          "constructionId": "c-wall",
+          "zoneId": "z1",
+          "windows": [
+            {
+              "id": "win-N",
+              "name": "Raam N",
+              "area": 4,
+              "uValue": 1.1,
+              "gValue": 0.6,
+              "orientation": "N",
+              "surfaceId": "wall-N"
+            }
+          ]
+        },
+        {
+          "id": "wall-S",
+          "name": "Gevel S",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 30,
+          "orientation": "S",
+          "constructionId": "c-wall",
+          "zoneId": "z1",
+          "windows": [
+            {
+              "id": "win-S",
+              "name": "Raam S",
+              "area": 8,
+              "uValue": 1.1,
+              "gValue": 0.6,
+              "orientation": "S",
+              "surfaceId": "wall-S"
+            }
+          ]
+        },
+        {
+          "id": "roof",
+          "name": "Dak zuid",
+          "type": "roof",
+          "thermalBoundary": "outdoor",
+          "area": 35.36,
+          "orientation": "S",
+          "constructionId": "c-roof",
+          "zoneId": "z1",
+          "windows": []
+        },
+        {
+          "id": "roof-n",
+          "name": "Dak noord",
+          "type": "roof",
+          "thermalBoundary": "outdoor",
+          "area": 35.36,
+          "orientation": "N",
+          "constructionId": "c-roof",
+          "zoneId": "z1",
+          "windows": []
+        },
+        {
+          "id": "floor",
+          "name": "Vloer",
+          "type": "floor",
+          "thermalBoundary": "ground",
+          "area": 50,
+          "orientation": "horizontal",
+          "constructionId": "c-floor",
+          "zoneId": "z1",
+          "windows": []
+        }
+      ],
+      "thermalBridges": [],
+      "pointThermalBridges": [],
+      "pointBridgeInventoryComplete": true,
+      "airTightness": {
+        "qv10": 0.4
+      }
+    }
+  ],
+  "heatingSystems": [
+    {
+      "id": "h1",
+      "name": "HR107",
+      "type": "hr107",
+      "cop": 0.975,
+      "coverageFraction": 1
+    }
+  ],
+  "ventilationSystems": [
+    {
+      "id": "v1",
+      "name": "C",
+      "type": "type_c",
+      "heatRecoveryEfficiency": 0,
+      "sfp": 0.2
+    }
+  ],
+  "coolingSystems": [],
+  "hotWaterSystems": [],
+  "solarPV": [],
+  "solarThermal": [],
+  "unheatedSpaces": [],
+  "constructions": [
+    {
+      "id": "c-wall",
+      "name": "Gevel Rc 4,7",
+      "layers": [],
+      "rcValue": 4.7,
+      "uValue": 0.21
+    },
+    {
+      "id": "c-roof",
+      "name": "Dak Rc 6,3",
+      "layers": [],
+      "rcValue": 6.3,
+      "uValue": 0.16
+    },
+    {
+      "id": "c-floor",
+      "name": "Vloer Rc 3,7",
+      "layers": [],
+      "rcValue": 3.7,
+      "uValue": 0.26
+    }
+  ],
+  "ntaCalculation": {
+    "calculationScope": "residential",
+    "constructionYear": 2020,
+    "areaSourceReference": "voorbeeld: plattegrond",
+    "usageFunction": "residential",
+    "dwellingType": "other",
+    "setpoints": {
+      "heatingC": 20,
+      "coolingC": 24,
+      "sourceReference": "tabel 7.13 woonfunctie (overgenomen)"
+    },
+    "thermalMass": {
+      "floor": "very_heavy",
+      "wall": "heavy",
+      "ceiling": "open_or_none",
+      "sourceReference": "voorbeeld: betonvloeren, metselwerk"
+    },
+    "internalGains": {
+      "method": "residential",
+      "dwellingCount": 1,
+      "sourceReference": "één woning"
+    },
+    "surfaceTilts": [
+      {
+        "surfaceId": "roof",
+        "tiltDeg": 45,
+        "sourceReference": "voorbeeld: doorsnedetekening"
+      },
+      {
+        "surfaceId": "roof-n",
+        "tiltDeg": 45,
+        "sourceReference": "voorbeeld: doorsnedetekening"
+      }
+    ],
+    "windowSolar": {
+      "frameFraction": 0.25,
+      "sourceReference": "voorbeeld: minimale belemmering (§17.3.2a), geen beweegbare zonwering",
+      "obstruction": {
+        "method": "minimal"
+      }
+    },
+    "groundFloors": [
+      {
+        "surfaceId": "floor",
+        "exposedPerimeterM": 10,
+        "constructionResistanceM2kPerW": 3.87,
+        "edgeThermalBridges": {
+          "method": "forfait"
+        },
+        "sourceReference": "voorbeeld: Rc 3,7 + Rsi 0,17"
+      }
+    ],
+    "ventilationFlows": [],
+    "emission": {
+      "system": "radiators_or_convectors",
+      "balancing": "none_or_unknown",
+      "control": "main_room_thermostat",
+      "sourceReference": "voorbeeld: opname"
+    },
+    "distribution": {
+      "method": "heated_zone_only_space_heating",
+      "sourceReference": "voorbeeld: leidingen binnen de thermische schil, alleen ruimteverwarming"
+    },
+    "generator": {
+      "kind": "gas_boiler",
+      "boiler": {
+        "generatorId": "boiler",
+        "role": "individual_main",
+        "location": "inside_thermal_boundary",
+        "kind": "hr107",
+        "fuel": "natural_gas",
+        "averageDesignEmissionTemperatureC": 45,
+        "emissionCircuit": "direct",
+        "equipmentReference": "voorbeeld: typeplaatje",
+        "locationReference": "voorbeeld: tekening",
+        "temperatureAndCircuitReference": "voorbeeld: ontwerp",
+        "pilotFlamePresent": false,
+        "installationYear": 2020,
+        "installationYearReference": "voorbeeld: factuur"
+      }
+    },
+    "bacsFactor": 1,
+    "bacsSourceReference": "woonfunctie zonder BACS",
+    "useInventoryComplete": true,
+    "declaredUses": [],
+    "productionInventoryComplete": true,
+    "pvSystems": [
+      {
+        "id": "pv",
+        "peakPower": {
+          "method": "panels",
+          "panelPeakPowerW": 300,
+          "panelCount": 6
+        },
+        "azimuthDeg": 180,
+        "tiltDeg": 45,
+        "mounting": "moderately_ventilated",
+        "obstructionFactors": [
+          1
+        ],
+        "sourceReference": "voorbeeld: datasheet"
+      }
+    ],
+    "demandUsesFixedC1Ventilation": false,
+    "batteryStoragePresent": false,
+    "bblFunction": "other_residential",
+    "verticalPipes": [
+      {
+        "id": "standleiding",
+        "storeys": 2,
+        "insulated": false,
+        "sourceReference": "voorbeeld: één ongeïsoleerde standleiding over beide bouwlagen (7.3.3, tabel 7.1)"
+      }
+    ],
+    "ventilation": {
+      "zoneId": "z1",
+      "usableFloorAreaM2": 100,
+      "category": "residential",
+      "functions": [
+        {
+          "function": "residential",
+          "areaM2": 100,
+          "swimmingPool": false
+        }
+      ],
+      "dwellingCount": 1,
+      "apartmentBuilding": false,
+      "buildingHeightM": 9,
+      "constructionYear": 2020,
+      "floorAboveCrawlspace": false,
+      "heatingSetpointC": 20,
+      "coolingSetpointC": 24,
+      "system": {
+        "kind": "single",
+        "unit": {
+          "variant": "c1",
+          "ducts": "luka_a_b_c",
+          "equipmentReference": "voorbeeld: mechanische afzuiging, gelijkstroomventilator"
+        }
+      },
+      "flowReduction": {
+        "collective": false
+      },
+      "infiltration": {
+        "method": "measured",
+        "qv10DmPerSM2": 0.4,
+        "sourceReference": "voorbeeld: C1-afzuigsysteem, gemeten qv10 0,4 dm³/(s·m²)"
+      },
+      "combustionAppliances": [],
+      "fans": {
+        "method": "forfait",
+        "current": "dc",
+        "manufactureYear": 2020
+      },
+      "sourceReference": "voorbeeld: C1-afzuigsysteem, gemeten qv10 0,4 dm³/(s·m²)"
+    },
+    "hotWater": {
+      "need": {
+        "method": "residential",
+        "dwellingCount": 1,
+        "sourceReference": "één woning"
+      },
+      "emission": {
+        "method": "residential",
+        "served": "kitchen_and_bathroom",
+        "kitchenLengthM": 3,
+        "bathroomLengthM": 5,
+        "sourceReference": "voorbeeld: plattegrond"
+      },
+      "generator": {
+        "kind": "gas_appliance",
+        "appliance": "combi_gaskeur_hr_cw"
+      },
+      "equipmentReference": "voorbeeld: HR-combiketel met Gaskeur CW-label"
+    }
+  },
+  "registration": {
+    "evidence": [
+      {
+        "id": "foto-gevel",
+        "kind": "photo_detail",
+        "fileName": "gevel.jpg",
+        "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "date": "2026-10-01",
+        "checkedBy": "EP-adviseur",
+        "linkedPaths": [
+          "/zones/@z1/surfaces/@wall-N"
+        ]
+      }
+    ]
+  }
+}

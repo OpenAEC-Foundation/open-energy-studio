@@ -1,3 +1,4 @@
+import { isTauri } from '@tauri-apps/api/core';
 import type { IProject, IBENGResult } from '../energy/types';
 import { generateReportHTML } from './ReportTemplate';
 import { generateNtaInputDossierHTML } from './NtaInputDossier';
@@ -13,6 +14,14 @@ import { fileNamePart, htmlToPdf, savePdf } from './pdf';
 
 // Every report download is a pdf (feedback 8 Oct 2026); the HTML templates are laid
 // out in a hidden frame and drawn into A4. The function names keep their history.
+
+/** The desktop app could not write the dossier ZIP (disk full, no permission, …). */
+export class DossierWriteError extends Error {
+  constructor(readonly reason: string) {
+    super(`dossier_write_failed: ${reason}`);
+    this.name = 'DossierWriteError';
+  }
+}
 
 /** Runs the maatwerkadvies of the project and downloads its report. */
 export async function downloadMaatwerkadviesReportHTML(project: IProject): Promise<void> {
@@ -63,18 +72,24 @@ export async function downloadProjectDossier(project: IProject) {
     : null;
   const opname = await assessStoredSurvey(project.basisopname, project.ntaCalculation?.normVersion);
   const bundle = await buildProjectDossier({ project, assessment, opname, reportHtml, generatedAt: generatedAt.toISOString() });
+  // Throws DossierTooLargeError above the ZIP limit, before anything is saved.
   const zip = zipProjectDossier(bundle);
   const fileName = `Projectdossier-${(project.name || 'project').replace(/[^\p{L}\p{N}._-]+/gu, '-')}.zip`;
-  try {
+  if (isTauri()) {
+    // In the desktop app a failed write is an error the user must see: a
+    // browser-download fallback does nothing in the webview, so it would
+    // only make a failed export look like a successful one.
     const { save } = await import('@tauri-apps/plugin-dialog');
     const { writeFile } = await import('@tauri-apps/plugin-fs');
     const path = await save({ defaultPath: fileName, filters: [{ name: 'ZIP', extensions: ['zip'] }] });
-    if (path) {
+    if (!path) return bundle.manifest;
+    try {
       await writeFile(path, zip);
-      return bundle.manifest;
+    } catch (reason) {
+      throw new DossierWriteError(reason instanceof Error ? reason.message : String(reason));
     }
-    if (path === null) return bundle.manifest;
-  } catch { /* browser fallback */ }
+    return bundle.manifest;
+  }
   const blob = new Blob([zip.buffer as ArrayBuffer], { type: 'application/zip' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');

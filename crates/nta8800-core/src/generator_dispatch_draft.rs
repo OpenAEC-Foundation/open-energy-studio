@@ -317,7 +317,7 @@ pub fn assess_generator_dispatch_draft(
             "invalid"
         },
         scope: "nta8800_9_6_1_installed_power_dispatch",
-        consultation_source: DRAFT_SOURCE,
+        consultation_source: crate::norm_versions::cite(DRAFT_SOURCE),
         target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint: input_fingerprint(&json!(input)),

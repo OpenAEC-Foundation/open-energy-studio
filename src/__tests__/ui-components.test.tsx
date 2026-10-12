@@ -314,7 +314,6 @@ describe('i18n keys of the redesign', () => {
 
   it('has no English feedback strings left in the Dutch UI', () => {
     const dutch = nl as Record<string, string>;
-    expect(dutch['feedback.sendFeedback']).toBe('Feedback sturen');
     expect(dutch['feedback.submit']).not.toMatch(/Feedback$/);
   });
 

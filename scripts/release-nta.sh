@@ -9,13 +9,17 @@
 #     prepares the released notes (unreleased items under "Rekenkern
 #     <KERNEL_VERSION>") in the archive, without touching the worktree yet;
 #  2. runs the full gate (scripts/verify-nta.sh), keeping its log and the
-#     reference-suite report;
+#     reference-suite report, and writes the ISSO 54 testset dossier
+#     (testset/: every deeltest as a project file the app opens, with an
+#     outcome overview in Markdown, CSV and JSON; BRL 9501 §3.3);
 #  3. builds the desktop packages (Tauri, .deb) offline;
 #  4. exports the user manual as one HTML file (and a PDF when chromium or
 #     wkhtmltopdf is installed), stamped with both versions (BRL 9501 §4.4);
 #  5. only then commits the released notes (one commit), so a failing gate or
 #     build leaves no release commit behind;
-#  6. writes the leveringsdocument, a manifest and SHA256SUMS;
+#  6. writes the leveringsdocument, a pre-filled test report
+#     (docs/templates/nta8800-testrapport.md), the GitHub release text
+#     (github-release.md), a manifest and SHA256SUMS;
 #  7. creates the annotated git tag oes-v<program>-kernel-v<kernel>.
 # When a release fails before its tag, its archive is moved aside to
 # release/<tag>.mislukt-<time>/ so the release can simply be run again.
@@ -68,6 +72,14 @@ if [[ $dry_run -eq 0 ]]; then
     printf 'De werkmap heeft lokale wijzigingen; een vrijgave vraagt een schone werkmap.\n' >&2
     exit 1
   fi
+  # A skip switch of the gate in the environment would leave out the Rust 1.77.2 run or
+  # the app run against the real kernel; a release needs the full gate.
+  for skip in NTA_SKIP_MSRV NTA_SKIP_KERNEL_E2E; do
+    if [[ "${!skip:-0}" == "1" ]]; then
+      printf '%s=1 staat aan; een vrijgave vraagt de volledige gate.\n' "$skip" >&2
+      exit 1
+    fi
+  done
   if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
     printf 'Tag %s bestaat al: verhoog de programma- of rekenkernversie.\n' "$tag" >&2
     exit 1
@@ -139,6 +151,36 @@ else
   step "gate (log in ${archive}/gate.log)"
   NTA_EVIDENCE_DIR="$PWD/$archive/evidence" scripts/verify-nta.sh 2>&1 | tee "$archive/gate.log"
   gate_status="geslaagd"
+  # Test counts and step times as the gate itself reported them (BRL 9501
+  # §6.2–6.3): the test report and the release text are filled from this file.
+  # It also stops the release when the log is no evidence: a failed or cut-off gate, or
+  # (outside a dry run) a gate that left out a required step.
+  summary_args=(--require-pass)
+  if [[ $dry_run -eq 1 ]]; then summary_args+=(--allow-missing-steps); fi
+  node scripts/nta-gate-summary.mjs --log "$archive/gate.log" \
+    --reference "$archive/evidence/reference/reference-report.json" --out "$archive/gate-samenvatting.json" \
+    "${summary_args[@]}"
+fi
+
+# Every ISSO 54 deeltest as a project file the app opens, with an outcome
+# overview (BRL 9501 §3.3). Exit 3 means only that no case has an expected
+# value yet: the dossier is written all the same.
+step "testsetdossier ISSO 54 (BRL 9501 §3.3, in ${archive}/testset)"
+testset_exit=0
+# The same commit wording as the gate (verify-nta.sh): a dry run from a dirty
+# worktree must not present the dossier as made from a clean commit.
+testset_commit="$(git rev-parse HEAD)"
+if [[ -n "$(git status --porcelain)" ]]; then
+  testset_commit="${testset_commit} (met lokale wijzigingen)"
+fi
+cargo run --locked --quiet --manifest-path crates/nta8800-service/Cargo.toml \
+  --bin reference_gate -- --suite training-data/reference-suites/isso54-v2.json \
+  --report-dir "$archive/testset/vergelijking" --testset-dir "$archive/testset" \
+  --testset-topics training-data/isso54/onderwerpen.json \
+  --commit "$testset_commit" || testset_exit=$?
+if [[ $testset_exit -ne 0 && $testset_exit -ne 3 ]]; then
+  printf 'Het testsetdossier kon niet worden gemaakt (code %s).\n' "$testset_exit" >&2
+  exit 1
 fi
 
 packages=()
@@ -181,6 +223,13 @@ fi
 manual_args=()
 for file in "${manual_files[@]}"; do manual_args+=(--manual "$file"); done
 
+# The gate, the testset and the build must not have changed tracked files: the release
+# commit and the leveringsdocument name exactly the commit that was checked.
+if [[ $dry_run -eq 0 && -n "$(git status --porcelain)" ]]; then
+  printf 'De gate of de build heeft de werkmap gewijzigd:\n%s\n' "$(git status --porcelain)" >&2
+  exit 1
+fi
+
 if [[ $notes_to_commit -eq 1 ]]; then
   step "releasenotes: onuitgebrachte items onder Rekenkern ${kernel_version} (commit)"
   cp "$archive/releasenotes.md" docs/nta8800-releasenotes.md
@@ -197,10 +246,41 @@ step "leveringsdocument"
 node scripts/nta-leveringsdocument.mjs --out "$archive/leveringsdocument.md" \
   --commit "$commit" --tag "$tag" --date "$release_date" "${manual_args[@]}" "${packages[@]}"
 
+step "testrapport (docs/nta8800-testprotocol.md §7)"
+node --input-type=module -e "
+  import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+  import { renderGateSummaryMarkdown } from './scripts/nta-gate-summary.mjs';
+  const summaryFile = '$archive/gate-samenvatting.json';
+  const summary = existsSync(summaryFile) ? JSON.parse(readFileSync(summaryFile, 'utf8')) : null;
+  const fields = {
+    GATE_SUMMARY: renderGateSummaryMarkdown(summary),
+    PROGRAM_VERSION: '$program_version',
+    KERNEL_VERSION: '$kernel_version',
+    TAG: '$tag',
+    COMMIT: '$commit',
+    RELEASE_DATE: '$release_date',
+    GATE_STATUS: '$gate_status',
+    DRY_RUN: $dry_run === 1 ? 'ja' : 'nee',
+  };
+  const template = readFileSync('docs/templates/nta8800-testrapport.md', 'utf8');
+  const report = template.replace(/\{\{([A-Z_]+)\}\}/g, (match, key) => fields[key] ?? match);
+  writeFileSync('$archive/testrapport.md', report);
+"
+
+step "github-release.md (tekst voor de GitHub-release)"
+repo_remote="$(git remote get-url origin 2>/dev/null || true)"
+gate_summary_args=()
+if [[ -f "$archive/gate-samenvatting.json" ]]; then
+  gate_summary_args=(--gate-summary "$archive/gate-samenvatting.json")
+fi
+node scripts/nta-github-release.mjs --out "$archive/github-release.md" --tag "$tag" \
+  --commit "$commit" --notes "$archive/releasenotes.md" --repo-url "$repo_remote" \
+  "${gate_summary_args[@]}" "${packages[@]}" "${manual_files[@]}" "$archive/leveringsdocument.md" "$archive/testrapport.md"
+
 step "manifest en SHA256SUMS"
 node --input-type=module -e "
   import { readIdentity, sha256File } from './scripts/nta-leveringsdocument.mjs';
-  import { writeFileSync } from 'node:fs';
+  import { readdirSync, writeFileSync, existsSync } from 'node:fs';
   const manifest = {
     ...readIdentity('.'),
     tag: '$tag',
@@ -209,9 +289,18 @@ node --input-type=module -e "
     dryRun: $dry_run === 1,
     gate: '$gate_status',
     packagesBuilt: $skip_build === 0,
+    gateSummary: existsSync('$archive/gate-samenvatting.json')
+      ? { file: 'gate-samenvatting.json', sha256: sha256File('$archive/gate-samenvatting.json') }
+      : null,
     manual: '${manual_files[*]}'.split(' ').filter(Boolean).map((path) => ({
       file: path.slice('$archive/'.length), sha256: sha256File(path),
     })),
+    testset: {
+      cases: readdirSync('$archive/testset/projecten').filter((name) => name.endsWith('.oes.json')).length,
+      overview: ['testset.md', 'testset.csv', 'testset.json'].map((name) => ({
+        file: 'testset/' + name, sha256: sha256File('$archive/testset/' + name),
+      })),
+    },
   };
   writeFileSync('$archive/manifest.json', JSON.stringify(manifest, null, 2) + '\n');
 "

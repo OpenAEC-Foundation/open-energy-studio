@@ -8,6 +8,7 @@ import {
 } from '../../core/nta/KernelClient';
 import { useI18n } from '../../i18n/i18n';
 import './HeatPumpAuxDiagnosticPanel.css';
+import { DecimalInput } from '../ui';
 
 type NumericField =
   | 'standbyElectronicsW' | 'deliveryPumpDuringCompressorW' | 'deliveryPumpPrePostW'
@@ -129,7 +130,7 @@ export function HeatPumpAuxDiagnosticPanel({ pump, onSave }: { pump: INtaHeatPum
         <input type="text" value={generatorSource} onChange={(event) => { invalidate(); setGeneratorSource(event.target.value); }} /></label>
       {numericFields.map((field) => <label key={field}>
         <span>{t(`kernel.auxDraft.${field}`)}</span>
-        <input type="number" min="0" step="any" value={numbers[field]}
+        <DecimalInput min="0" step="any" value={numbers[field]}
           onChange={(event) => { invalidate(); setNumbers((prior) => ({ ...prior, [field]: event.target.value })); }} />
       </label>)}
       <label><span>{t('kernel.auxDraft.measurementSource')}</span>
@@ -143,7 +144,7 @@ export function HeatPumpAuxDiagnosticPanel({ pump, onSave }: { pump: INtaHeatPum
       <legend>{t('kernel.auxDraft.months')}</legend>
       <div className="heat-pump-aux-draft-months">{months.map((value, index) => <label key={index}>
         <span>{t('kernel.auxDraft.month')} {index + 1}</span>
-        <input type="number" min="0" step="any" value={value}
+        <DecimalInput min="0" step="any" value={value}
           onChange={(event) => { invalidate(); setMonths((prior) => prior.map((item, at) => at === index ? event.target.value : item)); }} />
       </label>)}</div>
     </fieldset>

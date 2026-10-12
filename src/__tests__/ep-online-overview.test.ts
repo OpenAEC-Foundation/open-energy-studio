@@ -112,4 +112,27 @@ describe('EP-Online data overview', () => {
     expect(file.schema).toContain('EpbdExportTypesV4');
     expect(bundle.manifest.files.some((entry) => entry.path === 'ep-online-gegevensoverzicht.json')).toBe(true);
   });
+
+  it('leaves the class and indicators out for an older, non-registrable edition', () => {
+    const legacy = {
+      ...assessment(25.5), status: 'calculated_legacy_edition', normVersion: '2022', targetNormVersion: 'NTA 8800:2022',
+      registrationEligible: false,
+    } as unknown as ProjectPerformanceAssessment;
+    const overview = buildEpOnlineOverview(project(), legacy);
+    expect(overview.pandcertificaat.Energieklasse).toBeNull();
+    for (const field of ['Energiebehoefte', 'Primaire_fossiele_energie', 'Aandeel_hernieuwbare_energie', 'Temperatuuroverschrijding', 'Warmtebehoefte']) {
+      expect(overview.pandcertificaat).not.toHaveProperty(field);
+      expect(overview.omitted.find((item) => item.field === field)?.reason).toMatch(/oudere uitgave \(NTA 8800:2022\), niet registreerbaar/);
+    }
+    expect(overview.notice).toMatch(/NTA 8800:2022/);
+  });
+
+  it('fills the class and indicators for the current edition', () => {
+    const overview = buildEpOnlineOverview(project(), {
+      ...assessment(25.5), normVersion: '2025+C1', registrationEligible: true,
+    } as unknown as ProjectPerformanceAssessment);
+    expect(overview.pandcertificaat.Energieklasse).toBe('A+++');
+    expect(overview.pandcertificaat.Energiebehoefte).toBe(55.12);
+    expect(overview.notice).not.toMatch(/oudere uitgave/);
+  });
 });

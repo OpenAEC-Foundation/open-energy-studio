@@ -429,8 +429,10 @@
 .ui-tabs__tab:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ── Stepper ── */
-.ui-stepper { display: flex; align-items: center; list-style: none; padding: 0; margin: 0; }
-.ui-stepper__step { display: flex; align-items: center; flex: 1; min-width: 0; }
+/* A step never shrinks below its line and label: in a narrow work area the
+   stepper scrolls instead of drawing the connector lines through the labels. */
+.ui-stepper { display: flex; align-items: center; list-style: none; padding: 0; margin: 0; overflow-x: auto; }
+.ui-stepper__step { display: flex; align-items: center; flex: 1 0 auto; min-width: max-content; }
 .ui-stepper__step:first-child { flex: none; }
 .ui-stepper__line { flex: 1; height: 1.5px; min-width: 14px; margin: 0 10px; background: var(--line); }
 .ui-stepper__line--done { background: var(--ok); }
@@ -550,3 +552,8 @@ button.ui-stepper__btn:focus-visible { outline: none; box-shadow: var(--focus-ri
   animation: ui-shimmer 1.4s ease-in-out infinite;
 }
 @keyframes ui-shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+
+/* Raw technical error behind a disclosure (UX finding 1, 10 October 2026). */
+.ui-tech-details { margin-top: 6px; font-size: 12px; color: var(--text-2, inherit); }
+.ui-tech-details summary { cursor: pointer; }
+.ui-tech-details code { display: block; margin-top: 4px; white-space: pre-wrap; overflow-wrap: anywhere; }

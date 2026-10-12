@@ -8,6 +8,7 @@ import type { IProject } from '../core/energy/types';
 import { MaatwerkadviesPanel } from '../components/MaatwerkadviesPanel/MaatwerkadviesPanel';
 import { regenerateTemplatePatches } from '../core/nta/MwaTemplates';
 import { renderWithProviders, userEvent } from './test-utils';
+import { SLOW_UI_TEST_MS } from './timeouts';
 
 const dwelling = JSON.parse(readFileSync(resolve(process.cwd(), 'training-data/nta8800-example-terraced-dwelling.json'), 'utf8')) as IProject;
 
@@ -60,7 +61,7 @@ describe('maatwerkadvies measure templates in the panel', () => {
     expect(measure.template).toBeNull();
     expect(measure.patch).toHaveLength(2);
     expect(screen.getAllByLabelText('Path (JSON pointer)')[0]).toHaveValue('/ntaCalculation/ventilation/infiltration');
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 
   it('renders every template with the NTA form fields', async () => {
     const user = userEvent.setup();
@@ -85,7 +86,7 @@ describe('maatwerkadvies measure templates in the panel', () => {
     expect(stored().measures[0].category).toBe('hot_water');
     await user.selectOptions(kind(), 'lighting');
     expect(screen.getByTestId('mwa-template-problems-m1')).toHaveTextContent('The project has no chapter 14 lighting.');
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 
   it('regenerates template patches against the current project', () => {
     const definition = {

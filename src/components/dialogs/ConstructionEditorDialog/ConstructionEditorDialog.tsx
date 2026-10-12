@@ -1,9 +1,11 @@
 import { useState, useMemo, useId } from 'react';
 import { useI18n } from '../../../i18n/i18n';
+import { formatNumber } from '../../../i18n/format';
 import { useEnergy } from '../../../context/EnergyContext';
 import { IConstruction, IConstructionLayer } from '../../../core/energy/types';
 import { DialogShell } from '../DialogShell';
 import { NtaConstructionSection, type NtaConstructionResult } from './NtaConstructionSection';
+import { DecimalInput } from '../../ui';
 
 interface ConstructionEditorDialogProps {
   editId?: string | null;
@@ -12,7 +14,7 @@ interface ConstructionEditorDialogProps {
 
 export function ConstructionEditorDialog({ editId, onClose }: ConstructionEditorDialogProps) {
   const fieldId = useId();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { state, dispatch } = useEnergy();
 
   const existing = editId
@@ -152,8 +154,7 @@ export function ConstructionEditorDialog({ editId, onClose }: ConstructionEditor
                     />
                   </td>
                   <td style={{ padding: '2px 4px' }}>
-                    <input
-                      type="number"
+                    <DecimalInput
                       min={0}
                       step={0.001}
                       aria-label={`${t('dialog.construction.thickness')} ${i + 1}`}
@@ -163,8 +164,7 @@ export function ConstructionEditorDialog({ editId, onClose }: ConstructionEditor
                     />
                   </td>
                   <td style={{ padding: '2px 4px' }}>
-                    <input
-                      type="number"
+                    <DecimalInput
                       min={0.001}
                       step={0.001}
                       aria-label={`${t('dialog.construction.lambda')} ${i + 1}`}
@@ -198,16 +198,16 @@ export function ConstructionEditorDialog({ editId, onClose }: ConstructionEditor
         <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
           <div className="dialog-field" style={{ flex: 1 }}>
             <label htmlFor={`${fieldId}-2`}>{t('dialog.construction.rcValue')}</label>
-            <input id={`${fieldId}-2`} type="text" readOnly value={shownRc.toFixed(2)} />
+            <input id={`${fieldId}-2`} type="text" readOnly value={formatNumber(shownRc, locale, 2)} />
           </div>
           <div className="dialog-field" style={{ flex: 1 }}>
             <label htmlFor={`${fieldId}-3`}>{t('dialog.construction.uValue')}</label>
-            <input id={`${fieldId}-3`} type="text" readOnly value={shownU.toFixed(3)} />
+            <input id={`${fieldId}-3`} type="text" readOnly value={formatNumber(shownU, locale, 3)} />
           </div>
         </div>
         {ntaResult && <p role="status" style={{ fontSize: 12 }}>
-          {t('nta.construction.applied')}: U = {ntaResult.u.toFixed(2)} W/m²K
-          {ntaResult.rc != null && <> · R<sub>c</sub> = {ntaResult.rc.toFixed(2)} m²K/W</>}
+          {t('nta.construction.applied')}: U = {formatNumber(ntaResult.u, locale, 2)} W/m²K
+          {ntaResult.rc != null && <> · R<sub>c</sub> = {formatNumber(ntaResult.rc, locale, 2)} m²K/W</>}
           {' '}<button type="button" className="btn btn-sm" onClick={() => setNtaResult(null)}>{t('nta.construction.undo')}</button>
         </p>}
         <NtaConstructionSection layers={layers} onApply={setNtaResult} />

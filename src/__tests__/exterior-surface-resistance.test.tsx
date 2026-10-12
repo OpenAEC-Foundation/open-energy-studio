@@ -4,6 +4,7 @@ import { useEnergy } from '../context/EnergyContext';
 import { ConstructionEditorDialog } from '../components/dialogs/ConstructionEditorDialog/ConstructionEditorDialog';
 import { SURFACE_RESISTANCE } from '../core/energy/Constants';
 import { renderWithProviders, userEvent } from './test-utils';
+import { SLOW_UI_TEST_MS } from './timeouts';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -34,7 +35,7 @@ describe('exterior surface resistance of a project construction (NTA 8800 table 
     await user.click(screen.getByRole('button', { name: 'Save' }));
     const saved = JSON.parse(screen.getByTestId('constructions').textContent ?? '[]');
     expect(saved[saved.length - 1]).toMatchObject({ uValue: 0.4, exteriorSurfaceResistance: 0 });
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 
   it('leaves the default R_se 0,04 implicit', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => assessment(0.04) }));
@@ -45,7 +46,7 @@ describe('exterior surface resistance of a project construction (NTA 8800 table 
     await user.click(screen.getByRole('button', { name: 'Save' }));
     const saved = JSON.parse(screen.getByTestId('constructions').textContent ?? '[]');
     expect(saved[saved.length - 1]).not.toHaveProperty('exteriorSurfaceResistance');
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 
   it('keeps R_se 0,04 for internal surfaces', () => {
     expect(SURFACE_RESISTANCE.internal.rse).toBe(0.04);

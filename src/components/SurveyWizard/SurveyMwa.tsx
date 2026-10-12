@@ -4,6 +4,7 @@
  * packages, use and tariffs, and the advice. The calculation is
  * src/core/mwa/surveyMeasures.ts on the kernel's building base.
  */
+import { DecimalInput } from '../ui';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Droplet, Flame, Home, Layers, PanelTop, Sun, Wind, LayoutGrid } from 'lucide-react';
 import './SurveyWizard.css';
@@ -204,7 +205,7 @@ function Effect({ result, current, t, locale }: { result: MwaVariantResult | nul
 }
 
 function NumberInput({ label, value, onChange, step = 'any' }: { label: string; value: number | undefined; onChange: (value: number) => void; step?: string }) {
-  return <label>{label}<input type="number" step={step} value={Number.isFinite(value) ? value : ''} onChange={(event) => onChange(Number(event.target.value))} /></label>;
+  return <label>{label}<DecimalInput step={step} value={Number.isFinite(value) ? value : ''} onChange={(event) => onChange(Number(event.target.value))} /></label>;
 }
 
 function Measures({ definition, survey, save, resultOf, current, t, locale }: {

@@ -5,7 +5,7 @@
 //! it compiles for `wasm32-unknown-unknown` as well as for the servers.
 
 use nta8800_core::norm_versions::{self, NormVersion};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{json, Value};
 
 /// HTTP method of an operation's route.
@@ -89,8 +89,37 @@ pub struct Operation {
     pub input: Option<InputSpec>,
     /// Functional group, used as OpenAPI tag.
     pub category: &'static str,
-    pub run: fn(&Value) -> Outcome,
+    /// Runs the operation on the request body. The body is taken by value
+    /// so the input members are moved, never copied: a request holds one
+    /// parsed body, which the HTTP memory bound counts on.
+    pub run: fn(Value) -> Outcome,
 }
+
+/// Every machine code the error envelope can carry, as the OpenAPI document
+/// lists them. `unknown_tool` is answered by the MCP server only.
+pub const ERROR_CODES: &[&str] = &[
+    "invalid_json",
+    "invalid_request_shape",
+    "missing_request_member",
+    "invalid_project_shape",
+    "invalid_maatwerkadvies_shape",
+    "invalid_norm_version",
+    "norm_version_conflict",
+    "norm_version_not_applicable",
+    "edition_not_implemented",
+    "payload_too_large",
+    "unsupported_media_type",
+    "host_not_allowed",
+    "not_found",
+    "method_not_allowed",
+    "non_finite_result",
+    "serialization_failed",
+    "kernel_panic",
+    "calculation_unavailable",
+    "server_busy",
+    "calculation_timeout",
+    "unknown_tool",
+];
 
 /// The common error envelope. `error` and `code` carry the same machine code
 /// (`error` is kept for older clients), `message` is human readable, `path`
@@ -147,9 +176,17 @@ fn missing_member(key: &str) -> Outcome {
     }
 }
 
+/// Moves `body[key]` out of the request body.
+fn take_member(body: &mut Value, key: &str) -> Result<Value, Outcome> {
+    body.get_mut(key)
+        .map(Value::take)
+        .ok_or_else(|| missing_member(key))
+}
+
 /// Deserializes `body[key]` into `T`, reporting the JSON path of a mismatch.
-pub fn member<T: DeserializeOwned>(body: &Value, key: &str) -> Result<T, Outcome> {
-    let value = body.get(key).ok_or_else(|| missing_member(key))?;
+/// The member is moved out of the body, not copied.
+pub fn member<T: DeserializeOwned>(mut body: Value, key: &str) -> Result<T, Outcome> {
+    let value = take_member(&mut body, key)?;
     serde_path_to_error::deserialize::<_, T>(value).map_err(|error| {
         let inner = error.path().to_string();
         let path = if inner == "." || inner.is_empty() {
@@ -171,7 +208,7 @@ pub fn member<T: DeserializeOwned>(body: &Value, key: &str) -> Result<T, Outcome
 
 /// Runs a typed kernel function on `body[key]` and maps its status.
 pub fn typed<T: DeserializeOwned, R: Serialize>(
-    body: &Value,
+    body: Value,
     key: &str,
     run: impl FnOnce(T) -> R,
     rule: StatusRule,
@@ -197,26 +234,43 @@ fn ok(value: Value) -> Outcome {
     }
 }
 
-fn project_member(body: &Value) -> Result<Value, Outcome> {
-    body.get("project")
-        .cloned()
-        .ok_or_else(|| missing_member("project"))
+fn project_member(body: &mut Value) -> Result<Value, Outcome> {
+    take_member(body, "project")
 }
 
 fn invalid_project_shape(message: String) -> Outcome {
+    invalid_project_shape_at("project", message)
+}
+
+fn invalid_project_shape_at(path: &str, message: String) -> Outcome {
     Outcome {
         status: 400,
         body: error_body(
             "invalid_project_shape",
             message,
-            Some("project".into()),
+            Some(path.into()),
             Value::Null,
         ),
     }
 }
 
-fn run_validate(body: &Value) -> Outcome {
-    let project = match project_member(body) {
+/// A project member that must be a JSON object. Relabel and the label-input
+/// hash work on the raw project, as the desktop app does, so only the shape
+/// of the member itself is checked.
+fn project_object(body: &mut Value, key: &str) -> Result<Value, Outcome> {
+    let project = take_member(body, key)?;
+    if project.is_object() {
+        Ok(project)
+    } else {
+        Err(invalid_project_shape_at(
+            key,
+            format!("`{key}` must be a project object"),
+        ))
+    }
+}
+
+fn run_validate(mut body: Value) -> Outcome {
+    let project = match project_member(&mut body) {
         Ok(project) => project,
         Err(outcome) => return outcome,
     };
@@ -229,20 +283,21 @@ fn run_validate(body: &Value) -> Outcome {
     }
 }
 
-fn run_calculate_beng(body: &Value) -> Outcome {
-    let project = match project_member(body) {
+fn run_calculate_beng(mut body: Value) -> Outcome {
+    let project = match project_member(&mut body) {
         Ok(project) => project,
         Err(outcome) => return outcome,
     };
     match nta8800_core::assess_json(project) {
         Err(message) => invalid_project_shape(message),
-        Ok(assessment) if assessment.status == "invalid" => Outcome {
-            status: 422,
-            body: json!({
-                "error": "invalid_project_input",
-                "code": "invalid_project_input",
-                "assessment": assessment
-            }),
+        // Like every other route, a refused input answers 422 with the
+        // assessment itself (status `invalid` and its issues).
+        Ok(assessment) if assessment.status == "invalid" => match finite_value(&assessment) {
+            Ok(value) => Outcome {
+                status: 422,
+                body: value,
+            },
+            Err(outcome) => outcome,
         },
         Ok(_) => {
             let mut body = error_body(
@@ -257,13 +312,34 @@ fn run_calculate_beng(body: &Value) -> Outcome {
     }
 }
 
-fn run_project_performance(body: &Value) -> Result<Value, Outcome> {
-    let project = project_member(body)?;
+fn run_project_performance(mut body: Value) -> Result<Value, Outcome> {
+    let project = project_member(&mut body)?;
     let assessment = nta8800_core::project_performance::assess_project_performance(&project);
     finite_value(&assessment)
 }
 
-fn run_calculate_project_performance(body: &Value) -> Outcome {
+/// Compares the project between its own edition (`ntaCalculation.normVersion`)
+/// and the request's `normVersion`, which is active while this runs.
+fn run_compare_project_editions(mut body: Value) -> Outcome {
+    let project = match project_member(&mut body) {
+        Ok(project) => project,
+        Err(outcome) => return outcome,
+    };
+    if !project.get("ntaCalculation").is_some_and(Value::is_object) {
+        return invalid_project_shape_at(
+            "project.ntaCalculation",
+            "The project has no ntaCalculation block to move to another edition".into(),
+        );
+    }
+    let report =
+        nta8800_core::edition_switch::compare_project_editions(&project, norm_versions::current());
+    match finite_value(&report) {
+        Ok(value) => ok(value),
+        Err(outcome) => outcome,
+    }
+}
+
+fn run_calculate_project_performance(body: Value) -> Outcome {
     match run_project_performance(body) {
         Ok(value) => Outcome {
             status: StatusRule::Calculated.status(&value),
@@ -273,77 +349,77 @@ fn run_calculate_project_performance(body: &Value) -> Outcome {
     }
 }
 
+/// Identity and status fields every project projection keeps.
+const PROJECTION_FIELDS: [&str; 9] = [
+    "status",
+    "kernelVersion",
+    "targetNormVersion",
+    "normVersion",
+    "registrationEligible",
+    "inputFingerprint",
+    "attestStatus",
+    "gaps",
+    "warnings",
+];
+
 /// The project assessment reduced to its identity and status fields plus
-/// `members`, so a client can ask for one part without the rest.
-fn project_projection(body: &Value, members: &[&str]) -> Outcome {
-    match run_project_performance(body) {
-        Err(outcome) => outcome,
-        Ok(value) => {
-            let mut out = serde_json::Map::new();
-            for key in [
-                "status",
-                "kernelVersion",
-                "targetNormVersion",
-                "normVersion",
-                "registrationEligible",
-                "inputFingerprint",
-                "attestStatus",
-                "gaps",
-                "warnings",
-            ] {
-                if let Some(item) = value.get(key) {
-                    out.insert(key.to_string(), item.clone());
-                }
-            }
-            for key in members {
-                out.insert(
-                    (*key).to_string(),
-                    value.get(*key).cloned().unwrap_or(Value::Null),
-                );
-            }
-            let value = Value::Object(out);
-            Outcome {
-                status: StatusRule::Calculated.status(&value),
-                body: value,
+/// `extra`, so a client can ask for one part without the rest.
+fn projection(mut value: Value, extra: Vec<(&str, Value)>) -> Outcome {
+    let mut out = serde_json::Map::new();
+    if let Some(object) = value.as_object_mut() {
+        for key in PROJECTION_FIELDS {
+            if let Some(item) = object.remove(key) {
+                out.insert(key.to_string(), item);
             }
         }
     }
+    for (key, item) in extra {
+        out.insert(key.to_string(), item);
+    }
+    let value = Value::Object(out);
+    Outcome {
+        status: StatusRule::Calculated.status(&value),
+        body: value,
+    }
 }
 
-fn run_assess_registration(body: &Value) -> Outcome {
-    project_projection(body, &["registration"])
-}
-
-fn run_label_data(body: &Value) -> Outcome {
-    project_projection(body, &["labelData"])
-}
-
-fn run_energy_by_service(body: &Value) -> Outcome {
+fn project_projection(body: Value, member: &str) -> Outcome {
     match run_project_performance(body) {
         Err(outcome) => outcome,
-        Ok(value) => {
-            let energy = value
-                .get("performance")
-                .and_then(|performance| performance.get("energyByService"))
-                .cloned()
+        Ok(mut value) => {
+            let part = value
+                .as_object_mut()
+                .and_then(|object| object.remove(member))
                 .unwrap_or(Value::Null);
-            let out = json!({
-                "status": value.get("status"),
-                "kernelVersion": value.get("kernelVersion"),
-                "inputFingerprint": value.get("inputFingerprint"),
-                "gaps": value.get("gaps"),
-                "energyByService": energy,
-            });
-            Outcome {
-                status: StatusRule::Calculated.status(&out),
-                body: out,
-            }
+            projection(value, vec![(member, part)])
         }
     }
 }
 
-fn run_label_input_hash(body: &Value) -> Outcome {
-    match project_member(body) {
+fn run_assess_registration(body: Value) -> Outcome {
+    project_projection(body, "registration")
+}
+
+fn run_label_data(body: Value) -> Outcome {
+    project_projection(body, "labelData")
+}
+
+fn run_energy_by_service(body: Value) -> Outcome {
+    match run_project_performance(body) {
+        Err(outcome) => outcome,
+        Ok(mut value) => {
+            let energy = value
+                .get_mut("performance")
+                .and_then(|performance| performance.get_mut("energyByService"))
+                .map(Value::take)
+                .unwrap_or(Value::Null);
+            projection(value, vec![("energyByService", energy)])
+        }
+    }
+}
+
+fn run_label_input_hash(mut body: Value) -> Outcome {
+    match project_object(&mut body, "project") {
         Err(outcome) => outcome,
         Ok(project) => ok(json!({
             "labelInputSha256": nta8800_core::relabel::label_input_hash(&project),
@@ -352,24 +428,25 @@ fn run_label_input_hash(body: &Value) -> Outcome {
     }
 }
 
-fn run_relabel(body: &Value) -> Outcome {
-    let (Some(original), Some(current)) = (body.get("original"), body.get("current")) else {
-        let key = if body.get("original").is_none() {
-            "original"
-        } else {
-            "current"
-        };
-        return missing_member(key);
+fn run_relabel(mut body: Value) -> Outcome {
+    let original = match project_object(&mut body, "original") {
+        Ok(original) => original,
+        Err(outcome) => return outcome,
     };
-    match finite_value(&nta8800_core::relabel::assess_relabel(original, current)) {
+    let current = match project_object(&mut body, "current") {
+        Ok(current) => current,
+        Err(outcome) => return outcome,
+    };
+    match finite_value(&nta8800_core::relabel::assess_relabel(&original, &current)) {
         Ok(value) => ok(value),
         Err(outcome) => outcome,
     }
 }
 
-fn run_maatwerkadvies(body: &Value) -> Outcome {
-    let Some(input) = body.get("input").cloned() else {
-        return missing_member("input");
+fn run_maatwerkadvies(mut body: Value) -> Outcome {
+    let input = match take_member(&mut body, "input") {
+        Ok(input) => input,
+        Err(outcome) => return outcome,
     };
     match nta8800_core::maatwerkadvies::assess_maatwerkadvies_json(input) {
         Ok(assessment) => match finite_value(&assessment) {
@@ -407,7 +484,10 @@ enum EditionRoute {
     Active,
     /// The result does not depend on the edition (label-input hash).
     Independent,
-    /// Reference cases are compared in 2025+C1:2026 only.
+    /// A reference case carries its own edition in `case.normVersion`; the
+    /// result is stamped with it and a request edition must match it.
+    ReferenceCase,
+    /// The diagnostic comparisons are made in 2025+C1:2026 only.
     Fixed,
 }
 
@@ -435,10 +515,10 @@ fn edition_route(op: &Operation, body: &Value) -> EditionRoute {
         // A relabel stays in the original's edition (BRL 9500-W §4.2.4).
         "assess_relabel" => EditionRoute::Slots(vec![("original", PROJECT), ("current", PROJECT)]),
         "get_label_input_hash" => EditionRoute::Independent,
-        "audit_reference_case"
-        | "compare_reference_case"
-        | "compare_direct_diagnostic"
-        | "compare_gas_heat_pump_chain_diagnostic" => EditionRoute::Fixed,
+        "audit_reference_case" | "compare_reference_case" => EditionRoute::ReferenceCase,
+        "compare_direct_diagnostic" | "compare_gas_heat_pump_chain_diagnostic" => {
+            EditionRoute::Fixed
+        }
         _ => EditionRoute::Active,
     }
 }
@@ -491,19 +571,85 @@ fn stamp_edition(outcome: &mut Outcome, version: NormVersion) {
     norm_versions::request::stamp(&mut outcome.body, version);
 }
 
+/// Whether an operation can answer 422 (a kernel refusal). Validation,
+/// relabel, the label-input hash and the reference audit always answer 200
+/// with their findings in the body.
+pub fn may_refuse(op: &Operation) -> bool {
+    op.method == Method::Post
+        && !matches!(
+            op.name,
+            "validate_project"
+                | "assess_relabel"
+                | "get_label_input_hash"
+                | "audit_reference_case"
+                | "compare_project_editions"
+        )
+}
+
+/// The top-level members an operation's request may carry: its input
+/// member(s) and `normVersion`.
+pub fn request_members(op: &Operation) -> Vec<&'static str> {
+    let mut members = Vec::new();
+    if let Some(input) = op.input {
+        members.push(input.key);
+    }
+    if op.name == "assess_relabel" {
+        members.push("current");
+    }
+    if op.method == Method::Post {
+        members.push(NORM_VERSION_MEMBER);
+    }
+    members
+}
+
+/// Refuses a request with a top-level member the operation does not know,
+/// so a misspelled `normversion` is not silently ignored.
+fn unknown_member(op: &Operation, body: &Value) -> Option<Outcome> {
+    let allowed = request_members(op);
+    let unknown = body
+        .as_object()?
+        .keys()
+        .find(|key| !allowed.contains(&key.as_str()))?;
+    Some(Outcome {
+        status: 400,
+        body: error_body(
+            "invalid_request_shape",
+            if allowed.is_empty() {
+                format!("Unknown request member `{unknown}`; this operation takes no members")
+            } else {
+                format!(
+                    "Unknown request member `{unknown}`; this operation takes {}",
+                    allowed
+                        .iter()
+                        .map(|key| format!("`{key}`"))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            },
+            Some(unknown.clone()),
+            Value::Null,
+        ),
+    })
+}
+
 /// Runs an operation as the HTTP and MCP adapters do: with the request's
 /// optional `normVersion` applied (written into the input's own edition, or
-/// active while the kernel runs) and the edition stamped on the result.
-pub fn execute(op: &Operation, body: &Value) -> Outcome {
+/// active while the kernel runs) and the edition stamped on the result. The
+/// body is moved through, never copied.
+pub fn execute(op: &Operation, mut body: Value) -> Outcome {
+    // A GET operation takes no members; its schema says so
+    // (`additionalProperties: false`), so MCP arguments are refused too.
+    if let Some(outcome) = unknown_member(op, &body) {
+        return outcome;
+    }
     if op.method == Method::Get {
         return (op.run)(body);
     }
-    let requested = match requested_norm_version(body) {
+    let requested = match requested_norm_version(&body) {
         Ok(requested) => requested,
         Err(outcome) => return outcome,
     };
     let mut version = requested.unwrap_or_default();
-    let mut body = body.clone();
     match edition_route(op, &body) {
         EditionRoute::Slots(slots) => {
             if let Some(version) = requested {
@@ -516,8 +662,28 @@ pub fn execute(op: &Operation, body: &Value) -> Outcome {
             version = slots
                 .first()
                 .and_then(|(member, pointer)| body.get(*member)?.pointer(pointer))
-                .and_then(|value| serde_json::from_value(value.clone()).ok())
+                .and_then(|value| NormVersion::deserialize(value).ok())
                 .unwrap_or_default();
+        }
+        EditionRoute::ReferenceCase => {
+            let own = body
+                .pointer("/case/normVersion")
+                .and_then(Value::as_str)
+                .and_then(nta8800_core::reference::reference_edition);
+            if let (Some(requested), Some(own)) = (requested, own) {
+                if requested != own {
+                    return edition_error(
+                        "norm_version_conflict",
+                        format!(
+                            "The request asks for {} but the reference case is in {}",
+                            requested.label(),
+                            own.label()
+                        ),
+                        NORM_VERSION_MEMBER.into(),
+                    );
+                }
+            }
+            version = own.or(requested).unwrap_or_default();
         }
         EditionRoute::Active if !version.implemented() => {
             return Outcome {
@@ -533,13 +699,13 @@ pub fn execute(op: &Operation, body: &Value) -> Outcome {
         EditionRoute::Fixed if !version.is_default() => {
             return edition_error(
                 "norm_version_not_applicable",
-                "Reference cases are compared in NTA 8800:2025+C1:2026 only".into(),
+                "The diagnostic comparisons are made in NTA 8800:2025+C1:2026 only".into(),
                 NORM_VERSION_MEMBER.into(),
             );
         }
         EditionRoute::Active | EditionRoute::Independent | EditionRoute::Fixed => {}
     }
-    let mut outcome = norm_versions::with_version(version, || (op.run)(&body));
+    let mut outcome = norm_versions::with_version(version, || (op.run)(body));
     // The legacy status is a success under every status rule, so stamping
     // never changes the HTTP status.
     if outcome.status == 200 || outcome.status == 422 {
@@ -644,6 +810,15 @@ static OPERATIONS: &[Operation] = &[
         input: Some(InputSpec { key: "project", description: PROJECT_DOC }),
         category: "project",
         run: run_calculate_project_performance,
+    },
+    Operation {
+        name: "compare_project_editions",
+        method: Method::Post,
+        path: "/v1/nta8800/project/editions/compare",
+        description: "Compare a project between its own NTA 8800 edition (ntaCalculation.normVersion) and the edition in the request's normVersion (default 2025+C1): the inputs the target refuses, newly requires, ignores or reads differently, each with its switch point of docs/nta8800-normversies.md, its path and a fix (drop, switchOff or set are safe and applied in adjustedProject; enter, choose and review are left to the adviser). Calculates the project in both editions; changes nothing in the request",
+        input: Some(InputSpec { key: "project", description: PROJECT_DOC }),
+        category: "project",
+        run: run_compare_project_editions,
     },
     Operation {
         name: "get_energy_by_service",

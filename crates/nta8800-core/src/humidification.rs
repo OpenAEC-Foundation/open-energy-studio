@@ -18,6 +18,8 @@ use serde::{Deserialize, Serialize};
 pub const INTERPRETATIONS: &[&str] = &[
     "§12.1 (p. 520) assumes one humidification system per calculation zone; a second humidifier on the same zone is refused (humidifier_zone_duplicate)",
     "12.2.1 (p. 521) sets the recoverable loss to 0 for \"grote opwekkers (A_g > 500 m²)\"; the served area of the humidification generator is used when given (servedAreaM2), otherwise the area connected to the space-heating system, as for 9.2.5.1",
+    "table 12.1 (p. 522) gives (Δx·t)_a;SUP per use function; a zone with several functions takes the mean weighted by their areas",
+    "12.3 (p. 521) gives η 0,6 for gas and oil alike; the fuel is booked on its own carrier (table 5.2: natural gas or fuel oil); the earlier choice gas_or_oil and the survey answer non_electric_steam (ISSO 75.1, which does not ask the fuel) book natural gas",
 ];
 
 /// h_we at 20 °C, kJ/kg.
@@ -77,7 +79,11 @@ pub struct HumidityFunctionArea {
 #[serde(rename_all = "snake_case")]
 pub enum SteamCarrier {
     Electricity,
-    GasOrOil,
+    /// Earlier projects stored `gas_or_oil`; that choice booked the fuel as
+    /// natural gas and still does.
+    #[serde(alias = "gas_or_oil")]
+    Gas,
+    Oil,
 }
 
 impl SteamCarrier {
@@ -85,7 +91,7 @@ impl SteamCarrier {
     fn efficiency(self) -> f64 {
         match self {
             Self::Electricity => 0.8,
-            Self::GasOrOil => 0.6,
+            Self::Gas | Self::Oil => 0.6,
         }
     }
 }
@@ -177,11 +183,19 @@ pub struct HumidityMonth {
     pub heating_system_load_kwh: f64,
     /// E_hum for steam generators (12.3), kWh.
     pub steam_electricity_kwh: f64,
+    /// E_hum of a gas-fired steam generator, kWh.
     pub steam_fuel_kwh: f64,
+    /// E_hum of an oil-fired steam generator, kWh (table 5.2: carrier oil).
+    #[serde(skip_serializing_if = "is_zero")]
+    pub steam_oil_kwh: f64,
     /// Q_H;hum;rbl (12.4), kWh.
     pub recoverable_kwh: f64,
     /// Q_C;dhum (12.5), kWh, delivered by the cooling system.
     pub dehumidification_need_kwh: f64,
+}
+
+fn is_zero(value: &f64) -> bool {
+    *value == 0.0
 }
 
 pub fn validate_humidity(input: &HumidityInput) -> Vec<HumidityIssue> {
@@ -245,6 +259,7 @@ pub fn calculate_humidity(input: &HumidityInput) -> Result<Vec<HumidityMonth>, V
                 heating_system_load_kwh: 0.0,
                 steam_electricity_kwh: 0.0,
                 steam_fuel_kwh: 0.0,
+                steam_oil_kwh: 0.0,
                 recoverable_kwh: 0.0,
                 dehumidification_need_kwh: 0.0,
             };
@@ -275,7 +290,8 @@ pub fn calculate_humidity(input: &HumidityInput) -> Result<Vec<HumidityMonth>, V
                         let energy = need / efficiency;
                         match carrier {
                             SteamCarrier::Electricity => month.steam_electricity_kwh = energy,
-                            SteamCarrier::GasOrOil => month.steam_fuel_kwh = energy,
+                            SteamCarrier::Gas => month.steam_fuel_kwh = energy,
+                            SteamCarrier::Oil => month.steam_oil_kwh = energy,
                         }
                         if input
                             .installation_area_m2
@@ -347,6 +363,37 @@ mod tests {
             calculate_humidity(&floor).unwrap()[7].dehumidification_need_kwh,
             0.0
         );
+    }
+
+    #[test]
+    fn an_oil_fired_steam_generator_books_oil() {
+        // 12.3 with η 0,6 for gas or oil; table 5.2 keeps oil (stookolie)
+        // apart from natural gas, so the carrier follows the fuel.
+        let oil = calculate_humidity(&office(Humidifier::Steam {
+            carrier: SteamCarrier::Oil,
+        }))
+        .unwrap();
+        let need = 2538.2 * 1.205 * 1000.0 / 3600.0 * 0.82;
+        assert!((oil[0].steam_oil_kwh - need / 0.6).abs() < 1e-9);
+        assert_eq!(oil[0].steam_fuel_kwh, 0.0);
+        assert!((oil[0].recoverable_kwh - 0.4 * need).abs() < 1e-9);
+        let gas = calculate_humidity(&office(Humidifier::Steam {
+            carrier: SteamCarrier::Gas,
+        }))
+        .unwrap();
+        assert!((gas[0].steam_fuel_kwh - need / 0.6).abs() < 1e-9);
+        assert_eq!(gas[0].steam_oil_kwh, 0.0);
+        // Projects saved with the earlier "gas_or_oil" choice keep booking
+        // natural gas.
+        let legacy: Humidifier =
+            serde_json::from_value(serde_json::json!({"kind": "steam", "carrier": "gas_or_oil"}))
+                .unwrap();
+        assert!(matches!(
+            legacy,
+            Humidifier::Steam {
+                carrier: SteamCarrier::Gas
+            }
+        ));
     }
 
     #[test]

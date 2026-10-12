@@ -7,15 +7,17 @@
  * order; the step pages render the entries of their own page. Fields and paths
  * are unchanged.
  */
+import { NumberInput } from '../ui/Field';
 import { ThermalMassPerM22022Field } from './NtaEdition2022Fields';
 import type { ComponentType } from 'react';
-import { DEFAULT_NORM_VERSION, IMPLEMENTED_NORM_VERSIONS } from '../../core/nta/KernelClient';
+import { DEFAULT_NORM_VERSION } from '../../core/nta/KernelClient';
+import { EditionSwitchField } from './NtaEditionSwitch';
 import type { IProject } from '../../core/energy/types';
 import type { StepId } from '../../core/navigation/routes';
 import { HeatingEmission2023Fields } from './NtaEdition2023Fields';
 import { useI18n } from '../../i18n/i18n';
 import {
-  CheckField, NumberField, read, SelectField, TextField, TriStateField, useFieldPath, type Draft, type Path,
+  CheckField, NumberField, read, SelectField, TextField, TriStateField, useFieldPath, write, type Draft, type Path,
 } from './NtaFormFields';
 import { PvSystemFields } from './NtaPvFields';
 import {
@@ -26,7 +28,8 @@ import { DynamicWindowsFields } from './NtaDynamicWindows';
 import { WindowObstructionsFields } from './NtaWindowObstructions';
 import { WindowShadingsFields } from './NtaWindowShadings';
 import { WindowGlazingsFields } from './NtaWindowGlazings';
-import { CirculationPsiFields } from './NtaPipeGeometry';
+import { HotWaterCirculationFields } from './NtaPipeGeometry';
+import { CommonSpaceFillField, ZoneDataFields } from './NtaZoneData';
 import { AnnexAaCalculationFields } from './NtaAnnexAaFields';
 import { annexAaCalculations, annexAaEditionRules } from '../../core/nta/annexAaForm';
 import { DeclaredHeatingTableTool, GroundFloorDetailFields } from './NtaProductGenerators';
@@ -37,7 +40,7 @@ import {
   SpaceGeneratorFields, WindowObstructionFields,
 } from './NtaSystemSections';
 import {
-  buildVentilationDraft, removeVentilation, syncVentilation, utilityInternalGains,
+  buildVentilationDraft, removeVentilation, syncVentilation, utilityInternalGains, verticalPipesResidential,
 } from '../../core/nta/NtaFormModels';
 import { bacsTemplate } from '../../core/nta/NtaSystemTemplates';
 import {
@@ -84,12 +87,16 @@ export function VerticalPipesFields({ draft, change, residential, path, label }:
         <option value="listed">{t('nta.form.verticalPipes.listed')}</option>
       </select>
     </label>
-    {list?.map((_, index) => <div key={index} className="nta-form-row">
+    {list?.map((_, index) => <div key={index} className="nta-form-row" role="group"
+      aria-label={`${t('nta.form.verticalPipes.item')} ${index + 1}`}>
       {residential
         ? <NumberField {...field} path={[...path, index, 'storeys']} label={t('nta.form.verticalPipes.storeys')} step="1" />
-        : <NumberField {...field} path={[...path, index, 'buildingHeightM']} label={t('nta.form.verticalPipes.height')} />}
+        : <>
+          <NumberField {...field} path={[...path, index, 'buildingHeightM']} label={t('nta.form.verticalPipes.height')} />
+          <NumberField {...field} path={[...path, index, 'areaShare']} label={t('nta.form.verticalPipes.areaShare')} optional />
+        </>}
       <CheckField {...field} path={[...path, index, 'insulated']} label={t('nta.form.verticalPipes.insulated')} />
-      <NumberField {...field} path={[...path, index, 'sharedZones']} label={t('nta.form.verticalPipes.shared')} step="1" />
+      <NumberField {...field} path={[...path, index, 'sharedZones']} label={t('nta.form.verticalPipes.shared')} step="1" optional />
       <TextField {...field} path={[...path, index, 'sourceReference']} label={t('nta.form.source')} />
       <button type="button" onClick={() => change(path, list.filter((_, other) => other !== index))}>
         {t('nta.form.verticalPipes.remove')}</button>
@@ -282,15 +289,19 @@ function GeneralSection(props: NtaSectionProps) {
   const { draft } = props;
   const f = fieldOf(props);
   return <>
-    <SelectField {...f} path={['normVersion']} label={t('nta.form.normVersion')} fallback={DEFAULT_NORM_VERSION}
-      options={IMPLEMENTED_NORM_VERSIONS.map((edition) => [edition, t(`nta.edition.${edition}`)])} />
+    <EditionSwitchField draft={draft} project={props.project} change={props.change} update={props.update} />
     {read(draft, ['normVersion']) != null && read(draft, ['normVersion']) !== DEFAULT_NORM_VERSION
       && <p className="nta-form-note" role="note">{t('nta.form.normVersionLegacy')}</p>}
     <SelectField {...f} path={['calculationScope']} label={t('nta.form.scope')}
       options={[['residential', t('nta.form.scope.residential')], ['utility', t('nta.form.scope.utility')]]} />
     <TextField {...f} path={['areaSourceReference']} label={t('nta.form.areaSource')} />
     <SelectField {...f} path={['usageFunction']} label={t('nta.form.usageFunction')}
-      options={USAGE_FUNCTIONS.map((key) => [key, t(`nta.form.usage.${key}`)])} />
+      options={USAGE_FUNCTIONS.map((key) => [key, t(`nta.form.usage.${key}`)])}
+      // The dwelling type only applies to a residential use (dwelling_type_not_applicable otherwise).
+      onChange={(_, value) => props.update((current) => {
+        const next = write(current, ['usageFunction'], value);
+        return value === 'residential' ? next : write(next, ['dwellingType'], undefined);
+      })} />
     {read(draft, ['usageFunction']) === 'residential' && <SelectField {...f} path={['dwellingType']}
       label={t('nta.form.dwellingType')} options={[
         ['apartment_building', t('nta.form.dwellingType.apartment')], ['other', t('nta.form.dwellingType.other')]]} />}
@@ -301,6 +312,9 @@ function GeneralSection(props: NtaSectionProps) {
       ['office', t('nta.form.bbl.office')], ['education', t('nta.form.bbl.education')], ['retail', t('nta.form.bbl.retail')],
       ['other_assembly', t('nta.form.bbl.other_assembly')], ['other_healthcare', t('nta.form.bbl.other_healthcare')],
       ['sport', t('nta.form.bbl.sport')], ['other_lodging', t('nta.form.bbl.other_lodging')],
+      ['caravan', t('nta.form.bbl.caravan')], ['floating_building_after2018_berth', t('nta.form.bbl.floating_building_after2018_berth')],
+      ['floating_building_other_berth', t('nta.form.bbl.floating_building_other_berth')],
+      ['lodging_in_lodging_building', t('nta.form.bbl.lodging_in_lodging_building')],
     ]} />
     <SelectField {...f} path={['zebHeatDeliveryTemperature']}
       label={locale === 'nl' ? 'Aflevertemperatuur externe warmte voor ZEB (bijlage AB)' : 'External heat delivery temperature for ZEB (Annex AB)'}
@@ -433,9 +447,12 @@ function InternalGainsSection(props: NtaSectionProps) {
   const f = fieldOf(props);
   return <>
     {residentialScope(draft)
-      ? <NumberField {...f} path={['internalGains', 'dwellingCount']} label={t('nta.form.dwellingCount')} step="1" />
+      ? <>
+        <NumberField {...f} path={['internalGains', 'dwellingCount']} label={t('nta.form.dwellingCount')} step="1" />
+        <NumberField {...f} path={['internalGains', 'dwellingShare']} label={t('nta.form.dwellingShare')} optional />
+      </>
       : <>
-        <SelectField {...f} path={['internalGains', 'method']} label={t('nta.gains.method')}
+        <SelectField required {...f} path={['internalGains', 'method']} label={t('nta.gains.method')}
           options={[['utility', t('nta.gains.method.utility')], ['declared', t('nta.gains.method.declared')]]}
           onChange={(_, value) => change(['internalGains'], value === 'utility'
             ? { ...utilityInternalGains(), sourceReference: read(draft, ['internalGains', 'sourceReference']) ?? '' }
@@ -488,7 +505,8 @@ function RoofTiltsSection(props: NtaSectionProps) {
   const tilts = (read(props.draft, ['surfaceTilts']) as Draft[] | undefined) ?? [];
   const surfaceName = surfaceNameOf(props.project);
   return <>
-    {tilts.map((item, index) => <div key={String(item.surfaceId)} className="nta-form-row">
+    {tilts.map((item, index) => <div key={String(item.surfaceId)} className="nta-form-row" role="group"
+      aria-label={surfaceName(item.surfaceId)}>
       <NumberField {...f} path={['surfaceTilts', index, 'tiltDeg']} label={`${surfaceName(item.surfaceId)} — ${t('nta.form.tilt')}`} />
       <TextField {...f} path={['surfaceTilts', index, 'sourceReference']} label={t('nta.form.source')} />
     </div>)}
@@ -502,7 +520,8 @@ function GroundFloorsSection(props: NtaSectionProps) {
   const ground = (read(draft, ['groundFloors']) as Draft[] | undefined) ?? [];
   const surfaceName = surfaceNameOf(props.project);
   return <>
-    {ground.map((item, index) => <div key={String(item.surfaceId)} className="nta-form-row">
+    {ground.map((item, index) => <div key={String(item.surfaceId)} className="nta-form-row" role="group"
+      aria-label={surfaceName(item.surfaceId)}>
       <NumberField {...f} path={['groundFloors', index, 'exposedPerimeterM']} label={`${surfaceName(item.surfaceId)} — ${t('nta.form.perimeter')}`} />
       <NumberField {...f} path={['groundFloors', index, 'constructionResistanceM2kPerW']} label={t('nta.form.floorResistance')} />
       <label data-path={`ntaCalculation.groundFloors[${index}].edgeThermalBridges`}>{t('nta.form.edgeBridges')}
@@ -525,15 +544,32 @@ function GroundFloorsSection(props: NtaSectionProps) {
   </>;
 }
 
+function ThermalBridgeRouteSection({ draft, change }: NtaSectionProps) {
+  const { t } = useI18n();
+  return <>
+    <label data-path="ntaCalculation.thermalBridgeRoute">{t('nta.form.thermalBridgeRoute')}
+      <select value={String(read(draft, ['thermalBridgeRoute']) ?? '')}
+        onChange={(event) => change(['thermalBridgeRoute'], event.target.value || null)}>
+        <option value="">{t('nta.form.thermalBridgeRoute.fromFloors')}</option>
+        <option value="forfait">{t('nta.form.thermalBridgeRoute.forfait')}</option>
+        <option value="detailed">{t('nta.form.thermalBridgeRoute.detailed')}</option>
+      </select>
+    </label>
+    <p className="nta-form-note">{t('nta.form.thermalBridgeRoute.note')}</p>
+  </>;
+}
+
 function VerticalPipesSection({ draft, change, project }: NtaSectionProps) {
   const { t } = useI18n();
-  const residential = residentialScope(draft);
+  // The route (storeys or building height) follows the zone's use function, as in the kernel.
   return <>
     {project.zones.length > 1
       ? ((read(draft, ['zoneData']) as Draft[] | undefined) ?? []).map((item, index) =>
-        <VerticalPipesFields key={String(item.zoneId)} draft={draft} change={change} residential={residential}
+        <VerticalPipesFields key={String(item.zoneId)} draft={draft} change={change}
+          residential={verticalPipesResidential(draft, item)}
           path={['zoneData', index, 'verticalPipes']} label={String(item.zoneId)} />)
-      : <VerticalPipesFields draft={draft} change={change} residential={residential} path={['verticalPipes']} />}
+      : <VerticalPipesFields draft={draft} change={change} residential={verticalPipesResidential(draft)}
+        path={['verticalPipes']} />}
     <p className="nta-form-note">{t('nta.form.verticalPipes.note')}</p>
   </>;
 }
@@ -559,14 +595,13 @@ function VentilationModeSection(props: NtaSectionProps) {
     </label>
     {!chapter11 && <>
       <label data-path="ntaCalculation.ventilationFlows">{t('nta.form.ventilationConstant')}
-        <input type="number" step="any" value={typeof constantConductance === 'number' ? constantConductance : ''}
-          onChange={(event) => setConstantVentilation(event.target.value === '' ? null : Number(event.target.value))} />
+        <NumberInput value={typeof constantConductance === 'number' ? constantConductance : null}
+          onChange={(next) => setConstantVentilation(next ?? null)} />
       </label>
       <label>{t('nta.form.ventilationFlow')}
-        <input type="number" step="any" value={typeof constantConductance === 'number'
-          ? Math.round((constantConductance / AIR_HEAT_CAPACITY_W_PER_M3H_K) * 100) / 100 : ''}
-          onChange={(event) => setConstantVentilation(event.target.value === ''
-            ? null : Number(event.target.value) * AIR_HEAT_CAPACITY_W_PER_M3H_K)} />
+        <NumberInput value={typeof constantConductance === 'number'
+          ? Math.round((constantConductance / AIR_HEAT_CAPACITY_W_PER_M3H_K) * 100) / 100 : null}
+          onChange={(next) => setConstantVentilation(next == null ? null : next * AIR_HEAT_CAPACITY_W_PER_M3H_K)} />
       </label>
       <TextField {...f} path={['ventilationFlows', 0, 'sourceReference']} label={t('nta.form.source')} />
       <p className="nta-form-note">{t('nta.form.ventilationNote')}</p>
@@ -578,6 +613,9 @@ function VentilationModeSection(props: NtaSectionProps) {
   </>;
 }
 
+/** Air heating and local heaters have no hydronic balancing (table 9.3 footnote a). */
+const nonHydronicEmission = (system: unknown) => system === 'air_heating' || system === 'local_heater';
+
 function EmissionSection(props: NtaSectionProps) {
   const { t } = useI18n();
   const { draft, change } = props;
@@ -586,7 +624,14 @@ function EmissionSection(props: NtaSectionProps) {
     <SelectField {...f} path={['emission', 'system']} label={t('nta.form.emissionSystem')} options={[
       ['radiators_or_convectors', t('nta.form.emission.radiators')], ['floor_heating', t('nta.form.emission.floor')],
       ['fan_assisted_radiators_or_convectors', t('nta.form.emission.fanAssisted')],
-      ['air_heating', t('nta.form.emission.air')], ['local_heater', t('nta.form.emission.local')], ['other_or_unknown', t('nta.form.unknown')]]} />
+      ['air_heating', t('nta.form.emission.air')], ['local_heater', t('nta.form.emission.local')], ['other_or_unknown', t('nta.form.unknown')]]}
+      // Table 9.3 footnote a: hydronic balancing applies to a water system only (emission_balancing_inconsistent).
+      onChange={(_, value) => props.update((current) => {
+        const next = write(current, ['emission', 'system'], value);
+        const balancing = read(current, ['emission', 'balancing']);
+        if (nonHydronicEmission(value)) return write(next, ['emission', 'balancing'], 'not_applicable');
+        return balancing === 'not_applicable' ? write(next, ['emission', 'balancing'], 'none_or_unknown') : next;
+      })} />
     {(read(draft, ['emission', 'system']) === 'air_heating' || read(draft, ['emission', 'airHeaters']) != null) &&
       <AirHeatersFields draft={draft} change={change} />}
     <HeatingEmission2023Fields draft={draft} change={change} />
@@ -620,9 +665,12 @@ function EmissionControlSection(props: NtaSectionProps) {
   const { t } = useI18n();
   const f = fieldOf(props);
   return <>
-    <SelectField {...f} path={['emission', 'balancing']} label={t('nta.form.balancing')} options={[
-      ['none_or_unknown', t('nta.form.unknown')], ['static', t('nta.form.balancing.static')],
-      ['dynamic', t('nta.form.balancing.dynamic')], ['not_applicable', t('nta.form.balancing.na')]]} />
+    <SelectField {...f} path={['emission', 'balancing']} label={t('nta.form.balancing')}
+      // Only the choices table 9.3 allows for this emission system (footnote a).
+      options={nonHydronicEmission(read(props.draft, ['emission', 'system']))
+        ? [['not_applicable', t('nta.form.balancing.na')]]
+        : [['none_or_unknown', t('nta.form.unknown')], ['static', t('nta.form.balancing.static')],
+          ['dynamic', t('nta.form.balancing.dynamic')]]} />
     <SelectField {...f} path={['emission', 'control']} label={t('nta.form.control')} options={[
       ['main_room_thermostat', t('nta.form.control.main')], ['central_with_room_valves', t('nta.form.control.central')],
       ['individual_room_thermostats', t('nta.form.control.individual')], ['other_or_unknown', t('nta.form.unknown')]]} />
@@ -655,14 +703,15 @@ function HotWaterSection(props: NtaSectionProps) {
   return <>
     {residential
       ? <NumberField {...f} path={['hotWater', 'need', 'dwellingCount']} label={t('nta.form.dwellingCount')} step="1" />
-      : <>
+      : <CommonSpaceFillField draft={draft} change={change} path={['hotWater', 'need', 'areas']}
+        available={((read(draft, ['additionalHotWaterSystems']) as unknown[] | undefined) ?? []).length === 0}>
         <SelectField {...f} path={['hotWater', 'need', 'areas', 0, 'function']} label={t('nta.form.hotWaterFunction')} options={[
           ['office', t('nta.form.label.office')], ['education', t('nta.form.label.education')], ['retail', t('nta.form.label.retail')],
           ['sport', t('nta.form.label.sport')], ['lodging', t('nta.form.label.lodging')], ['cell', t('nta.form.label.cell')],
           ['assembly_without_day_care', t('nta.form.label.assembly')], ['assembly_with_day_care', t('nta.form.label.dayCare')],
           ['healthcare_without_beds', t('nta.form.label.healthcare')], ['healthcare_with_beds', t('nta.form.label.healthcareBeds')]]} />
         <NumberField {...f} path={['hotWater', 'need', 'areas', 0, 'areaM2']} label={t('nta.form.area')} />
-      </>}
+      </CommonSpaceFillField>}
     <TextField {...f} path={['hotWater', 'need', 'sourceReference']} label={t('nta.form.source')} />
     {residential ? <>
       <SelectField {...f} path={['hotWater', 'emission', 'served']} label={t('nta.form.hotWaterTaps')} options={[
@@ -671,11 +720,11 @@ function HotWaterSection(props: NtaSectionProps) {
       <KitchenPipeDiameterField draft={draft} change={change} path={['hotWater', 'emission', 'kitchenPipeDiameter']} />
       <NumberField {...f} path={['hotWater', 'emission', 'bathroomLengthM']} label={t('nta.form.hotWaterBathroomLength')} />
     </> : <NumberField {...f} path={['hotWater', 'emission', 'meanLengthM']} label={t('nta.form.hotWaterMeanLength')} />}
-    <TextField {...f} path={['hotWater', 'emission', 'sourceReference']} label={t('nta.form.source')} />
+    <TextField {...f} path={['hotWater', 'emission', 'sourceReference']} label={t('nta.form.hotWaterEmissionSource')} />
     <HotWaterGeneratorFields draft={draft} change={change} base={['hotWater', 'generator']} />
     <HotWaterGeneratorsFields draft={draft} change={change} />
     <HotWaterStorageFields draft={draft} change={change} />
-    <CirculationPsiFields draft={draft} change={change} />
+    <HotWaterCirculationFields draft={draft} change={change} base={['hotWater']} />
     <TextField {...f} path={['hotWater', 'equipmentReference']} label={t('nta.form.boilerEquipmentSource')} />
   </>;
 }
@@ -746,6 +795,11 @@ export const NTA_SECTIONS: NtaSectionDef[] = [
     paths: ['labelFunctions', 'bblFunctions', 'functionAreas'] },
   { id: 'setpoints', step: 'building', sub: 'zones', titleKey: 'nta.form.setpoints', Component: SetpointsSection, paths: ['setpoints'] },
   { id: 'mass', step: 'building', sub: 'zones', titleKey: 'nta.form.mass', Component: MassSection, paths: ['thermalMass'] },
+  { id: 'zoneData', step: 'building', sub: 'zones', titleKey: 'nta.zoneData.title',
+    Component: ({ draft, change, project }) => <ZoneDataFields draft={draft} change={change} project={project} />, paths: ['zoneData'],
+    // A single utility zone needs the section too: function areas and common spaces (6.6.4) live on zone data only.
+    when: (project, draft) => project.zones.length > 1 || listed('zoneData')(project, draft)
+      || read(draft, ['calculationScope']) === 'utility' },
   { id: 'internalGains', step: 'building', sub: 'zones', titleKey: 'nta.form.internalGains', Component: InternalGainsSection, paths: ['internalGains'] },
   { id: 'windows', step: 'building', sub: 'envelope', titleKey: 'nta.form.windows', Component: WindowsSection, paths: ['windowSolar'] },
   { id: 'windowObstructions', step: 'building', sub: 'envelope', titleKey: 'nta.form.windowObstructions.title',
@@ -760,11 +814,13 @@ export const NTA_SECTIONS: NtaSectionDef[] = [
   { id: 'dynamicWindows', step: 'building', sub: 'envelope', titleKey: 'nta.form.dynamic.title', Component: DynamicWindowsSection,
     paths: ['dynamicWindows'], advanced: true },
   { id: 'sunrooms', step: 'building', sub: 'unheated', titleKey: 'nta.form.sunroom.title',
-    Component: ({ draft, change }) => <SunroomsFields draft={draft} change={change} />, paths: ['sunrooms'] },
+    Component: ({ draft, change, project }) => <SunroomsFields draft={draft} change={change} project={project} />, paths: ['sunrooms'] },
   { id: 'roofTilts', step: 'building', sub: 'envelope', titleKey: 'nta.form.roofTilts', Component: RoofTiltsSection,
     paths: ['surfaceTilts'], when: listed('surfaceTilts') },
   { id: 'groundFloors', step: 'building', sub: 'envelope', titleKey: 'nta.form.groundFloors', Component: GroundFloorsSection,
     paths: ['groundFloors'], when: listed('groundFloors') },
+  { id: 'thermalBridgeRoute', step: 'building', sub: 'envelope', titleKey: 'nta.form.thermalBridgeRoute', Component: ThermalBridgeRouteSection,
+    paths: ['thermalBridgeRoute'] },
   { id: 'verticalPipes', step: 'installations', sub: 'heating', part: 'distribution', titleKey: 'nta.form.verticalPipes',
     Component: VerticalPipesSection, paths: ['verticalPipes'], advanced: true },
   { id: 'ventilation', step: 'installations', sub: 'ventilation', titleKey: 'nta.form.ventilation', Component: VentilationModeSection,

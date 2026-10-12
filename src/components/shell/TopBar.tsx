@@ -141,7 +141,7 @@ export function TopBar(props: TopBarProps) {
 
       <button type="button" className="top-bar-search" onClick={props.onOpenPalette} title={t('shell.search')} aria-keyshortcuts="Control+K"
         aria-haspopup="dialog">
-        <Search aria-hidden="true" /><span>{t('shell.search')}</span><Kbd>Ctrl K</Kbd>
+        <Search aria-hidden="true" /><span className="top-bar-label">{t('shell.search')}</span><Kbd>Ctrl K</Kbd>
       </button>
 
       <div className="top-bar-actions">
@@ -171,9 +171,9 @@ export function TopBar(props: TopBarProps) {
         </div>
         {props.hasDocument && <>
           <Button icon={<Save aria-hidden="true" />} onClick={props.onSaveProject} title={`${t('ribbon.save')} (Ctrl+S)`}
-            aria-keyshortcuts="Control+S">{t('shell.save')}</Button>
+            aria-keyshortcuts="Control+S"><span className="top-bar-label">{t('shell.save')}</span></Button>
           <Button variant="primary" icon={<RefreshCw aria-hidden="true" />} kbd="Ctrl ↵" onClick={props.onRecalculate}
-            loading={props.recalculating} aria-keyshortcuts="Control+Enter">{t('shell.recalculate')}</Button>
+            loading={props.recalculating} aria-keyshortcuts="Control+Enter"><span className="top-bar-label">{t('shell.recalculate')}</span></Button>
           <IconButton icon={<PanelRight aria-hidden="true" />} aria-label={t('shell.inspector')} aria-pressed={props.inspectorOpen}
             aria-keyshortcuts="Control+." onClick={props.onToggleInspector} />
         </>}

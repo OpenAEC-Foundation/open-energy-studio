@@ -1,0 +1,596 @@
+{
+  "id": "public-comparison-i",
+  "name": "Vergelijking openbaar rapport I (kantoor met bijeenkomstfunctie in bedrijfspand)",
+  "description": "Fictieve herbouw van een openbaar BENG-rapport (Uniec 3.0.9.3, NTA 8800:2020+A1); niet het echte gebouw. Een rekenzone met kantoor- en bijeenkomstfunctie en een gemeenschappelijke ruimte, luchtwarmtepomp met recirculatieluchtverwarming, balansventilatie met WTW, compressiekoeling, 125 PV-panelen.",
+  "buildingFunction": "office",
+  "address": "Fictief adres",
+  "city": "Fictief",
+  "zones": [
+    {
+      "id": "z1",
+      "name": "Rekenzone 1",
+      "floorArea": 439.04,
+      "volume": 1536.64,
+      "height": 3.5,
+      "surfaces": [
+        {
+          "id": "nw",
+          "name": "Noordwestgevel (rekenzone en gemeenschappelijk)",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 38.08,
+          "orientation": "NW",
+          "constructionId": "c-gevel",
+          "zoneId": "z1",
+          "windows": [
+            {
+              "id": "receptie-nw",
+              "name": "Receptie",
+              "area": 13.52,
+              "uValue": 1.4,
+              "gValue": 0.5,
+              "orientation": "NW",
+              "surfaceId": "nw"
+            },
+            {
+              "id": "entree",
+              "name": "Entree",
+              "area": 14.37,
+              "uValue": 1.4,
+              "gValue": 0.5,
+              "orientation": "NW",
+              "surfaceId": "nw"
+            }
+          ]
+        },
+        {
+          "id": "w",
+          "name": "Westgevel (rekenzone en gemeenschappelijk)",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 106.35,
+          "orientation": "W",
+          "constructionId": "c-gevel",
+          "zoneId": "z1",
+          "windows": [
+            {
+              "id": "receptie-w",
+              "name": "Receptie",
+              "area": 8.08,
+              "uValue": 1.4,
+              "gValue": 0.5,
+              "orientation": "W",
+              "surfaceId": "w"
+            },
+            {
+              "id": "kantoortuin",
+              "name": "Open kantoortuin",
+              "area": 30.97,
+              "uValue": 1.4,
+              "gValue": 0.5,
+              "orientation": "W",
+              "surfaceId": "w"
+            },
+            {
+              "id": "vergaderzaal",
+              "name": "Vergaderzaal",
+              "area": 15.06,
+              "uValue": 1.4,
+              "gValue": 0.5,
+              "orientation": "W",
+              "surfaceId": "w"
+            },
+            {
+              "id": "kantoor",
+              "name": "Kantoor",
+              "area": 16.12,
+              "uValue": 1.4,
+              "gValue": 0.5,
+              "orientation": "W",
+              "surfaceId": "w"
+            },
+            {
+              "id": "hal",
+              "name": "Hal",
+              "area": 5.27,
+              "uValue": 1.4,
+              "gValue": 0.5,
+              "orientation": "W",
+              "surfaceId": "w"
+            }
+          ]
+        },
+        {
+          "id": "dak",
+          "name": "Plat dak",
+          "type": "roof",
+          "thermalBoundary": "outdoor",
+          "area": 448.47,
+          "orientation": "horizontal",
+          "constructionId": "c-dak",
+          "zoneId": "z1",
+          "windows": []
+        },
+        {
+          "id": "vloer",
+          "name": "Begane grondvloer",
+          "type": "floor",
+          "thermalBoundary": "ground",
+          "area": 448.47,
+          "orientation": "horizontal",
+          "constructionId": "c-vloer",
+          "zoneId": "z1",
+          "windows": []
+        }
+      ],
+      "thermalBridges": [
+        {
+          "id": "tb-NW-0.15",
+          "name": "psi 0.15",
+          "psiValue": 0.15,
+          "length": 10.16,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NW"
+          ]
+        },
+        {
+          "id": "tb-NW-0.09",
+          "name": "psi 0.09",
+          "psiValue": 0.09,
+          "length": 11.4,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NW"
+          ]
+        },
+        {
+          "id": "tb-NW-0.1",
+          "name": "psi 0.1",
+          "psiValue": 0.1,
+          "length": 10.16,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NW"
+          ]
+        },
+        {
+          "id": "tb-NW-0.14",
+          "name": "psi 0.14",
+          "psiValue": 0.14,
+          "length": 7.4,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "NW"
+          ]
+        },
+        {
+          "id": "tb-W-0.15",
+          "name": "psi 0.15",
+          "psiValue": 0.15,
+          "length": 28.34,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "W"
+          ]
+        },
+        {
+          "id": "tb-W-0.09",
+          "name": "psi 0.09",
+          "psiValue": 0.09,
+          "length": 23.45,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "W"
+          ]
+        },
+        {
+          "id": "tb-W-0.1",
+          "name": "psi 0.1",
+          "psiValue": 0.1,
+          "length": 29.32,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "W"
+          ]
+        },
+        {
+          "id": "tb-horizontal-0.16",
+          "name": "psi 0.16",
+          "psiValue": 0.16,
+          "length": 46.53,
+          "zoneId": "z1",
+          "thermalBoundary": "outdoor",
+          "orientations": [
+            "horizontal"
+          ]
+        }
+      ],
+      "airTightness": {
+        "qv10": 0.69
+      },
+      "pointThermalBridges": [],
+      "pointBridgeInventoryComplete": true
+    }
+  ],
+  "heatingSystems": [],
+  "ventilationSystems": [],
+  "coolingSystems": [],
+  "hotWaterSystems": [],
+  "solarPV": [],
+  "solarThermal": [],
+  "unheatedSpaces": [],
+  "constructions": [
+    {
+      "id": "c-gevel",
+      "name": "Gevel Rc 4,70",
+      "layers": [],
+      "rcValue": 4.7,
+      "uValue": 0.2053
+    },
+    {
+      "id": "c-dak",
+      "name": "Plat dak Rc 6,30",
+      "layers": [],
+      "rcValue": 6.3,
+      "uValue": 0.1553
+    },
+    {
+      "id": "c-vloer",
+      "name": "Begane grondvloer Rc 3,70",
+      "layers": [],
+      "rcValue": 3.7,
+      "uValue": 0.2558
+    }
+  ],
+  "ntaCalculation": {
+    "calculationScope": "utility",
+    "constructionYear": 2021,
+    "areaSourceReference": "openbare bron Uniec 3.0.9.3 printout (verbouw bedrijfspand Seafarm 439,04 m2, 01-04-2021): Ag 439,04 m2: bijeenkomst overig 64,08, kantoor 251,80 en gemeenschappelijke ruimte 123,16 (naar rato over beide functies)",
+    "usageFunction": "office",
+    "setpoints": {
+      "heatingC": 21.0,
+      "coolingC": 24.0,
+      "sourceReference": "tabel 7.13: kantoor en bijeenkomst overig 21/24"
+    },
+    "thermalMass": {
+      "floor": "heavy",
+      "wall": "light",
+      "ceiling": "closed_or_suspended",
+      "sourceReference": "openbare bron Uniec 3.0.9.3 printout (verbouw bedrijfspand Seafarm 439,04 m2, 01-04-2021): hsb/sfb/staalskelet met staalbeton of niet-massieve betonnen vloeren, gesloten of verlaagd plafond, 1 bouwlaag; tabel 7.10 rij 250 tot 500 kg/m2, 110 kJ/m2K, C_m 48 290 000 J/K (2020+A1 p. 179-180)"
+    },
+    "internalGains": {
+      "method": "utility",
+      "lighting": {
+        "method": "chapter14"
+      },
+      "sourceReference": "tabellen 7.2/7.3 per functie; verlichting uit hoofdstuk 14"
+    },
+    "windowSolar": {
+      "frameFraction": 0.25,
+      "obstruction": {
+        "method": "minimal"
+      },
+      "sourceReference": "default F_F; openbare bron Uniec 3.0.9.3 printout (verbouw bedrijfspand Seafarm 439,04 m2, 01-04-2021): minimale belemmering tenzij per raam anders"
+    },
+    "groundFloors": [
+      {
+        "surfaceId": "vloer",
+        "exposedPerimeterM": 46.53,
+        "constructionResistanceM2kPerW": 3.87,
+        "edgeThermalBridges": {
+          "method": "detailed",
+          "bridges": [
+            {
+              "lengthM": 46.53,
+              "psiWPerMk": 0.27,
+              "sourceReference": "I.1 nr 01"
+            }
+          ]
+        },
+        "sourceReference": "openbare bron Uniec 3.0.9.3 printout (verbouw bedrijfspand Seafarm 439,04 m2, 01-04-2021): op/boven mv, z <= 0,3; Rc 3,70 + R_si 0,17; omtrek niet in de uitdraai, aangenomen gelijk aan de lengte van de funderingsaansluitingen (39,59 + 6,94 m)"
+      }
+    ],
+    "ventilationFlows": [],
+    "emission": {
+      "system": "air_heating",
+      "balancing": "not_applicable",
+      "control": "other_or_unknown",
+      "sourceReference": "openbare bron Uniec 3.0.9.3 printout (verbouw bedrijfspand Seafarm 439,04 m2, 01-04-2021): recirculatieluchtverwarming, vertrekhoogte <= 4 m, regeling forfaitair (dT 1,1 K)",
+      "airHeaters": {
+        "kind": {
+          "kind": "indirect",
+          "roomHeightAbove8M": false,
+          "warmAirReturn": true
+        },
+        "sourceReference": "openbare bron Uniec 3.0.9.3 printout (verbouw bedrijfspand Seafarm 439,04 m2, 01-04-2021): onbekende ventilator met terugkeer warme lucht (tabel 9.13), forfaitair 119,6 W"
+      },
+      "edition2023": {
+        "kind": {
+          "type": "ventilation_air",
+          "configuration": "recirculation"
+        },
+        "pipeSystem": "not_hydronic"
+      }
+    },
+    "distribution": {
+      "method": "heated_zone_only_space_heating",
+      "sourceReference": "openbare bron Uniec 3.0.9.3 printout (verbouw bedrijfspand Seafarm 439,04 m2, 01-04-2021): geen watergedragen distributie; geen leidingen buiten de verwarmde zone"
+    },
+    "generator": {
+      "kind": "heat_pump_forfait",
+      "forfait": {
+        "generatorId": "wp",
+        "classificationSourceReference": "openbare bron Uniec 3.0.9.3 printout (verbouw bedrijfspand Seafarm 439,04 m2, 01-04-2021): elektrische warmtepomp forfaitair, buitenlucht, afgifte binnenlucht, COP 2,80",
+        "scope": "utility_collective_or_over25_kw",
+        "source": "outdoor_air",
+        "sink": "indoor_air",
+        "installationYear": 2021,
+        "installationYearReference": "openbare bron Uniec 3.0.9.3 printout (verbouw bedrijfspand Seafarm 439,04 m2, 01-04-2021): nieuwbouw, bouwjaar 2021"
+      },
+      "sourceSystem": "individual",
+      "sourceSystemReference": "buitenlucht"
+    },
+    "bacsFactor": 1.0,
+    "bacsSourceReference": "openbare bron Uniec 3.0.9.3 printout (verbouw bedrijfspand Seafarm 439,04 m2, 01-04-2021): geen GBS in de uitdraai",
+    "useInventoryComplete": true,
+    "declaredUses": [],
+    "productionInventoryComplete": true,
+    "pvSystems": [
+      {
+        "id": "pv",
+        "peakPower": {
+          "method": "declared_specific",
+          "peakPowerWPerM2": 200.0,
+          "panelAreaM2": 187.5
+        },
+        "azimuthDeg": 135.0,
+        "tiltDeg": 15.0,
+        "mounting": "strongly_ventilated",
+        "obstructionFactors": [
+          1.0
+        ],
+        "sourceReference": "openbare bron Uniec 3.0.9.3 printout (verbouw bedrijfspand Seafarm 439,04 m2, 01-04-2021): 125 panelen van 300 Wp, zuidoost 15 graden, sterk geventileerd, minimale belemmering; paneeloppervlak niet in de uitdraai, aangenomen 1,5 m2 (200 Wp/m2)"
+      }
+    ],
+    "lighting": [
+      {
+        "zoneId": "z1",
+        "functions": [
+          {
+            "function": "office",
+            "areaM2": 349.98
+          },
+          {
+            "function": "assembly_without_day_care",
+            "areaM2": 89.06
+          }
+        ],
+        "lightingZones": [
+          {
+            "id": "vz1",
+            "areaM2": 315.88,
+            "power": {
+              "method": "installed",
+              "luminaires": [
+                {
+                  "count": 1,
+                  "power": {
+                    "method": "system",
+                    "powerW": 1895.28
+                  }
+                }
+              ],
+              "sourceReference": "openbare bron Uniec 3.0.9.3 printout (verbouw bedrijfspand Seafarm 439,04 m2, 01-04-2021): eigen waarde 6,00 W/m2 over 315.88 m2"
+            },
+            "parasitic": {
+              "method": "forfait"
+            },
+            "occupancy": {
+              "control": "manual_or_unknown",
+              "centralOnControl": false,
+              "largeOfficeGroup": false
+            },
+            "daylight": {
+              "method": "none"
+            },
+            "extractedLuminaires": false
+          },
+          {
+            "id": "vz-gemeenschappelijk",
+            "areaM2": 123.16,
+            "power": {
+              "method": "installed",
+              "luminaires": [
+                {
+                  "count": 1,
+                  "power": {
+                    "method": "system",
+                    "powerW": 738.96
+                  }
+                }
+              ],
+              "sourceReference": "openbare bron Uniec 3.0.9.3 printout (verbouw bedrijfspand Seafarm 439,04 m2, 01-04-2021): eigen waarde 6,00 W/m2 over 123.16 m2"
+            },
+            "parasitic": {
+              "method": "forfait"
+            },
+            "occupancy": {
+              "control": "manual_or_unknown",
+              "centralOnControl": false,
+              "largeOfficeGroup": false
+            },
+            "daylight": {
+              "method": "none"
+            },
+            "extractedLuminaires": false
+          }
+        ],
+        "sourceReference": "openbare bron Uniec 3.0.9.3 printout (verbouw bedrijfspand Seafarm 439,04 m2, 01-04-2021): eigen verlichtingsvermogen 6,00 W/m2, parasitair forfaitair, vertrek hand aan/uit, geen daglichtregeling"
+      }
+    ],
+    "labelFunction": "office",
+    "demandUsesFixedC1Ventilation": false,
+    "batteryStoragePresent": false,
+    "bblFunction": "office",
+    "verticalPipes": [
+      {
+        "id": "toiletgroep",
+        "buildingHeightM": 10.0,
+        "insulated": false,
+        "sourceReference": "openbare bron Uniec 3.0.9.3 printout (verbouw bedrijfspand Seafarm 439,04 m2, 01-04-2021): verticale leidingen onbekend, 1 toiletgroep"
+      }
+    ],
+    "ventilation": {
+      "zoneId": "z1",
+      "usableFloorAreaM2": 439.04,
+      "category": "utility",
+      "functions": [
+        {
+          "function": "office",
+          "areaM2": 349.98,
+          "swimmingPool": false
+        },
+        {
+          "function": "other_assembly",
+          "areaM2": 89.06,
+          "swimmingPool": false
+        }
+      ],
+      "dwellingCount": 0,
+      "apartmentBuilding": false,
+      "buildingHeightM": 10.0,
+      "constructionYear": 2021,
+      "floorAboveCrawlspace": false,
+      "heatingSetpointC": 21.0,
+      "coolingSetpointC": 24.0,
+      "system": {
+        "kind": "single",
+        "unit": {
+          "variant": "d2",
+          "ducts": "luka_a_b_c",
+          "heatRecovery": {
+            "efficiency": {
+              "method": "table",
+              "exchanger": "counter_flow_aluminium"
+            },
+            "bypass": {
+              "kind": "full"
+            },
+            "layout": "central",
+            "constantVolumeControl": false,
+            "supplyDuctInsulation": {
+              "kind": "insulated"
+            },
+            "equipmentReference": "openbare bron Uniec 3.0.9.3 printout (verbouw bedrijfspand Seafarm 439,04 m2, 01-04-2021): tegenstroom aluminium 0,750, 100 % bypass"
+          },
+          "equipmentReference": "openbare bron Uniec 3.0.9.3 printout (verbouw bedrijfspand Seafarm 439,04 m2, 01-04-2021): D.2 centrale WTW zonder zonering, zonder sturing, forfaitair"
+        }
+      },
+      "flowReduction": {
+        "collective": false
+      },
+      "infiltration": {
+        "method": "measured",
+        "qv10DmPerSM2": 0.69,
+        "sourceReference": "openbare bron Uniec 3.0.9.3 printout (verbouw bedrijfspand Seafarm 439,04 m2, 01-04-2021): geen meetwaarde; q_v10;lea;ref 0,69 uit de uitdraai overgenomen"
+      },
+      "combustionAppliances": [],
+      "fans": {
+        "method": "forfait",
+        "current": "dc",
+        "manufactureYear": 2021
+      },
+      "sourceReference": "openbare bron Uniec 3.0.9.3 printout (verbouw bedrijfspand Seafarm 439,04 m2, 01-04-2021): Dc balansventilatie, forfaitaire ventilatoren, onbekende volumeregeling"
+    },
+    "hotWater": {
+      "need": {
+        "method": "utility",
+        "areas": [
+          {
+            "function": "office",
+            "areaM2": 349.98
+          },
+          {
+            "function": "assembly_without_day_care",
+            "areaM2": 89.06
+          }
+        ],
+        "sourceReference": "openbare bron Uniec 3.0.9.3 printout (verbouw bedrijfspand Seafarm 439,04 m2, 01-04-2021): tabel 13.1 per functie"
+      },
+      "emission": {
+        "method": "utility",
+        "meanLengthM": 2.0,
+        "sourceReference": "openbare bron Uniec 3.0.9.3 printout (verbouw bedrijfspand Seafarm 439,04 m2, 01-04-2021): uittapleidingen <= 3 m"
+      },
+      "storage": [],
+      "generator": {
+        "kind": "electric_instantaneous"
+      },
+      "equipmentReference": "openbare bron Uniec 3.0.9.3 printout (verbouw bedrijfspand Seafarm 439,04 m2, 01-04-2021): elektrisch doorstroomtoestel forfaitair, COP 0,95"
+    },
+    "normVersion": "2020+A1",
+    "windowObstructions": [
+      {
+        "windowId": "receptie-nw",
+        "obstruction": {
+          "method": "side_obstruction",
+          "side": "right",
+          "relativeWidth": 0.204,
+          "coolingHeightCondition": true
+        },
+        "sourceReference": "openbare bron Uniec 3.0.9.3 printout (verbouw bedrijfspand Seafarm 439,04 m2, 01-04-2021), receptie NW: zijbelemmering rechts, hoogte >= 2,5 m, afstand 7,73 m, breedte 37,85 m, hoek 12 graden; b_b = afstand / breedte"
+      },
+      {
+        "windowId": "entree",
+        "obstruction": {
+          "method": "side_obstruction",
+          "side": "right",
+          "relativeWidth": 0.067,
+          "coolingHeightCondition": true
+        },
+        "sourceReference": "openbare bron Uniec 3.0.9.3 printout (verbouw bedrijfspand Seafarm 439,04 m2, 01-04-2021), entree NW: zijbelemmering rechts, hoogte >= 2,5 m, afstand 2,53 m, breedte 37,85 m, hoek 4 graden; b_b = afstand / breedte"
+      }
+    ],
+    "heatPumpRenewable": {
+      "sourceBelow20C": true,
+      "exhaustAirSource": false,
+      "sourceReference": "outdoor air"
+    },
+    "bblFunctions": [
+      {
+        "function": "office",
+        "areaM2": 349.98
+      },
+      {
+        "function": "other_assembly",
+        "areaM2": 89.06
+      }
+    ],
+    "cooling": {
+      "emission": {
+        "emitter": "fan_coil_or_rac_on_ceiling",
+        "balancing": "not_applicable",
+        "control": "unknown_or_other",
+        "fanCoilCount": 20,
+        "sourceReference": "openbare bron Uniec 3.0.9.3 printout (verbouw bedrijfspand Seafarm 439,04 m2, 01-04-2021): directe expansie plafond, regeling in hoofdvertrek (dT -2,5 K), 20 ventilatoren van 10 W"
+      },
+      "generators": [
+        {
+          "id": "koel",
+          "generator": {
+            "kind": "compression"
+          },
+          "equipmentReference": "openbare bron Uniec 3.0.9.3 printout (verbouw bedrijfspand Seafarm 439,04 m2, 01-04-2021): compressiekoeling forfaitair, EER 3,00, directe expansie"
+        }
+      ]
+    }
+  }
+}

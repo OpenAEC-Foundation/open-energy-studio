@@ -7,6 +7,7 @@ import { renderWithProviders } from './test-utils';
 import type { IProject } from '../core/energy/types';
 import type { ProjectPerformanceAssessment } from '../core/nta/KernelClient';
 import { dutchNumber } from '../core/report/DutchReportText';
+import { SLOW_UI_TEST_MS } from './timeouts';
 
 vi.mock('../core/nta/KernelClient', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../core/nta/KernelClient')>()),
@@ -48,10 +49,10 @@ describe('report builder', () => {
     await user.click(screen.getByRole('radio', { name: /Summary|Samenvatting/ }));
     expect(preview()).not.toContain('Bouwkundige uitgangspunten');
     expect(preview()).toContain(dutchNumber(assessment.performance!.primaryFossilIndicatorKwhPerM2Year, 2));
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 
   it('says so while the kernel is still running', () => {
     renderWithProviders(<ReportBuilder project={project} assessment={null} pending />);
     expect(screen.getByRole('status')).toHaveTextContent(/kernel|rekenkern/i);
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 });

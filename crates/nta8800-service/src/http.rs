@@ -12,7 +12,8 @@ use std::{
 use tokio::sync::Semaphore;
 
 use axum::{
-    extract::{rejection::JsonRejection, DefaultBodyLimit, FromRequest, Request, State},
+    body::Bytes,
+    extract::{DefaultBodyLimit, FromRequest, Request, State},
     http::{header, HeaderMap, HeaderValue, Method as HttpMethod, StatusCode},
     middleware::{self, Next},
     response::{IntoResponse, Response},
@@ -28,19 +29,33 @@ use crate::operations::{error_body, execute, operations, Method, Operation, Outc
 pub struct HttpConfig {
     /// Largest accepted request body in bytes.
     pub body_limit_bytes: usize,
+    /// Largest number of JSON values (array elements, object members,
+    /// scalars) in a request body. The parsed body takes memory per value,
+    /// not per byte (about 30 bytes for a compact array element, roughly
+    /// 100 for an object member), so this caps a request's parsed body
+    /// whatever its byte size. A body above it is refused with 413
+    /// `payload_too_large` before it is parsed.
+    pub max_json_values: usize,
     /// Origins allowed by CORS. Empty: no CORS headers. `*`: any origin.
     pub cors_origins: Vec<String>,
+    /// Host names (the `Host` header without its port) the service answers.
+    /// Empty: any. The API binary fills it with `localhost`, `127.0.0.1`
+    /// and `::1` when it listens on a loopback address, so a web page that
+    /// rebinds its own DNS name to 127.0.0.1 cannot reach the service; any
+    /// other host gets 403 `host_not_allowed`.
+    pub allowed_hosts: Vec<String>,
     /// Write one line per request to stderr.
     pub log_requests: bool,
     /// Calculations that may run at the same time. Further requests wait
     /// for a slot, up to [`HttpConfig::max_waiting_requests`].
     pub max_concurrent_calculations: usize,
     /// Requests that may wait for a calculation slot. A waiting request
-    /// already holds its parsed body, so together with the body limit this
-    /// bounds the memory of the queue: at most
-    /// `(max_concurrent_calculations + max_waiting_requests) × body limit`
-    /// of request bodies. A request beyond it is refused at once with 503
-    /// `server_busy`, before its body is read. `0`: no queue.
+    /// already holds its parsed body. The admitted requests (running plus
+    /// waiting) each hold at most one body of at most
+    /// [`HttpConfig::max_json_values`] values: no route copies it (see
+    /// [`crate::operations::Operation::run`]). A request beyond the queue is
+    /// refused at once with 503 `server_busy`, before its body is read.
+    /// `0`: no queue.
     pub max_waiting_requests: usize,
     /// Longest wait for a free calculation slot. After it the client gets
     /// 503 `server_busy` and no calculation is started.
@@ -67,11 +82,22 @@ pub fn default_max_waiting_requests() -> usize {
     default_max_concurrent_calculations() * 2
 }
 
+/// Default cap on the JSON values of a request: 500 000. A realistic
+/// project has about 650 values per calculation zone (public case H: 1 317
+/// values for 2 zones, 48 kB), so this admits about 750 zones, nearly twice
+/// the largest project the kernel benchmark runs (400 zones).
+pub const DEFAULT_MAX_JSON_VALUES: usize = 500_000;
+
+/// Host names a loopback-bound service answers by default.
+pub const LOOPBACK_HOSTS: [&str; 3] = ["localhost", "127.0.0.1", "::1"];
+
 impl Default for HttpConfig {
     fn default() -> Self {
         Self {
             body_limit_bytes: 16 * 1024 * 1024,
+            max_json_values: DEFAULT_MAX_JSON_VALUES,
             cors_origins: Vec::new(),
+            allowed_hosts: Vec::new(),
             log_requests: false,
             max_concurrent_calculations: default_max_concurrent_calculations(),
             max_waiting_requests: default_max_waiting_requests(),
@@ -91,6 +117,8 @@ struct Limits {
     calculation_timeout: Duration,
     /// `Retry-After` of a 503, in seconds.
     retry_after_secs: u64,
+    /// Cap on the JSON values of a request body.
+    max_json_values: usize,
 }
 
 /// `Retry-After` hint of a 503: a quarter of the calculation timeout,
@@ -104,20 +132,140 @@ fn respond(outcome: Outcome) -> Response {
     (status, Json(outcome.body)).into_response()
 }
 
-fn rejection_outcome(rejection: JsonRejection) -> Outcome {
-    let status = rejection.status();
-    let (http, code) = match status {
-        StatusCode::PAYLOAD_TOO_LARGE => (413, "payload_too_large"),
-        StatusCode::UNSUPPORTED_MEDIA_TYPE => (415, "unsupported_media_type"),
-        _ => (400, "invalid_json"),
-    };
-    Outcome {
-        status: http,
-        body: error_body(code, rejection.body_text(), None, Value::Null),
-    }
+fn outcome(status: u16, body: Value) -> Outcome {
+    Outcome { status, body }
 }
 
-fn busy(code: &'static str, message: String, retry_after_secs: u64) -> Response {
+fn refusal(status: u16, body: Value) -> Response {
+    respond(outcome(status, body))
+}
+
+/// Whether the request declares a JSON body (`application/json` or an
+/// `application/*+json` type), as axum's JSON extractor requires.
+fn is_json_content_type(headers: &HeaderMap) -> bool {
+    let Some(value) = headers
+        .get(header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+    else {
+        return false;
+    };
+    let mime = value
+        .split(';')
+        .next()
+        .unwrap_or("")
+        .trim()
+        .to_ascii_lowercase();
+    mime == "application/json" || (mime.starts_with("application/") && mime.ends_with("+json"))
+}
+
+/// An upper estimate of the JSON values in `bytes`: one per opening
+/// bracket and per comma, plus one. `None` as soon as it exceeds `limit`, so
+/// a huge body is refused without a full scan. Commas and brackets inside
+/// strings do not count.
+pub fn json_value_count(bytes: &[u8], limit: usize) -> Option<usize> {
+    let mut count = 1usize;
+    let mut in_string = false;
+    let mut escaped = false;
+    for &byte in bytes {
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if byte == b'\\' {
+                escaped = true;
+            } else if byte == b'"' {
+                in_string = false;
+            }
+            continue;
+        }
+        match byte {
+            b'"' => in_string = true,
+            b',' | b'[' | b'{' => {
+                count += 1;
+                if count > limit {
+                    return None;
+                }
+            }
+            _ => {}
+        }
+    }
+    Some(count)
+}
+
+/// Reads and parses a request body: JSON content type, at most the body
+/// limit in bytes (the [`DefaultBodyLimit`] layer) and at most
+/// `max_values` JSON values, a JSON object.
+async fn read_json_body(request: Request, max_values: usize) -> Result<Value, Outcome> {
+    if !is_json_content_type(request.headers()) {
+        return Err(outcome(
+            415,
+            error_body(
+                "unsupported_media_type",
+                "Content-Type must be application/json",
+                None,
+                Value::Null,
+            ),
+        ));
+    }
+    let bytes = match Bytes::from_request(request, &()).await {
+        Ok(bytes) => bytes,
+        Err(rejection) if rejection.status() == StatusCode::PAYLOAD_TOO_LARGE => {
+            return Err(outcome(
+                413,
+                error_body(
+                    "payload_too_large",
+                    rejection.body_text(),
+                    None,
+                    Value::Null,
+                ),
+            ))
+        }
+        Err(rejection) => {
+            return Err(outcome(
+                400,
+                error_body("invalid_json", rejection.body_text(), None, Value::Null),
+            ))
+        }
+    };
+    if json_value_count(&bytes, max_values).is_none() {
+        return Err(outcome(
+            413,
+            error_body(
+                "payload_too_large",
+                format!("The request body has more than {max_values} JSON values"),
+                None,
+                json!({ "maxJsonValues": max_values }),
+            ),
+        ));
+    }
+    let body: Value = match serde_json::from_slice(&bytes) {
+        Ok(body) => body,
+        Err(error) => {
+            return Err(outcome(
+                400,
+                error_body(
+                    "invalid_json",
+                    format!("The request body is not valid JSON: {error}"),
+                    None,
+                    Value::Null,
+                ),
+            ))
+        }
+    };
+    if !body.is_object() {
+        return Err(outcome(
+            400,
+            error_body(
+                "invalid_request_shape",
+                "The request body must be a JSON object",
+                None,
+                Value::Null,
+            ),
+        ));
+    }
+    Ok(body)
+}
+
+fn refuse_busy(code: &'static str, message: String, retry_after_secs: u64) -> Response {
     let mut response = respond(Outcome {
         status: 503,
         body: error_body(code, message, None, Value::Null),
@@ -134,27 +282,16 @@ async fn dispatch(op: &'static Operation, limits: Arc<Limits>, request: Request)
     // Admission comes before the body is read, so the queue of waiting
     // requests (each holding its body) stays bounded.
     let Ok(_admitted) = limits.admission.clone().try_acquire_owned() else {
-        return busy(
+        return refuse_busy(
             "server_busy",
             "Too many requests are waiting for a calculation slot; try again later".to_string(),
             limits.retry_after_secs,
         );
     };
-    let body = match Json::<Value>::from_request(request, &()).await {
-        Ok(Json(body)) => body,
-        Err(rejection) => return respond(rejection_outcome(rejection)),
+    let body = match read_json_body(request, limits.max_json_values).await {
+        Ok(body) => body,
+        Err(outcome) => return respond(outcome),
     };
-    if !body.is_object() {
-        return respond(Outcome {
-            status: 400,
-            body: error_body(
-                "invalid_request_shape",
-                "The request body must be a JSON object",
-                None,
-                Value::Null,
-            ),
-        });
-    }
     let slot = match tokio::time::timeout(
         limits.queue_timeout,
         limits.slots.clone().acquire_owned(),
@@ -163,7 +300,7 @@ async fn dispatch(op: &'static Operation, limits: Arc<Limits>, request: Request)
     {
         Ok(Ok(slot)) => slot,
         _ => {
-            return busy(
+            return refuse_busy(
                 "server_busy",
                 format!(
                     "No calculation slot became free within {} s; try again later",
@@ -179,12 +316,12 @@ async fn dispatch(op: &'static Operation, limits: Arc<Limits>, request: Request)
     // however long the request waited for the slot.
     let work = tokio::task::spawn_blocking(move || {
         let _slot = slot;
-        execute(op, &body)
+        execute(op, body)
     });
     let joined = match tokio::time::timeout(limits.calculation_timeout, work).await {
         Ok(joined) => joined,
         Err(_) => {
-            return busy(
+            return refuse_busy(
                 "calculation_timeout",
                 format!(
                     "The calculation took longer than {} s; the result is withheld",
@@ -209,7 +346,7 @@ async fn dispatch(op: &'static Operation, limits: Arc<Limits>, request: Request)
 }
 
 async fn dispatch_get(op: &'static Operation) -> Response {
-    respond((op.run)(&Value::Object(Default::default())))
+    respond((op.run)(Value::Object(Default::default())))
 }
 
 async fn health() -> Json<Value> {
@@ -276,7 +413,9 @@ async fn cors(State(config): State<Arc<HttpConfig>>, request: Request, next: Nex
         return next.run(request).await;
     }
     let origin = allowed_origin(&config, request.headers());
-    if request.method() == HttpMethod::OPTIONS {
+    // Every answer depends on the Origin header once CORS is on, also a
+    // refused preflight, so caches must key on it.
+    let mut response = if request.method() == HttpMethod::OPTIONS {
         let mut response = StatusCode::NO_CONTENT.into_response();
         if let Some(origin) = origin {
             let headers = response.headers_mut();
@@ -293,20 +432,76 @@ async fn cors(State(config): State<Arc<HttpConfig>>, request: Request, next: Nex
                 header::ACCESS_CONTROL_MAX_AGE,
                 HeaderValue::from_static("600"),
             );
-            headers.insert(header::VARY, HeaderValue::from_static("origin"));
         }
-        return response;
-    }
-    let mut response = next.run(request).await;
-    if let Some(origin) = origin {
         response
-            .headers_mut()
-            .insert(header::ACCESS_CONTROL_ALLOW_ORIGIN, origin);
+    } else {
+        let mut response = next.run(request).await;
+        if let Some(origin) = origin {
+            response
+                .headers_mut()
+                .insert(header::ACCESS_CONTROL_ALLOW_ORIGIN, origin);
+        }
         response
-            .headers_mut()
-            .insert(header::VARY, HeaderValue::from_static("origin"));
-    }
+    };
     response
+        .headers_mut()
+        .append(header::VARY, HeaderValue::from_static("Origin"));
+    response
+}
+
+/// The host name of a `Host` header or an allowed-host entry: without its
+/// port, an IPv6 address without its brackets (`[::1]:3007` and `::1` are
+/// both `::1`), in lower case.
+fn host_name(host: &str) -> String {
+    let host = host.trim();
+    let name = if let Some(rest) = host.strip_prefix('[') {
+        rest.split(']').next().unwrap_or("")
+    } else if host.matches(':').count() > 1 {
+        // A bare IPv6 address has no port.
+        host
+    } else {
+        host.split(':').next().unwrap_or("")
+    };
+    name.to_ascii_lowercase()
+}
+
+/// Refuses a request whose `Host` is not an allowed host (DNS rebinding):
+/// a page that points its own name at 127.0.0.1 still sends that name.
+/// A request without `Host` (not a browser) passes.
+async fn host_check(
+    State(config): State<Arc<HttpConfig>>,
+    request: Request,
+    next: Next,
+) -> Response {
+    if config.allowed_hosts.is_empty() {
+        return next.run(request).await;
+    }
+    if let Some(host) = request
+        .headers()
+        .get(header::HOST)
+        .and_then(|value| value.to_str().ok())
+    {
+        let name = host_name(host);
+        let allowed = config
+            .allowed_hosts
+            .iter()
+            .any(|allowed| host_name(allowed) == name);
+        if !allowed {
+            return refusal(
+                403,
+                error_body(
+                    "host_not_allowed",
+                    format!(
+                        "Host {name} is not served; allowed: {}",
+                        config.allowed_hosts.join(", ")
+                    ),
+                    None,
+                    Value::Null,
+                ),
+            );
+        }
+    }
+    next.run(request).await
 }
 
 async fn log_requests(
@@ -345,6 +540,7 @@ pub fn app_with(config: HttpConfig) -> Router {
         queue_timeout: config.queue_timeout,
         calculation_timeout: config.calculation_timeout,
         retry_after_secs: retry_after_secs(&config),
+        max_json_values: config.max_json_values.max(1),
     });
     let config = Arc::new(config);
     let mut router = Router::new()
@@ -367,6 +563,7 @@ pub fn app_with(config: HttpConfig) -> Router {
         .layer(middleware::from_fn(method_not_allowed))
         .layer(DefaultBodyLimit::max(config.body_limit_bytes))
         .layer(middleware::from_fn_with_state(config.clone(), cors))
+        .layer(middleware::from_fn_with_state(config.clone(), host_check))
         .layer(middleware::from_fn_with_state(config, log_requests))
 }
 
@@ -390,9 +587,14 @@ fn input_schema(op: &Operation) -> Value {
             "type": "string",
             "enum": editions,
             "default": nta8800_core::norm_versions::NormVersion::default().id(),
-            "description": "NTA 8800 edition to calculate with (default 2025+C1, the only registrable one). Written into the input's own edition (ntaCalculation.normVersion, survey or building normVersion, maatwerkadvies base, both relabel projects) when absent and must match it when present; diagnostic routes run with it active. Results record normVersion and targetNormVersion; an older edition gives status calculated_legacy_edition and is never registrable, except a relabel in the original's edition. Reference cases accept only 2025+C1."
+            "description": "NTA 8800 edition to calculate with (default 2025+C1, the only registrable one). Written into the input's own edition (ntaCalculation.normVersion, survey or building normVersion, maatwerkadvies base, both relabel projects) when absent and must match it when present; diagnostic routes run with it active. Results record normVersion and targetNormVersion; an older edition gives status calculated_legacy_edition and is never registrable, except a relabel in the original's edition. A reference case is compared in its own case.normVersion (any implemented edition); a request edition must match it. The two diagnostic comparisons (direct-diagnostic, gas-chain-diagnostic) take only 2025+C1."
         }),
     );
+    if op.name == "compare_project_editions" {
+        properties[crate::operations::NORM_VERSION_MEMBER]["description"] = json!(
+            "Target edition to compare the project with (default 2025+C1). The project keeps its own edition in ntaCalculation.normVersion; the result's adjustedProject carries the target."
+        );
+    }
     if op.name == "assess_relabel" {
         properties.insert(
             "current".to_string(),
@@ -404,6 +606,67 @@ fn input_schema(op: &Operation) -> Value {
         "type": "object",
         "properties": properties,
         "required": required,
+        "additionalProperties": false,
+    })
+}
+
+/// JSON Schema of an operation's 200 result. Most results are described in
+/// docs/nta8800-api.md; the edition comparison has its shape here.
+fn result_schema(op: &Operation) -> Value {
+    if op.name == "list_interpretations" {
+        // The one result that is not an object (an MCP tool result wraps it
+        // as `{"result": [...]}`, see bin/mcp.rs).
+        return json!({
+            "type": "array",
+            "items": { "type": "object", "required": ["module", "part", "items"], "properties": {
+                "module": { "type": "string" },
+                "part": { "type": "string" },
+                "items": { "type": "array", "items": { "type": "string" } }
+            } }
+        });
+    }
+    if op.name != "compare_project_editions" {
+        return json!({ "type": "object" });
+    }
+    let editions: Vec<&str> = nta8800_core::norm_versions::NormVersion::ALL
+        .iter()
+        .map(|version| version.id())
+        .collect();
+    json!({
+        "type": "object",
+        "required": ["fromNormVersion", "toNormVersion", "switchPoints", "items", "adjustedProject", "statusAfterAutomaticChanges", "remainingAfterAutomaticChanges"],
+        "properties": {
+            "fromNormVersion": { "type": "string", "enum": editions, "description": "The project's own edition" },
+            "toNormVersion": { "type": "string", "enum": editions, "description": "The requested edition" },
+            "fromLabel": { "type": "string" },
+            "toLabel": { "type": "string" },
+            "switchPoints": {
+                "type": "array",
+                "description": "Switch points of docs/nta8800-normversies.md whose values or routes differ between the two editions",
+                "items": { "type": "object", "properties": {
+                    "points": { "type": "array", "items": { "type": "string" } },
+                    "subject": { "type": "string" },
+                    "fields": { "type": "array", "items": { "type": "string" } },
+                    "hasInputs": { "type": "boolean" }
+                } }
+            },
+            "items": {
+                "type": "array",
+                "items": { "type": "object", "required": ["category", "code", "path", "points", "fix", "resolvedByAutomaticChanges"], "properties": {
+                    "category": { "type": "string", "enum": ["refused", "required", "ignored", "reinterpreted", "warning"] },
+                    "code": { "type": "string", "description": "Kernel code, or input_ignored_in_edition / input_reinterpreted_in_edition" },
+                    "path": { "type": "string", "description": "Project input path, for example ntaCalculation.groundFloors[0].below.wallHeightAboveGroundM" },
+                    "points": { "type": "array", "items": { "type": "string" }, "description": "Switch point numbers" },
+                    "subject": { "type": ["string", "null"] },
+                    "fix": { "type": "string", "enum": ["drop", "switchOff", "set", "enter", "choose", "review"], "description": "drop, switchOff and set are applied in adjustedProject; the others are left to the adviser" },
+                    "value": { "description": "The value a set or switchOff writes; with choose, the value the target edition asks for (named, never written: the table 9.28 test standard is evidence)" },
+                    "resolvedByAutomaticChanges": { "type": "boolean" }
+                } }
+            },
+            "adjustedProject": { "type": "object", "description": "The project in the target edition with the automatic changes applied" },
+            "statusAfterAutomaticChanges": { "type": "string" },
+            "remainingAfterAutomaticChanges": { "type": "array", "items": { "type": "object" }, "description": "Gaps of adjustedProject the project did not have in its own edition" }
+        }
     })
 }
 
@@ -412,9 +675,24 @@ pub fn request_schema(op: &Operation) -> Value {
     input_schema(op)
 }
 
+/// The 405 answer of a route called with another method; `Allow` names the
+/// route's own method.
+fn method_not_allowed_response(method: Method, error: &Value) -> Value {
+    let allow = match method {
+        Method::Get => "GET, HEAD",
+        Method::Post => "POST",
+    };
+    json!({
+        "description": format!("Called with another method than the route's own (method_not_allowed); the Allow header gives {allow}"),
+        "headers": { "Allow": { "description": "The method(s) the route takes", "schema": { "type": "string" } } },
+        "content": { "application/json": { "schema": error } }
+    })
+}
+
 /// OpenAPI 3.1 document built from the operation registry.
 pub fn openapi_document() -> Value {
     let error = json!({ "$ref": "#/components/schemas/Error" });
+    let host_refused = json!({ "description": "The Host header names a host the service does not answer (host_not_allowed; protection against DNS rebinding)", "content": { "application/json": { "schema": error } } });
     let mut paths = serde_json::Map::new();
     paths.insert(
         "/health".to_string(),
@@ -422,8 +700,12 @@ pub fn openapi_document() -> Value {
             "operationId": "health",
             "tags": ["service"],
             "summary": "Liveness check",
-            "responses": { "200": { "description": "Service is up",
-                "content": { "application/json": { "schema": { "type": "object" } } } } }
+            "responses": {
+                "200": { "description": "Service is up",
+                    "content": { "application/json": { "schema": { "type": "object" } } } },
+                "403": host_refused,
+                "405": method_not_allowed_response(Method::Get, &error),
+            }
         }}),
     );
     paths.insert(
@@ -432,8 +714,12 @@ pub fn openapi_document() -> Value {
             "operationId": "openapi",
             "tags": ["service"],
             "summary": "This OpenAPI 3.1 document",
-            "responses": { "200": { "description": "OpenAPI document",
-                "content": { "application/json": { "schema": { "type": "object" } } } } }
+            "responses": {
+                "200": { "description": "OpenAPI document",
+                    "content": { "application/json": { "schema": { "type": "object" } } } },
+                "403": host_refused,
+                "405": method_not_allowed_response(Method::Get, &error),
+            }
         }}),
     );
     for op in operations() {
@@ -445,14 +731,18 @@ pub fn openapi_document() -> Value {
         let mut responses = serde_json::Map::new();
         responses.insert(
             "200".into(),
-            json!({ "description": "Result", "content": { "application/json": { "schema": { "type": "object" } } } }),
+            json!({ "description": "Result", "content": { "application/json": { "schema": result_schema(op) } } }),
         );
+        responses.insert("403".into(), host_refused.clone());
+        responses.insert("405".into(), method_not_allowed_response(op.method, &error));
         if op.method == Method::Post {
-            responses.insert("400".into(), json!({ "description": "Malformed request: invalid JSON, missing member or wrong input shape", "content": { "application/json": { "schema": error } } }));
-            responses.insert("413".into(), json!({ "description": "Request body larger than the configured limit", "content": { "application/json": { "schema": error } } }));
+            responses.insert("400".into(), json!({ "description": "Malformed request: invalid JSON, an unknown or missing member, a wrong input shape or an edition that does not fit", "content": { "application/json": { "schema": error } } }));
+            responses.insert("413".into(), json!({ "description": "Request body larger than the configured byte limit or with more JSON values than the configured value limit", "content": { "application/json": { "schema": error } } }));
             responses.insert("415".into(), json!({ "description": "Content-Type is not application/json", "content": { "application/json": { "schema": error } } }));
-            responses.insert("422".into(), json!({ "description": "The kernel refuses or cannot complete the input; the body is the assessment with its status, gaps and issues", "content": { "application/json": { "schema": { "type": "object" } } } }));
-            responses.insert("500".into(), json!({ "description": "Result withheld (non_finite_result or serialization_failed) or kernel failure", "content": { "application/json": { "schema": error } } }));
+            if crate::operations::may_refuse(op) {
+                responses.insert("422".into(), json!({ "description": "The kernel refuses or cannot complete the input; the body is the assessment with its status, gaps and issues", "content": { "application/json": { "schema": { "type": "object" } } } }));
+            }
+            responses.insert("500".into(), json!({ "description": "Result withheld (non_finite_result or serialization_failed) or kernel failure (kernel_panic)", "content": { "application/json": { "schema": error } } }));
             responses.insert("503".into(), json!({ "description": "Too many requests waiting or no calculation slot free within the queue timeout (server_busy), or the calculation exceeded the calculation timeout (calculation_timeout). The Retry-After header gives the seconds to wait before retrying.", "headers": { "Retry-After": { "description": "Seconds to wait before retrying", "schema": { "type": "integer", "minimum": 1 } } }, "content": { "application/json": { "schema": error } } }));
         }
         if op.name == "calculate_beng" {
@@ -490,14 +780,19 @@ pub fn openapi_document() -> Value {
             ),
             "license": { "name": "LGPL-3.0-or-later" }
         },
-        "servers": [{ "url": "http://127.0.0.1:3007" }],
+        // Relative: the document describes the service that serves it,
+        // wherever it listens (by default http://127.0.0.1:3007).
+        "servers": [{ "url": "/", "description": "The service serving this document (default http://127.0.0.1:3007)" }],
         "paths": paths,
         "components": { "schemas": { "Error": {
             "type": "object",
             "required": ["error", "code", "message"],
             "properties": {
                 "error": { "type": "string", "description": "Machine code (same as code; kept for older clients)" },
-                "code": { "type": "string", "description": "Machine code, e.g. invalid_json, invalid_request_shape, missing_request_member, invalid_project_shape, payload_too_large, unsupported_media_type, not_found, method_not_allowed, non_finite_result, serialization_failed, kernel_panic, calculation_unavailable" },
+                "code": { "type": "string", "description": format!(
+                    "Machine code: {} (unknown_tool from the MCP server only)",
+                    crate::operations::ERROR_CODES.join(", ")
+                ) },
                 "message": { "type": "string" },
                 "path": { "type": ["string", "null"], "description": "JSON path of the offending input or result value" },
                 "details": { "description": "Optional extra data" }

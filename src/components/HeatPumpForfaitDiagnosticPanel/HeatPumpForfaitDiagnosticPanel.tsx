@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useProjectEdition } from '../../context/EnergyContext';
 import type { BuildingFunction, INtaHeatPumpInput } from '../../core/energy/types';
-import { diagnoseForfaitHeatPumpDraftWithRust, type ForfaitHeatPumpDraftAssessment, type ForfaitHeatPumpDraftInput } from '../../core/nta/KernelClient';
+import { diagnoseForfaitHeatPumpDraftWithRust, heatPumpHighTestStandard, type ForfaitHeatPumpDraftAssessment, type ForfaitHeatPumpDraftInput } from '../../core/nta/KernelClient';
 import { useI18n } from '../../i18n/i18n';
 import './HeatPumpForfaitDiagnosticPanel.css';
+import { DecimalInput } from '../ui';
 
 type Source = ForfaitHeatPumpDraftInput['source'];
 type TestCondition = NonNullable<ForfaitHeatPumpDraftInput['highEfficiencyEvidence']>['points'][number]['condition'];
@@ -137,7 +138,7 @@ export function HeatPumpForfaitDiagnosticPanel({ pump, buildingFunction, onSave 
       highEfficiencyEvidence: highRow ? {
         productReference: productReference.trim(),
         testReportReference: testReportReference.trim(),
-        testStandardEdition: 'NEN-EN 14511-2:2022',
+        testStandardEdition: heatPumpHighTestStandard(edition),
         points: conditions.map((item) => ({ condition: item.condition, measuredCop: Number(testCops[item.condition]) })),
       } : null,
       sourceTemperatureC: sourceTemperatureValue,
@@ -181,7 +182,7 @@ export function HeatPumpForfaitDiagnosticPanel({ pump, buildingFunction, onSave 
         {options.map((item) => <option key={item} value={item}>{t(`kernel.forfait.source.${item}`)}</option>)}
       </select></label>
       {sourceTemperatureBounds && <>
-        <label><span>{t('kernel.forfait.sourceTemperature')}</span><input type="number" step="any" value={sourceTemperature}
+        <label><span>{t('kernel.forfait.sourceTemperature')}</span><DecimalInput step="any" value={sourceTemperature}
           onChange={(event) => { invalidate(); setSourceTemperature(event.target.value); }} /></label>
         <label><span>{t('kernel.forfait.sourceTemperatureReference')}</span><input type="text" value={sourceTemperatureReference}
           onChange={(event) => { invalidate(); setSourceTemperatureReference(event.target.value); }} /></label>
@@ -195,7 +196,7 @@ export function HeatPumpForfaitDiagnosticPanel({ pump, buildingFunction, onSave 
       }}><option value="base">{t('kernel.forfait.baseRow')}</option>
         {highRowAvailable && <option value="table_9_28_high_efficiency">{t('kernel.forfait.highRow')}</option>}
       </select></label>
-      {pump.sink === 'hydronic' && <label><span>{t('kernel.forfait.temperature')}</span><input type="number" min="0" max="70" step="any"
+      {pump.sink === 'hydronic' && <label><span>{t('kernel.forfait.temperature')}</span><DecimalInput min="0" max="70" step="any"
         value={temperature} onChange={(event) => { invalidate(); setTemperature(event.target.value); }} /></label>}
       <label><span>{t('kernel.forfait.classificationReference')}</span><input type="text" value={classificationReference}
         onChange={(event) => { invalidate(); setClassificationReference(event.target.value); }} /></label>
@@ -205,10 +206,10 @@ export function HeatPumpForfaitDiagnosticPanel({ pump, buildingFunction, onSave 
         <label><span>{t('kernel.forfait.testReportReference')}</span><input type="text" value={testReportReference}
           onChange={(event) => { invalidate(); setTestReportReference(event.target.value); }} /></label>
         {conditions.map((item) => <label key={item.condition}><span>{item.label} · COP &gt; {item.threshold}</span>
-          <input type="number" min={item.threshold} step="any" value={testCops[item.condition] ?? ''}
+          <DecimalInput min={item.threshold} step="any" value={testCops[item.condition] ?? ''}
             onChange={(event) => { invalidate(); setTestCops((current) => ({ ...current, [item.condition]: event.target.value })); }} /></label>)}
       </>}
-      <label><span>{t('kernel.forfait.capacity')}</span><input type="number" min="0" step="any" value={capacity}
+      <label><span>{t('kernel.forfait.capacity')}</span><DecimalInput min="0" step="any" value={capacity}
         onChange={(event) => { invalidate(); setCapacity(event.target.value); }} /></label>
       <label><span>{t('kernel.forfait.capacityReference')}</span><input type="text" value={capacityReference}
         onChange={(event) => { invalidate(); setCapacityReference(event.target.value); }} /></label>
@@ -219,7 +220,7 @@ export function HeatPumpForfaitDiagnosticPanel({ pump, buildingFunction, onSave 
         <option value="true">{t('kernel.forfait.collectiveYes')}</option>
       </select></label>
       {correctionRequired && <>
-        <label><span>{t('kernel.forfait.factor')}</span><input type="number" min="0" step="any" value={factor}
+        <label><span>{t('kernel.forfait.factor')}</span><DecimalInput min="0" step="any" value={factor}
           onChange={(event) => { invalidate(); setFactor(event.target.value); }} /></label>
         <label><span>{t('kernel.forfait.factorReference')}</span><input type="text" value={factorReference}
           onChange={(event) => { invalidate(); setFactorReference(event.target.value); }} /></label>

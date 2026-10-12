@@ -7,8 +7,22 @@ import type { IProject } from '../../core/energy/types';
 import { labelInputSha256 } from '../../core/nta/Registration';
 import { assessStoredSurvey } from '../../core/nta/SurveyTemplates';
 import type { OpnameAssessment, ProjectPerformanceAssessment } from '../../core/nta/KernelClient';
-import { downloadProjectDossier } from '../../core/report/ReportGenerator';
-import { checkDossierCompleteness, openDossierItems, type DossierItem } from '../../core/report/ProjectDossier';
+import { DossierWriteError, downloadProjectDossier } from '../../core/report/ReportGenerator';
+import {
+  checkDossierCompleteness, DossierTooLargeError, MAX_DOSSIER_BYTES, openDossierItems, type DossierItem,
+} from '../../core/report/ProjectDossier';
+import { useI18n } from '../../i18n/i18n';
+
+const GIB = 1024 * 1024 * 1024;
+
+/** The message for a failed dossier export. */
+export function dossierErrorText(reason: unknown, t: (key: string, options?: Record<string, unknown>) => string): string {
+  if (reason instanceof DossierTooLargeError) {
+    return t('dossier.error.tooLarge', { size: (reason.totalBytes / GIB).toFixed(1), max: MAX_DOSSIER_BYTES / GIB });
+  }
+  if (reason instanceof DossierWriteError) return t('dossier.error.writeFailed', { reason: reason.reason });
+  return reason instanceof Error ? reason.message : String(reason);
+}
 
 export interface DossierState {
   checklist: DossierItem[];
@@ -26,6 +40,7 @@ export function useDossier(
   assessment: ProjectPerformanceAssessment | null,
   kernelPending: boolean,
 ): DossierState {
+  const { t } = useI18n();
   const [exported, setExported] = useState<{ project: IProject; checklist: DossierItem[]; missingEvidence: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +49,7 @@ export function useDossier(
     setBusy(true);
     downloadProjectDossier(project)
       .then((manifest) => setExported({ project, checklist: manifest.checklist, missingEvidence: manifest.missingEvidence.length }))
-      .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : String(reason)))
+      .catch((reason: unknown) => setError(dossierErrorText(reason, t)))
       .finally(() => setBusy(false));
   };
   // The live check uses the same inputs as the dossier export: the kernel

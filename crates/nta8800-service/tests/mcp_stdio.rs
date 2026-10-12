@@ -19,7 +19,15 @@ struct Server {
 
 impl Server {
     fn start() -> Self {
-        let mut child = Command::new(env!("CARGO_BIN_EXE_mcp"))
+        Self::start_with(&[])
+    }
+
+    fn start_with(env: &[(&str, &str)]) -> Self {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_mcp"));
+        for (key, value) in env {
+            command.env(key, value);
+        }
+        let mut child = command
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
@@ -45,6 +53,21 @@ impl Server {
     fn send(&mut self, message: Value) {
         writeln!(self.stdin, "{message}").unwrap();
         self.stdin.flush().unwrap();
+    }
+
+    fn send_raw(&mut self, line: &str) {
+        writeln!(self.stdin, "{line}").unwrap();
+        self.stdin.flush().unwrap();
+    }
+
+    /// The next message on stdout; panics after 60 s, which is what a
+    /// client without an answer would do.
+    fn next(&mut self) -> Value {
+        let line = self
+            .lines
+            .recv_timeout(Duration::from_secs(60))
+            .expect("the server answers");
+        serde_json::from_str(&line).unwrap()
     }
 
     fn request(&mut self, id: u64, method: &str, params: Value) -> Value {
@@ -190,4 +213,61 @@ fn mcp_server_speaks_the_protocol() {
     let text = read["contents"][0]["text"].as_str().unwrap();
     let groups: Value = serde_json::from_str(text).unwrap();
     assert!(!groups.as_array().unwrap().is_empty());
+}
+
+/// Lines the MCP library would leave unanswered get a JSON-RPC error, and
+/// the server keeps answering afterwards: invalid and truncated JSON,
+/// nesting deeper than 128 levels, non-object arguments and a line longer
+/// than the cap (set to 4096 bytes here; 64 MiB by default).
+#[test]
+fn mcp_server_answers_malformed_lines() {
+    let mut server = Server::start_with(&[("OES_MCP_MAX_LINE_BYTES", "4096")]);
+    server.request(
+        1,
+        "initialize",
+        json!({
+            "protocolVersion": "2025-06-18",
+            "capabilities": {},
+            "clientInfo": { "name": "test", "version": "1" }
+        }),
+    );
+    server.send(json!({ "jsonrpc": "2.0", "method": "notifications/initialized" }));
+
+    server.send_raw("{bad json");
+    let bad = server.next();
+    assert_eq!(bad["error"]["code"], -32700, "{bad}");
+    assert_eq!(bad["id"], Value::Null);
+
+    server.send_raw(r#"{"jsonrpc":"2.0","id":11,"method":"tools/list""#);
+    let truncated = server.next();
+    assert_eq!(truncated["error"]["code"], -32700, "{truncated}");
+    assert_eq!(truncated["id"], 11);
+
+    let deep = format!(
+        r#"{{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{{"name":"get_version","arguments":{{"a":{}{}}}}}}}"#,
+        "[".repeat(200),
+        "]".repeat(200)
+    );
+    server.send_raw(&deep);
+    let deep = server.next();
+    assert_eq!(deep["error"]["code"], -32600, "{deep}");
+    assert_eq!(deep["id"], 10);
+
+    server.send(json!({ "jsonrpc": "2.0", "id": 12, "method": "tools/call",
+        "params": { "name": "get_version", "arguments": [1] } }));
+    let params = server.next();
+    assert_eq!(params["error"]["code"], -32602, "{params}");
+    assert_eq!(params["id"], 12);
+
+    server.send_raw(&"x".repeat(5000));
+    let long = server.next();
+    assert_eq!(long["error"]["code"], -32600, "{long}");
+
+    // Still answering.
+    let version = server.request(
+        13,
+        "tools/call",
+        json!({ "name": "get_version", "arguments": {} }),
+    );
+    assert_eq!(version["isError"], false);
 }

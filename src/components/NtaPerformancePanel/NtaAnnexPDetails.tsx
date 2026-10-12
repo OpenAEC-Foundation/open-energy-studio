@@ -39,7 +39,7 @@ function PipeAmbientFields({ draft, change, base }: SectionProps & { base: Path 
   const field = { draft, onChange: change };
   const kind = read(draft, [...base, 'kind']);
   return <>
-    <SelectField {...field} path={[...base, 'kind']} label={t('nta.annexP.pipe.ambient')} options={[
+    <SelectField required {...field} path={[...base, 'kind']} label={t('nta.annexP.pipe.ambient')} options={[
       ['outdoor', t('nta.annexP.pipe.ambient.outdoor')], ['crawlspace', t('nta.annexP.pipe.ambient.crawlspace')],
       ['indoor', t('nta.annexP.pipe.ambient.indoor')]]}
       onChange={(_, value) => change(base, value === 'indoor' ? { kind: 'indoor', temperatureC: null }
@@ -54,7 +54,7 @@ function PipePlacementFields({ draft, change, base }: SectionProps & { base: Pat
   const field = { draft, onChange: change };
   const kind = read(draft, [...base, 'kind']);
   return <>
-    <SelectField {...field} path={[...base, 'kind']} label={t('nta.annexP.pipe.placement')} options={[
+    <SelectField required {...field} path={[...base, 'kind']} label={t('nta.annexP.pipe.placement')} options={[
       ['buried', t('nta.annexP.pipe.placement.buried')], ['in_air', t('nta.annexP.pipe.placement.inAir')]]}
       onChange={(_, value) => change(base, value === 'in_air'
         ? { kind: 'in_air', ambient: { kind: 'indoor', temperatureC: null } }

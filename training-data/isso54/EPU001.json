@@ -276,7 +276,15 @@
     "demandUsesFixedC1Ventilation": false,
     "batteryStoragePresent": false,
     "bblFunction": "office",
-    "verticalPipes": [],
+    "verticalPipes": [
+      {
+        "id": "toiletgroep",
+        "storeys": 0,
+        "buildingHeightM": 5.4,
+        "insulated": false,
+        "sourceReference": "ISSO 54 v2.0, EP-U001 p. 44: zelfde gebouw als EP-W001 (leidingdoorvoeren forfaitair) met 1 toiletgroep; NTA 8800:2022 7.3.3, formule 7.17a (p. 155-156): 1 ongeisoleerde fictieve leiding per toiletgroep, N = H/3"
+      }
+    ],
     "ventilation": {
       "zoneId": "epw001-zone",
       "usableFloorAreaM2": 96.0,

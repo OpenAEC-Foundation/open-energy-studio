@@ -67,22 +67,17 @@ export const pt: Record<string, string> = {
   'ribbon.exportReport': 'Exportar relatório',
 
   // Project Browser
-  'browser.project': 'Projeto',
   'browser.zones': 'Zonas',
-  'browser.zone': 'Zona',
   'browser.surfaces': 'Superfícies',
   'browser.windows': 'Janelas',
   'browser.thermalBridges': 'Pontes térmicas',
   'browser.constructions': 'Construções',
-  'browser.installations': 'Instalações',
   'browser.heating': 'Aquecimento',
   'browser.ventilation': 'Ventilação',
   'browser.cooling': 'Arrefecimento',
   'browser.hotWater': 'Água quente',
-  'browser.renewables': 'Renováveis',
   'browser.solarPV': 'Solar fotovoltaico',
   'browser.solarThermal': 'Solar térmico',
-  'browser.airTightness': 'Estanquidade ao ar',
 
   // Properties Panel
   'properties.title': 'Propriedades',
@@ -109,7 +104,6 @@ export const pt: Record<string, string> = {
   'dialog.save': 'Guardar',
   'dialog.cancel': 'Cancelar',
   'dialog.delete': 'Eliminar',
-  'dialog.add': 'Adicionar',
   'dialog.edit': 'Editar',
   'dialog.close': 'Fechar',
 
@@ -417,7 +411,6 @@ export const pt: Record<string, string> = {
   'theme.system': 'Sistema (Detecção automática)',
   'theme.dark': 'Escuro',
   'theme.light': 'Claro',
-  'theme.blue': 'Azul',
   'theme.highContrast': 'Alto contraste',
   'settings.general.autoSave': 'Guardar automaticamente',
   'settings.general.autoSaveDesc': 'Guardar automaticamente o projeto a intervalos regulares',
@@ -440,7 +433,6 @@ export const pt: Record<string, string> = {
 
   // Feedback dialog
   'feedback.title': 'Send Feedback',
-  'feedback.sendFeedback': 'Send Feedback',
   'feedback.email': 'Email',
   'feedback.emailPlaceholder': 'your@email.com',
   'feedback.fullName': 'Full Name',

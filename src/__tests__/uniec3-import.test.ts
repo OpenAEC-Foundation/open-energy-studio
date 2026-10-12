@@ -23,7 +23,7 @@ const archive = () => zipSync({
 });
 
 describe('Uniec3 export import', () => {
-  const project = importFromUNIEC3(archive(), 'voorbeeld.uniec3');
+  const project = importFromUNIEC3(archive());
   const surfaces = project.zones.flatMap((zone) => zone.surfaces);
   const byName = (name: string) => surfaces.find((surface) => surface.name === name)!;
   const nta = project.ntaCalculation as unknown as Record<string, Array<Record<string, unknown>>>;
@@ -34,7 +34,7 @@ describe('Uniec3 export import', () => {
     expect(project.name).toBe('Voorbeeldwoning (Uniec3)');
     expect(project.buildingFunction).toBe('residential');
     expect(project.registration).toMatchObject({ purpose: 'delivery', constructionYear: 2023 });
-    expect(project.importLog?.[0]).toMatchObject({ tool: 'UNIEC3', fileName: 'voorbeeld.uniec3' });
+    expect(project.importLog?.[0]).toMatchObject({ tool: 'UNIEC3' });
   });
 
   it('reads the zone with its usable floor area and the measured qv10', () => {

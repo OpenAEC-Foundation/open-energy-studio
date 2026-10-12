@@ -1016,7 +1016,7 @@ pub(crate) fn edition_status(
     recorder.warning(
         "survey_protocol_edition_differs",
         "normVersion",
-        "the ISSO survey protocol (7e druk, 2025) belongs to NTA 8800:2025+C1; a survey calculated in an older edition is for comparison only and cannot be registered",
+        "the ISSO survey protocol (7e druk, 2025) belongs to the 2025+C1 edition; a survey calculated in an older edition is for comparison only and cannot be registered",
     );
     if status == "calculated_unverified" {
         "calculated_legacy_edition"

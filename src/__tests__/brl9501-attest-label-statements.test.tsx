@@ -16,6 +16,7 @@ import { generateEnergyPerformanceReportHTML } from '../core/report/EnergyPerfor
 import { buildEpOnlineOverview } from '../core/report/EpOnlineOverview';
 import { RegistrationForm } from '../components/shell/pages/RegistrationForm';
 import { renderWithProviders, userEvent } from './test-utils';
+import { SLOW_UI_TEST_MS } from './timeouts';
 
 const root = resolve(__dirname, '../..');
 const load = () => ({
@@ -116,5 +117,5 @@ describe('label elements k and l (Omgevingsregeling art. 5.13a lid 1)', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }));
     const stored = JSON.parse(screen.getByTestId('registration').textContent ?? 'null');
     expect(stored.labelStatements).toEqual({ respondsToExternalSignals: false, lowTemperatureHeating: true });
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 });

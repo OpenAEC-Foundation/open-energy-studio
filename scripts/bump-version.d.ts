@@ -1,0 +1,3 @@
+// Types for scripts/bump-version.js, used by its Vitest test.
+export const VERSION_FILES: string[];
+export function setVersion(files: Record<string, string>, version: string): Record<string, string>;

@@ -34,7 +34,8 @@ export function FunctionAreasFields({ draft, change, base, functions, prefix }: 
   const field = { draft, onChange: change };
   const rows = list(draft, [base]);
   return <>
-    {rows.map((_, index) => <div key={index} className="nta-form-row">
+    {rows.map((_, index) => <div key={index} className="nta-form-row" role="group"
+      aria-label={`${t(`nta.form.${base}`)} ${index + 1}`}>
       <SelectField {...field} path={[base, index, 'function']} label={t(`nta.form.${base}`)}
         options={functions.map((key) => [key, t(`${prefix}.${key}`)])} />
       <NumberField {...field} path={[base, index, 'areaM2']} label={t('nta.form.functionArea')} />
@@ -47,20 +48,53 @@ export function FunctionAreasFields({ draft, change, base, functions, prefix }: 
   </>;
 }
 
-/** 9.23 with tables 9.12/9.13: direct or indirect air heaters. */
+/** Table 9.12/9.13 type of one group of air heaters at `path` (its `kind`). */
+function AirHeaterKindFields({ draft, change, path }: SectionProps & { path: Path }) {
+  const { t } = useI18n();
+  const field = { draft, onChange: change };
+  const kind = read(draft, [...path, 'kind']);
+  const yesNo = { yes: t('nta.form.yes'), no: t('nta.form.no') };
+  return <>
+    <label>{t('nta.form.airHeaters.type')}
+      <select value={typeof kind === 'string' ? kind : ''} onChange={(event) => change(path,
+        (airHeatersTemplate(event.target.value as 'direct' | 'indirect') as { kind: unknown }).kind)}>
+        <option value="direct">{t('nta.form.airHeaters.direct')}</option>
+        <option value="indirect">{t('nta.form.airHeaters.indirect')}</option>
+      </select>
+    </label>
+    {kind === 'direct' && <TriStateField {...field} {...yesNo} path={[...path, 'radialFan']} label={t('nta.form.airHeaters.radialFan')} />}
+    {kind === 'indirect' && <>
+      <TriStateField {...field} {...yesNo} path={[...path, 'roomHeightAbove8M']} label={t('nta.form.airHeaters.above8m')} />
+      <TriStateField {...field} {...yesNo} path={[...path, 'warmAirReturn']} label={t('nta.form.airHeaters.warmAirReturn')} />
+      <TriStateField {...field} {...yesNo} path={[...path, 'ecMotor']} label={t('nta.form.airHeaters.ecMotor')} />
+    </>}
+  </>;
+}
+
+/** 9.23 with tables 9.12/9.13: direct or indirect air heaters, of one or
+ *  several types (n_H,aux counts every heater in the zone). */
 export function AirHeatersFields({ draft, change }: SectionProps) {
   const { t } = useI18n();
   const field = { draft, onChange: change };
   const base: Path = ['emission', 'airHeaters'];
   const kind = read(draft, [...base, 'kind', 'kind']);
   const yesNo = { yes: t('nta.form.yes'), no: t('nta.form.no') };
+  const furtherValue = read(draft, [...base, 'further']);
+  const further = Array.isArray(furtherValue) ? furtherValue : [];
   return <>
     <label>{t('nta.form.airHeaters')}
-      <select value={typeof kind === 'string' ? kind : ''} onChange={(event) => change(base, event.target.value === ''
-        ? undefined
-        : { ...airHeatersTemplate(event.target.value as 'direct' | 'indirect'),
+      <select value={typeof kind === 'string' ? kind : ''} onChange={(event) => {
+        if (event.target.value === '') { change(base, undefined); return; }
+        // Changing the type keeps the count, the other types, Q_h;b and the source.
+        const kept: Record<string, unknown> = {
           designHeatLoadW: read(draft, [...base, 'designHeatLoadW']) ?? null,
-          sourceReference: read(draft, [...base, 'sourceReference']) ?? '' })}>
+          sourceReference: read(draft, [...base, 'sourceReference']) ?? '',
+        };
+        const count = read(draft, [...base, 'count']);
+        if (count != null) kept.count = count;
+        if (further.length > 0) kept.further = further;
+        change(base, { ...airHeatersTemplate(event.target.value as 'direct' | 'indirect'), ...kept });
+      }}>
         <option value="">—</option>
         <option value="direct">{t('nta.form.airHeaters.direct')}</option>
         <option value="indirect">{t('nta.form.airHeaters.indirect')}</option>
@@ -73,6 +107,19 @@ export function AirHeatersFields({ draft, change }: SectionProps) {
       <TriStateField {...field} {...yesNo} path={[...base, 'kind', 'ecMotor']} label={t('nta.form.airHeaters.ecMotor')} />
     </>}
     {kind != null && <>
+      <NumberField {...field} path={[...base, 'count']} label={t('nta.form.airHeaters.count')} />
+      {further.map((_, index) => <div key={index} className="nta-form-row">
+        <AirHeaterKindFields draft={draft} change={change} path={[...base, 'further', index, 'kind']} />
+        <NumberField {...field} path={[...base, 'further', index, 'count']} label={t('nta.form.airHeaters.count')} />
+        <button type="button" className="nta-form-remove" onClick={() => {
+          const rest = further.filter((__, item) => item !== index);
+          change([...base, 'further'], rest.length > 0 ? rest : undefined);
+        }}>{t('nta.form.remove')}</button>
+      </div>)}
+      <button type="button" className="btn" onClick={() => change([...base, 'further'],
+        [...further, { kind: (airHeatersTemplate('direct') as { kind: unknown }).kind, count: 1 }])}>
+        {t('nta.form.airHeaters.addType')}
+      </button>
       <NumberField {...field} path={[...base, 'designHeatLoadW']} label={t('nta.form.airHeaters.designLoad')} />
       <TextField {...field} path={[...base, 'sourceReference']} label={t('nta.form.source')} />
     </>}
@@ -93,9 +140,15 @@ function BacsEvidenceFields({ draft, change, base, label }: SectionProps & { bas
       {label}
     </label>
     {present && <>
-      <CheckField {...field} path={[...base, 'present']} label={t('nta.form.bacs.present')} />
-      <SelectField {...field} path={[...base, 'automaticControlsClass']} label={t('nta.form.bacs.controlsClass')} options={BACS_CLASSES} />
-      <SelectField {...field} path={[...base, 'energyManagementClass']} label={t('nta.form.bacs.managementClass')} options={BACS_CLASSES} />
+      {/* Classes belong to a present BACS only (absent_bacs_has_classes): unticking clears them. */}
+      <CheckField {...field} path={[...base, 'present']} label={t('nta.form.bacs.present')}
+        onChange={(_, value) => change(base, value === true
+          ? { ...(read(draft, base) as Draft), present: true }
+          : { ...(read(draft, base) as Draft), present: false, automaticControlsClass: undefined, energyManagementClass: undefined })} />
+      {read(draft, [...base, 'present']) === true && <>
+        <SelectField {...field} path={[...base, 'automaticControlsClass']} label={t('nta.form.bacs.controlsClass')} options={BACS_CLASSES} />
+        <SelectField {...field} path={[...base, 'energyManagementClass']} label={t('nta.form.bacs.managementClass')} options={BACS_CLASSES} />
+      </>}
       <TextField {...field} path={[...base, 'sourceReference']} label={t('nta.form.source')} />
     </>}
   </>;
@@ -120,7 +173,8 @@ export function BacsFields({ draft, change }: SectionProps) {
         <SelectField {...field} path={at('service')} label={t('nta.form.bacs.service')} options={[
           ['heating', t('nta.form.bacs.service.heating')], ['cooling', t('nta.form.bacs.service.cooling')]]} />
         <TextField {...field} path={at('sourceReference')} label={t('nta.form.source')} />
-        {generators.map((_, generator) => <div key={generator} className="nta-form-row">
+        {generators.map((_, generator) => <div key={generator} className="nta-form-row" role="group"
+          aria-label={`${t('nta.form.bacs.generator')} ${generator + 1}`}>
           <TextField {...field} path={at('generators', generator, 'id')} label={t('nta.form.bacs.generatorId')} />
           <NumberField {...field} path={at('generators', generator, 'nominalThermalCapacityKw')} label={t('nta.form.bacs.capacity')} />
           <TextField {...field} path={at('generators', generator, 'sourceReference')} label={t('nta.form.source')} />

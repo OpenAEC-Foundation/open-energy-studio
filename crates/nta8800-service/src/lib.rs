@@ -9,6 +9,7 @@ pub mod http;
 /// The operation registry lives in `nta8800-operations`; it is re-exported
 /// here so `nta8800_service::operations` keeps working for the adapters.
 pub use nta8800_operations as operations;
+pub mod testset;
 
 use axum::{extract::Json, http::StatusCode};
 use serde::Serialize;
@@ -580,13 +581,16 @@ mod tests {
         assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
         let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
         let result: Value = serde_json::from_slice(&bytes).unwrap();
-        assert_eq!(result["error"], "invalid_project_input");
-        assert!(result["assessment"]["issues"]
+        // The 422 body is the assessment itself, as on every other route.
+        assert_eq!(result["status"], "invalid");
+        assert!(result.get("error").is_none());
+        assert!(result["issues"]
             .as_array()
             .unwrap()
             .iter()
             .any(|issue| issue["code"] == "floor_area_sum_invalid"));
-        assert_eq!(result["assessment"]["calculationAvailable"], false);
+        assert_eq!(result["calculationAvailable"], false);
+        assert_eq!(result["normVersion"], "2025+C1");
     }
 
     fn monthly_demand_sample() -> Value {
@@ -2337,13 +2341,13 @@ mod tests {
         assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
         let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
         let result: Value = serde_json::from_slice(&bytes).unwrap();
-        assert_eq!(result["error"], "invalid_project_input");
-        assert!(result["assessment"]["issues"]
+        assert_eq!(result["status"], "invalid");
+        assert!(result["issues"]
             .as_array()
             .unwrap()
             .iter()
             .any(|issue| issue["code"] == "system_type_required"));
-        assert_eq!(result["assessment"]["calculationAvailable"], false);
+        assert_eq!(result["calculationAvailable"], false);
     }
 
     fn survey_1975() -> Value {
@@ -2433,8 +2437,17 @@ mod tests {
             assert_eq!(result["code"], "edition_not_implemented");
         }
 
+        // A reference case is compared in its own edition; a request edition
+        // must match it. The diagnostic comparisons take only 2025+C1.
         let (status, result) = post_json(
             "/v1/nta8800/reference/audit",
+            json!({ "case": {"normVersion": "NTA 8800:2025+C1:2026"}, "normVersion": "2024" }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(result["code"], "norm_version_conflict");
+        let (status, result) = post_json(
+            "/v1/nta8800/reference/direct-diagnostic/compare",
             json!({ "case": {}, "normVersion": "2024" }),
         )
         .await;

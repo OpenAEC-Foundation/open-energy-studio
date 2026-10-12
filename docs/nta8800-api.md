@@ -20,7 +20,9 @@ cargo run --release --manifest-path crates/nta8800-service/Cargo.toml --bin api
 | `--bind ADRES` | `OES_API_BIND` | `127.0.0.1` |
 | `--port POORT` | `OES_API_PORT` | `3007` |
 | `--cors-origin ORIGIN` (herhaalbaar, `*` voor alles) | `OES_API_CORS_ORIGINS` (kommagescheiden) | geen CORS |
+| `--allowed-host HOST` (herhaalbaar) | `OES_API_ALLOWED_HOSTS` (kommagescheiden) | op een loopback-adres: `localhost`, `127.0.0.1` en `::1`, plus de opgegeven namen; op een ander adres alleen de opgegeven namen (geen: geen controle) |
 | `--body-limit-mb N` | `OES_API_BODY_LIMIT_MB` | `16` (1–1024) |
+| `--max-json-values N` | `OES_API_MAX_JSON_VALUES` | `500000` (1000–100000000): het grootste aantal JSON-waarden (array-elementen, objectleden, getallen, teksten) in een verzoek |
 | `--max-calculations N` | `OES_API_MAX_CALCULATIONS` | aantal processorkernen (1–1024): zoveel berekeningen lopen tegelijk, de rest wacht |
 | `--max-waiting N` | `OES_API_MAX_WAITING` | twee keer het aantal rekenplaatsen (0–65536): zoveel verzoeken mogen op een rekenplaats wachten; een verzoek daarboven krijgt meteen 503 `server_busy`, nog voordat de body is gelezen |
 | `--queue-timeout-s N` | `OES_API_QUEUE_TIMEOUT_S` | `30` (1–86400): langste wachttijd op een rekenplaats; daarna 503 `server_busy` en er start geen berekening |
@@ -30,9 +32,25 @@ cargo run --release --manifest-path crates/nta8800-service/Cargo.toml --bin api
 
 Een vlag wint van de omgevingsvariabele. Op een niet-loopback-adres meldt de server een waarschuwing: de API heeft geen authenticatie en is bedoeld voor lokaal gebruik. SIGINT en SIGTERM stoppen netjes: de server neemt geen nieuwe verbindingen meer aan en laat lopende verzoeken afmaken.
 
-Het geheugen van een berekening groeit ongeveer evenredig met het aantal rekenzones (circa 0,7 MB per zone, zie [Grenzen en prestaties](nta8800-programmabeschrijving.md#8-grenzen-en-prestaties)). `--max-calculations` begrenst het geheugen van de lopende berekeningen. Een wachtend verzoek houdt zijn ingelezen body vast; `--max-waiting` begrenst daarom de wachtrij, en het verzoek wordt toegelaten of geweigerd voordat de body wordt gelezen. Samen begrenzen ze de request-bodies tot `(max-calculations + max-waiting) × body-limit`.
+**Geheugen.** Een ingelezen body kost geheugen per JSON-waarde, niet per byte. Gemeten (`crates/nta8800-service/tests/memory_bound.rs`):
+- een compact array-element kost ongeveer 42 bytes;
+- een waarde van een echt project (openbaar geval H) ongeveer 136 bytes, dat is 3,8 bytes per byte JSON.
+
+Een body van 16 MiB met alleen nullen (`[0,0,…]`) zou zo ruim 300 MB innemen. Daarom telt de service eerst de waarden en weigert een verzoek boven `--max-json-values` met 413 `payload_too_large`, nog voordat de JSON wordt ingelezen. Met de standaard van 500 000 waarden kost een ingelezen body hoogstens ongeveer 70 MB (136 bytes × 500 000). Een echt project heeft ongeveer 650 waarden per rekenzone; de standaard laat dus ongeveer 750 zones toe, bijna twee keer het grootste project uit de prestatiemeting (400 zones).
+
+Geen route kopieert de body: het invoerlid gaat in zijn geheel door naar de kern (de test controleert dit). Een toegelaten verzoek houdt dus één ingelezen body vast. Het geheugen van alle toegelaten verzoeken samen is daarmee ten hoogste:
+
+`(max-calculations + max-waiting) × (ca. 136 bytes × max-json-values)` plus het rekengeheugen van de lopende berekeningen (circa 0,7 MB per rekenzone, zie [Grenzen en prestaties](nta8800-programmabeschrijving.md#8-grenzen-en-prestaties)).
+
+Met 8 rekenplaatsen, 16 wachtplaatsen en de standaarden is dat ongeveer 1,7 GB in het slechtste geval. Verlaag `--max-json-values` of `--max-waiting` op een machine met minder geheugen. Het verzoek wordt toegelaten of geweigerd voordat de body wordt gelezen; de bytes van een body (hoogstens `--body-limit-mb`) worden losgelaten zodra de JSON is ingelezen.
 
 De wachttijd en de berekening hebben elk hun eigen tijdslimiet. Een verzoek dat binnen `--queue-timeout-s` geen rekenplaats krijgt, krijgt 503 `server_busy` en start geen berekening; een verzoek dat lang heeft gewacht, krijgt dus nooit een berekening die meteen weer wordt afgebroken. Een berekening die langer duurt dan `--calculation-timeout-s`, geeft 503 `calculation_timeout`; de service maakt haar op de achtergrond af en houdt zolang haar rekenplaats bezet. Elke 503 heeft een `Retry-After`-header: een kwart van de rekentijdslimiet, tussen 1 en 60 seconden.
+
+Hoe lang een berekening duurt, staat in [programmabeschrijving §8](nta8800-programmabeschrijving.md#8-grenzen-en-prestaties). Een utiliteitsgebouw van 50 rekenzones met 2 250 ramen rekent in ongeveer 0,5 s (release-build). Een project met lege velden duurt iets langer, omdat de kern elk leeg veld opzoekt: 200 lege velden in dat gebouw kosten ongeveer 1,6 s. Beide blijven ruim binnen de standaardrekentijd van 120 s.
+
+**Hostnamen.** Een webpagina kan haar eigen domeinnaam naar 127.0.0.1 laten wijzen (*DNS rebinding*) en zo een lokale service bereiken. Op een loopback-adres beantwoordt de service daarom alleen `localhost`, `127.0.0.1` en `::1` (met of zonder poort) plus de namen uit `--allowed-host`. Een andere `Host` krijgt 403 `host_not_allowed`. Een verzoek zonder `Host`-header (geen browser) gaat door.
+
+**CORS.** Met `--cors-origin` krijgt elk antwoord `Vary: Origin`, ook een geweigerde preflight, zodat een cache een antwoord voor de ene origin niet aan een andere geeft.
 
 De ontwikkelserver (`npm run dev`) stuurt `/api/*` door naar poort 3007; de desktop-app roept de kern rechtstreeks aan en gebruikt de API niet.
 
@@ -43,25 +61,31 @@ De ontwikkelserver (`npm run dev`) stuurt `/api/*` door naar poort 3007; de desk
   - `serviceVersion` en `apiVersion`;
   - `kernelVersion` (het rekenkerngedeelte van het versienummer, BRL 9501 §5.2);
   - `targetNormVersion` (NTA 8800:2025+C1:2026);
-  - `supportedNormVersions`: de bekende edities van NTA 8800 (`id`, `label`, `implemented`, `registrationEligible`, `default`, aanwijzingsperiode). Een project kiest een editie met `ntaCalculation.normVersion` (`"2024"` of `"2025+C1"`, standaard `"2025+C1"`); zie [nta8800-normversies.md](nta8800-normversies.md);
+  - `supportedNormVersions`: de bekende edities van NTA 8800 (`id`, `label`, `implemented`, `registrationEligible`, `default`, aanwijzingsperiode). Een project kiest een editie met `ntaCalculation.normVersion` (`"2020+A1"`, `"2022"`, `"2023"`, `"2024"` of `"2025+C1"`, standaard `"2025+C1"`); zie [nta8800-normversies.md](nta8800-normversies.md);
   - `buildCommit` (uit `OES_BUILD_COMMIT` tijdens het bouwen, anders `null`);
   - `buildFingerprint`, een SHA-256 over versies en bewerkingentabel. Twee builds met dezelfde vingerafdruk hebben dezelfde kern en dezelfde routes.
 - Elke rekenuitkomst bevat zelf ook `kernelVersion`, `targetNormVersion` en `inputFingerprint`; projectuitkomsten ook `normVersion` en `registrationEligible`. Een berekening in een oudere editie heeft status `calculated_legacy_edition` (HTTP 200) en is nooit registreerbaar (uitzondering: een herlabeling in de editie van het oorspronkelijke project).
-- **Editie per verzoek.** Elke `POST`-bewerking (en elke MCP-tool) neemt naast het invoerlid het optionele lid `normVersion` (`"2020+A1"`, `"2022"`, `"2023"`, `"2024"`, `"2025+C1"`; standaard `"2025+C1"`). De service schrijft het in de eigen plek van de invoer als die ontbreekt (`ntaCalculation.normVersion`, `survey.normVersion`, `input.normVersion`, de basis van het maatwerkadvies, beide projecten bij herlabelen) en rekent de constructies en diagnoses met die editie actief. Elke uitkomst krijgt `normVersion` en `targetNormVersion`. Referentiegevallen nemen alleen `"2025+C1"`. Details en de betekenis per route: [nta8800-normversies.md](nta8800-normversies.md#uitgave-per-route).
-- `GET /health` geeft `{"status":"ok"}`.
-- `GET /v1/openapi.json` geeft het OpenAPI 3.1-document. Daarin staat per bewerking `operationId` en `x-mcp-tool` (de MCP-toolnaam).
+- **Editie per verzoek.** Elke `POST`-bewerking (en elke MCP-tool) neemt naast het invoerlid het optionele lid `normVersion` (`"2020+A1"`, `"2022"`, `"2023"`, `"2024"`, `"2025+C1"`; standaard `"2025+C1"`). De service schrijft het in de eigen plek van de invoer als die ontbreekt (`ntaCalculation.normVersion`, `survey.normVersion`, `input.normVersion`, de basis van het maatwerkadvies, beide projecten bij herlabelen) en rekent de constructies en diagnoses met die editie actief. Elke uitkomst krijgt `normVersion` en `targetNormVersion`. Een referentiegeval (`reference/audit`, `reference/compare`) rekent in zijn eigen `case.normVersion` (elke geïmplementeerde editie) en krijgt die editie als stempel; een `normVersion` in het verzoek moet daarmee overeenkomen, anders 400 `norm_version_conflict`. De twee diagnosevergelijkingen (`reference/direct-diagnostic/compare`, `reference/gas-chain-diagnostic/compare`) nemen alleen `"2025+C1"`. Details en de betekenis per route: [nta8800-normversies.md](nta8800-normversies.md#uitgave-per-route).
+- `GET /v1/nta8800/capabilities` geeft de reikwijdte van de kern:
+  - `implemented`: de onderdelen, waaronder de projectberekening met meer rekenzones, de basisopnames, het maatwerkadvies, herlabelen en registratie;
+  - `projectCalculationAvailable` (`true`): de projectberekening rekent BENG, TOjuli en het indicatieve label;
+  - `calculationAvailable` (`false`): alleen de verouderde route `/v1/nta8800/calculate` rekent niet; het veld blijft voor oudere clients;
+  - `supportedNormVersions`: dezelfde lijst als `/v1/version`.
+- `GET /health` geeft `{"status":"ok","kernel":"rust","kernelVersion":"…"}`.
+- `GET /v1/openapi.json` geeft het OpenAPI 3.1-document. Daarin staat per bewerking `operationId` en `x-mcp-tool` (de MCP-toolnaam). De `servers`-regel is relatief (`/`): het document beschrijft de service die het levert, op welk adres die ook luistert (standaard `http://127.0.0.1:3007`).
 
 ## Statuscodes en foutmodel
 
 | Code | Betekenis | Body |
 |---|---|---|
 | 200 | Uitkomst | het resultaat van de kern |
-| 400 | Ongeldig verzoek: geen geldige JSON, geen object, ontbrekend lid, verkeerde vorm of een `normVersion` die niet past | foutenvelop |
+| 400 | Ongeldig verzoek: geen geldige JSON (ook: dieper genest dan 128 niveaus), geen object, een onbekend of ontbrekend lid, verkeerde vorm of een `normVersion` die niet past | foutenvelop |
+| 403 | De `Host`-header noemt een naam die de service niet beantwoordt (`host_not_allowed`) | foutenvelop |
 | 404 / 405 | Onbekende route of verkeerde methode | foutenvelop |
-| 413 | Body groter dan de limiet | foutenvelop |
+| 413 | Body groter dan de bytelimiet of met meer JSON-waarden dan `--max-json-values` (`payload_too_large`) | foutenvelop |
 | 415 | `Content-Type` is geen `application/json` | foutenvelop |
-| 422 | De kern weigert of kan niet afmaken (status `invalid`, `incomplete`, `derived_input_rejected`, `invalid_case`, …) | de **beoordeling zelf**, met `status`, `gaps` en `issues`; bij een diagnose in een editie zonder profiel de foutenvelop `edition_not_implemented` |
-| 500 | Uitkomst achtergehouden (`non_finite_result`) of kernfout (`kernel_panic`) | foutenvelop |
+| 422 | De kern weigert of kan niet afmaken (status `invalid`, `incomplete`, `derived_input_rejected`, `invalid_case`, …) | de **beoordeling zelf**, met `status`, `gaps` en `issues`, ook bij de verouderde route `/v1/nta8800/calculate` |
+| 500 | Uitkomst achtergehouden (`non_finite_result`, `serialization_failed`) of kernfout (`kernel_panic`) | foutenvelop |
 | 501 | Alleen de verouderde route `/v1/nta8800/calculate` | foutenvelop |
 | 503 | Wachtrij vol of geen rekenplaats vrij binnen de wachttijdslimiet (`server_busy`), of de berekening duurde langer dan de rekentijdslimiet (`calculation_timeout`) | foutenvelop, met `Retry-After` |
 
@@ -77,13 +101,29 @@ De foutenvelop:
 }
 ```
 
-`error` en `code` zijn gelijk; `error` blijft bestaan voor oudere clients. `path` is het JSON-pad van de foute invoer of, bij `non_finite_result`, van de niet-eindige uitkomst. Codes: `invalid_json`, `invalid_request_shape`, `missing_request_member`, `invalid_project_shape`, `invalid_maatwerkadvies_shape`, `invalid_norm_version` (onbekende editie; `details.supportedNormVersions`), `norm_version_conflict` (de invoer heeft al een andere editie), `norm_version_not_applicable` (geen plek voor de editie, of een referentiegeval buiten 2025+C1), `edition_not_implemented`, `payload_too_large`, `unsupported_media_type`, `not_found`, `method_not_allowed`, `non_finite_result`, `kernel_panic`, `calculation_unavailable`, `server_busy`, `calculation_timeout`.
+`error` en `code` zijn gelijk; `error` blijft bestaan voor oudere clients. `path` is het JSON-pad van de foute invoer of, bij `non_finite_result`, van de niet-eindige uitkomst. Codes:
+- `invalid_json`, `invalid_request_shape` (ook: een onbekend lid naast het invoerlid en `normVersion`), `missing_request_member`, `invalid_project_shape` (ook: `original`, `current` of `project` bij herlabelen is geen object), `invalid_maatwerkadvies_shape`;
+- `invalid_norm_version` (onbekende editie; `details.supportedNormVersions`), `norm_version_conflict` (de invoer of het referentiegeval heeft al een andere editie), `norm_version_not_applicable` (geen plek voor de editie, of een diagnosevergelijking buiten 2025+C1), `edition_not_implemented` (een editie zonder profiel van de kern; geen enkele bekende editie heeft dat nu);
+- `payload_too_large` (`details.maxJsonValues` als het aantal waarden te groot is), `unsupported_media_type`, `host_not_allowed`, `not_found`, `method_not_allowed`;
+- `non_finite_result`, `serialization_failed`, `kernel_panic`, `calculation_unavailable`, `server_busy`, `calculation_timeout`;
+- alleen via MCP: `unknown_tool`.
 
 Een 422 is geen fout van de client of de server, maar een rekenuitkomst: lees `gaps` (ontbrekende invoer met pad) en `issues` (strijdige invoer). De betekenis van elke code staat in de app en in [hoofdstuk 5 van de handleiding](handleiding-nta8800/05-validatie.md).
 
+Vijf bewerkingen antwoorden nooit 422; hun bevindingen staan in de body bij 200:
+- `validate_project` (status `invalid` of `structurally_valid`; de app leest de beoordeling ook bij `invalid`);
+- `assess_relabel`;
+- `get_label_input_hash`;
+- `audit_reference_case`;
+- `compare_project_editions` (wat de doeluitgave weigert of vraagt, staat in `items` en `remainingAfterAutomaticChanges`).
+
+Het OpenAPI-document noemt 422 alleen bij de bewerkingen die het kunnen geven, en 403 en 405 bij elke route. Elke code die de service kan geven, staat in de beschrijving van `Error.code`; een test leest de bronnen en houdt die lijst volledig. Een tweede test stuurt elke bewerking lege, verkeerde en onbekende leden, een onbekende of oudere `normVersion`, een verkeerd `Content-Type` en de verkeerde methode, en controleert dat elk antwoord een gedocumenteerde status en code heeft en geen paniek- of bronpad noemt.
+
+`GET /v1/nta8800/interpretations` geeft als enige een lijst (per module een groep), geen object; het OpenAPI-document beschrijft die vorm.
+
 ## Bewerkingen
 
-Elke `POST` verwacht een JSON-object met één lid (soms twee), genoemd in de derde kolom, plus het optionele lid `normVersion`. `null`-leden van objecten mag je weglaten; de desktop-app doet dat ook.
+Elke `POST` verwacht een JSON-object met één lid (soms twee), genoemd in de derde kolom, plus het optionele lid `normVersion`. Andere leden worden geweigerd (400 `invalid_request_shape`), zodat een verschreven `normversion` niet ongemerkt in de standaardeditie rekent; de schema's in het OpenAPI-document hebben `additionalProperties: false`. `null`-leden van objecten mag je weglaten; de desktop-app doet dat ook.
 
 | Route | MCP-tool | Invoerlid | Wat |
 |---|---|---|---|
@@ -93,6 +133,7 @@ Elke `POST` verwacht een JSON-object met één lid (soms twee), genoemd in de de
 | `POST /v1/nta8800/validate` | `validate_project` | `project` | Validate an Open Energy Studio project structure |
 | `POST /v1/nta8800/calculate` | `calculate_beng` | `project` | Legacy endpoint |
 | `POST /v1/nta8800/project/performance` | `calculate_project_performance` | `project` | Calculate a saved .oes project with its ntaCalculation block per NTA 8800:2025+C1:2026 |
+| `POST /v1/nta8800/project/editions/compare` | `compare_project_editions` | `project` | Compare a project between its own edition and the request's `normVersion` (zie *Uitgave wijzigen* hieronder) |
 | `POST /v1/nta8800/project/energy-by-service` | `get_energy_by_service` | `project` | Return delivered, primary fossil and renewable energy per service (verwarming, tapwater, koeling, bevochtiging, ventilatoren, verlichting, hulpenergie), carrier and month (NTA 8800 §5.5.3) |
 | `POST /v1/nta8800/label/data` | `get_label_data` | `project` | Return the label data (labelgegevens) per Omgevingsregeling art. 5.13 and 5.13a |
 | `POST /v1/nta8800/registration/assess` | `assess_registration` | `project` | Check a project's registration block for EP-Online registration per BRL 9500-W/U (29-05-2026) and the Omgevingsregeling |
@@ -132,6 +173,22 @@ Elke `POST` verwacht een JSON-object met één lid (soms twee), genoemd in de de
 | `POST /v1/nta8800/reference/compare` | `compare_reference_case` | `case` | Compare submitted BENG/TOjuli expectations to the unverified Rust project result |
 | `POST /v1/nta8800/reference/direct-diagnostic/compare` | `compare_direct_diagnostic` | `case` | Compare four direct-transmission diagnostic terms to supplied W/K expectations |
 | `POST /v1/nta8800/reference/gas-chain-diagnostic/compare` | `compare_gas_heat_pump_chain_diagnostic` | `case` | Compare all twelve gas heat-pump draft 9.62 and equipment-electricity values plus annual equipment electricity to supplied expectations |
+
+### Uitgave wijzigen (`compare_project_editions`)
+
+Bij deze route is `normVersion` de **doeluitgave** (standaard 2025+C1); het project behoudt zijn eigen uitgave in `ntaCalculation.normVersion`. Een project zonder `ntaCalculation` geeft 400 `invalid_project_shape`. De route antwoordt altijd 200 en verandert niets aan het verzoek. De kern rekent het project in beide uitgaven door (`crates/nta8800-core/src/edition_switch.rs`):
+
+| Veld | Inhoud |
+|---|---|
+| `fromNormVersion`, `toNormVersion` | eigen uitgave en doeluitgave |
+| `switchPoints` | de omschakelpunten van [`nta8800-normversies.md`](nta8800-normversies.md) waarvan de profielwaarden tussen de twee uitgaven verschillen (`points`, `subject`, `fields`, `hasInputs`) |
+| `items[]` | per invoer: `category` (`refused`, `required`, `ignored`, `reinterpreted`, `warning`), de kerncode, het projectpad, de omschakelpunten (`points`), `fix` en `resolvedByAutomaticChanges` |
+| `adjustedProject` | het project in de doeluitgave met de automatische aanpassingen |
+| `statusAfterAutomaticChanges`, `remainingAfterAutomaticChanges` | status en nieuwe gaten van `adjustedProject`: precies de punten die voor de adviseur overblijven |
+
+`fix` is `drop`, `switchOff` of `set` (veilig, toegepast in `adjustedProject`), of `enter`, `choose` of `review` (aan de adviseur). Automatisch verandert alleen een lid dat het omschakelpunt noemt, nooit een omsluitend object of lijstelement. Een geweigerd lid dat na het weglaten verplicht blijkt, of waarvan het weglaten het blok onleesbaar maakt, wordt teruggezet en krijgt `choose`. Verplichte waarden worden nooit verzonnen. De gedateerde NEN-EN 14511-2 van een testrapport voor tabel 9.28 (punt 67a) is bewijs en wordt nooit herschreven: het item krijgt `choose` met in `value` de norm die de doeluitgave vraagt. Het OpenAPI-document beschrijft de vorm van het resultaat.
+
+De koppeling van een melding aan een omschakelpunt volgt uit de profielen zelf: elk veld van `NormProfile` hoort bij precies één omschakelpunt (`norm_versions::switches`), en een test controleert dat elk veld dat tussen twee uitgaven verschilt en elke genummerde rij van `nta8800-normversies.md` een omschakelpunt heeft.
 
 ### Keuzes bij de pariteit met de desktop-app
 
@@ -190,11 +247,14 @@ curl -s -X POST http://127.0.0.1:3007/v1/nta8800/relabel/assess \
 - elke route;
 - het OpenAPI-document tegen het register;
 - de foutenvelop bij ongeldige JSON, verkeerde content-type, verkeerde vorm, onbekende route, verkeerde methode en een te grote body;
-- CORS;
+- de grens op het aantal JSON-waarden, onbekende leden, herlabelen en hash met iets anders dan een project, de editie van een referentiegeval, de reikwijdte in `capabilities`, de velden van `energy-by-service`, de hostcontrole en de 422-regels in het OpenAPI-document;
+- CORS, met `Vary: Origin`;
 - versie en gezondheid;
 - beide voorbeeldprojecten via alle projectroutes;
 - drie basisopnames;
 - een project zonder NTA-invoer (422 met gaten).
+
+`crates/nta8800-service/tests/memory_bound.rs` meet met een tellende allocator wat een ingelezen body per JSON-waarde kost, en controleert dat een bewerking de body niet kopieert.
 
 ## Build
 

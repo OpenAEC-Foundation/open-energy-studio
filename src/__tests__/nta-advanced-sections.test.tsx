@@ -144,6 +144,34 @@ describe('advanced NTA calculation fields', () => {
     expect(current().emission).toEqual({ system: 'air_heating' });
   });
 
+  it('keeps the count and the other air-heater types when the type changes (9.23)', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Harness initial={{ emission: { system: 'air_heating', airHeaters: {
+      kind: { kind: 'direct', radialFan: false }, count: 1,
+      further: [{ kind: { kind: 'direct', radialFan: true }, count: 3 }],
+      designHeatLoadW: null, sourceReference: 'ISSO 54 EP-W203o' } } }}
+      body={(draft, change) => <AirHeatersFields draft={draft} change={change} />} />);
+    // The count and the other types are shown.
+    const counts = screen.getAllByLabelText(/Number of air heaters of this type/);
+    expect(counts).toHaveLength(2);
+    expect(counts[1]).toHaveAttribute('aria-valuenow', '3');
+    // Changing the first type keeps them.
+    await user.selectOptions(screen.getByLabelText('Air heaters (tables 9.12/9.13)'), 'indirect');
+    expect(current().emission.airHeaters).toMatchObject({
+      kind: { kind: 'indirect' }, count: 1,
+      further: [{ kind: { kind: 'direct', radialFan: true }, count: 3 }],
+      sourceReference: 'ISSO 54 EP-W203o',
+    });
+    // Another type can be added and removed.
+    await user.click(screen.getByRole('button', { name: 'Add another type (9.23)' }));
+    expect(current().emission.airHeaters.further).toHaveLength(2);
+    await user.selectOptions(screen.getAllByLabelText('Air-heater type')[1], 'indirect');
+    expect(current().emission.airHeaters.further[1].kind.kind).toBe('indirect');
+    await user.click(screen.getAllByRole('button', { name: 'Remove' })[1]);
+    await user.click(screen.getAllByRole('button', { name: 'Remove' })[0]);
+    expect(current().emission.airHeaters.further).toBeUndefined();
+  });
+
   it('edits label and Bbl use functions with their areas', async () => {
     const user = userEvent.setup();
     renderWithProviders(<Harness initial={{}} body={(draft, change) => <>

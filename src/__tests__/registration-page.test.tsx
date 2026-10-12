@@ -13,6 +13,7 @@ import { ProjectInfoDialog } from '../components/dialogs/ProjectInfoDialog/Proje
 import { softwareIdentity } from '../core/nta/Registration';
 import type { RegistrationAssessment } from '../core/nta/KernelClient';
 import { renderWithProviders, userEvent } from './test-utils';
+import { SLOW_UI_TEST_MS } from './timeouts';
 
 afterEach(() => {
   localStorage.removeItem('nta-bag-registrations');
@@ -51,7 +52,7 @@ describe('registration page', () => {
     const ledger = JSON.parse(localStorage.getItem('nta-bag-registrations') ?? '[]');
     // Not registered yet (no EP-Online number), so not in the ledger.
     expect(ledger.map((item: { projectId: string }) => item.projectId)).toEqual(['other']);
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 
   it('shows the relabel fields only for a relabel (formerly in the project-info dialog)', async () => {
     const user = userEvent.setup();
@@ -63,7 +64,7 @@ describe('registration page', () => {
     expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Discard' }));
     expect(screen.queryByLabelText('Kernel version of original survey (relabel)')).not.toBeInTheDocument();
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 
   it('names every reason a registration is not ready', () => {
     const base = { issues: [], plausibility: [] } as unknown as RegistrationAssessment;
@@ -82,7 +83,7 @@ describe('registration step', () => {
     expect(screen.getByText('Registration in EP-Online requires a BRL 9501 attest')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Calculation program and attest' })).toBeInTheDocument();
     expect(screen.getByLabelText('BAG object id')).toBeEnabled();
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 });
 
 describe('project information dialog', () => {
@@ -109,5 +110,5 @@ describe('project information dialog', () => {
     expect(onClose).toHaveBeenCalledOnce();
     const stored = JSON.parse(screen.getByTestId('project').textContent ?? 'null');
     expect(stored).toMatchObject({ name: 'Woning 1', city: 'Delft' });
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 });

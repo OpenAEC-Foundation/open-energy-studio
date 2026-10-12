@@ -3,6 +3,7 @@ import { useEnergy } from '../../../context/EnergyContext';
 import type { IPointThermalBridge, ThermalBoundary } from '../../../core/energy/types';
 import { useI18n } from '../../../i18n/i18n';
 import { DialogShell } from '../DialogShell';
+import { DecimalInput } from '../../ui';
 
 const boundaries: ThermalBoundary[] = ['outdoor', 'ground', 'unheated_space', 'adjacent_conditioned', 'internal'];
 
@@ -56,7 +57,7 @@ export function PointBridgeDialog({ editId, onClose }: { editId?: string | null;
       </select>
     </div>}
     <div className="dialog-field"><label htmlFor="point-bridge-chi">{t('kernel.pointBridge.chi')}</label>
-      <input id="point-bridge-chi" type="number" step="any" value={chi}
+      <DecimalInput id="point-bridge-chi" step="any" value={chi}
         onChange={(event) => setChi(event.target.value)} />
     </div>
     <div className="dialog-field"><label htmlFor="point-bridge-boundary">{t('kernel.boundary.label')}</label>

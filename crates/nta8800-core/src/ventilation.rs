@@ -2711,6 +2711,16 @@ fn cross_ventilation(openings: &[CoolingOpening]) -> bool {
     })
 }
 
+/// 11.77/11.77b: α_min ≤ α_w;k < α_max with α_min/max = α_ref ∓ 45°, so an
+/// opening on a sector boundary counts in one sector only (2025+C1 p. 480,
+/// 2024 p. 464, 2023 p. 469). Both conventions run clockwise, so the
+/// north-based azimuth gives the same half-open sectors as the south-based
+/// α of the norm; the angle wraps at 360°.
+fn in_sector(azimuth_deg: f64, reference_deg: f64) -> bool {
+    let offset = (azimuth_deg - reference_deg).rem_euclid(360.0);
+    offset < 45.0 || offset >= 315.0
+}
+
 /// 11.77–11.79.
 fn cross_area(openings: &[CoolingOpening], areas: &[f64], total: f64) -> f64 {
     let mut result = f64::INFINITY;
@@ -2727,7 +2737,7 @@ fn cross_area(openings: &[CoolingOpening], areas: &[f64], total: f64) -> f64 {
                     // all openings by orientation only.
                     (o.tilt_deg < 60.0
                         && crate::norm_versions::profile().cross_area_roof_all_sectors)
-                        || angular_difference(o.azimuth_deg, reference) <= 45.0
+                        || in_sector(o.azimuth_deg, reference)
                 })
                 .map(|(_, a)| a)
                 .sum();
@@ -4054,8 +4064,10 @@ mod tests {
             close(screened.net_area(), 1.46 * 30.0 / 71.0 * 2.0 * 0.5, 1e-12);
         });
         // A roof hatch (β 30°) and a façade window, both facing north:
-        // 11.77a counts the hatch in every sector (2024 p. 464), so sectors
-        // 135° and 225° pair it with the window: 2·(1/√2)/4. 11.77 of
+        // 11.77a counts the hatch in every sector (2024 p. 464). The window
+        // lies in sector 0° only for i = 1 and in sector 45° only for i = 2
+        // (α_min ≤ α < α_max), so three sectors per loop pair the hatch with
+        // the window: 3·(1/√2)/4. 11.77 of
         // NTA 8800:2023 (p. 469) sorts both into the north sector only, and
         // no sector has area on both sides: A_w;cros = 0.
         let mut hatch = opening(0.0);
@@ -4064,7 +4076,7 @@ mod tests {
         assert!(cross_ventilation(&mixed));
         close(
             cross_area(&mixed, &[1.0, 1.0], 2.0),
-            2.0 / 2f64.sqrt() / 4.0,
+            3.0 / 2f64.sqrt() / 4.0,
             1e-12,
         );
         crate::norm_versions::with_version(crate::norm_versions::NormVersion::V2023, || {
@@ -4076,6 +4088,40 @@ mod tests {
             entry_loss_coefficient: 0.5,
         };
         close(discharge.net_area(), 0.55 / 0.67, 1e-12);
+    }
+
+    #[test]
+    fn an_opening_on_a_sector_boundary_counts_in_one_sector() {
+        // 11.77b: α_min ≤ α_w;k < α_max (2025+C1 p. 480). A north window
+        // (α 0°) and a south-east window (α 135°), 1 m² each, A_w;tot 2 m².
+        // i = 1 (sectors 0/90/180/270): north in 0°, south-east in 180°
+        // (−45° from it, on the closed side), not in 90° (+45°):
+        //   2·1/√(1/1² + 1/1²) / 4 = 2·(1/√2)/4.
+        // i = 2 (sectors 45/135/225/315): north in 45° only, south-east in
+        // 135° only: again 2·(1/√2)/4. A_w;cros = (1/√2)/2 ≈ 0,353 6.
+        // Counting a boundary opening in both neighbouring sectors gave
+        // 3·(1/√2)/4 ≈ 0,530 3.
+        let opening = |azimuth: f64| CoolingOpening {
+            id: "w".into(),
+            area: OpeningArea::Declared { net_area_m2: 1.0 },
+            centre_height_m: 1.5,
+            opening_height_m: 1.0,
+            azimuth_deg: azimuth,
+            tilt_deg: 90.0,
+        };
+        let openings = vec![opening(0.0), opening(135.0)];
+        assert!(cross_ventilation(&openings));
+        close(
+            cross_area(&openings, &[1.0, 1.0], 2.0),
+            2.0 / 2f64.sqrt() / 4.0,
+            1e-12,
+        );
+        assert!(in_sector(0.0, 0.0));
+        assert!(in_sector(315.0, 0.0));
+        assert!(!in_sector(45.0, 0.0));
+        assert!(in_sector(45.0, 90.0));
+        assert!(in_sector(0.0, 45.0));
+        assert!(!in_sector(0.0, 315.0));
     }
 
     #[test]
@@ -4309,5 +4355,36 @@ mod tests {
             flow_control_factor(FlowControlMethod::SpeedControl, 0.8),
             0.65
         );
+    }
+
+    /// Review 52, independent recalculation of 11.77–11.79 (2025+C1
+    /// p. 480–481) with α_min ≤ α < α_max, written from the norm with the
+    /// south-based α: east 2 m², west 1 m², north-west 0,5 m² (on a
+    /// boundary) and 1,5 m² at 200° (north-based), all vertical, give
+    /// 1,105 384; all openings in one sector give no cross-ventilation area
+    /// (A_w;tot − A_w;or,j = 0 in 11.78).
+    #[test]
+    fn review52_cross_area_against_an_independent_implementation() {
+        let opening = |azimuth: f64| CoolingOpening {
+            id: "w".into(),
+            area: OpeningArea::Declared { net_area_m2: 1.0 },
+            centre_height_m: 1.5,
+            opening_height_m: 1.0,
+            azimuth_deg: azimuth,
+            tilt_deg: 90.0,
+        };
+        let openings = vec![
+            opening(90.0),
+            opening(270.0),
+            opening(315.0),
+            opening(200.0),
+        ];
+        close(
+            cross_area(&openings, &[2.0, 1.0, 0.5, 1.5], 5.0),
+            1.105_383_919_682_465_3,
+            1e-12,
+        );
+        let one_sector = vec![opening(170.0), opening(190.0)];
+        close(cross_area(&one_sector, &[1.0, 2.0], 3.0), 0.0, 1e-12);
     }
 }

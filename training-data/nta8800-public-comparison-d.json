@@ -431,10 +431,10 @@
     },
     "thermalMass": {
       "floor": "very_heavy",
-      "wall": "very_heavy",
+      "wall": "heavy",
       "ceiling": "open_or_none",
       "massKgPerM2": 800.0,
-      "sourceReference": "openbare bron Uniec 3.0.10.0 printout (vakantiewoning, 2021): dragend metselwerk met massieve betonnen vloeren (tabel 7.10 rij > 750 kg/m2)"
+      "sourceReference": "openbare bron Uniec 3.0.10.0 printout (vakantiewoning, 2021): dragend metselwerk met massieve betonnen vloeren (tabel 7.10 rij > 750 kg/m2, 2020+A1 p. 180); klassen vloer zeer zwaar, wand zwaar (dragend metselwerk)"
     },
     "internalGains": {
       "method": "residential",

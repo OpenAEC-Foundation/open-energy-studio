@@ -1,6 +1,7 @@
 import type { IProject } from '../energy/types';
 import type { MaatwerkadviesAssessment, MwaVariantResult, NtaMaatwerkadvies } from '../nta/KernelClient';
 import { escapeHtml } from './HtmlEscaping';
+import { attestText, programIdentity, programText } from './ProgramIdentity';
 import { dutchCodeCell, dutchCodeHtml, dutchDetailHtml, dutchNumber, dutchTimeHtml } from './DutchReportText';
 import { measureEvidenceNotes } from '../nta/MwaTemplates';
 import { nl } from '../../i18n/nl';
@@ -83,6 +84,17 @@ function variantRow(result: MwaVariantResult): string {
     ${n(savings?.energyCostEur)}${n(result.investmentEur)}${n(result.simplePaybackYears, 1)}${n(result.netPresentValueEur)}</tr>`;
 }
 
+/**
+ * The NCW period: the adviser's horizon, or the common one the kernel chose (the longest
+ * lifetime). BRL 9501 §4.1.3 (p. 7): the inputs of a financial figure stand with its result.
+ */
+function horizonText(definition: NtaMaatwerkadvies, assessment: MaatwerkadviesAssessment): string {
+  const given = definition.economics?.horizonYears;
+  if (given != null) return `${num(given)} jaar (opgegeven)`;
+  const used = assessment.packages[0]?.horizonYears ?? assessment.measures[0]?.horizonYears;
+  return used == null ? '—' : `${num(used)} jaar (langste levensduur van de maatregelen)`;
+}
+
 /** BRL 9500-MWA-W/U §3.1 report: current use, packages, savings, costs and advice. */
 export function generateMaatwerkadviesReportHTML(
   project: IProject,
@@ -90,6 +102,7 @@ export function generateMaatwerkadviesReportHTML(
   assessment: MaatwerkadviesAssessment,
 ): string {
   const generatedTime = dutchTimeHtml();
+  const identity = programIdentity(assessment.kernelVersion, assessment.targetNormVersion);
   const head = `<!doctype html><html lang="nl"><head><meta charset="utf-8">
     <title>Maatwerkadvies — ${escapeHtml(project.name)}</title>
     <style>body{font:14px/1.5 system-ui,sans-serif;max-width:1100px;margin:32px auto;padding:0 20px;color:#202530}
@@ -98,10 +111,11 @@ export function generateMaatwerkadviesReportHTML(
     @media print{body{margin:12mm;padding:0;font-size:11px}table{break-inside:avoid}}</style></head><body>
     <h1>Maatwerkadvies</h1>
     <p>Project: ${escapeHtml(project.name)} · ${escapeHtml(project.address ?? '')} ${escapeHtml(project.city ?? '')} · Gegenereerd: ${generatedTime}</p>
-    <div class="notice"><strong>Onverifieerde berekening, niet geattesteerd.</strong> De energieberekening komt uit de Rust-rekenkern van Open Energy Studio (NTA 8800:2025+C1:2026). Werkelijke besparingen hangen af van gebruik, uitvoering en energieprijzen. TO<sub>juli</sub> is slechts een indicatie en is voor bestaande bouw niet gevalideerd (ISSO 82.2 §4.2.3).</div>
+    <div class="notice"><strong>Onverifieerde berekening, niet geattesteerd.</strong> De energieberekening komt uit de Rust-rekenkern van Open Energy Studio (${escapeHtml(assessment.targetNormVersion)}). Werkelijke besparingen hangen af van gebruik, uitvoering en energieprijzen. TO<sub>juli</sub> is slechts een indicatie en is voor bestaande bouw niet gevalideerd (ISSO 82.2 §4.2.3).</div>
     <h2>Herleidbaarheid</h2><table><tbody>
-      <tr><th>Doeluitgave</th>${cell(assessment.targetNormVersion)}<th>Kernelversie</th>${cell(assessment.kernelVersion)}</tr>
+      <tr><th>Doeluitgave</th>${cell(assessment.targetNormVersion)}<th>Rekenkernversie</th>${cell(assessment.kernelVersion)}</tr>
       <tr><th>Status</th>${cell(status(assessment.status))}<th>Atteststatus</th>${cell(status(assessment.attestStatus))}</tr>
+      <tr><th>Rekenprogramma</th>${cell(programText(identity))}<th>BRL 9501-attestnummer</th>${cell(attestText(identity))}</tr>
       <tr><th>Invoervingerafdruk</th><td colspan="3"><code>${escapeHtml(assessment.inputFingerprint)}</code></td></tr>
     </tbody></table>`;
   if (assessment.status === 'invalid' || !assessment.current) {
@@ -131,7 +145,12 @@ export function generateMaatwerkadviesReportHTML(
   const chosen = assessment.packages.find((item) => item.id === advice?.packageId);
   const passport = assessment.renovationPassport;
   const list = (items: string[]) => items.length ? `<ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : '<p>Geen.</p>';
-  return `${head}
+  // A partly calculated advice keeps its kernel issues, as the screen shows them.
+  const issuesSection = assessment.issues.length > 0
+    ? `<h2>Meldingen</h2><table><thead><tr><th>Code</th><th>Pad</th><th>Detail</th></tr></thead><tbody>${assessment.issues
+      .map((item) => `<tr>${dutchCodeCell(item.code)}${cell(item.path)}<td>${dutchDetailHtml(item.detail)}</td></tr>`).join('')}</tbody></table>`
+    : '';
+  return `${head}${issuesSection}
     <h2>Huidige situatie</h2>
     <table><tbody>
       <tr><th>Energielabel (indicatief, NTA 8800)</th>${cell(current.label.labelClass ?? '—')}<th>EP2 [kWh/m²·jr]</th>${n(current.label.primaryFossilIndicatorKwhPerM2, 1)}</tr>
@@ -184,7 +203,9 @@ export function generateMaatwerkadviesReportHTML(
       <li>Het gebouw kan in de praktijk gevoeliger zijn voor oververhitting; aanvullende (dynamische) studies kunnen zinvol zijn.</li>
     </ul>` : ''}
     <h2>Advies</h2>
-    <p><strong>Best passend pakket:</strong> ${escapeHtml(chosen?.name ?? '—')} (${advice?.chosenBy === 'adviser' ? 'keuze adviseur' : 'automatisch: hoogste netto contante waarde, door adviseur te bevestigen'})</p>
+    <p><strong>Best passend pakket:</strong> ${chosen
+      ? `${escapeHtml(chosen.name)} (${advice?.chosenBy === 'adviser' ? 'keuze adviseur' : 'automatisch: hoogste netto contante waarde, door adviseur te bevestigen'})`
+      : 'geen pakket geadviseerd'}</p>
     ${advice?.motivation ? `<p>${escapeHtml(advice.motivation)}</p>` : ''}
     <h3>Waarschuwingen</h3>${list(advice?.warnings ?? [])}
     <h3>Uitwerking door een specialist</h3>${list(advice?.specialistNotes ?? [])}
@@ -193,6 +214,7 @@ export function generateMaatwerkadviesReportHTML(
       <tr><th>Gastarief</th><td>€ ${num(tariffs.gasEurPerM3, 3)}/m³</td><th>Elektriciteit levering / teruglevering</th><td>€ ${num(tariffs.electricityEurPerKwh, 3)} / € ${num(tariffs.electricityExportEurPerKwh ?? 0, 3)} per kWh</td></tr>
       <tr><th>Warmte</th><td>€ ${num(tariffs.districtHeatEurPerKwh ?? 0, 3)}/kWh</td><th>Bron tarieven</th>${cell(tariffs.sourceReference)}</tr>
       <tr><th>Discontovoet / prijsstijging</th><td>${num((definition.economics?.discountRate ?? 0.03) * 100, 1)} % / ${num((definition.economics?.energyPriceChange ?? 0) * 100, 1)} %</td><th>Bron</th>${cell(definition.economics?.sourceReference ?? '—')}</tr>
+      <tr><th>Looptijd netto contante waarde</th><td>${horizonText(definition, assessment)}</td><th>Prijsstijging onderhoud / basisjaar</th><td>${num((definition.economics?.maintenancePriceChange ?? 0) * 100, 1)} % / ${escapeHtml(definition.economics?.baseYear ?? '—')}</td></tr>
     </tbody></table>
     <h3>Interpretaties van de rekenkern</h3>
     <p>De rekenkern legt zijn interpretaties vast in het Engels, zoals ze in de broncode staan; ze zijn hier ongewijzigd opgenomen.</p>

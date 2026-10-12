@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import syntheticCase from '../../../training-data/nta8800-gas-chain-diagnostic-synthetic.json';
 import { compareGasHeatPumpChainDiagnosticWithRust, type GasChainDiagnosticCase, type GasChainDiagnosticComparison } from '../../core/nta/KernelClient';
 import { useI18n } from '../../i18n/i18n';
@@ -7,6 +7,7 @@ import './GasChainReferencePanel.css';
 
 export function GasChainReferencePanel() {
   const { t, locale } = useI18n();
+  const hintId = useId();
   const [text, setText] = useState('');
   const [result, setResult] = useState<GasChainDiagnosticComparison | null>(null);
   const [comparedSource, setComparedSource] = useState<GasChainDiagnosticCase['source'] | null>(null);
@@ -96,9 +97,12 @@ export function GasChainReferencePanel() {
       <label>{t('kernel.gasReference.json')}
         <textarea value={text} rows={9} spellCheck={false} onChange={(event) => setCaseText(event.target.value)} />
       </label>
-      <button type="button" disabled={loading || !text.trim()} onClick={() => void compare()}>
+      <button type="button" disabled={loading || !text.trim()} onClick={() => void compare()}
+        aria-describedby={!text.trim() ? `${hintId}-load-first` : undefined}>
         {loading ? t('kernel.gasReference.loading') : t('kernel.gasReference.compare')}
       </button>
+      {/* Why the button is off (UX finding 9). */}
+      {!text.trim() && <p id={`${hintId}-load-first`} className="gas-chain-reference-hint">{t('kernel.gasReference.loadFirst')}</p>}
       {error && <p role="alert" className="gas-chain-reference-error">{error}</p>}
       {result && <div role="status" className="gas-chain-reference-result" data-status={result.status}>
         <p><strong>{t(`kernel.gasReference.status.${result.status}`)}</strong> · {result.caseId}</p>

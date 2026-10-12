@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useI18n } from '../../i18n/i18n';
+import { formatNumber } from '../../i18n/format';
 import { useEnergy } from '../../context/EnergyContext';
 import { PanelRightClose } from 'lucide-react';
 import type { IZone, ISurface, IWindow, IThermalBridge, IPointThermalBridge, IConstruction, IHeatingSystem, IVentilationSystem, ICoolingSystem, IHotWaterSystem, ISolarPV, ISolarThermal } from '../../core/energy/types';
@@ -64,7 +65,7 @@ function PropertyRow({ label, value }: { label: string; value: string | number }
 
 /** `embedded`: rendered inside the shell inspector, which owns the frame, header and width. */
 export function PropertiesPanel({ embedded = false }: { embedded?: boolean } = {}) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { state } = useEnergy();
   const { item, type } = findItem(state);
   const [collapsed, setCollapsed] = useState(false);
@@ -188,8 +189,8 @@ export function PropertiesPanel({ embedded = false }: { embedded?: boolean } = {
           return (
             <>
               <PropertyRow label={t('properties.name')} value={c.name} />
-              <PropertyRow label={t('properties.rcValue')} value={`${c.rcValue.toFixed(2)} m²K/W`} />
-              <PropertyRow label={t('properties.uValue')} value={`${c.uValue.toFixed(3)} W/m²K`} />
+              <PropertyRow label={t('properties.rcValue')} value={`${formatNumber(c.rcValue, locale, 2)} m²K/W`} />
+              <PropertyRow label={t('properties.uValue')} value={`${formatNumber(c.uValue, locale, 3)} W/m²K`} />
             </>
           );
         })()}
@@ -200,8 +201,8 @@ export function PropertiesPanel({ embedded = false }: { embedded?: boolean } = {
             <>
               <PropertyRow label={t('properties.name')} value={h.name} />
               <PropertyRow label={t('properties.type')} value={h.type} />
-              <PropertyRow label={t('properties.cop')} value={h.cop.toFixed(2)} />
-              <PropertyRow label={t('properties.coverage')} value={`${(h.coverageFraction * 100).toFixed(0)}%`} />
+              <PropertyRow label={t('properties.cop')} value={formatNumber(h.cop, locale, 2)} />
+              <PropertyRow label={t('properties.coverage')} value={`${formatNumber(h.coverageFraction * 100, locale, 0)}%`} />
             </>
           );
         })()}
@@ -212,7 +213,7 @@ export function PropertiesPanel({ embedded = false }: { embedded?: boolean } = {
             <>
               <PropertyRow label={t('properties.name')} value={v.name} />
               <PropertyRow label={t('properties.type')} value={v.type} />
-              <PropertyRow label={t('properties.efficiency')} value={`${(v.heatRecoveryEfficiency * 100).toFixed(0)}%`} />
+              <PropertyRow label={t('properties.efficiency')} value={`${formatNumber(v.heatRecoveryEfficiency * 100, locale, 0)}%`} />
             </>
           );
         })()}
@@ -223,7 +224,7 @@ export function PropertiesPanel({ embedded = false }: { embedded?: boolean } = {
             <>
               <PropertyRow label={t('properties.name')} value={c.name} />
               <PropertyRow label={t('properties.type')} value={c.type} />
-              <PropertyRow label={t('properties.eer')} value={c.eer.toFixed(2)} />
+              <PropertyRow label={t('properties.eer')} value={formatNumber(c.eer, locale, 2)} />
             </>
           );
         })()}
@@ -234,7 +235,7 @@ export function PropertiesPanel({ embedded = false }: { embedded?: boolean } = {
             <>
               <PropertyRow label={t('properties.name')} value={hw.name} />
               <PropertyRow label={t('properties.type')} value={hw.type} />
-              <PropertyRow label={t('properties.efficiency')} value={hw.efficiency.toFixed(2)} />
+              <PropertyRow label={t('properties.efficiency')} value={formatNumber(hw.efficiency, locale, 2)} />
             </>
           );
         })()}

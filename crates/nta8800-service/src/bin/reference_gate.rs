@@ -17,6 +17,7 @@ use nta8800_core::reference::{
     compare_reference_case, comparison_status_acceptable, ReferenceCase, ReferenceComparison,
 };
 use nta8800_core::{KERNEL_VERSION, TARGET_NORM_VERSION};
+use nta8800_service::testset::{self, apply_patch, PatchStep};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -66,22 +67,6 @@ struct Suite {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct PatchStep {
-    op: PatchOp,
-    pointer: String,
-    #[serde(default)]
-    value: Option<Value>,
-}
-
-#[derive(Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
-enum PatchOp {
-    Set,
-    Remove,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct PublishedValue {
     path: String,
     value: f64,
@@ -99,36 +84,6 @@ struct SuiteRecord {
 
 fn sha256(bytes: &[u8]) -> String {
     format!("sha256:{:x}", Sha256::digest(bytes))
-}
-
-/// Applies `set`/`remove` steps at JSON pointers. A step whose target (or,
-/// for `set`, whose parent) is missing is an error, so a fixture change
-/// cannot silently turn a patch into a no-op.
-fn apply_patch(project: &mut Value, steps: Vec<PatchStep>) -> Result<(), String> {
-    for step in steps {
-        let (parent, key) = step
-            .pointer
-            .rsplit_once('/')
-            .ok_or_else(|| format!("Patch pointer must start with '/': {}", step.pointer))?;
-        let object = project
-            .pointer_mut(parent)
-            .and_then(Value::as_object_mut)
-            .ok_or_else(|| format!("Patch parent is not an object: {}", step.pointer))?;
-        match step.op {
-            PatchOp::Set => {
-                let value = step
-                    .value
-                    .ok_or_else(|| format!("Patch set needs a value: {}", step.pointer))?;
-                object.insert(key.to_string(), value);
-            }
-            PatchOp::Remove => {
-                object
-                    .remove(key)
-                    .ok_or_else(|| format!("Patch remove target is missing: {}", step.pointer))?;
-            }
-        }
-    }
-    Ok(())
 }
 
 /// A suite case: a reference manifest whose `project` is read from
@@ -556,6 +511,117 @@ fn run_with(paths: &[PathBuf], suites: &[PathBuf], plan_path: Option<&Path>) -> 
     report
 }
 
+/// Writes the testset dossier (BRL 9501 §3.3): per suite case a project
+/// file the app opens (`projecten/<caseId>.oes.json`) and an overview in
+/// Markdown and CSV. The numbers come from the project as written, through
+/// the operation of the HTTP route; the expected values and verdict from the
+/// comparison in `report`, once a case has expectations.
+fn write_testset(
+    dir: &Path,
+    topics_path: Option<&Path>,
+    suites: &[PathBuf],
+    report: &GateReport,
+) -> Result<usize, String> {
+    let topics = match topics_path {
+        None => serde_json::Map::new(),
+        Some(path) => {
+            let value: Value = fs::read(path)
+                .map_err(|error| format!("{}: {error}", path.display()))
+                .and_then(|bytes| {
+                    serde_json::from_slice(&bytes).map_err(|error| error.to_string())
+                })?;
+            value
+                .get("series")
+                .and_then(Value::as_object)
+                .cloned()
+                .ok_or_else(|| format!("{}: no series object", path.display()))?
+        }
+    };
+    let projects = dir.join("projecten");
+    fs::create_dir_all(&projects).map_err(|error| error.to_string())?;
+    // The dossier lists exactly the files it writes: an earlier run's files
+    // would be counted and hashed with it in the release manifest.
+    if fs::read_dir(&projects)
+        .map_err(|error| error.to_string())?
+        .next()
+        .is_some()
+    {
+        return Err(format!("{} is not empty", projects.display()));
+    }
+    let mut file_names = HashSet::new();
+    let mut rows = Vec::new();
+    for path in suites {
+        let bytes = fs::read(path).map_err(|error| format!("{}: {error}", path.display()))?;
+        let suite: Suite = serde_json::from_slice(&bytes).map_err(|error| error.to_string())?;
+        let suite_dir = path.parent().unwrap_or(Path::new("."));
+        for raw in suite.cases {
+            let resolved = resolve_suite_case(raw, suite_dir)?;
+            let case_id = resolved.case.case_id.clone();
+            let project = resolved.case.project;
+            let first = testset::calculate(&project);
+            let file_name = testset::project_file_name(&case_id)?;
+            if !file_names.insert(file_name.clone()) {
+                return Err(format!("Duplicate caseId: {case_id}"));
+            }
+            let text = testset::project_file(&project, &first);
+            // What the app sends after opening the file; the overview is its answer.
+            let opened = testset::open_project_file(&text)?;
+            let assessment = testset::calculate(&opened);
+            if assessment.get("inputFingerprint") != first.get("inputFingerprint") {
+                return Err(format!(
+                    "{case_id}: the opened project file calculates with another input fingerprint"
+                ));
+            }
+            fs::write(projects.join(&file_name), &text).map_err(|error| error.to_string())?;
+            let comparison = report
+                .cases
+                .iter()
+                .find(|item| item.comparison.case_id == case_id)
+                .map(|item| serde_json::to_value(&item.comparison).expect("comparison serializes"));
+            rows.push(testset::row(
+                &case_id,
+                testset::topic(&case_id, &topics),
+                &format!("projecten/{file_name}"),
+                &text,
+                &assessment,
+                comparison.as_ref(),
+            ));
+        }
+    }
+    let header = [
+        (
+            "Commit",
+            report
+                .commit
+                .clone()
+                .unwrap_or_else(|| UNKNOWN_COMMIT.into()),
+        ),
+        ("Rekenkernversie", KERNEL_VERSION.to_string()),
+        ("Normversie van de kern", TARGET_NORM_VERSION.to_string()),
+        (
+            "Suites",
+            suites
+                .iter()
+                .map(|path| path.display().to_string())
+                .collect::<Vec<_>>()
+                .join(", "),
+        ),
+    ];
+    let written = fs::write(dir.join("testset.md"), testset::markdown(&rows, &header))
+        .and_then(|()| fs::write(dir.join("testset.csv"), testset::csv(&rows)))
+        .and_then(|()| {
+            fs::write(
+                dir.join("testset.json"),
+                format!(
+                    "{}\n",
+                    serde_json::to_string_pretty(&rows).expect("rows serialize")
+                ),
+            )
+        });
+    written.map_err(|error| error.to_string())?;
+    Ok(rows.len())
+}
+
 /// Shown when no commit was supplied (a Dutch word, not a kernel code).
 const UNKNOWN_COMMIT: &str = "onbekend";
 
@@ -708,8 +774,15 @@ fn main() -> ExitCode {
     let mut suites = Vec::new();
     let mut report_dir = None;
     let mut commit = None;
+    let mut testset_dir = None;
+    let mut testset_topics: Option<PathBuf> = None;
     while let Some(arg) = args.next() {
-        if arg == "--suite" || arg == "--report-dir" || arg == "--commit" {
+        if arg == "--suite"
+            || arg == "--report-dir"
+            || arg == "--commit"
+            || arg == "--testset-dir"
+            || arg == "--testset-topics"
+        {
             let Some(value) = args.next() else {
                 eprintln!("{} requires a value", arg.to_string_lossy());
                 return ExitCode::from(2);
@@ -718,6 +791,10 @@ fn main() -> ExitCode {
                 suites.push(PathBuf::from(value));
             } else if arg == "--report-dir" {
                 report_dir = Some(PathBuf::from(value));
+            } else if arg == "--testset-dir" {
+                testset_dir = Some(PathBuf::from(value));
+            } else if arg == "--testset-topics" {
+                testset_topics = Some(PathBuf::from(value));
             } else {
                 commit = Some(value.to_string_lossy().into_owned());
             }
@@ -756,6 +833,18 @@ fn main() -> ExitCode {
         }
     } else {
         println!("{json}");
+    }
+    if let Some(dir) = testset_dir {
+        match write_testset(&dir, testset_topics.as_deref(), &suites, &report) {
+            Ok(count) => eprintln!("Testset dossier: {count} cases in {}", dir.display()),
+            Err(error) => {
+                eprintln!(
+                    "Could not write the testset dossier to {}: {error}",
+                    dir.display()
+                );
+                return ExitCode::from(2);
+            }
+        }
     }
     if success {
         ExitCode::SUCCESS
@@ -1051,6 +1140,46 @@ mod tests {
         fs::remove_dir_all(dir).unwrap();
     }
 
+    // Review 32: the dossier holds only the files of this run, one per case.
+    #[test]
+    fn testset_dossier_refuses_stale_files_duplicates_and_unsafe_ids() {
+        let dir = suite_dir();
+        let write_suite = |cases: Vec<Value>| {
+            let suite = dir.join("suite.json");
+            fs::write(
+                &suite,
+                json!({"suiteId":"s", "description":"d", "cases":cases}).to_string(),
+            )
+            .unwrap();
+            suite
+        };
+        let suite = write_suite(vec![suite_case(8.2, json!([]))]);
+        let report = run_with(&[], std::slice::from_ref(&suite), None);
+        let out = dir.join("dossier");
+        assert_eq!(
+            write_testset(&out, None, std::slice::from_ref(&suite), &report),
+            Ok(1)
+        );
+        let rows: Value =
+            serde_json::from_slice(&fs::read(out.join("testset.json")).unwrap()).unwrap();
+        assert_eq!(rows[0]["verdict"], "binnen de band");
+        // A second run into the same folder would mix in the first run's files.
+        let again = write_testset(&out, None, std::slice::from_ref(&suite), &report);
+        assert!(again.unwrap_err().contains("is not empty"));
+
+        let suite = write_suite(vec![suite_case(8.2, json!([])), suite_case(8.2, json!([]))]);
+        let duplicate = write_testset(&dir.join("d2"), None, std::slice::from_ref(&suite), &report);
+        assert!(duplicate.unwrap_err().contains("Duplicate caseId"));
+
+        let mut escaping = suite_case(8.2, json!([]));
+        escaping["caseId"] = json!("../escaped");
+        let suite = write_suite(vec![escaping]);
+        let unsafe_id = write_testset(&dir.join("d3"), None, std::slice::from_ref(&suite), &report);
+        assert!(unsafe_id.unwrap_err().contains("not a plain file name"));
+        assert!(!dir.join("d3/escaped.oes.json").exists());
+        fs::remove_dir_all(dir).unwrap();
+    }
+
     #[test]
     fn suite_errors_fail_the_run() {
         let dir = suite_dir();
@@ -1175,8 +1304,8 @@ mod tests {
         assert!(failing.is_empty(), "{failing:?}");
         assert!(report.numeric_comparison_passed);
         assert_eq!(report.comparison_verdict, "passed");
-        assert_eq!(report.compared_cases, 23);
-        assert_eq!(report.cases.len(), 250);
+        assert_eq!(report.compared_cases, 30);
+        assert_eq!(report.cases.len(), 290);
         // The public cases and RVO compare; every ISSO 54 deeltest is
         // pending (its results document is not in hand) and calculates.
         for case in &report.cases {
@@ -1192,7 +1321,7 @@ mod tests {
                 case.comparison.case_id
             );
         }
-        assert_eq!(report.pending_expectation_cases, 227);
+        assert_eq!(report.pending_expectation_cases, 260);
         // Every edition the kernel calculates in is exercised.
         for edition in [
             "NTA 8800:2025+C1:2026",

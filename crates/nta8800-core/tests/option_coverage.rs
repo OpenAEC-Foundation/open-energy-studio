@@ -76,7 +76,7 @@ macro_rules! fixture {
 
 /// The fixtures a user's input can look like, per route.
 fn fixtures() -> Vec<Fixture> {
-    let sources: [(&str, Route, &str); 26] = [
+    let sources: [(&str, Route, &str); 27] = [
         fixture!("example-office", Route::Project),
         fixture!("example-terraced-dwelling", Route::Project),
         fixture!("project-performance-synthetic", Route::Project),
@@ -86,6 +86,9 @@ fn fixtures() -> Vec<Fixture> {
         fixture!("public-comparison-d", Route::Project),
         fixture!("public-comparison-e", Route::Project),
         fixture!("public-comparison-f", Route::Project),
+        // A heated basement with the depth per wall part (8.42), so the
+        // catalogue lists the basement's fields and its wall parts.
+        fixture!("public-comparison-n", Route::Project),
         fixture!("building-performance-synthetic", Route::Building),
         fixture!(
             "rvo-voorbeeldwoningen-galerijwoning-1975-1991",
@@ -150,7 +153,47 @@ fn fixtures() -> Vec<Fixture> {
             );
             Fixture { name, route, value }
         })
+        .chain(new_input_fixtures())
         .collect()
+}
+
+/// Review 55: inputs on the routes of reviews 40–54, so the sweep finds the
+/// positions inside them (the sunroom members, the steam carrier, the
+/// collective connection, the thermal-bridge route, the narrow cavity of
+/// F.2) and not only the block member that holds them.
+fn new_input_fixtures() -> Vec<Fixture> {
+    let mut fixtures: Vec<Fixture> = support::new_inputs::new_input_projects()
+        .into_iter()
+        // Case N is already a fixture of its own.
+        .filter(|(name, _)| !name.starts_with("public-comparison-n"))
+        .map(|(name, value)| Fixture {
+            name,
+            route: Route::Project,
+            value,
+        })
+        .collect();
+    let mut envelope: Value = serde_json::from_str(include_str!(
+        "../../../training-data/nta8800-constructions-synthetic.json"
+    ))
+    .unwrap();
+    envelope["elements"][0]["element"]["construction"]["build"]["layers"]
+        .as_array_mut()
+        .unwrap()
+        .insert(2, support::new_inputs::narrow_cavity_layer());
+    fixtures.push(Fixture {
+        name: "constructions-synthetic (weakly ventilated narrow cavity)",
+        route: Route::Envelope,
+        value: envelope,
+    });
+    for fixture in &fixtures {
+        assert!(
+            shape_error(fixture.route, &fixture.value).is_none(),
+            "{}: {:?}",
+            fixture.name,
+            shape_error(fixture.route, &fixture.value)
+        );
+    }
+    fixtures
 }
 
 /// Further JSON that only serves as a donor of blocks (generators,
@@ -190,6 +233,25 @@ fn seeds() -> Value {
             "wallResistanceM2kPerW": 2.5
         } },
         { "heatedBasement": { "depthM": 1.5, "wallResistanceM2kPerW": 2.5 } },
+        // 6.6.4 common space of a zone, allocated by the kernel.
+        { "commonSpaces": [{ "id": "seed", "areaM2": 5.0, "servedFunctions": ["office"],
+            "sourceReference": "seed" }] },
+        // Chapter 14 daylight sectors: every sector kind, including the
+        // F_D;dayl of NEN-EN 15193-1 annex F (2025+C1 p. 672).
+        { "daylight": { "method": "sectors", "sourceReference": "seed", "sectors": [
+            { "kind": "vertical_windows", "sectorWidthM": 4.0, "lintelHeightM": 2.6, "actualDepthM": 5.0,
+              "openingAreaM2": 6.0, "heavilyShaded": false, "control": "automatic_dimming" },
+            { "kind": "rooflights", "rooflightDepthM": 1.0, "rooflightWidthM": 1.0, "clearHeightM": 3.0,
+              "wallDistancesM": [2.0, 2.0, 2.0, 2.0], "openingAreaM2": 1.0, "roomLengthM": 6.0,
+              "roomWidthM": 6.0, "luminaireHeightM": 2.0, "control": "automatic_dimming" },
+            { "kind": "tilted_window", "tiltDeg": 45.0, "windowLengthM": 1.2, "slopeOffsetM": 0.5,
+              "slopeStartHeightM": 2.0, "ceilingHeightM": 3.0, "windowWidthM": 1.0,
+              "rooflight": { "wallDistancesM": [1.0, 1.0, 1.0, 1.0], "roomLengthM": 4.0,
+                "roomWidthM": 4.0, "luminaireHeightM": 2.0 },
+              "control": "automatic_switching_or_unknown" },
+            { "kind": "declared", "areaM2": 10.0, "daylightDependencyFactor": 0.78,
+              "sourceReference": "NEN-EN 15193-1:2017 bijlage F" }
+        ] } },
     ])
 }
 
@@ -1086,3 +1148,49 @@ fn numeric_route_jobs(fixtures: &[Fixture]) -> Vec<Job> {
 const MIN_VARIANTS: usize = 1490;
 const MIN_FIELDS: usize = 1210;
 const MIN_OMITTED: usize = 300;
+
+/// The catalogue of input options a user can choose, for the form-coverage
+/// check of the interface (`src/__tests__/nta-form-coverage.test.ts`): every
+/// enum variant and optional field of the project input (`ntaCalculation`
+/// and the project model) and of both surveys, as serde lists them.
+/// `UPDATE_INPUT_OPTIONS=1` rewrites the committed file; otherwise a new
+/// option fails here until the catalogue, and with it the form check, is
+/// brought up to date.
+#[test]
+fn input_option_catalogue_is_current() {
+    let fixtures = fixtures();
+    let positions = discover(&fixtures);
+    let mut entries = Vec::new();
+    for position in &positions {
+        let route = match position.route {
+            Route::Project => "project",
+            Route::Residential => "residentialSurvey",
+            Route::Utility => "utilitySurvey",
+            _ => continue,
+        };
+        entries.push(json!({
+            "route": route,
+            "kind": match position.kind {
+                Kind::Variant => "variant",
+                Kind::Field => "field",
+            },
+            "path": position.schema,
+            "options": position.options,
+        }));
+    }
+    let text = serde_json::to_string_pretty(&Value::Array(entries)).unwrap() + "\n";
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../training-data/nta8800-input-options.json"
+    );
+    if std::env::var_os("UPDATE_INPUT_OPTIONS").is_some() {
+        std::fs::write(path, &text).unwrap();
+        return;
+    }
+    let committed = std::fs::read_to_string(path).unwrap_or_default();
+    assert!(
+        committed == text,
+        "training-data/nta8800-input-options.json is out of date: run this test with \
+         UPDATE_INPUT_OPTIONS=1 and map the new options in src/core/nta/formCoverage.ts"
+    );
+}

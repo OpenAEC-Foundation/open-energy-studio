@@ -17,6 +17,9 @@ use nta8800_core::project_performance::assess_project_performance;
 use serde_json::{json, Value};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::Arc;
+use support::new_inputs::new_input_projects;
+
+mod support;
 
 #[derive(Clone, Copy)]
 enum Kind {
@@ -279,6 +282,12 @@ fn perturbed_fixtures_never_panic_or_give_non_finite_numbers() {
             )
         })
         .collect();
+    // Review 55: the routes added in reviews 40–54 (shared sunroom, collective
+    // delivery set, forfait bridges without a ground floor, oil steam, a
+    // boiler over 500 m², TOjuli method 3 in 2024, basement wall parts).
+    for (name, value) in new_input_projects() {
+        fixtures.push((name, Kind::Project, value, trials));
+    }
     // Each maatwerkadvies trial runs a dozen variants; fewer trials suffice.
     fixtures.push((
         "maatwerkadvies",
@@ -395,4 +404,61 @@ fn extreme_project_values_block_and_unusual_ones_warn() {
         .iter()
         .any(|warning| warning.code == "qv10_out_of_range"));
     assert_eq!(result.status, "calculated_unverified");
+}
+
+/// Review 55: a collective installation's connected area of 10³⁰⁰ m² made
+/// the 9.4 auxiliary energy non-finite; it is now a range gap at its input,
+/// and an unusual one a warning.
+#[test]
+fn an_extreme_connected_area_is_a_range_gap() {
+    let mut huge = support::new_inputs::collective_delivery_set();
+    huge["ntaCalculation"]["collectiveConnection"]["connectedUsableAreaM2"] = json!(1e300);
+    let result = assess_project_performance(&huge);
+    assert_eq!(result.status, "invalid");
+    assert!(result
+        .gaps
+        .iter()
+        .any(|gap| gap.code == "connected_area_out_of_range"
+            && gap.path == "ntaCalculation.collectiveConnection.connectedUsableAreaM2"));
+    assert!(!result
+        .gaps
+        .iter()
+        .any(|gap| gap.code == "non_finite_result"));
+    let mut large = support::new_inputs::collective_delivery_set();
+    large["ntaCalculation"]["collectiveConnection"]["connectedUsableAreaM2"] = json!(2.0e6);
+    let result = assess_project_performance(&large);
+    assert!(result.status.starts_with("calculated"), "{:?}", result.gaps);
+    assert!(result
+        .warnings
+        .iter()
+        .any(|warning| warning.code == "connected_area_out_of_range"));
+}
+
+/// Review 55: the fuzz inputs of the new routes calculate as given, so the
+/// perturbations start from a working input and reach the new members.
+#[test]
+fn new_input_fixtures_calculate() {
+    for (name, value) in new_input_projects() {
+        let result = assess_project_performance(&value);
+        assert!(
+            result.status.starts_with("calculated"),
+            "{name}: {} {:?}",
+            result.status,
+            result.gaps
+        );
+        assert!(first_non_finite(&result).is_none(), "{name}");
+        // Each input takes its new route, not a fallback.
+        let warned = |code: &str| result.warnings.iter().any(|item| item.code == code);
+        if name.contains("boiler") || name.contains("1200") {
+            assert!(warned("generator_large_system_outside"), "{name}");
+        }
+        if name.contains("forfait") {
+            assert!(!warned("detailed_thermal_bridges_none_entered"), "{name}");
+        }
+        if name.contains("shared sunroom") {
+            let derived = result.derived_input.as_ref().unwrap();
+            let rooms = &derived.space_heating.demand.sunrooms;
+            assert_eq!(rooms[0].bordering_zones.len(), 2, "{name}");
+        }
+    }
 }

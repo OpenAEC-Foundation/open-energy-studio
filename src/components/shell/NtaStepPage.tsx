@@ -12,6 +12,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import './ntaStep.css';
 import { ArrowLeft, ArrowRight, FileText, Paperclip, Undo2 } from 'lucide-react';
 import { useI18n } from '../../i18n/i18n';
+import { kernelCodeLabel } from '../../i18n/format';
 import { useKernel } from '../../context/KernelProvider';
 import { useNtaDraft, type NtaDraftState } from '../../context/NtaDraftProvider';
 import { isPathWithin, parseKernelPath, formatKernelPath } from '../../core/nta/pathUtil';
@@ -20,7 +21,7 @@ import { kernelIssues, type StepIssue } from '../../core/nta/stepStatus';
 import { WORKFLOW_STEPS, type Route } from '../../core/navigation/routes';
 import type { IProject } from '../../core/energy/types';
 import { Banner, Button, Card, Segmented, Stepper, cx, type StepItem } from '../ui';
-import { focusPathIn } from './focusPath';
+import { fieldLabelIn, focusPathIn } from './focusPath';
 import { EvidenceReferencePicker } from '../EvidenceLink/EvidenceLink';
 import { FieldPathPrefixProvider, read, Section, type Draft } from '../NtaPerformancePanel/NtaFormFields';
 import { NTA_PATH_PREFIX } from '../NtaPerformancePanel/NtaCalculationForm';
@@ -134,6 +135,21 @@ function EvidenceBlock({ draft, def, container, change }: {
 }) {
   const { t } = useI18n();
   const items = sectionEvidence(draft, def);
+  // The form label of each reference field, read from the rendered section, so a row says
+  // "Bron toestel" instead of `generator.boiler.equipmentReference` (UX finding 4). The kernel
+  // path stays as the tooltip and as the fallback when a field has no label of its own.
+  const [labels, setLabels] = useState<Record<string, string>>({});
+  const pathsKey = items.map((item) => item.path).join('|');
+  useLayoutEffect(() => {
+    const element = container();
+    if (!element) return;
+    const next: Record<string, string> = {};
+    for (const path of pathsKey ? pathsKey.split('|') : []) {
+      const label = fieldLabelIn(element, prefixed(path));
+      if (label) next[path] = label;
+    }
+    setLabels((current) => (JSON.stringify(current) === JSON.stringify(next) ? current : next));
+  });
   if (items.length === 0) return null;
   const open = items.filter((item) => !item.filled).length;
   const goTo = (path: string) => {
@@ -145,22 +161,25 @@ function EvidenceBlock({ draft, def, container, change }: {
       <div className="nta-evidence__head">
         <strong>{t('ntaStep.evidence')}</strong>
         {open > 0
-          ? <span className="nta-evidence__badge">{t('ntaStep.evidence.open', { n: open })}</span>
+          ? <span className="nta-evidence__badge">{t('ntaStep.evidence.open', { count: open })}</span>
           : <span className="nta-evidence__ok">{t('ntaStep.evidence.complete')}</span>}
       </div>
       <ul className="nta-evidence__list">
         {items.map((item) => {
           const value = read(draft, parseKernelPath(item.path));
+          const label = labels[item.path];
           return (
             <li key={item.path} className={item.filled ? 'filled' : 'open'}>
-              <code>{item.path}</code>
+              {label
+                ? <span className="nta-evidence__label" title={item.path}>{label}</span>
+                : <code>{item.path}</code>}
               {item.filled
                 ? <span className="nta-evidence__value"><Paperclip aria-hidden="true" /> {String(value)}</span>
                 : <span className="nta-evidence__value">{t('ntaStep.evidence.missing')}</span>}
               {change && <EvidenceReferencePicker path={item.path} value={value}
                 onChange={(next) => change(parseKernelPath(item.path), next)} />}
               <button type="button" className="ui-btn ui-btn--ghost ui-btn--sm" onClick={() => goTo(item.path)}
-                aria-label={`${t('ui.goTo')}: ${item.path}`}>
+                aria-label={`${t('ui.goTo')}: ${label ?? item.path}`}>
                 {t('ui.goTo')} <ArrowRight aria-hidden="true" />
               </button>
             </li>
@@ -273,7 +292,7 @@ export function NtaStepSections({ route }: { route: Route }) {
       id,
       label: <>{t(PART_KEYS[id])}{own.length > 0 && <span className={cx('nta-part-count', errors > 0 && 'nta-part-count--error')}>{own.length}</span>}</>,
       status: id === part ? 'current' : errors > 0 ? 'error' : warnings > 0 ? 'warn' : 'done',
-      statusText: [errors > 0 && t('ntaStep.check.errors', { n: errors }), warnings > 0 && t('ntaStep.check.warnings', { n: warnings })]
+      statusText: [errors > 0 && t('ntaStep.check.errors', { count: errors }), warnings > 0 && t('ntaStep.check.warnings', { count: warnings })]
         .filter(Boolean).join(', ') || undefined,
     };
   });
@@ -306,32 +325,58 @@ function useIssueMarks(ref: React.RefObject<HTMLElement | null>, issues: Array<S
   draft: Draft | null, mode: FieldMode, part: string | undefined) {
   const { t } = useI18n();
   useEffect(() => {
-    const container = ref.current;
-    if (!container) return;
-    const marked = new Map<HTMLElement, { kind: 'error' | 'warning'; codes: string[] }>();
-    const elements = Array.from(container.querySelectorAll<HTMLElement>('label[data-path]'));
-    for (const issue of issues) {
-      let best: HTMLElement | null = null;
-      let bestLength = -1;
-      for (const element of elements) {
-        const candidate = element.dataset.path ?? '';
-        if (isPathWithin(issue.focus, candidate) && candidate.length > bestLength) { best = element; bestLength = candidate.length; }
-      }
-      if (!best) continue;
-      const current = marked.get(best);
-      marked.set(best, {
-        kind: current?.kind === 'error' || issue.kind === 'error' ? 'error' : 'warning',
-        codes: [...(current?.codes ?? []), issue.code],
-      });
-    }
-    for (const element of Array.from(container.querySelectorAll<HTMLElement>('[data-issue]'))) {
-      if (!marked.has(element)) { element.removeAttribute('data-issue'); element.removeAttribute('title'); }
-    }
-    for (const [element, mark] of marked) {
-      element.dataset.issue = mark.kind;
-      element.title = `${t(`ui.severity.${mark.kind}`)}: ${mark.codes.join(', ')}`;
-    }
+    if (ref.current) applyIssueMarks(ref.current, issues, t);
   }, [ref, issues, draft, mode, part, t]);
+}
+
+/**
+ * Marks the field (`label[data-path]`) closest to each finding: a red or yellow
+ * edge, a visible marker (CSS) and, on its controls, `aria-invalid` for an
+ * error and `aria-description` with the message, so the finding is announced
+ * and not only coloured (WCAG 1.3.1, 1.4.1). Unmarks fields without a finding.
+ */
+export function applyIssueMarks(container: HTMLElement, issues: Array<{ kind: 'error' | 'warning'; code: string; focus: string }>,
+  t: (key: string, options?: Record<string, unknown>) => string) {
+  const marked = new Map<HTMLElement, { kind: 'error' | 'warning'; codes: string[] }>();
+  const elements = Array.from(container.querySelectorAll<HTMLElement>('label[data-path]'));
+  for (const issue of issues) {
+    let best: HTMLElement | null = null;
+    let bestLength = -1;
+    for (const element of elements) {
+      const candidate = element.dataset.path ?? '';
+      if (isPathWithin(issue.focus, candidate) && candidate.length > bestLength) { best = element; bestLength = candidate.length; }
+    }
+    if (!best) continue;
+    const current = marked.get(best);
+    marked.set(best, {
+      kind: current?.kind === 'error' || issue.kind === 'error' ? 'error' : 'warning',
+      codes: [...(current?.codes ?? []), issue.code],
+    });
+  }
+  const controls = (label: HTMLElement) =>
+    Array.from(label.querySelectorAll<HTMLElement>('input:not([type=hidden]), select, textarea'));
+  for (const element of Array.from(container.querySelectorAll<HTMLElement>('[data-issue]'))) {
+    if (!marked.has(element)) {
+      element.removeAttribute('data-issue');
+      element.removeAttribute('title');
+      for (const control of controls(element)) {
+        control.removeAttribute('aria-invalid');
+        control.removeAttribute('aria-description');
+      }
+    }
+  }
+  for (const [element, mark] of marked) {
+    element.dataset.issue = mark.kind;
+    // The human text of each code (gap, issue or warning), never the bare key.
+    const texts = [...new Set(mark.codes)].map((code) => kernelCodeLabel(t, code).text);
+    const message = `${t(`ui.severity.${mark.kind}`)}: ${texts.join('; ')}`;
+    element.title = message;
+    for (const control of controls(element)) {
+      if (mark.kind === 'error') control.setAttribute('aria-invalid', 'true');
+      else control.removeAttribute('aria-invalid');
+      control.setAttribute('aria-description', message);
+    }
+  }
 }
 
 /** Changed field names for the apply bar: the last member of each path. */

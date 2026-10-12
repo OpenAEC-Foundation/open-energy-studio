@@ -1,14 +1,17 @@
 /**
  * Registration data of the Registratie step (UI redesign F9): message type,
  * object and BAG, survey and advisers, WLC-GWP, detail-survey triggers and the
- * evidence register. Formerly part of the project-info dialog; the behaviour is
- * unchanged — one local draft, saved with `cleanRegistration` (software
- * identity kept on a relabel) and the BAG ledger update.
+ * evidence register. Formerly part of the project-info dialog. It edits the
+ * document's registration draft (`RegistrationDraftProvider`, review 35), saved
+ * with `cleanRegistration` (software identity kept on a relabel) and the BAG
+ * ledger update.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { NumberInput } from '../../ui/Field';
+import { useEffect, useId, useState } from 'react';
 import { Save, Undo2 } from 'lucide-react';
 import { useI18n } from '../../../i18n/i18n';
 import { useEnergy } from '../../../context/EnergyContext';
+import { registrationChanged, useRegistrationDraft } from '../../../context/RegistrationDraftProvider';
 import type { NtaDetailSurveyTriggers, NtaRegistration } from '../../../core/nta/KernelClient';
 import {
   bagConflicts, cleanRegistration, readBagLedger, recordBagRegistration, registrationSoftware,
@@ -58,9 +61,13 @@ export function RegistrationForm() {
   const { state, dispatch } = useEnergy();
   const { project } = state;
   const stored = project.registration;
-  const [registration, setRegistration] = useState<NtaRegistration>(stored ?? {});
-  // A new stored registration (save, undo, another document) restarts the draft.
-  useEffect(() => { setRegistration(stored ?? {}); }, [stored]);
+  // The document's draft, so leaving the step loses nothing (review 35); a
+  // local one outside a document.
+  const shared = useRegistrationDraft();
+  const [local, setLocal] = useState<NtaRegistration>(stored ?? {});
+  // A new stored registration (save, undo, another document) restarts the local draft.
+  useEffect(() => { if (!shared) setLocal(stored ?? {}); }, [stored, shared]);
+  const registration = shared?.draft ?? local;
   // Calculation core of the kernel that calculates this project, stored with
   // the program identity (BRL 9500-W §4.2.4, p. 24).
   const [kernelVersion, setKernelVersion] = useState<string | undefined>();
@@ -69,7 +76,14 @@ export function RegistrationForm() {
     void stampProject(project).then((stamp) => { if (active) setKernelVersion(stamp?.kernelVersion); });
     return () => { active = false; };
   }, [project]);
-  const update = (patch: Partial<NtaRegistration>) => setRegistration((current) => ({ ...current, ...patch }));
+  const update = (patch: Partial<NtaRegistration>) => {
+    if (shared) shared.update(patch);
+    else setLocal((current) => ({ ...current, ...patch }));
+  };
+  const discard = () => {
+    if (shared) shared.discard();
+    else setLocal(stored ?? {});
+  };
   const advisor = (key: 'surveyingAdvisor' | 'registeringAdvisor') =>
     registration[key] ?? { name: '', competenceNumber: '' };
 
@@ -86,7 +100,14 @@ export function RegistrationForm() {
   };
   const conflicts = bagConflicts(ledgerEntry, readBagLedger());
   const software = registrationSoftware(registration, kernelVersion);
-  const dirty = useMemo(() => JSON.stringify(registration) !== JSON.stringify(stored ?? {}), [registration, stored]);
+  // Saving also restamps the program identity (Omgevingsregeling art. 5.14 lid 1 onder b), so a
+  // stored stamp from another kernel version is a change to save even with the fields unchanged.
+  const stampOutdated = stored?.software != null && kernelVersion != null
+    && JSON.stringify(stored.software) !== JSON.stringify(software);
+  // A field set and cleared again is no change: compared as it would be stored.
+  const dirty = registrationChanged(registration, stored);
+  const canSave = dirty || stampOutdated;
+  const formId = useId();
 
   const textInput = ({ key, type }: TextField) => (
     <div className="dialog-field" key={key} data-path={`registration.${key}`}>
@@ -139,8 +160,8 @@ export function RegistrationForm() {
           </div>
           <div className="dialog-field" data-path="registration.constructionYear">
             <label htmlFor="reg-construction-year">{t('reg.constructionYear')}</label>
-            <input id="reg-construction-year" type="number" value={registration.constructionYear ?? ''}
-              onChange={(e) => update({ constructionYear: e.target.value ? Number(e.target.value) : undefined })} />
+            <NumberInput id="reg-construction-year" value={registration.constructionYear ?? null} optional
+              onChange={(next) => update({ constructionYear: next ?? undefined })} />
           </div>
           <div className="dialog-field" data-path="registration.messageType">
             <label htmlFor="reg-message-type">{t('reg.messageType')}</label>
@@ -201,8 +222,8 @@ export function RegistrationForm() {
         <div className="dialog-grid">
           <div className="dialog-field" data-path="registration.wlcGwp.valueKgCo2EqPerM2Year">
             <label htmlFor="reg-wlc-value">{t('reg.wlcGwp.value')}</label>
-            <input id="reg-wlc-value" type="number" step="any" value={registration.wlcGwp?.valueKgCo2EqPerM2Year ?? ''}
-              onChange={(e) => update({ wlcGwp: { ...registration.wlcGwp, valueKgCo2EqPerM2Year: e.target.value ? Number(e.target.value) : undefined } })} />
+            <NumberInput id="reg-wlc-value" value={registration.wlcGwp?.valueKgCo2EqPerM2Year ?? null} optional
+              onChange={(next) => update({ wlcGwp: { ...registration.wlcGwp, valueKgCo2EqPerM2Year: next ?? undefined } })} />
           </div>
           <div className="dialog-field" data-path="registration.wlcGwp.reportReference">
             <label htmlFor="reg-wlc-reference">{t('reg.wlcGwp.reference')}</label>
@@ -216,8 +237,8 @@ export function RegistrationForm() {
           </div>
           <div className="dialog-field" data-path="registration.buildingUsableFloorAreaM2">
             <label htmlFor="reg-building-area">{t('reg.buildingUsableFloorArea')}</label>
-            <input id="reg-building-area" type="number" step="any" value={registration.buildingUsableFloorAreaM2 ?? ''}
-              onChange={(e) => update({ buildingUsableFloorAreaM2: e.target.value ? Number(e.target.value) : undefined })} />
+            <NumberInput id="reg-building-area" value={registration.buildingUsableFloorAreaM2 ?? null} optional
+              onChange={(next) => update({ buildingUsableFloorAreaM2: next ?? undefined })} />
           </div>
         </div>
       </Card>
@@ -268,16 +289,27 @@ export function RegistrationForm() {
       </Card>
 
       <Card title={t('evidence.title')} level={2}>
+        {(shared?.evidenceConflicts.length ?? 0) > 0 && (
+          <Banner tone="warn" role="status">
+            {t('registration.form.evidenceConflict', { names: shared!.evidenceConflicts.join(', ') })}
+          </Banner>
+        )}
         <div data-path="registration.evidence">
           <EvidenceRegister evidence={registration.evidence ?? []} onChange={(evidence) => update({ evidence })} />
         </div>
       </Card>
 
       <div className="registration-form-actions" role="group" aria-label={t('registration.form.actions')}>
-        {dirty && <span className="registration-form-dirty">{t('registration.form.unsaved')}</span>}
+        {dirty
+          ? <span className="registration-form-dirty">{t('registration.form.unsaved')}</span>
+          : stampOutdated
+            ? <span className="registration-form-dirty">{t('registration.form.stampOutdated')}</span>
+            : <span id={`${formId}-clean`} className="registration-form-clean">{t('registration.form.nothingToSave')}</span>}
         <Button type="button" variant="ghost" icon={<Undo2 aria-hidden="true" />} disabled={!dirty}
-          onClick={() => setRegistration(stored ?? {})}>{t('registration.form.discard')}</Button>
-        <Button type="submit" variant="primary" icon={<Save aria-hidden="true" />}>{t('registration.form.save')}</Button>
+          onClick={discard}>{t('registration.form.discard')}</Button>
+        {/* Nothing changed, nothing to save (UX finding 8). */}
+        <Button type="submit" variant="primary" icon={<Save aria-hidden="true" />} disabled={!canSave}
+          aria-describedby={canSave ? undefined : `${formId}-clean`}>{t('registration.form.save')}</Button>
       </div>
     </form>
   );

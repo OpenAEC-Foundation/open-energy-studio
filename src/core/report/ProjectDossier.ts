@@ -1,4 +1,4 @@
-import { strToU8, zipSync } from 'fflate';
+import { strToU8, zipSync, type Zippable, type ZippableFile } from 'fflate';
 import type { IProject } from '../energy/types';
 import type {
   NtaEvidenceItem, NtaEvidenceKind, NtaRegistration, OpnameAssessment, ProjectPerformanceAssessment, RelabelAssessment,
@@ -10,6 +10,7 @@ import { labelInputSha256, relabelDeadline } from '../nta/Registration';
 import { isProductionPath } from '../nta/RelabelText';
 import { measureEvidenceNotes } from '../nta/MwaTemplates';
 import { buildEpOnlineOverview } from './EpOnlineOverview';
+import { attestText, programIdentity, type ProgramIdentity } from './ProgramIdentity';
 
 /**
  * Project dossier of an EP adviser (BRL 9500-W Bijlage 3, p. 61–63;
@@ -40,6 +41,11 @@ export interface DossierContext {
   labelInputSha256?: string | null;
   /** The kernel assessment or the survey assessment is still running (live check only). */
   pending?: boolean;
+  /**
+   * Whether the dossier carries the delivered report. `undefined` in the live
+   * check (the report is produced at export); `false` makes the item missing.
+   */
+  reportPresent?: boolean;
 }
 
 /** Items whose status follows from the kernel run or the survey assessment. */
@@ -54,6 +60,31 @@ function has(evidence: NtaEvidenceItem[], ...kinds: NtaEvidenceKind[]): boolean 
 
 function filled(value: string | undefined): boolean {
   return value != null && value.trim() !== '';
+}
+
+/** Input keys that carry a product value from a kwaliteits- or gelijkwaardigheidsverklaring. */
+const DECLARATION_KEYS = new Set([
+  'qualityDeclaration', 'declaredControlFactor', 'declaredEfficiencies', 'declaredAuxiliaryConstants',
+  'highEfficiencyEvidence',
+]);
+const DECLARATION_FLAGS = new Set(['qualityDeclarationPresent', 'qualityDeclarationUsed']);
+
+/**
+ * Whether the NTA input uses a value from a kwaliteits- of
+ * gelijkwaardigheidsverklaring (BRL 9500-W §4.2.7 p. 25, Bijlage 3 p. 63; U p. 21).
+ */
+export function usesQualityDeclaration(value: unknown, path: string[] = []): boolean {
+  if (Array.isArray(value)) return value.some((item) => usesQualityDeclaration(item, path));
+  if (value == null || typeof value !== 'object') return false;
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    if (child == null) continue;
+    if (DECLARATION_KEYS.has(key)) return true;
+    if (DECLARATION_FLAGS.has(key) && child === true) return true;
+    // A declared generator value (hot water 13.8.4.7, heat-pump COP).
+    if (key === 'declared' && path.some((segment) => /generator/i.test(segment)) && typeof child === 'object') return true;
+    if (usesQualityDeclaration(child, [...path, key])) return true;
+  }
+  return false;
 }
 
 /** The relabel comparison the kernel ran again at registration, if any. */
@@ -83,7 +114,7 @@ export function checkDossierCompleteness(context: DossierContext): DossierItem[]
     : item);
 }
 
-function dossierItems({ project, assessment, opname, relabel: given, labelInputSha256: currentSha }: DossierContext): DossierItem[] {
+function dossierItems({ project, assessment, opname, relabel: given, labelInputSha256: currentSha, reportPresent }: DossierContext): DossierItem[] {
   const registration: NtaRegistration = project.registration ?? {};
   // The verdict comes from the kernel's fresh comparison at registration,
   // never from the stored one (BRL 9500-W Bijlage 3, p. 63).
@@ -109,7 +140,10 @@ function dossierItems({ project, assessment, opname, relabel: given, labelInputS
   add('survey_type', 'general', 'Basis- of detailopname', registration.surveyType != null);
   add('client_information', 'general', 'Bewijs van het informeren van de opdrachtgever en van door de opdrachtgever aangereikte gegevens',
     has(evidence, 'client_statement'));
-  add('delivered_report', 'general', 'Het aan de opdrachtgever geleverde energieprestatie-rapport', assessment != null);
+  // The report itself must be in the dossier (BRL 9500-W Bijlage 3 p. 61, U p. 53).
+  add('delivered_report', 'general', 'Het aan de opdrachtgever geleverde energieprestatie-rapport',
+    assessment != null && reportPresent !== false,
+    reportPresent === false ? 'het dossier bevat geen energieprestatie-rapport' : undefined);
 
   // Bouwkundige gegevens
   add('floor_plan', 'building', 'Plattegrond met maatvoering en indeling', has(evidence, 'drawing'));
@@ -125,6 +159,15 @@ function dossierItems({ project, assessment, opname, relabel: given, labelInputS
     has(evidence, ...(bbl ? ['drawing', 'datasheet'] as NtaEvidenceKind[] : ['photo_overview', 'drawing'] as NtaEvidenceKind[])));
   add('installation_types', 'installations', 'Type opwekkers, ventilatie, tapwater en energieproductie (foto, factuur of ontwerpgegevens)',
     has(evidence, ...installationEvidence));
+  // Utility buildings also record humidification and lighting (BRL 9500-U Bijlage 3 p. 53).
+  const utility = assessment?.derivedInput?.calculationScope === 'utility'
+    || (assessment?.derivedInput == null && project.buildingFunction != null && project.buildingFunction !== 'residential');
+  if (utility) {
+    add('humidification_type', 'installations', 'Type bevochtiging en/of ontvochtiging (foto, factuur of ontwerpgegevens)',
+      has(evidence, ...installationEvidence));
+    add('lighting_type', 'installations', 'Type verlichting (foto en/of factuur)',
+      has(evidence, ...(bbl ? installationEvidence : ['photo_overview', 'photo_detail', 'invoice'] as NtaEvidenceKind[])));
+  }
 
   // Uitwerking
   const applied = opname?.appliedDefaults ?? [];
@@ -169,8 +212,11 @@ function dossierItems({ project, assessment, opname, relabel: given, labelInputS
     assessment != null && assessment.status === 'calculated_unverified',
     assessment == null ? 'geen kernuitvoer' : assessment.status !== 'calculated_unverified' ? `kernstatus ${assessment.status}` : undefined);
   const registrar = registration.registeringAdvisor;
-  add('registration_data', 'result', 'Registratiedatum, registrerende adviseur en EP-Online-nummer',
-    filled(registration.registrationDate) && filled(registrar?.name) && filled(registration.epOnlineNumber));
+  // Name and registration number of the registering adviser (BRL 9500-W Bijlage 3 p. 62, U p. 54).
+  add('registration_data', 'result', 'Registratiedatum, naam en registratienummer van de registrerende adviseur en EP-Online-nummer',
+    filled(registration.registrationDate) && filled(registrar?.name) && filled(registrar?.competenceNumber)
+      && filled(registration.epOnlineNumber),
+    filled(registrar?.name) && !filled(registrar?.competenceNumber) ? 'registratienummer van de registrerende adviseur ontbreekt' : undefined);
   add('electronic_files', 'result', 'Elektronische bestanden van de energieprestatieberekening', assessment != null);
   if (bbl || delivery) {
     attention('gto_cooling_load', 'result', 'GTO- en koellastberekeningen, indien gemaakt', 'opnemen als ze zijn gemaakt');
@@ -192,8 +238,16 @@ function dossierItems({ project, assessment, opname, relabel: given, labelInputS
     unchecked.length ? `${unchecked.length} bestand(en) zonder controle` : undefined);
   add('construction_phase', 'evidence', 'Tijdens de bouw verzamelde gegevens (Bijlage 5)',
     delivery ? has(evidence, 'photo_detail', 'photo_overview') : null);
-  add('quality_declarations', 'evidence', 'Gecontroleerde kwaliteits- en gelijkwaardigheidsverklaringen',
-    bbl ? has(evidence, 'quality_declaration', 'declaration_of_performance') : null);
+  // Applies whenever the input uses a declared product value, for every purpose:
+  // the declaration with merk and type, plus a photo or invoice (W Bijlage 3 p. 63,
+  // §4.2.7 p. 25; U p. 21). At toets Bbl the design data stand in for the photo.
+  const declared = usesQualityDeclaration(project.ntaCalculation);
+  const declarationShown = has(evidence, 'quality_declaration', 'declaration_of_performance');
+  const declarationProven = bbl || has(evidence, 'photo_detail', 'invoice');
+  add('quality_declarations', 'evidence', 'Gecontroleerde kwaliteits- en gelijkwaardigheidsverklaringen (merk, type) met foto of factuur',
+    declared || bbl ? declarationShown && declarationProven : null,
+    declared && !declarationShown ? 'de invoer gebruikt een kwaliteitsverklaring; voeg de verklaring toe'
+      : declared && !declarationProven ? 'voeg een foto of factuur van het product toe' : undefined);
   add('photos', 'evidence', 'Leesbare foto\'s van typeaanduiding en maatvoering',
     bbl ? null : has(evidence, 'photo_detail'));
   add('invoices', 'evidence', 'Facturen op naam en/of adres', bbl ? null : has(evidence, 'invoice'));
@@ -280,6 +334,12 @@ export interface DossierManifest {
   projectName: string;
   kernel: KernelStamp | null;
   attestStatus: string | null;
+  /**
+   * The program that made the files (Omgevingsregeling art. 5.14 lid 1 onder b; BRL 9501 §5.2
+   * and §6.1): name and program version apart from the rekenkern, and the attest number, or
+   * `attestNumberText` "nog niet toegekend" while there is none.
+   */
+  software: ProgramIdentity & { attestNumberText: string };
   files: DossierManifestEntry[];
   /** Table of contents of the evidence (Bijlage 3 "bewijsmateriaal met inhoudsopgave"): file, hash and what it supports. */
   evidence: DossierEvidenceEntry[];
@@ -303,6 +363,11 @@ export interface DossierEvidenceEntry {
 export interface DossierBundle {
   files: Record<string, Uint8Array>;
   manifest: DossierManifest;
+}
+
+function dossierSoftware(assessment: ProjectPerformanceAssessment | null | undefined): DossierManifest['software'] {
+  const identity = programIdentity(assessment?.kernelVersion, assessment?.targetNormVersion);
+  return { ...identity, attestNumberText: attestText(identity) };
 }
 
 /** Builds the dossier files and a manifest with the SHA-256 of each file. */
@@ -344,15 +409,19 @@ export async function buildProjectDossier(
   const usage = evidenceUsage(project);
   for (const item of project.registration?.evidence ?? []) {
     const bytes = await loadEvidenceBytes(item);
-    if (bytes) files[evidenceArchiveName(item)] = bytes;
+    // Two entries can map to the same name (a repeated id, or ids that
+    // differ only in characters safeName drops): the second gets a suffix,
+    // so no file overwrites another and the manifest hash stays true.
+    const archivePath = bytes ? uniqueArchivePath(evidenceArchiveName(item), files) : null;
+    if (bytes && archivePath) files[archivePath] = bytes;
     else missingEvidence.push({ id: item.id, fileName: item.fileName, reason: 'bestand niet beschikbaar of hash wijkt af' });
     evidenceEntries.push({
       id: item.id, kind: item.kind, fileName: item.fileName, sha256: item.sha256, date: item.date ?? null,
-      archivePath: bytes ? evidenceArchiveName(item) : null, checkedBy: item.checkedBy ?? null,
+      archivePath, checkedBy: item.checkedBy ?? null,
       supports: usage.get(item.id) ?? [],
     });
   }
-  const checklist = checkDossierCompleteness({ ...context, pending: false, labelInputSha256: labelSha });
+  const checklist = checkDossierCompleteness({ ...context, pending: false, labelInputSha256: labelSha, reportPresent: Boolean(context.reportHtml) });
   files['dossier-checklist.json'] = strToU8(JSON.stringify(checklist, null, 2));
   const entries: DossierManifestEntry[] = [];
   for (const [path, bytes] of Object.entries(files).sort(([a], [b]) => a.localeCompare(b))) {
@@ -363,6 +432,7 @@ export async function buildProjectDossier(
     projectName: project.name,
     kernel,
     attestStatus: assessment?.attestStatus ?? null,
+    software: dossierSoftware(assessment),
     files: entries,
     evidence: evidenceEntries,
     missingEvidence,
@@ -372,9 +442,56 @@ export async function buildProjectDossier(
   return { files, manifest };
 }
 
+/** `path`, or `name-2.ext`, `name-3.ext` … when `path` is already taken (case-insensitively). */
+export function uniqueArchivePath(path: string, taken: Record<string, unknown>): string {
+  const used = new Set(Object.keys(taken).map((key) => key.toLowerCase()));
+  if (!used.has(path.toLowerCase())) return path;
+  const slash = path.lastIndexOf('/');
+  const dot = path.lastIndexOf('.');
+  const split = dot > slash + 1 ? dot : path.length;
+  const base = path.slice(0, split);
+  const extension = path.slice(split);
+  let index = 2;
+  while (used.has(`${base}-${index}${extension}`.toLowerCase())) index += 1;
+  return `${base}-${index}${extension}`;
+}
+
+/**
+ * Largest dossier written as one ZIP. fflate writes no ZIP64 records, so an
+ * archive over 4 GiB would be corrupt; and every byte sits in memory twice
+ * while zipping. Above this limit the export stops with a clear message.
+ */
+export const MAX_DOSSIER_BYTES = 2 * 1024 * 1024 * 1024;
+
+/** Thrown when a dossier would exceed `MAX_DOSSIER_BYTES`. */
+export class DossierTooLargeError extends Error {
+  constructor(readonly totalBytes: number) {
+    super(`dossier_too_large: ${totalBytes} bytes`);
+    this.name = 'DossierTooLargeError';
+  }
+}
+
+/** File types that are already compressed: stored, not deflated again. */
+const STORED_EXTENSIONS = new Set([
+  'jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif', 'pdf', 'zip', 'docx', 'xlsx', 'odt', 'ods',
+  'mp4', 'mov', 'm4v', 'mp3', 'gz', '7z',
+]);
+
+function alreadyCompressed(path: string): boolean {
+  const dot = path.lastIndexOf('.');
+  return dot > path.lastIndexOf('/') && STORED_EXTENSIONS.has(path.slice(dot + 1).toLowerCase());
+}
+
 /** The bundle as one ZIP archive. */
 export function zipProjectDossier(bundle: DossierBundle): Uint8Array {
+  const total = Object.values(bundle.files).reduce((sum, data) => sum + data.byteLength, 0);
+  if (total > MAX_DOSSIER_BYTES) throw new DossierTooLargeError(total);
   // Copy into this realm so zipSync treats each value as a file (see UNIEC3Exporter).
-  const copies = Object.fromEntries(Object.entries(bundle.files).map(([path, data]) => [path, new Uint8Array(data)]));
+  // Photos, PDFs and other compressed files are stored (level 0): deflating
+  // them again only costs time and memory.
+  const copies: Zippable = Object.fromEntries(Object.entries(bundle.files).map(([path, data]): [string, ZippableFile] => [
+    path,
+    alreadyCompressed(path) ? [new Uint8Array(data), { level: 0 }] : new Uint8Array(data),
+  ]));
   return zipSync(copies, { level: 6 });
 }

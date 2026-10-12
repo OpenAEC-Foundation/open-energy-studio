@@ -1,134 +1,109 @@
 name: Build and Release
 
+# Release builds for a pushed release tag. The tag is made locally by
+# scripts/release-nta.sh: oes-v<program>-kernel-v<KERNEL_VERSION>, e.g.
+# oes-v0.2.0-kernel-v0.3.0. Older v<program> tags still work.
+#
+# 1. verify  - the tag must match package.json and KERNEL_VERSION; then the
+#              full NTA gate (scripts/verify-nta.sh, including Rust 1.77.2).
+# 2. release - uses the GitHub release for the tag if it already exists
+#              (its notes, e.g. from release/<tag>/github-release.md, are left
+#              untouched); otherwise creates it as a draft pre-release.
+# 3. build   - installers for Linux (deb, rpm, AppImage), macOS (universal
+#              dmg) and Windows (NSIS, MSI), uploaded to that release; an
+#              asset already on it (the .deb from release-nta.sh) is kept.
+# 4. checksums - SHA256SUMS-installers.txt over all uploaded installers.
+# A draft created here stays a draft: publishing is a manual decision.
+
 on:
   push:
     tags:
+      - 'oes-v*'
       - 'v*'
   workflow_dispatch:
     inputs:
-      version:
-        description: 'Version tag (e.g., v2026.2.0)'
+      tag:
+        description: 'Existing release tag to build (e.g. oes-v0.2.0-kernel-v0.3.0)'
         required: true
-        default: 'v2026.2.0'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
-      - name: Install frontend dependencies
-        run: npm ci
-
-      - name: Frontend type check, tests and build
+      - name: Tag matches program and kernel version
+        shell: bash
         run: |
-          npx tsc --noEmit
-          npm test -- --run --maxWorkers=2
-          npm run build
+          set -euo pipefail
+          program="$(node -p "require('./package.json').version")"
+          kernel="$(node scripts/nta-kernel-version.mjs version)"
+          case "$RELEASE_TAG" in
+            oes-v*) expected="oes-v${program}-kernel-v${kernel}" ;;
+            v*)     expected="v${program}" ;;
+            *)      echo "Unknown tag form: $RELEASE_TAG" >&2; exit 1 ;;
+          esac
+          if [ "$RELEASE_TAG" != "$expected" ]; then
+            echo "Tag $RELEASE_TAG does not match the sources (expected $expected)." >&2
+            exit 1
+          fi
+          echo "Tag $RELEASE_TAG matches program $program and kernel $kernel."
+
+      - name: Release notes and manual stamp
+        run: |
+          node scripts/nta-kernel-version.mjs check
+          node scripts/nta-manual.mjs check
+
+      # The same check scripts/release-nta.sh makes before tagging: released
+      # sections of the release notes are unchanged since the previous tag.
+      - name: Released sections unchanged since the previous release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          previous="$(git tag -l 'oes-v*-kernel-v*' --sort=-creatordate | grep -vxF "$RELEASE_TAG" | head -n 1 || true)"
+          if [ -z "$previous" ] || ! git cat-file -e "${previous}:docs/nta8800-releasenotes.md" 2>/dev/null; then
+            echo "No earlier release tag with release notes; nothing to compare."
+            exit 0
+          fi
+          git show "${previous}:docs/nta8800-releasenotes.md" > "$RUNNER_TEMP/releasenotes-previous.md"
+          node scripts/nta-kernel-version.mjs check-released "$RUNNER_TEMP/releasenotes-previous.md"
 
       - name: Install Rust stable with Clippy and rustfmt
         uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
 
-      - name: Rust formatting
-        run: |
-          cargo fmt --manifest-path crates/nta8800-core/Cargo.toml --check
-          cargo fmt --manifest-path crates/nta8800-service/Cargo.toml --check
-
-      - name: Rust tests and Clippy
-        run: |
-          cargo test --manifest-path crates/nta8800-core/Cargo.toml
-          cargo test --manifest-path crates/nta8800-service/Cargo.toml
-          cargo clippy --manifest-path crates/nta8800-core/Cargo.toml --all-targets -- -D warnings
-          cargo clippy --manifest-path crates/nta8800-service/Cargo.toml --all-targets -- -D warnings
-
-      - name: Core minimum Rust version
-        run: |
-          rustup toolchain install 1.77.2 --profile minimal
-          CARGO_TARGET_DIR=target/msrv-core cargo +1.77.2 test --manifest-path crates/nta8800-core/Cargo.toml
-
-  create-release:
-    needs: verify
-    permissions:
-      contents: write
-    runs-on: ubuntu-latest
-    outputs:
-      release_id: ${{ steps.create-release.outputs.result }}
-      version: ${{ steps.get-version.outputs.version }}
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Get version
-        id: get-version
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
-          else
-            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Create release
-        id: create-release
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const version = '${{ steps.get-version.outputs.version }}';
-            const { data } = await github.rest.repos.createRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              tag_name: version,
-              name: `Open Energy Studio ${version}`,
-              body: `## What's New in ${version}\n\nEnergy performance workspace with an experimental NTA 8800 input audit. BENG and energy-label outputs are indicative; the Rust calculation kernel is not yet verified or attested.\n\n### Downloads\n- **Windows**: Download the \`.exe\` setup file\n- **macOS**: Download the \`.dmg\` file (universal - supports Intel and Apple Silicon)\n- **Linux**: Download the \`.deb\` package or \`.AppImage\``,
-              draft: true,
-              prerelease: true
-            });
-            return data.id;
-
-  build-linux-mac:
-    needs: create-release
-    permissions:
-      contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: 'ubuntu-22.04'
-            args: ''
-          - platform: 'macos-latest'
-            args: '--target universal-apple-darwin'
-
-    runs-on: ${{ matrix.platform }}
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install Rust targets (macOS universal)
-        if: matrix.platform == 'macos-latest'
-        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+      - name: Install Rust 1.77.2 (kernel MSRV)
+        run: rustup toolchain install 1.77.2 --profile minimal
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: src-tauri -> target
+          workspaces: |
+            crates/nta8800-core -> target
+            crates/nta8800-service -> target
+            src-tauri -> target
 
-      - name: Install dependencies (Ubuntu only)
-        if: matrix.platform == 'ubuntu-22.04'
+      - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
@@ -136,89 +111,184 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Build Tauri app
-        uses: tauri-apps/tauri-action@action-v0.6.1
+      # No separate `npm run build`: the gate builds the frontend itself
+      # before the Tauri check, exactly as scripts/release-nta.sh does.
+      - name: NTA gate (scripts/verify-nta.sh)
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          args: ${{ matrix.args }}
-          releaseId: ${{ needs.create-release.outputs.release_id }}
+          NTA_VITEST_MAX_WORKERS: '2'
+        run: scripts/verify-nta.sh
 
-  build-windows:
-    needs: create-release
+      - name: Keep gate evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: gate-evidence-${{ env.RELEASE_TAG }}
+          path: nta-evidence/gate
+          if-no-files-found: ignore
+          retention-days: 90
+
+  release:
+    needs: verify
+    runs-on: ubuntu-latest
     permissions:
       contents: write
-    runs-on: windows-latest
-
     steps:
-      - uses: actions/checkout@v4
+      - name: Use the existing release or create a draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" --repo "$REPO" > /dev/null 2>&1; then
+            echo "Release $RELEASE_TAG exists; its notes are left as they are."
+          else
+            gh release create "$RELEASE_TAG" --repo "$REPO" --verify-tag --draft --prerelease \
+              --title "Open Energy Studio ${RELEASE_TAG}" \
+              --notes "Draft created by the release workflow. Replace these notes with release/${RELEASE_TAG}/github-release.md from scripts/release-nta.sh before publishing. Open Energy Studio is not yet attested under BRL 9501."
+          fi
+
+  build:
+    needs: release
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ubuntu-22.04
+            args: '--bundles deb,rpm,appimage'
+            bundles: 'deb rpm appimage'
+          - platform: macos-latest
+            args: '--target universal-apple-darwin --bundles dmg'
+            bundles: 'dmg'
+          - platform: windows-latest
+            args: '--bundles nsis,msi'
+            bundles: 'nsis msi'
+    runs-on: ${{ matrix.platform }}
+    env:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.RELEASE_TAG }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 22
+          cache: npm
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Rust targets (macOS universal)
+        if: runner.os == 'macOS'
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
 
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf rpm
+
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Build Tauri app
-        uses: tauri-apps/tauri-action@action-v0.6.1
+      - name: Build installers
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          releaseId: ${{ needs.create-release.outputs.release_id }}
+          APPIMAGE_EXTRACT_AND_RUN: '1'
+        run: npm run tauri:build -- ${{ matrix.args }}
 
-      - name: Sign Windows executables
-        uses: azure/trusted-signing-action@v0.5.0
+      - name: Sign Windows installers (when signing secrets are configured)
+        if: runner.os == 'Windows' && env.AZURE_CLIENT_ID != ''
+        uses: azure/trusted-signing-action@v1
         with:
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
           azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
           endpoint: ${{ secrets.AZURE_ENDPOINT }}
-          trusted-signing-account-name: ${{ secrets.AZURE_TRUSTED_SIGNING_ACCOUNT_NAME }}
+          signing-account-name: ${{ secrets.AZURE_TRUSTED_SIGNING_ACCOUNT_NAME }}
           certificate-profile-name: ${{ secrets.AZURE_CERTIFICATE_PROFILE_NAME }}
-          files-folder: ${{ github.workspace }}/src-tauri/target/release/bundle/nsis
-          files-folder-filter: exe
-          files-folder-depth: 1
+          files-folder: ${{ github.workspace }}/src-tauri/target/release/bundle
+          files-folder-filter: exe,msi
+          files-folder-depth: 2
           file-digest: SHA256
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
           timestamp-digest: SHA256
 
-      - name: Upload signed installer to release
+      - name: Upload installers to the release
         shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
         run: |
-          VERSION="${{ needs.create-release.outputs.version }}"
-          for file in src-tauri/target/release/bundle/nsis/*-setup.exe; do
-            gh release upload "$VERSION" "$file" --clobber --repo "${{ github.repository }}"
+          set -euo pipefail
+          shopt -s nullglob
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            root="src-tauri/target/universal-apple-darwin/release/bundle"
+          else
+            root="src-tauri/target/release/bundle"
+          fi
+          files=()
+          for kind in ${{ matrix.bundles }}; do
+            for f in "$root/$kind"/*.deb "$root/$kind"/*.rpm "$root/$kind"/*.AppImage \
+                     "$root/$kind"/*.dmg "$root/$kind"/*-setup.exe "$root/$kind"/*.msi; do
+              files+=("$f")
+            done
           done
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No installers found under $root" >&2
+            exit 1
+          fi
+          # An asset already on the release (the .deb that scripts/release-nta.sh
+          # built and recorded in its leveringsdocument and SHA256SUMS) is kept:
+          # replacing it would break those checksums. GitHub stores spaces in
+          # asset names as dots. To rebuild an asset, delete it from the release first.
+          existing="$(gh release view "$RELEASE_TAG" --repo "$REPO" --json assets --jq '.assets[].name')"
+          upload=()
+          for f in "${files[@]}"; do
+            name="$(basename "$f")"
+            name="${name// /.}"
+            if grep -qxF -- "$name" <<< "$existing"; then
+              echo "Keeping existing release asset $name"
+            else
+              upload+=("$f")
+            fi
+          done
+          if [ "${#upload[@]}" -eq 0 ]; then
+            echo "All installers of this platform are already on the release."
+            exit 0
+          fi
+          printf 'Uploading %s\n' "${upload[@]}"
+          gh release upload "$RELEASE_TAG" "${upload[@]}" --repo "$REPO"
 
-  publish-release:
+  checksums:
+    needs: build
+    runs-on: ubuntu-latest
     permissions:
       contents: write
-    runs-on: ubuntu-latest
-    needs: [create-release, build-linux-mac, build-windows]
-
     steps:
-      - name: Publish release
-        uses: actions/github-script@v7
+      - name: SHA256SUMS over the uploaded installers
         env:
-          release_id: ${{ needs.create-release.outputs.release_id }}
-        with:
-          script: |
-            github.rest.repos.updateRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              release_id: process.env.release_id,
-              draft: false,
-              prerelease: true
-            });
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir installers && cd installers
+          for pattern in '*.deb' '*.rpm' '*.AppImage' '*.dmg' '*.exe' '*.msi'; do
+            gh release download "$RELEASE_TAG" --repo "$REPO" --pattern "$pattern" || true
+          done
+          if [ -z "$(ls -A)" ]; then
+            echo "No installers on release $RELEASE_TAG" >&2
+            exit 1
+          fi
+          sha256sum -- * > ../SHA256SUMS-installers.txt
+          cat ../SHA256SUMS-installers.txt
+          cd ..
+          gh release upload "$RELEASE_TAG" SHA256SUMS-installers.txt --clobber --repo "$REPO"

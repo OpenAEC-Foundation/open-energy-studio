@@ -1,0 +1,438 @@
+{
+  "id": "public-comparison-o",
+  "name": "Vergelijking openbaar rapport O (gezondheidszorgfunctie op een warmtenet)",
+  "description": "Fictieve herbouw van een openbaar BENG-rapport (Uniec 3.1.5.0, NTA 8800:2022); niet het echte gebouw. Een gezondheidszorgfunctie zonder bedgebied van 451,50 m2 op de begane grond van een woongebouw, externe warmtelevering met een kwaliteitsverklaring voor verwarming en warm tapwater, vloerverwarming, ventilatiesysteem D.3 met luchtbehandelingskast en roterende warmtewisselaar, 15 PV-panelen.",
+  "buildingFunction": "healthcare",
+  "address": "Fictief adres",
+  "city": "Fictief",
+  "zones": [
+    {
+      "id": "z1",
+      "name": "Gezondheidszorg",
+      "floorArea": 451.5,
+      "volume": 1354.5,
+      "height": 3.0,
+      "surfaces": [
+        {
+          "id": "gevel-no",
+          "name": "Gevel NO",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 163.93,
+          "orientation": "NE",
+          "constructionId": "c-gevel",
+          "zoneId": "z1",
+          "windows": [
+            { "id": "no-c1", "name": "Raam C", "area": 8.0, "uValue": 1.2, "gValue": 0.55, "orientation": "NE", "surfaceId": "gevel-no" },
+            { "id": "no-c2", "name": "Raam C", "area": 8.0, "uValue": 1.2, "gValue": 0.55, "orientation": "NE", "surfaceId": "gevel-no" },
+            { "id": "no-c3", "name": "Raam C", "area": 8.0, "uValue": 1.2, "gValue": 0.55, "orientation": "NE", "surfaceId": "gevel-no" },
+            { "id": "no-c4", "name": "Raam C", "area": 8.0, "uValue": 1.2, "gValue": 0.55, "orientation": "NE", "surfaceId": "gevel-no" },
+            { "id": "no-d1", "name": "Raam D", "area": 9.5, "uValue": 1.2, "gValue": 0.55, "orientation": "NE", "surfaceId": "gevel-no" },
+            { "id": "no-e1", "name": "Raam E", "area": 19.4, "uValue": 1.2, "gValue": 0.55, "orientation": "NE", "surfaceId": "gevel-no" },
+            { "id": "no-e2", "name": "Raam E", "area": 19.4, "uValue": 1.2, "gValue": 0.55, "orientation": "NE", "surfaceId": "gevel-no" },
+            { "id": "no-e3", "name": "Raam E", "area": 19.4, "uValue": 1.2, "gValue": 0.55, "orientation": "NE", "surfaceId": "gevel-no" }
+          ]
+        },
+        {
+          "id": "gevel-zo",
+          "name": "Gevel ZO",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 105.95,
+          "orientation": "SE",
+          "constructionId": "c-gevel",
+          "zoneId": "z1",
+          "windows": [
+            { "id": "zo-a1", "name": "Raam A", "area": 15.48, "uValue": 1.2, "gValue": 0.55, "orientation": "SE", "surfaceId": "gevel-zo" },
+            { "id": "zo-a2", "name": "Raam A", "area": 15.48, "uValue": 1.2, "gValue": 0.55, "orientation": "SE", "surfaceId": "gevel-zo" },
+            { "id": "zo-a3", "name": "Raam A", "area": 15.48, "uValue": 1.2, "gValue": 0.55, "orientation": "SE", "surfaceId": "gevel-zo" },
+            { "id": "zo-b1", "name": "Raam B", "area": 14.29, "uValue": 1.2, "gValue": 0.55, "orientation": "SE", "surfaceId": "gevel-zo" }
+          ]
+        },
+        {
+          "id": "gevel-zw",
+          "name": "Gevel ZW",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 38.22,
+          "orientation": "SW",
+          "constructionId": "c-gevel",
+          "zoneId": "z1",
+          "windows": [
+            { "id": "zw-c1", "name": "Raam C", "area": 8.0, "uValue": 1.2, "gValue": 0.55, "orientation": "SW", "surfaceId": "gevel-zw" },
+            { "id": "zw-c2", "name": "Raam C", "area": 8.0, "uValue": 1.2, "gValue": 0.55, "orientation": "SW", "surfaceId": "gevel-zw" }
+          ]
+        },
+        {
+          "id": "gevel-nw",
+          "name": "Gevel NW",
+          "type": "wall",
+          "thermalBoundary": "outdoor",
+          "area": 6.06,
+          "orientation": "NW",
+          "constructionId": "c-gevel",
+          "zoneId": "z1",
+          "windows": []
+        },
+        {
+          "id": "wand-aor",
+          "name": "Wand naar de fietsenberging (AOR)",
+          "type": "wall",
+          "thermalBoundary": "unheated_space",
+          "unheatedSpaceId": "fietsenberging",
+          "area": 130.43,
+          "orientation": "N",
+          "constructionId": "c-gevel",
+          "zoneId": "z1",
+          "windows": []
+        },
+        {
+          "id": "dak",
+          "name": "Dak",
+          "type": "roof",
+          "thermalBoundary": "outdoor",
+          "area": 54.07,
+          "orientation": "horizontal",
+          "constructionId": "c-dak",
+          "zoneId": "z1",
+          "windows": []
+        },
+        {
+          "id": "vloer",
+          "name": "Vloer boven kruipruimte",
+          "type": "floor",
+          "thermalBoundary": "ground",
+          "area": 459.24,
+          "orientation": "horizontal",
+          "constructionId": "c-vloer",
+          "zoneId": "z1",
+          "windows": []
+        }
+      ],
+      "thermalBridges": [],
+      "airTightness": {
+        "qv10": 0.3
+      },
+      "pointThermalBridges": [],
+      "pointBridgeInventoryComplete": true
+    }
+  ],
+  "heatingSystems": [],
+  "ventilationSystems": [],
+  "coolingSystems": [],
+  "hotWaterSystems": [],
+  "solarPV": [],
+  "solarThermal": [],
+  "unheatedSpaces": [
+    {
+      "id": "fietsenberging",
+      "name": "Fietsenberging (overige gebruiksfunctie)",
+      "reductionFactor": 0.9606,
+      "factorSourceReference": "openbare bron Uniec 3.1.5.0 printout (gezondheidszorgfunctie 451,50 m2, 24-02-2023): AOR forfaitair (GVL_AOR_FOR), wand Rc 4,70 uit het beslisschema; geen b_U in de uitdraai, aangenomen H_ue = 5 A_T;iu (I.8, 2022 p. 814), dus b_U = 1 / (1 + U_C / 5) met U_C 0,2053 (C.10, 2022 p. 749)"
+    }
+  ],
+  "constructions": [
+    {
+      "id": "c-gevel",
+      "name": "Gevel Rc 4,70",
+      "layers": [],
+      "rcValue": 4.7,
+      "uValue": 0.2053
+    },
+    {
+      "id": "c-dak",
+      "name": "Dak Rc 6,30",
+      "layers": [],
+      "rcValue": 6.3,
+      "uValue": 0.1553
+    },
+    {
+      "id": "c-vloer",
+      "name": "Vloer boven kruipruimte Rc 3,70",
+      "layers": [],
+      "rcValue": 3.7,
+      "uValue": 0.2584
+    }
+  ],
+  "ntaCalculation": {
+    "normVersion": "2022",
+    "calculationScope": "utility",
+    "constructionYear": 2023,
+    "areaSourceReference": "openbare bron Uniec 3.1.5.0 printout (gezondheidszorgfunctie 451,50 m2, 24-02-2023): Ag 451,50 m2 gezondheidszorgfunctie overig, meerlaags utiliteitsgebouw",
+    "usageFunction": "other_healthcare",
+    "setpoints": {
+      "heatingC": 21.0,
+      "coolingC": 24.0,
+      "sourceReference": "tabel 7.13 gezondheidszorgfunctie overig"
+    },
+    "thermalMass": {
+      "floor": "very_heavy",
+      "wall": "heavy",
+      "ceiling": "closed_or_suspended",
+      "sourceReference": "openbare bron Uniec 3.1.5.0 printout (gezondheidszorgfunctie 451,50 m2, 24-02-2023): betonnen wand-vloer skeletbouw met massieve en niet-massieve betonnen vloeren, gesloten of verlaagd plafond, 1 bouwlaag; tabel 7.10 rij meer dan 750 kg/m2, 250 kJ/m2K (2022 p. 182)"
+    },
+    "internalGains": {
+      "method": "utility",
+      "lighting": {
+        "method": "chapter14"
+      },
+      "sourceReference": "tabellen 7.2/7.3 gezondheidszorgfunctie overig; verlichting uit hoofdstuk 14"
+    },
+    "windowSolar": {
+      "frameFraction": 0.25,
+      "obstruction": {
+        "method": "minimal"
+      },
+      "sourceReference": "default F_F; openbare bron Uniec 3.1.5.0 printout (gezondheidszorgfunctie 451,50 m2, 24-02-2023): minimale belemmering, geen zonwering, geen zomernachtventilatie"
+    },
+    "groundFloors": [
+      {
+        "surfaceId": "vloer",
+        "exposedPerimeterM": 106.85,
+        "constructionResistanceM2kPerW": 3.87,
+        "below": {
+          "kind": "crawlspace",
+          "floorResistanceM2kPerW": 0.0,
+          "depthClass": "other",
+          "wallResistanceM2kPerW": 4.7,
+          "wallUValueWPerM2k": 0.2053,
+          "ventilationOpeningM2PerM": 0.0012,
+          "wallHeightAboveGroundM": 0.0
+        },
+        "edgeThermalBridges": {
+          "method": "forfait"
+        },
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (gezondheidszorgfunctie 451,50 m2, 24-02-2023): op/boven mv boven grond/spouw (z <= 0,3), Rc 3,70 + R_si 0,17, h 0,00 m, P 106,85 m; kruipruimteventilatie, R_bw en kruipruimtevloer niet in de uitdraai, aangenomen 0,0012 m2/m, 4,70 en niet geisoleerd zoals bij K en L; geen lineaire bruggen in de uitdraai, dus forfaitaire toeslag"
+      }
+    ],
+    "ventilationFlows": [],
+    "emission": {
+      "system": "floor_heating",
+      "balancing": "none_or_unknown",
+      "control": "individual_room_thermostats",
+      "sourceReference": "openbare bron Uniec 3.1.5.0 printout (gezondheidszorgfunctie 451,50 m2, 24-02-2023): oppervlakteverwarming, vloerverwarming onbekend systeem, vertrekhoogte h <= 4 m, autom. temperatuurregeling per ruimte (dT type regeling 2,5 K, automatische regeling -0,5 K), waterzijdige inregeling onbekend"
+    },
+    "distribution": {
+      "method": "calculated",
+      "sourceReference": "openbare bron Uniec 3.1.5.0 printout (gezondheidszorgfunctie 451,50 m2, 24-02-2023)"
+    },
+    "distributionSystem": {
+      "designTemperatureClass": "45_40",
+      "installation": "individual",
+      "usageFunction": "healthcare_other",
+      "connectedStoreys": 1,
+      "pipeTransmittance": {
+        "method": "forfait",
+        "insulation": {
+          "state": "insulated",
+          "period": "from1995"
+        }
+      },
+      "valvesInsulated": true,
+      "pump": {
+        "method": "calculated",
+        "heatMeterPresent": true,
+        "energyEfficiencyIndex": 0.23,
+        "electricPowerKw": 0.238,
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (gezondheidszorgfunctie 451,50 m2, 24-02-2023): pompvermogen en EEI onbekend, forfaitair pomp 1 238 W, EEI 0,23; warmtemeter in de distributieleiding aanwezig"
+      },
+      "sourceReference": "openbare bron Uniec 3.1.5.0 printout (gezondheidszorgfunctie 451,50 m2, 24-02-2023): tweepijps 45 C, leidinggegevens onbekend (binnen 245,62 m, buiten de verwarmde zone 43,34 m = forfait 9.36 en 15 %), geisoleerd, kleppen en beugels geisoleerd, 1 bouwlaag"
+    },
+    "generator": {
+      "kind": "external_heat",
+      "supplierReference": "openbare bron Uniec 3.1.5.0 printout (gezondheidszorgfunctie 451,50 m2, 24-02-2023): externe warmtelevering productspecifiek, warmtenet regio Rotterdam, primair warmtenet, installatie met individuele aflevering, energiefractie 1,000",
+      "qualityDeclarationPresent": true,
+      "auxiliary": {
+        "electricallyConnectedDevices": 0,
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (gezondheidszorgfunctie 451,50 m2, 24-02-2023): geen elektrisch aangesloten toestel bij de opwekker in de uitdraai; hulpenergie verwarming 389 kWh komt van de distributiepomp"
+      }
+    },
+    "externalSupply": {
+      "heating": {
+        "method": "declared",
+        "primaryFactor": 0.35,
+        "renewableFactor": 0.6,
+        "co2KgPerKwh": 0.068,
+        "declarationReference": "BCRG-verklaring 20201880GK (geldig 18-12-2020 tot 18-12-2023), primair warmtenet: f_P;del 0,35, f_P;ren 0,60, k_CO2 0,068 kg/kWh; op basis van berekende en eventueel gemeten waarden",
+        "measuredOnly": false
+      },
+      "hotWater": {
+        "method": "declared",
+        "primaryFactor": 0.35,
+        "renewableFactor": 0.6,
+        "co2KgPerKwh": 0.068,
+        "declarationReference": "BCRG-verklaring 20201880GK (geldig 18-12-2020 tot 18-12-2023), primair warmtenet: f_P;del 0,35, f_P;ren 0,60, k_CO2 0,068 kg/kWh; op basis van berekende en eventueel gemeten waarden",
+        "measuredOnly": false
+      },
+      "cooling": null,
+      "collectiveHeatPumpSource": null,
+      "areaElectricity": []
+    },
+    "bacsFactor": 1.0,
+    "bacsSourceReference": "openbare bron Uniec 3.1.5.0 printout (gezondheidszorgfunctie 451,50 m2, 24-02-2023): geen GBS in de uitdraai",
+    "useInventoryComplete": true,
+    "declaredUses": [],
+    "productionInventoryComplete": true,
+    "pvSystems": [
+      {
+        "id": "pv",
+        "peakPower": {
+          "method": "declared_specific",
+          "peakPowerWPerM2": 205.41,
+          "panelAreaM2": 27.75
+        },
+        "azimuthDeg": 225.0,
+        "tiltDeg": 12.0,
+        "mounting": "strongly_ventilated",
+        "obstructionFactors": [
+          1.0
+        ],
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (gezondheidszorgfunctie 451,50 m2, 24-02-2023): 15 panelen van 380 Wp, zuidwest 12 graden, sterk geventileerd, minimale belemmering; bijgevoegde BCRG-verklaring 20201687GK: 1,85 m2 per paneel, 205,41 Wp/m2 in de kolom NTA 8800:2022"
+      }
+    ],
+    "lighting": [
+      {
+        "zoneId": "z1",
+        "functions": [
+          {
+            "function": "healthcare_without_beds",
+            "areaM2": 451.5
+          }
+        ],
+        "lightingZones": [
+          {
+            "id": "vz1",
+            "areaM2": 451.5,
+            "power": {
+              "method": "installed",
+              "luminaires": [
+                {
+                  "count": 1,
+                  "power": {
+                    "method": "system",
+                    "powerW": 4515.0
+                  }
+                }
+              ],
+              "sourceReference": "openbare bron Uniec 3.1.5.0 printout (gezondheidszorgfunctie 451,50 m2, 24-02-2023): eigen waarde 10,00 W/m2 over 451,50 m2"
+            },
+            "parasitic": {
+              "method": "forfait"
+            },
+            "occupancy": {
+              "control": "manual_or_unknown",
+              "centralOnControl": true,
+              "largeOfficeGroup": false
+            },
+            "daylight": {
+              "method": "none"
+            },
+            "extractedLuminaires": false
+          }
+        ],
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (gezondheidszorgfunctie 451,50 m2, 24-02-2023): eigen verlichtingsvermogen 10,00 W/m2, parasitair forfaitair, centraal aan, geen daglichtregeling, f_afzuiging 0,00, nieuwwaardecompensatie onbekend"
+      }
+    ],
+    "labelFunction": "healthcare_without_beds",
+    "demandUsesFixedC1Ventilation": false,
+    "batteryStoragePresent": false,
+    "bblFunction": "other_healthcare",
+    "verticalPipes": [
+      {
+        "id": "toiletgroep",
+        "buildingHeightM": 32.0,
+        "insulated": false,
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (gezondheidszorgfunctie 451,50 m2, 24-02-2023): verticale leidingen door de thermische schil onbekend, 1 toiletgroep, buitenwerkse gebouwhoogte 32,00 m"
+      }
+    ],
+    "ventilation": {
+      "zoneId": "z1",
+      "usableFloorAreaM2": 451.5,
+      "category": "utility",
+      "functions": [
+        {
+          "function": "other_healthcare",
+          "areaM2": 451.5,
+          "swimmingPool": false
+        }
+      ],
+      "dwellingCount": 0,
+      "apartmentBuilding": false,
+      "buildingHeightM": 32.0,
+      "constructionYear": 2023,
+      "floorAboveCrawlspace": false,
+      "heatingSetpointC": 21.0,
+      "coolingSetpointC": 24.0,
+      "system": {
+        "kind": "single",
+        "unit": {
+          "variant": "d3",
+          "ducts": "luka_a_b_c",
+          "heatRecovery": {
+            "efficiency": {
+              "method": "table",
+              "exchanger": "rotary"
+            },
+            "bypass": {
+              "kind": "full"
+            },
+            "layout": "central",
+            "constantVolumeControl": false,
+            "supplyDuctInsulation": {
+              "kind": "insulated"
+            },
+            "equipmentReference": "openbare bron Uniec 3.1.5.0 printout (gezondheidszorgfunctie 451,50 m2, 24-02-2023): langzaam roterende of intermitterende warmtewisselaar 0,700, 100 % bypass (aandeel 1,00), toevoerkanaal geisoleerd, type isolatie en lengte onbekend"
+          },
+          "airHandlingUnit": {
+            "insideThermalZone": true,
+            "supplyDuctsOutside": "none",
+            "heatingCoil": true,
+            "coolingCoil": true
+          },
+          "equipmentReference": "openbare bron Uniec 3.1.5.0 printout (gezondheidszorgfunctie 451,50 m2, 24-02-2023): Dc mechanische toe- en afvoer centraal, forfaitair, D.3 centrale WTW met CO2-sturing op toe- of afvoer, f 1,00, LBK in de thermische zone met verwarmings- en koelbatterij, geen kanalen buiten de thermische zone"
+        }
+      },
+      "flowReduction": {
+        "collective": false
+      },
+      "infiltration": {
+        "method": "measured",
+        "qv10DmPerSM2": 0.3,
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (gezondheidszorgfunctie 451,50 m2, 24-02-2023): meetwaarde voor infiltratie per gebouw, q_v10;lea;ref 0,30 dm3/s per m2"
+      },
+      "combustionAppliances": [],
+      "fans": {
+        "method": "forfait",
+        "current": "dc",
+        "manufactureYear": 2023
+      },
+      "sourceReference": "openbare bron Uniec 3.1.5.0 printout (gezondheidszorgfunctie 451,50 m2, 24-02-2023): forfaitair ventilatorvermogen, onbekende volumeregeling, geinstalleerde capaciteit onbekend, geen passieve koelregeling"
+    },
+    "hotWater": {
+      "need": {
+        "method": "utility",
+        "areas": [
+          {
+            "function": "healthcare_without_beds",
+            "areaM2": 451.5
+          }
+        ],
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (gezondheidszorgfunctie 451,50 m2, 24-02-2023): tabel 13.1 gezondheidszorgfunctie zonder bedgebied"
+      },
+      "emission": {
+        "method": "utility",
+        "meanLengthM": 5.0,
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (gezondheidszorgfunctie 451,50 m2, 24-02-2023): uittapleidingen > 3 m"
+      },
+      "storage": [],
+      "generator": {
+        "kind": "external_heat"
+      },
+      "deliverySets": {
+        "count": 1,
+        "sourceReference": "openbare bron Uniec 3.1.5.0 printout (gezondheidszorgfunctie 451,50 m2, 24-02-2023): 1 individuele afleverset, geen circulatieleiding"
+      },
+      "equipmentReference": "openbare bron Uniec 3.1.5.0 printout (gezondheidszorgfunctie 451,50 m2, 24-02-2023): externe warmtelevering productspecifiek voor verwarming en warm tapwater, geen indirect verwarmd voorraadvat"
+    }
+  }
+}

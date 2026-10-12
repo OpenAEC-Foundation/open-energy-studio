@@ -4,6 +4,7 @@ import type { INtaHeatPumpInput } from '../../core/energy/types';
 import { diagnoseGasCollectiveSourceDraftWithRust, diagnoseGasHeatPumpChainDraftWithRust, diagnoseGasHeatPumpMonthlyDraftWithRust, type GasCollectiveSourceDraftAssessment, type GasCollectiveSourceTemperatureClass, type GasHeatPumpChainDraftAssessment, type GasHeatPumpMonthlyDraftAssessment, type GasHeatPumpMonthlyDraftInput } from '../../core/nta/KernelClient';
 import { useI18n } from '../../i18n/i18n';
 import '../HeatPumpForfaitMonthlyPanel/HeatPumpForfaitMonthlyPanel.css';
+import { DecimalInput } from '../ui';
 
 const months = Array.from({ length: 12 }, (_, index) => index + 1);
 type SourceSystem = GasHeatPumpMonthlyDraftInput['sourceSystem'];
@@ -87,7 +88,7 @@ export function GasHeatPumpMonthlyPanel({ pump }: { pump: INtaHeatPumpInput }) {
       <th>{t('kernel.gasMonthly.month')}</th><th>{t('kernel.gasMonthly.output')}</th>
     </tr></thead><tbody>{months.map((month, index) => <tr key={month}>
       <th scope="row">{month}</th>
-      <td><input type="number" min="0" step="any" aria-label={`${t('kernel.gasMonthly.output')} ${month}`}
+      <td><DecimalInput min="0" step="any" aria-label={`${t('kernel.gasMonthly.output')} ${month}`}
         value={output[index]} onChange={(event) => { invalidate(); setOutput(output.map((value, offset) => offset === index ? event.target.value : value)); }} /></td>
     </tr>)}</tbody></table></div>
     <button type="button" disabled={loading} onClick={() => void diagnose()}>{t('kernel.gasMonthly.calculate')}</button>

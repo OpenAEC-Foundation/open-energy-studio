@@ -133,7 +133,7 @@ function AnnexAaZoneForm({ draft, change, base, windows, monthly2024, notice, on
   const windowName = (id: unknown) => {
     const bare = String(id ?? '').replace(/^window:/, '');
     const found = windows.find((window) => window.id === bare);
-    return found ? `${found.name || found.id} · ${formatNumber(found.area, locale, 2)} m² · ${found.orientation}` : null;
+    return found ? `${found.name || found.id} · ${formatNumber(found.area, locale, 2)} m² · ${t(`orientation.${found.orientation}`)}` : null;
   };
   const setRooms = (next: Draft[]) => change([...BASE, 'rooms'], next);
 

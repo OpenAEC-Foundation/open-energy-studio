@@ -2,9 +2,9 @@
  "attestStatus": "unattested",
  "derivedInput": {
   "activeCooling": null,
-  "areaSourceReference": "synthetic floor plan",
+  "areaSourceReference": "voorbeeld: plattegrond",
   "bacsFactor": 1.0,
-  "bacsSourceReference": "residential without BACS",
+  "bacsSourceReference": "woonfunctie zonder BACS",
   "batteryStoragePresent": false,
   "bblFunction": "other_residential",
   "calculationScope": "residential",
@@ -31,9 +31,9 @@
     "kitchenLengthM": 3.0,
     "method": "residential",
     "served": "kitchen_and_bathroom",
-    "sourceReference": "synthetic floor plan"
+    "sourceReference": "voorbeeld: plattegrond"
    },
-   "equipmentReference": "synthetic: HR combi boiler with Gaskeur CW label",
+   "equipmentReference": "voorbeeld: HR-combiketel met Gaskeur CW-label",
    "generator": {
     "appliance": "combi_gaskeur_hr_cw",
     "declared": null,
@@ -44,7 +44,7 @@
    "need": {
     "dwellingCount": 1,
     "method": "residential",
-    "sourceReference": "one dwelling"
+    "sourceReference": "één woning"
    },
    "showerHeatRecovery": null,
    "storage": []
@@ -70,18 +70,18 @@
      "panelCount": 6,
      "panelPeakPowerW": 300.0
     },
-    "sourceReference": "synthetic datasheet",
+    "sourceReference": "voorbeeld: datasheet",
     "tiltDeg": 45.0
    }
   ],
   "spaceHeating": {
    "demand": {
-    "areaSourceReference": "synthetic floor plan",
+    "areaSourceReference": "voorbeeld: plattegrond",
     "dwellingType": "other",
     "internalGains": {
      "dwellingCount": 1,
      "method": "residential",
-     "sourceReference": "one dwelling"
+     "sourceReference": "één woning"
     },
     "opaqueElements": [
      {
@@ -125,12 +125,12 @@
     "setpoints": {
      "coolingC": 24.0,
      "heatingC": 20.0,
-     "sourceReference": "table 7.13 residential (transcribed)"
+     "sourceReference": "tabel 7.13 woonfunctie (overgenomen)"
     },
     "thermalMass": {
      "ceiling": "open_or_none",
      "floor": "very_heavy",
-     "sourceReference": "synthetic: concrete floors, masonry",
+     "sourceReference": "voorbeeld: betonvloeren, metselwerk",
      "wall": "heavy"
     },
     "transmission": {
@@ -186,7 +186,7 @@
        },
        "exposedPerimeterM": 10.0,
        "id": "floor",
-       "sourceReference": "synthetic: Rc 3,7 + Rsi 0,17"
+       "sourceReference": "voorbeeld: Rc 3,7 + Rsi 0,17"
       }
      ],
      "groundInventoryConfirmed": true,
@@ -197,7 +197,7 @@
        "id": "standleiding",
        "insulated": false,
        "sharedZones": 1,
-       "sourceReference": "synthetic: one uninsulated soil stack over both storeys (7.3.3, table 7.1)",
+       "sourceReference": "voorbeeld: één ongeïsoleerde standleiding over beide bouwlagen (7.3.3, tabel 7.1)",
        "storeys": 2
       }
      ]
@@ -236,18 +236,18 @@
      "infiltration": {
       "method": "measured",
       "qv10DmPerSM2": 0.4,
-      "sourceReference": "synthetic: C1 extract system, measured qv10 0,4 dm³/(s·m²)"
+      "sourceReference": "voorbeeld: C1-afzuigsysteem, gemeten qv10 0,4 dm³/(s·m²)"
      },
      "installedCapacity": null,
      "maximumCapacityForCooling": null,
      "overventilation": null,
-     "sourceReference": "synthetic: C1 extract system, measured qv10 0,4 dm³/(s·m²)",
+     "sourceReference": "voorbeeld: C1-afzuigsysteem, gemeten qv10 0,4 dm³/(s·m²)",
      "system": {
       "kind": "single",
       "unit": {
        "airHandlingUnit": null,
        "ducts": "luka_a_b_c",
-       "equipmentReference": "synthetic: mechanical extract, DC fan",
+       "equipmentReference": "voorbeeld: mechanische afzuiging, gelijkstroomventilator",
        "heatRecovery": null,
        "variant": "c1"
       }
@@ -270,7 +270,7 @@
        "method": "minimal"
       },
       "orientation": "north",
-      "sourceReference": "project:window:win-N; synthetic: minimal obstruction (§17.3.2a), no movable shading",
+      "sourceReference": "project:window:win-N; voorbeeld: minimale belemmering (§17.3.2a), geen beweegbare zonwering",
       "tiltDeg": 90.0,
       "uValueWPerM2k": 1.1
      },
@@ -284,7 +284,7 @@
        "method": "minimal"
       },
       "orientation": "south",
-      "sourceReference": "project:window:win-S; synthetic: minimal obstruction (§17.3.2a), no movable shading",
+      "sourceReference": "project:window:win-S; voorbeeld: minimale belemmering (§17.3.2a), geen beweegbare zonwering",
       "tiltDeg": 90.0,
       "uValueWPerM2k": 1.1
      }
@@ -293,29 +293,29 @@
    },
    "distribution": {
     "method": "heated_zone_only_space_heating",
-    "sourceReference": "synthetic: pipes inside envelope, space heating only"
+    "sourceReference": "voorbeeld: leidingen binnen de thermische schil, alleen ruimteverwarming"
    },
    "emission": {
     "balancing": "none_or_unknown",
     "control": "main_room_thermostat",
-    "sourceReference": "synthetic survey",
+    "sourceReference": "voorbeeld: opname",
     "system": "radiators_or_convectors"
    },
    "generator": {
     "boiler": {
      "averageDesignEmissionTemperatureC": 45.0,
      "emissionCircuit": "direct",
-     "equipmentReference": "synthetic type plate",
+     "equipmentReference": "voorbeeld: typeplaatje",
      "fuel": "natural_gas",
      "generatorId": "boiler",
      "installationYear": 2020,
-     "installationYearReference": "synthetic invoice",
+     "installationYearReference": "voorbeeld: factuur",
      "kind": "hr107",
      "location": "inside_thermal_boundary",
-     "locationReference": "synthetic plan",
+     "locationReference": "voorbeeld: tekening",
      "pilotFlamePresent": false,
      "role": "individual_main",
-     "temperatureAndCircuitReference": "synthetic design"
+     "temperatureAndCircuitReference": "voorbeeld: ontwerp"
     },
     "kind": "gas_boiler"
    }

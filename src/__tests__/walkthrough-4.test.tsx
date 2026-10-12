@@ -21,6 +21,7 @@ import { ErrorBoundary } from '../components/ErrorBoundary/ErrorBoundary';
 import type { IConstruction, ICoolingSystem, IHeatingSystem, IHotWaterSystem, IProject, ISolarPV, ISolarThermal, IVentilationSystem } from '../core/energy/types';
 import { exampleProject } from '../core/nta/ExampleProjects';
 import { renderWithProviders, userEvent } from './test-utils';
+import { SLOW_UI_TEST_MS } from './timeouts';
 
 /** Construction without layers, as in both example projects: only Rc/U are stored. */
 const BARE: IConstruction = { id: 'con-test-bare', name: 'Gevel Rc 4,7', layers: [], rcValue: 4.7, uValue: 0.207, exteriorSurfaceResistance: 0 };
@@ -115,11 +116,11 @@ async function roundTripEveryEditor(initial?: IProject) {
 describe('opening and saving an editor without changes is a no-op', () => {
   it('keeps every stored value of each editor', async () => {
     await roundTripEveryEditor();
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 
   it('keeps every stored value, including the NTA input, on a project with ntaCalculation', async () => {
     await roundTripEveryEditor(exampleProject('terraced_dwelling'));
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 
   it('shows the stored Rc and U of a construction without layers and only recomputes after a layer edit', async () => {
     const user = userEvent.setup();
@@ -133,7 +134,7 @@ describe('opening and saving an editor without changes is a no-op', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Save' }));
     const saved = projectJson().constructions.find((c) => c.id === 'con-test-bare')!;
     expect(saved).toMatchObject({ name: 'Gevel hernoemd', rcValue: 4.7, uValue: 0.207, exteriorSurfaceResistance: 0 });
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 });
 
 describe('normalising an opened project', () => {

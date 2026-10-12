@@ -5,6 +5,7 @@ import { BasisopnamePanel } from '../components/BasisopnamePanel/BasisopnamePane
 import { renderWithProviders, userEvent, declare } from './test-utils';
 import { useEffect } from 'react';
 import { surveyExample } from '../core/nta/SurveyTemplates';
+import { SLOW_UI_TEST_MS } from './timeouts';
 
 function Editor() {
   const { state } = useEnergy();
@@ -61,7 +62,7 @@ describe('basisopname panel', () => {
     // Vertical pipes: explicitly none.
     await user.selectOptions(screen.getByLabelText('Vertical pipes (§7.2.4)'), 'none');
     expect(stored()!.survey.verticalPipes).toEqual([]);
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 
   it('records table 9.28 evidence for a heat pump and every NTA design class', async () => {
     const user = userEvent.setup();
@@ -123,7 +124,7 @@ describe('basisopname panel', () => {
     expect(survey.envelope.windows[0].solarControl).toEqual({ gValue: 0.3, sourceReference: '' });
     expect(survey.heating.designClass).toBe('c90_70');
     expect(survey.heating.heatPumpAbove70Declaration).toBe('BCRG 1');
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 
   it('edits table 9.3/9.6 generators and the table 9.12 distribution', async () => {
     const user = userEvent.setup();
@@ -168,7 +169,7 @@ describe('basisopname panel', () => {
     const heating = stored()!.survey.heating;
     expect(heating.distributionType).toEqual({ kind: 'one_pipe', emitterCount: 8 });
     expect(heating.pipeInsulation).toEqual({ insulated: true, insulationYear: 1990, fittingsInsulated: true });
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 
   it('clears hidden heat-pump and local-heater answers when the source or appliance changes', async () => {
     const user = userEvent.setup();
@@ -209,7 +210,7 @@ describe('basisopname panel', () => {
     const local = stored()!.survey.heating.generator;
     expect(local.appliance).toBe('oil_heater');
     expect(local).not.toHaveProperty('fuel');
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 
   it('edits houseboats, sunrooms and rooflights in the dwelling survey', async () => {
     const user = userEvent.setup();
@@ -251,7 +252,7 @@ describe('basisopname panel', () => {
     // §7.1.7, p. 65 and afb. 6.6.
     await user.selectOptions(screen.getByLabelText('Fossil-fuel installations on the plot (§7.1.7)'), 'true');
     await user.type(screen.getByLabelText('Sport halls without the swimming-pool room, A_g m² (p. 65)'), '450');
-    await user.click(screen.getByLabelText('Residence areas openly connected (afb. 6.6)'));
+    await user.click(screen.getByLabelText('Residence areas openly connected (fig. 6.6)'));
     // Tables 11.9–11.13 and §11.4.1.
     await user.selectOptions(screen.getByLabelText('Heat recovery (table 11.9)'), 'cold_storage_with_ahu');
     await user.selectOptions(screen.getByLabelText('Duct airtightness (table 11.13; unknown: 1,1)'), 'luka_d');
@@ -298,7 +299,7 @@ describe('basisopname panel', () => {
     expect(survey.cooling).toMatchObject({
       balanced: 'dynamic', balancingEvidenceReference: 'inregelrapport', maxPipeLengthM: 80,
     });
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 
   it('adds a dwelling cooling system in the ISSO 82.1 chapter 10 shape', async () => {
     const user = userEvent.setup();
@@ -335,7 +336,8 @@ describe('basisopname panel', () => {
     await user.click(screen.getByRole('button', { name: 'Calculate survey' }));
     expect(await screen.findByText('ISSO 82.1 p. 113 (table 9.7)')).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith('/api/v1/nta8800/opname/utility', expect.anything());
-    expect(screen.getByText('C')).toBeInTheDocument();
+    // The indicative label class (the utility vessel's energy-label select also lists 'C').
+    expect(screen.getAllByText('C').some((element) => element.tagName !== 'OPTION')).toBe(true);
     await user.type(screen.getByLabelText('Reason for the forfait heating.generator.engine'), 'plate missing');
     expect(stored()!.survey.inklapRedenen).toEqual({ 'heating.generator.engine': 'plate missing' });
     // The result stays while the reason is typed.
@@ -388,7 +390,7 @@ describe('basisopname panel', () => {
     expect(stored()!.survey.envelope.surfaces[0].zoneId).toBeNull();
     expect(stored()!.survey.lighting[0].zoneId).toBe('kantoorx');
     expect(screen.queryAllByLabelText('Calculation zone')).toHaveLength(0);
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 
   it('does not show an assessment for a survey changed during the request', async () => {
     let resolveResponse!: (value: { json: () => Promise<unknown> }) => void;

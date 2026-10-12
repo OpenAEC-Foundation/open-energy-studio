@@ -83,7 +83,7 @@ export function ReportView({ section = 'all' }: { section?: ReportViewSection })
           <strong>{model ? t('report.kernelStatus') : withheld ? t('results.withheld.title') : indicativeShown ? t('results.indicative') : t('results.noResults')}</strong>
           <p>{model ? t('report.kernelSource')
             : withheld ? t(kernelAssessment?.status === 'incomplete' ? 'results.withheld.incomplete' : 'results.withheld.invalid')
-            : indicativeShown ? t('results.indicativeDescription') : t('report.inputDossierScope')}</p>
+            : indicativeShown ? t('results.indicativeDescription') : t('report.noResultScope')}</p>
         </div>}
         {showReport && <ReportBuilder project={project} assessment={kernelAssessment} pending={kernelPending} />}
         {section === 'all' && <div className="report-input-dossier">

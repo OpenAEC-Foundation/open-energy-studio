@@ -67,22 +67,17 @@ export const tr: Record<string, string> = {
   'ribbon.exportReport': 'Rapor dışa aktar',
 
   // Project Browser
-  'browser.project': 'Proje',
   'browser.zones': 'Bölgeler',
-  'browser.zone': 'Bölge',
   'browser.surfaces': 'Yüzeyler',
   'browser.windows': 'Pencereler',
   'browser.thermalBridges': 'Isı köprüleri',
   'browser.constructions': 'Yapılar',
-  'browser.installations': 'Tesisatlar',
   'browser.heating': 'Isıtma',
   'browser.ventilation': 'Havalandırma',
   'browser.cooling': 'Soğutma',
   'browser.hotWater': 'Sıcak su',
-  'browser.renewables': 'Yenilenebilir',
   'browser.solarPV': 'Güneş PV',
   'browser.solarThermal': 'Güneş termal',
-  'browser.airTightness': 'Hava sızdırmazlığı',
 
   // Properties Panel
   'properties.title': 'Özellikler',
@@ -109,7 +104,6 @@ export const tr: Record<string, string> = {
   'dialog.save': 'Kaydet',
   'dialog.cancel': 'İptal',
   'dialog.delete': 'Sil',
-  'dialog.add': 'Ekle',
   'dialog.edit': 'Düzenle',
   'dialog.close': 'Kapat',
 
@@ -417,7 +411,6 @@ export const tr: Record<string, string> = {
   'theme.system': 'Sistem (Otomatik algılama)',
   'theme.dark': 'Koyu',
   'theme.light': 'Açık',
-  'theme.blue': 'Mavi',
   'theme.highContrast': 'Yüksek Kontrast',
   'settings.general.autoSave': 'Otomatik kaydet',
   'settings.general.autoSaveDesc': 'Projeyi düzenli aralıklarla otomatik kaydet',
@@ -440,7 +433,6 @@ export const tr: Record<string, string> = {
 
   // Feedback dialog
   'feedback.title': 'Send Feedback',
-  'feedback.sendFeedback': 'Send Feedback',
   'feedback.email': 'Email',
   'feedback.emailPlaceholder': 'your@email.com',
   'feedback.fullName': 'Full Name',

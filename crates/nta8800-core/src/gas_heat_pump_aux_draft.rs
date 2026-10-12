@@ -204,7 +204,7 @@ pub fn assess_gas_heat_pump_aux_draft(
             "invalid"
         },
         scope: "public_chapter_9_draft_9_91_9_92_gas_generator_auxiliary_only",
-        draft_source: DRAFT_SOURCE,
+        draft_source: crate::norm_versions::cite(DRAFT_SOURCE),
         target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint: input_fingerprint(&json!(input)),

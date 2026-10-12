@@ -82,6 +82,12 @@ pub const STANDBY_ELECTRONICS_W: f64 = 10.0;
 /// 13.49/13.50: recoverable share of circulation pump energy.
 pub const PUMP_RECOVERABLE_FACTOR: f64 = 0.20;
 
+/// Readings of chapter 13 where the norm leaves a choice.
+pub const INTERPRETATIONS: &[&str] = &[
+    "13.152 (p. 616–617): f_prac;gi = 1,0 only for the forfait values of 13.8.4.5–13.8.4.7; a declared value (heat pump, gas appliance of table 13.25, indirectly heated vessel of table 13.28) or an annex T value is no forfait value and takes 0,95 (vragen-nen 3)",
+    "Table 13.29 (p. 553): an unknown N_woon;si,W is A_g;gebouw;W / A_g;tot; the kernel rounds the quotient to whole dwellings before choosing the band (≤ 10, 11–20, > 20)",
+];
+
 /// Table 13.1 `Q_W;nd;spec`, kWh/m² per year.
 pub fn utility_specific_need(function: LabelFunction) -> Option<f64> {
     Some(match function {
@@ -177,8 +183,10 @@ pub enum HotWaterNeed {
         #[serde(rename = "sourceReference")]
         source_reference: String,
     },
-    /// 13.19 with table 13.1 per use function (areas sum to `A_g`).
+    /// 13.19 with table 13.1 per use function (areas sum to `A_g`). Empty
+    /// with common spaces and one system: filled from the 6.6.4 split.
     Utility {
+        #[serde(default)]
         areas: Vec<UtilityArea>,
         #[serde(rename = "sourceReference")]
         source_reference: String,
@@ -663,7 +671,8 @@ pub enum HotWaterGenerator {
         )]
         annex_t_conditions: Option<AnnexTConditions>,
     },
-    /// Table 13.25 individual heat pump, 1,4·c_source with table 13.27.
+    /// Table 13.25 individual heat pump: 1,4 or 1,4·c_source, without
+    /// c_W;gen. A declared value with a measured class takes table 13.27.
     HeatPump {
         #[serde(rename = "exhaustAirSource")]
         exhaust_air_source: bool,
@@ -824,13 +833,22 @@ pub struct HotWaterChp {
     /// (9.91/9.92) per 9.6.6.2.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auxiliary: Option<crate::space_heating_chain::OtherGeneratorAuxiliary>,
+    /// Method 2 with ε_chp;th and ε_chp;el from a quality declaration
+    /// instead of table 9.31 (§9.1, 2025+C1 p. 285; table 9.31 p. 343, which
+    /// §13.8.4.7.4 references).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub declared_efficiencies: Option<crate::space_heating_chain::DeclaredChpEfficiencies>,
     pub equipment_reference: String,
 }
 
 impl HotWaterChp {
-    /// Table 9.31 HT factors (ε_chp;th, ε_chp;el) for method 2.
+    /// Method 2 factors (ε_chp;th, ε_chp;el): the declared values when
+    /// given (§9.1), otherwise the table 9.31 HT row.
     fn forfait_factors(&self) -> Option<(f64, f64)> {
         let mut class = self.chp.clone()?;
+        if let Some(declared) = &self.declared_efficiencies {
+            return declared.factors();
+        }
         class.low_temperature = false;
         class.factors()
     }
@@ -2129,10 +2147,20 @@ pub fn validate_hot_water(
             }
         }
         if let Some(geometry) = &circulation.calculated_psi {
-            if geometry.psi().is_none() {
+            if geometry.dimension_above_one_metre() {
+                push("pipe_dimension_not_in_metres", "circulation.calculatedPsi");
+            } else if geometry.psi().is_none() {
                 push(
                     "hot_water_pipe_geometry_invalid",
                     "circulation.calculatedPsi",
+                );
+            }
+            // 13.27 and 13.29 fix h_a at 8,0 W/(m²·K) for hot water
+            // (2025+C1 p. 551), unlike heating (p. 311) and cooling (p. 385).
+            if geometry.surface_coefficient().is_some() {
+                push(
+                    "hot_water_pipe_surface_coefficient_fixed",
+                    "circulation.calculatedPsi.surfaceCoefficientWPerM2K",
                 );
             }
             if circulation.declared_psi_w_per_mk.is_some() {
@@ -2267,11 +2295,17 @@ pub fn validate_hot_water(
             .storage
             .iter()
             .all(|vessel| vessel.not_in_appliance_test);
+    // §13.8.4.7.4 (2022 p. 621, 2025+C1 p. 643): a CHP heating an
+    // indirectly heated vessel has its storage losses from 13.6, like a
+    // boiler; note 1 of §13.6.2 (2022 p. 547) does not exempt it.
     let allows_storage = needs_storage
         || separately_tested
-        || generators
-            .iter()
-            .any(|generator| matches!(generator, HotWaterGenerator::ExternalHeat));
+        || generators.iter().any(|generator| {
+            matches!(
+                generator,
+                HotWaterGenerator::ExternalHeat | HotWaterGenerator::Chp(_)
+            )
+        });
     if needs_storage && system.storage.is_empty() {
         push("hot_water_storage_required", "storage");
     }
@@ -2514,12 +2548,34 @@ fn generator_issues(generator: &HotWaterGenerator, prefix: &str) -> Vec<(&'stati
             ));
         }
         match (&chp.chp, &chp.method1) {
-            (Some(_), None) => {
-                if chp.forfait_factors().is_none() {
-                    issues.push(("chp_class_invalid", format!("{prefix}.chp")));
+            (Some(_), None) => match &chp.declared_efficiencies {
+                Some(declared) => {
+                    if declared.declaration_reference.trim().is_empty() {
+                        issues.push((
+                            "source_reference_required",
+                            format!("{prefix}.declaredEfficiencies.declarationReference"),
+                        ));
+                    }
+                    if declared.factors().is_none() {
+                        issues.push((
+                            "chp_declared_efficiency_invalid",
+                            format!("{prefix}.declaredEfficiencies"),
+                        ));
+                    }
                 }
-            }
+                None => {
+                    if chp.forfait_factors().is_none() {
+                        issues.push(("chp_class_invalid", format!("{prefix}.chp")));
+                    }
+                }
+            },
             (None, Some(product)) => {
+                if chp.declared_efficiencies.is_some() {
+                    issues.push((
+                        "chp_declared_efficiency_method1",
+                        format!("{prefix}.declaredEfficiencies"),
+                    ));
+                }
                 for item in
                     crate::micro_chp::validate_micro_chp(product, &format!("{prefix}.method1"))
                 {
@@ -2938,7 +2994,11 @@ fn generation_values(
                     annual_output_kwh,
                 )
             };
-            Ok((base * correction, 1.0))
+            // 13.152 (p. 616–617): f_prac;gi = 1,0 only for the forfait
+            // values of 13.8.4.5–13.8.4.7. A declared or annex T value is not
+            // a forfait value, so "alle overige gevallen" (0,95) applies, as
+            // for a declared heat pump (vragen-nen 3).
+            Ok((base * correction, if measured { 0.95 } else { 1.0 }))
         }
         HotWaterGenerator::HeatPump {
             source_correction,
@@ -2951,15 +3011,18 @@ fn generation_values(
             // declared for one tapping class takes c_W;gen for that class;
             // without a class it is the declaration's value interpolated
             // for this system's demand (allowed before rounding), so no
-            // class correction applies.
-            let correction = if declared.is_some() && measured_class.is_none() {
-                1.0
-            } else {
-                heat_pump_class_correction(
-                    measured_class.unwrap_or(ApplicationClass::Class4),
-                    annual_output_kwh,
-                )
-                .ok_or("hot_water_heat_pump_class_exceeded")?
+            // class correction applies. The forfait rows of table 13.25
+            // for heat pumps (1,4 and 1,4·c_source; 2025+C1 p. 641, 2020+A1
+            // p. 612) carry no c_W;gen, unlike the gas rows: 13.8.4.7.3 c)
+            // (2025+C1 p. 643, 2020+A1 p. 615) takes c_W;gen from the class
+            // "waarbij het rendement van de warmtepomp is gemeten", so only
+            // a declared value with its measured class corrects. A forfait
+            // value has no measured class: a class given next to it is
+            // ignored here (it still sets the shower class, 13.30).
+            let correction = match (declared, measured_class) {
+                (Some(_), Some(class)) => heat_pump_class_correction(*class, annual_output_kwh)
+                    .ok_or("hot_water_heat_pump_class_exceeded")?,
+                _ => 1.0,
             };
             // 13.152 (p. 616–617): f_prac;gi = 1,0 only for the forfait
             // values of 13.8.4.5–13.8.4.7; a declared value is not a forfait
@@ -3028,12 +3091,12 @@ fn generation_values(
                 (IndirectBoiler::Hr100Or104, false) => 0.80,
                 (IndirectBoiler::Hr107, false) => 0.85,
             };
-            Ok((
-                declared
-                    .as_ref()
-                    .map_or(table, |item| round_down(item.value, 0.025)),
-                1.0,
-            ))
+            // 13.152: a declared value (p. 645, rounded down to 0,025) is
+            // not a forfait value of table 13.28, so f_prac 0,95.
+            Ok(match declared {
+                Some(item) => (round_down(item.value, 0.025), 0.95),
+                None => (table, 1.0),
+            })
         }
         HotWaterGenerator::IndirectHeatPump { .. } => Ok((1.4, 1.0)),
         HotWaterGenerator::HeatPumpSeries { last_source } => {
@@ -4137,7 +4200,16 @@ pub fn assess_hot_water_with(
         .max(0.0);
         let diameter = circulation.outer_diameter_mm.unwrap_or_else(|| {
             if context.residential {
-                let dwellings = circulation.connected_dwellings.unwrap_or(1);
+                // Table 13.29 (2025+C1 p. 553, 2024 p. 538): an unknown
+                // N_woon;si,W is A_g;gebouw;W / A_g;tot, rounded to whole
+                // dwellings.
+                let dwellings = circulation.connected_dwellings.unwrap_or_else(|| {
+                    if area > 0.0 {
+                        (building_area / area).round().max(1.0) as u32
+                    } else {
+                        1
+                    }
+                });
                 if dwellings <= 10 {
                     28.0
                 } else if dwellings <= 20 {
@@ -4596,6 +4668,7 @@ mod tests {
     #[test]
     fn hot_water_chp_method_2_uses_the_ht_conversion_factors() {
         let input = system(HotWaterGenerator::Chp(Box::new(HotWaterChp {
+            declared_efficiencies: None,
             chp: Some(dhw_chp_class()),
             method1: None,
             also_space_heating: true,
@@ -4610,8 +4683,42 @@ mod tests {
         assert!((jan.natural_gas_kwh - jan.generator_output_kwh / 0.49).abs() < 1e-9);
         // 16.13.
         assert!((jan.chp_electricity_kwh - jan.generator_output_kwh * 0.30 / 0.49).abs() < 1e-9);
+        // §13.8.4.7.4: its indirectly heated vessel is calculated per 13.6.
+        let mut with_vessel = input.clone();
+        with_vessel.storage.push(StorageVessel {
+            id: "vat".into(),
+            volume_l: 2000.0,
+            loss: StorageLoss::Label {
+                label: StorageLabel::C,
+            },
+            connection_factor: 2,
+            electric_boiler_insulated_pipe: false,
+            in_heated_zone: false,
+            unheated_ambient_c: None,
+            not_in_appliance_test: false,
+            source_reference: "label".into(),
+        });
+        assert!(validate_hot_water(&with_vessel, context(), "hotWater").is_empty());
+        let stored = assess_hot_water(&with_vessel, context()).unwrap();
+        let stored_jan = &stored.months[0];
+        assert!(stored_jan.storage_loss_kwh > 0.0);
+        // 13.7: the loss is added once, on the demand side of the CHP, and
+        // the CHP's ε_th and ε_el apply to that output (as for a boiler).
+        assert!(
+            (stored_jan.generator_output_kwh
+                - jan.generator_output_kwh
+                - stored_jan.storage_loss_kwh)
+                .abs()
+                < 1e-9
+        );
+        assert!((stored_jan.natural_gas_kwh - stored_jan.generator_output_kwh / 0.49).abs() < 1e-9);
+        assert!(
+            (stored_jan.chp_electricity_kwh - stored_jan.generator_output_kwh * 0.30 / 0.49).abs()
+                < 1e-9
+        );
         // No method or both methods are rejected.
         let neither = system(HotWaterGenerator::Chp(Box::new(HotWaterChp {
+            declared_efficiencies: None,
             chp: None,
             method1: None,
             also_space_heating: false,
@@ -4621,6 +4728,70 @@ mod tests {
         assert!(validate_hot_water(&neither, context(), "hotWater")
             .iter()
             .any(|item| item.code == "hot_water_chp_method_required"));
+    }
+
+    /// §9.1 (2025+C1 p. 285): a quality declaration replaces the table 9.31
+    /// row that §13.8.4.7.4 references (p. 343), so hot water uses the
+    /// declared ε_chp;th 0,80 and ε_chp;el 0,12 (16.13), also on a row
+    /// without a table value. Method 1, a blank reference and an invalid
+    /// pair are refused.
+    #[test]
+    fn hot_water_chp_uses_declared_efficiencies() {
+        use crate::space_heating_chain::DeclaredChpEfficiencies;
+        let declared = |thermal: f64, electric: f64, reference: &str| {
+            Some(DeclaredChpEfficiencies {
+                thermal,
+                electric,
+                declaration_reference: reference.into(),
+            })
+        };
+        let chp = |declared_efficiencies, class: crate::space_cooling::ChpClass| {
+            system(HotWaterGenerator::Chp(Box::new(HotWaterChp {
+                declared_efficiencies,
+                chp: Some(class),
+                method1: None,
+                also_space_heating: true,
+                auxiliary: None,
+                equipment_reference: "CHP plate".into(),
+            })))
+        };
+        let input = chp(declared(0.809, 0.12, "BCRG declaration"), dhw_chp_class());
+        assert!(validate_hot_water(&input, context(), "hotWater").is_empty());
+        let result = assess_hot_water(&input, context()).unwrap();
+        let jan = &result.months[0];
+        // Rounded down to two decimals: 0,809 → 0,80.
+        assert!((jan.natural_gas_kwh - jan.generator_output_kwh / 0.80).abs() < 1e-9);
+        assert!((jan.chp_electricity_kwh - jan.generator_output_kwh * 0.12 / 0.80).abs() < 1e-9);
+
+        // A table row without a value ("n.v.t."): the declaration still
+        // calculates, without it the class is refused.
+        let mut empty_row = dhw_chp_class();
+        empty_row.power_kw = 2.0;
+        empty_row.built_after_2006 = false;
+        assert!(empty_row.factors().is_none());
+        let with = chp(declared(0.80, 0.12, "declaration"), empty_row.clone());
+        assert!(validate_hot_water(&with, context(), "hotWater").is_empty());
+        assert!(assess_hot_water(&with, context()).is_ok());
+        let without = chp(None, empty_row);
+        assert!(validate_hot_water(&without, context(), "hotWater")
+            .iter()
+            .any(|item| item.code == "chp_class_invalid"));
+
+        let codes = |input: &HotWaterSystem| {
+            validate_hot_water(input, context(), "hotWater")
+                .into_iter()
+                .map(|item| (item.code, item.path))
+                .collect::<Vec<_>>()
+        };
+        let blank = chp(declared(0.80, 0.12, " "), dhw_chp_class());
+        assert!(codes(&blank)
+            .iter()
+            .any(|(code, path)| *code == "source_reference_required"
+                && path.ends_with("declaredEfficiencies.declarationReference")));
+        let invalid = chp(declared(0.80, 0.30, "declaration"), dhw_chp_class());
+        assert!(codes(&invalid)
+            .iter()
+            .any(|(code, _)| *code == "chp_declared_efficiency_invalid"));
     }
 
     #[test]
@@ -4657,6 +4828,7 @@ mod tests {
             test_report_reference: "EN 50465 report".into(),
         };
         let input = system(HotWaterGenerator::Chp(Box::new(HotWaterChp {
+            declared_efficiencies: None,
             chp: None,
             method1: Some(product.clone()),
             also_space_heating: false,
@@ -4688,6 +4860,7 @@ mod tests {
         let mut unmeasured = product;
         unmeasured.full_load.auxiliary_power_kw = None;
         let mut fallback = HotWaterChp {
+            declared_efficiencies: None,
             chp: None,
             method1: Some(unmeasured),
             also_space_heating: false,
@@ -5446,6 +5619,53 @@ mod tests {
             codes.contains(&"hot_water_pipe_geometry_invalid"),
             "{codes:?}"
         );
+
+        // 13.27 and 13.29 fix h_a at 8,0 W/(m²·K) for hot water (p. 551):
+        // an own surface coefficient is refused, the default calculates.
+        let in_air =
+            |surface_coefficient| crate::heating_distribution::PipeGeometry::InsulatedInAir {
+                pipe_outer_diameter_m: 0.015,
+                insulated_diameter_m: 0.045,
+                insulation_lambda: 0.035,
+                surface_coefficient,
+            };
+        input.circulation = Some(circulation(None, Some(in_air(Some(10.0)))));
+        let codes: Vec<String> = validate_hot_water(&input, context(), "w")
+            .iter()
+            .map(|issue| format!("{} {}", issue.code, issue.path))
+            .collect();
+        assert!(
+            codes.contains(
+                &"hot_water_pipe_surface_coefficient_fixed w.circulation.calculatedPsi.surfaceCoefficientWPerM2K"
+                    .to_string()
+            ),
+            "{codes:?}"
+        );
+        input.circulation = Some(circulation(None, Some(in_air(None))));
+        assert!(validate_hot_water(&input, context(), "w")
+            .iter()
+            .all(|issue| !issue.path.contains("calculatedPsi")));
+
+        // Diameters typed in millimetres into the metre fields: the
+        // formulas mostly use ratios, so 15/35 "m" would give a plausible
+        // Ψ; above 1 m is refused with a units hint.
+        let millimetres = crate::heating_distribution::PipeGeometry::InsulatedInAir {
+            pipe_outer_diameter_m: 15.0,
+            insulated_diameter_m: 35.0,
+            insulation_lambda: 0.035,
+            surface_coefficient: None,
+        };
+        assert!(millimetres.psi().is_none());
+        input.circulation = Some(circulation(None, Some(millimetres)));
+        let codes: Vec<&str> = validate_hot_water(&input, context(), "w")
+            .iter()
+            .map(|issue| issue.code)
+            .collect();
+        assert!(codes.contains(&"pipe_dimension_not_in_metres"), "{codes:?}");
+        assert!(
+            !codes.contains(&"hot_water_pipe_geometry_invalid"),
+            "{codes:?}"
+        );
     }
 
     #[test]
@@ -5670,10 +5890,69 @@ mod tests {
         assert!((jan.carrier_input_kwh - carrier).abs() < 1e-9);
     }
 
+    /// Table 13.25 (2025+C1 p. 641, 2020+A1 p. 612) gives the forfait heat
+    /// pumps 1,4 and 1,4·c_source without c_W;gen; 13.8.4.7.3 c) (2025+C1
+    /// p. 643) corrects a measured class only. Public case J (Uniec, COP
+    /// 1,40 on a 126 kWh demand) uses the table value as is, where class 4
+    /// would give 1,4·0,45.
+    #[test]
+    fn forfait_heat_pump_takes_no_class_correction() {
+        for (exhaust_air_source, source_correction, expected) in
+            [(true, None, 1.4), (false, Some(1.04), 1.4 * 1.04)]
+        {
+            let input = system(HotWaterGenerator::HeatPump {
+                declared: None,
+                same_ground_source: false,
+                exhaust_air_source,
+                source_correction,
+                measured_class: None,
+                outdoor_air_fraction: None,
+            });
+            let result = assess_hot_water(&input, context()).unwrap();
+            // Class 4 would correct this demand.
+            let class4 = heat_pump_class_correction(
+                ApplicationClass::Class4,
+                result.annual_generator_output_kwh,
+            )
+            .unwrap();
+            assert!(class4 < 1.0, "{class4}");
+            for month in &result.months {
+                assert!((month.generation_efficiency - expected).abs() < 1e-12);
+            }
+        }
+    }
+
+    /// A forfait value has no measured class (13.8.4.7.3 c), 2025+C1 p. 643,
+    /// 2020+A1 p. 615): a class given next to it neither corrects 1,4 nor
+    /// fails on a larger demand.
+    #[test]
+    fn forfait_heat_pump_ignores_a_measured_class() {
+        for class in [ApplicationClass::Class1, ApplicationClass::Class3] {
+            let input = system(HotWaterGenerator::HeatPump {
+                declared: None,
+                same_ground_source: false,
+                exhaust_air_source: false,
+                source_correction: None,
+                measured_class: Some(class),
+                outdoor_air_fraction: None,
+            });
+            let result = assess_hot_water(&input, context()).unwrap();
+            for month in &result.months {
+                assert!((month.generation_efficiency - 1.4).abs() < 1e-12);
+            }
+        }
+    }
+
     #[test]
     fn heat_pump_classes_and_ambient_heat() {
+        let declared = || {
+            Some(DeclaredEfficiency {
+                value: 3.0,
+                source_reference: "BCRG 0000/01".into(),
+            })
+        };
         let mut input = system(HotWaterGenerator::HeatPump {
-            declared: None,
+            declared: declared(),
             same_ground_source: false,
             exhaust_air_source: false,
             source_correction: None,
@@ -5684,7 +5963,8 @@ mod tests {
         let annual = result.annual_generator_output_kwh;
         let correction = heat_pump_class_correction(ApplicationClass::Class3, annual).unwrap();
         let jan = &result.months[0];
-        let eta = 1.4 * correction;
+        // 13.152: a declared value takes f_prac 0,95.
+        let eta = 3.0 * correction * 0.95;
         assert!((jan.generation_efficiency - eta).abs() < 1e-12);
         if eta >= 1.0 {
             let ambient = jan.generator_output_kwh * (1.0 - 1.0 / eta);
@@ -5692,7 +5972,7 @@ mod tests {
         }
         // A class-1 measurement cannot serve a larger demand.
         input.generator = HotWaterGenerator::HeatPump {
-            declared: None,
+            declared: declared(),
             same_ground_source: false,
             exhaust_air_source: false,
             source_correction: None,
@@ -5909,8 +6189,9 @@ mod tests {
         });
         assert!(validate_hot_water(&input, context(), "dhw").is_empty());
         let result = assess_hot_water(&input, context()).unwrap();
-        // Class 1 has c_W;gen = 1 at every demand (table 13.26).
-        assert!((result.months[0].generation_efficiency - expected).abs() < 1e-9);
+        // Class 1 has c_W;gen = 1 at every demand (table 13.26); an annex T
+        // value is no forfait value, so f_prac 0,95 (13.152, review 41).
+        assert!((result.months[0].generation_efficiency - 0.95 * expected).abs() < 1e-9);
         assert_eq!(
             input.shower_heat_recovery.as_ref().unwrap().showers[0].efficiency(),
             0.5
@@ -6693,5 +6974,199 @@ mod tests {
             generation(&indirect(0.02), 2067.0),
             Err("hot_water_efficiency_invalid")
         );
+    }
+
+    /// Review 41: 13.152 (2025+C1 p. 616–617) gives f_prac 1,0 only to the
+    /// forfait values of 13.8.4.5–13.8.4.7; a declared gas or indirect-boiler
+    /// value is not one, so it takes 0,95, as a declared heat pump does.
+    #[test]
+    fn declared_gas_and_indirect_boiler_values_take_f_prac_0_95() {
+        let gas = |declared: Option<f64>| HotWaterGenerator::GasAppliance {
+            appliance: GasAppliance::CombiGaskeurHrCw,
+            measured_class: Some(ApplicationClass::Class4),
+            kitchen_only: false,
+            declared: declared.map(|value| DeclaredEfficiency {
+                value,
+                source_reference: "Gaskeur CW 0000".into(),
+            }),
+            annex_t: None,
+            annex_t_conditions: None,
+        };
+        // Table 13.25: 0,675 · c_W;gen; c_W;gen = 1 at 3 890 kWh (class 4).
+        assert_eq!(generation(&gas(None), 3890.0), Ok((0.675, 1.0)));
+        // Declared 0,71 is rounded down to 0,700.
+        let (eta, practical) = generation(&gas(Some(0.71)), 3890.0).unwrap();
+        assert!((eta - 0.70).abs() < 1e-9);
+        assert_eq!(practical, 0.95);
+
+        let indirect = |declared: Option<f64>| HotWaterGenerator::IndirectBoiler {
+            boiler: IndirectBoiler::Hr107,
+            oil: false,
+            inside_boundary: true,
+            also_space_heating: true,
+            declared: declared.map(|value| DeclaredEfficiency {
+                value,
+                source_reference: "BCRG 0000/02".into(),
+            }),
+            pilot_flame: false,
+        };
+        // Table 13.28 HR 107 inside the boundary: 0,90 with f_prac 1.
+        assert_eq!(generation(&indirect(None), 2067.0), Ok((0.90, 1.0)));
+        let (eta, practical) = generation(&indirect(Some(0.93)), 2067.0).unwrap();
+        assert!((eta - 0.925).abs() < 1e-9);
+        assert_eq!(practical, 0.95);
+
+        // In the chain: E_W = Q_W;gen;out / (f_prac · η) = Q / (0,95 · 0,925).
+        let result = assess_hot_water(&system(indirect(Some(0.93))), context()).unwrap();
+        let jan = &result.months[0];
+        let expected = jan.generator_output_kwh / (0.95 * 0.925);
+        assert!((jan.carrier_input_kwh - expected).abs() < 1e-9);
+    }
+
+    /// Review 41: table 13.29 (2025+C1 p. 553, 2024 p. 538). Without a known
+    /// N_woon;si,W the count is A_g;gebouw;W / A_g;tot: a 100 m² dwelling on
+    /// a 1 500 m² collective system counts 15 dwellings, so 35 mm, Ψ 0,299
+    /// at 15 mm insulation, not the 28 mm (Ψ 0,256) of one dwelling.
+    #[test]
+    fn table_13_29_counts_dwellings_from_the_areas_when_unknown() {
+        let mut input = system(HotWaterGenerator::ExternalHeat);
+        input.collective = Some(CollectiveHotWater {
+            building_usable_floor_area_m2: 1500.0,
+            source_reference: "drawing".into(),
+        });
+        input.circulation = Some(Circulation {
+            outer_diameter_mm: None,
+            insulation: PipeInsulation::Mm15,
+            declared_psi_w_per_mk: None,
+            calculated_psi: None,
+            fittings_insulated: true,
+            length_m: Some(100.0),
+            unheated_length_m: Some(0.0),
+            unheated_ambient_c: None,
+            floor_count: 5,
+            sport_hall_area_m2: 0.0,
+            connected_dwellings: None,
+            pump: CirculationPump {
+                control: PumpControl::UncontrolledOrUnknown,
+                label_power_kw: None,
+                energy_efficiency_index: None,
+            },
+            source_reference: "design".into(),
+        });
+        assert!(validate_hot_water(&input, context(), "dhw").is_empty());
+        let loss = |dwellings: Option<u32>| {
+            let mut input = input.clone();
+            input.circulation.as_mut().unwrap().connected_dwellings = dwellings;
+            assess_hot_water(&input, context()).unwrap().months[0].circulation_loss_kwh
+        };
+        // 13.26 with f_gebouw;si;W = 100/1 500, t = 744 h, 62,5 − 20 K and
+        // L_equi = 0,03/Ψ·L for insulated fittings.
+        let expected = |psi: f64| {
+            100.0 / 1500.0 * 744.0 / 1000.0 * psi * (62.5 - 20.0) * (100.0 + 0.03 / psi * 100.0)
+        };
+        assert!((loss(None) - expected(0.299)).abs() < 1e-9);
+        assert!((loss(Some(15)) - expected(0.299)).abs() < 1e-9);
+        assert!((loss(Some(1)) - expected(0.256)).abs() < 1e-9);
+    }
+
+    /// Review 52, independent recalculation of table 13.29 (2025+C1 p. 553):
+    /// with N_woon;si,W unknown, A_g;gebouw;W / A_g;tot (100 m²) gives the
+    /// band ≤ 10 → 28 mm, 11–20 → 35 mm, > 20 → 42 mm. Each case must
+    /// calculate exactly as the same system with that diameter entered.
+    #[test]
+    fn review52_table_13_29_bands_from_the_area_ratio() {
+        let build = |building: f64, diameter: Option<f64>| {
+            let mut input = system(HotWaterGenerator::ExternalHeat);
+            input.collective = Some(CollectiveHotWater {
+                building_usable_floor_area_m2: building,
+                source_reference: "drawing".into(),
+            });
+            input.circulation = Some(Circulation {
+                outer_diameter_mm: diameter,
+                insulation: PipeInsulation::Mm15,
+                declared_psi_w_per_mk: None,
+                calculated_psi: None,
+                fittings_insulated: true,
+                length_m: Some(100.0),
+                unheated_length_m: Some(0.0),
+                unheated_ambient_c: None,
+                floor_count: 5,
+                sport_hall_area_m2: 0.0,
+                connected_dwellings: None,
+                pump: CirculationPump {
+                    control: PumpControl::UncontrolledOrUnknown,
+                    label_power_kw: None,
+                    energy_efficiency_index: None,
+                },
+                source_reference: "design".into(),
+            });
+            assess_hot_water(&input, context()).unwrap().months[0].circulation_loss_kwh
+        };
+        for (building, diameter) in [
+            (1000.0, 28.0),
+            (1040.0, 28.0),
+            (1960.0, 35.0),
+            (2000.0, 35.0),
+            (2040.0, 35.0),
+            (2100.0, 42.0),
+        ] {
+            let derived = build(building, None);
+            let entered = build(building, Some(diameter));
+            assert!(
+                (derived - entered).abs() < 1e-9,
+                "{building}: {derived} vs {entered}"
+            );
+        }
+    }
+
+    /// Review 52, independent recalculation of 13.152 (2025+C1 p. 616–617)
+    /// with the rounding of p. 627/645: a declared 0,737 of a gas appliance
+    /// becomes 0,725 and a declared 0,949 of an indirectly heated vessel
+    /// 0,925, both with f_prac 0,95, so E_W = Q_W;gen;out / (0,95 · η). The
+    /// gas appliance measured in class 4 keeps c_W;gen of table 13.26
+    /// (p. 641–643, OPMERKING 1 of p. 640): linear in Q_W;dis;nren;an between
+    /// 1 805 kWh (0,80) and 2 500 kWh (0,867).
+    #[test]
+    fn review52_declared_values_take_f_prac_0_95() {
+        let gas = HotWaterGenerator::GasAppliance {
+            appliance: GasAppliance::CombiGaskeurHrCw,
+            measured_class: Some(ApplicationClass::Class4),
+            kitchen_only: false,
+            declared: Some(DeclaredEfficiency {
+                value: 0.737,
+                source_reference: "Gaskeur CW 0000".into(),
+            }),
+            annex_t: None,
+            annex_t_conditions: None,
+        };
+        let indirect = HotWaterGenerator::IndirectBoiler {
+            boiler: IndirectBoiler::Hr107,
+            oil: false,
+            inside_boundary: true,
+            also_space_heating: true,
+            declared: Some(DeclaredEfficiency {
+                value: 0.949,
+                source_reference: "BCRG 0000/02".into(),
+            }),
+            pilot_flame: false,
+        };
+        for (generator, declared, class_4) in [(gas, 0.725, true), (indirect, 0.925, false)] {
+            let result = assess_hot_water(&system(generator), context()).unwrap();
+            let annual: f64 = result.months.iter().map(|m| m.generator_output_kwh).sum();
+            let eta = if class_4 {
+                assert!((1805.0..=2500.0).contains(&annual), "{annual}");
+                declared * (0.80 + (annual - 1805.0) / (2500.0 - 1805.0) * (0.867 - 0.80))
+            } else {
+                declared
+            };
+            for month in &result.months {
+                let expected = month.generator_output_kwh / (0.95 * eta);
+                assert!(
+                    (month.carrier_input_kwh - expected).abs() < 1e-9 * expected.max(1.0),
+                    "{} vs {expected}",
+                    month.carrier_input_kwh
+                );
+            }
+        }
     }
 }

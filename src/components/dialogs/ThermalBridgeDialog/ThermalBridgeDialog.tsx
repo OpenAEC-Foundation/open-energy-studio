@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useId } from 'react';
 import { useI18n } from '../../../i18n/i18n';
 import { useEnergy } from '../../../context/EnergyContext';
 import { IThermalBridge, ThermalBoundary } from '../../../core/energy/types';
 import { DialogShell } from '../DialogShell';
+import { DecimalInput } from '../../ui';
 
 interface ThermalBridgeDialogProps {
   editId?: string | null;
@@ -12,6 +13,7 @@ interface ThermalBridgeDialogProps {
 const thermalBoundaries: ThermalBoundary[] = ['outdoor', 'ground', 'unheated_space', 'adjacent_conditioned', 'internal'];
 
 export function ThermalBridgeDialog({ editId, onClose }: ThermalBridgeDialogProps) {
+  const fieldId = useId();
   const { t } = useI18n();
   const { state, dispatch } = useEnergy();
   const { project } = state;
@@ -83,8 +85,8 @@ export function ThermalBridgeDialog({ editId, onClose }: ThermalBridgeDialogProp
       cancelLabel={t('dialog.cancel')}
     >
         <div className="dialog-field">
-          <label>{t('dialog.thermalBridge.name')}</label>
-          <input
+          <label htmlFor={`${fieldId}-a1`}>{t('dialog.thermalBridge.name')}</label>
+          <input id={`${fieldId}-a1`}
             type="text"
             value={name}
             onChange={(e) => { setName(e.target.value); setErrors(prev => ({ ...prev, name: '' })); }}
@@ -103,9 +105,8 @@ export function ThermalBridgeDialog({ editId, onClose }: ThermalBridgeDialogProp
         </div>}
 
         <div className="dialog-field">
-          <label>{t('dialog.thermalBridge.psiValue')}</label>
-          <input
-            type="number"
+          <label htmlFor={`${fieldId}-a2`}>{t('dialog.thermalBridge.psiValue')}</label>
+          <DecimalInput id={`${fieldId}-a2`}
             step={0.001}
             value={psiValue}
             onChange={(e) => setPsiValue(parseFloat(e.target.value) || 0)}
@@ -125,9 +126,8 @@ export function ThermalBridgeDialog({ editId, onClose }: ThermalBridgeDialogProp
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.thermalBridge.length')}</label>
-          <input
-            type="number"
+          <label htmlFor={`${fieldId}-a3`}>{t('dialog.thermalBridge.length')}</label>
+          <DecimalInput id={`${fieldId}-a3`}
             min={0}
             step={0.1}
             value={length}
@@ -136,8 +136,8 @@ export function ThermalBridgeDialog({ editId, onClose }: ThermalBridgeDialogProp
         </div>
 
         <div className="dialog-field">
-          <label>{t('dialog.thermalBridge.zone')}</label>
-          <select
+          <label htmlFor={`${fieldId}-a4`}>{t('dialog.thermalBridge.zone')}</label>
+          <select id={`${fieldId}-a4`}
             value={zoneId}
             onChange={(e) => { setZoneId(e.target.value); setErrors(prev => ({ ...prev, zoneId: '' })); }}
             disabled={!!existingBridge}

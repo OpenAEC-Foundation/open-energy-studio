@@ -143,15 +143,32 @@ export function EmptyState({ title, children, icon, action, className }: StatePr
   );
 }
 
-/** Error state: keeps `role="alert"` so the failure is announced. */
-export function ErrorState({ title, children, action, className }: StateProps) {
+/** Error state: keeps `role="alert"` so the failure is announced. `details` is the raw error, folded away. */
+export function ErrorState({ title, children, action, className, details }: StateProps & { details?: string | null }) {
   return (
     <div className={cx('ui-state', 'ui-state--error', className)} role="alert">
       <span className="ui-state__icon" aria-hidden="true"><AlertCircle /></span>
       <p className="ui-state__title">{title}</p>
       {children && <p className="ui-state__text">{children}</p>}
+      <TechnicalDetails>{details}</TechnicalDetails>
       {action && <div className="ui-state__action">{action}</div>}
     </div>
+  );
+}
+
+/**
+ * The raw technical error (an HTTP status, a parse error) behind a closed
+ * "Technische details" disclosure: the Dutch message says what happened and what
+ * to do; the detail stays available for support. Renders nothing without a detail.
+ */
+export function TechnicalDetails({ children }: { children?: string | null }) {
+  const { t } = useI18n();
+  if (!children) return null;
+  return (
+    <details className="ui-tech-details">
+      <summary>{t('ui.technicalDetails')}</summary>
+      <code>{children}</code>
+    </details>
   );
 }
 

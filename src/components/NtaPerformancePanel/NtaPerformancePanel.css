@@ -21,6 +21,9 @@
 .nta-performance details { margin-top: 12px; }
 .nta-performance summary { cursor: pointer; font-weight: 600; }
 .nta-performance-table { overflow-x: auto; }
+/* The per-window tables sit in a section's field grid; they take the whole row
+   instead of one 200 px field column. */
+.nta-form-grid > .nta-performance-table { grid-column: 1 / -1; }
 .nta-performance table { border-collapse: collapse; margin-top: 8px; min-width: 100%; font-variant-numeric: tabular-nums; }
 .nta-performance th, .nta-performance td { padding: 4px 8px; border-bottom: 1px solid var(--border); text-align: right; }
 .nta-performance th[scope="row"], .nta-performance thead th:first-child { text-align: left; }
@@ -148,8 +151,9 @@ fieldset.nta-form-row > legend { grid-column: 1 / -1; font-weight: 600; font-siz
 .nta-performance-totals .nta-performance-wide { grid-column: 1 / -1; flex-direction: column; justify-content: flex-start; }
 .nta-performance-totals .nta-performance-wide dd { font-weight: 400; }
 /* Selects with long option texts take two columns so the chosen text stays readable. */
-.nta-form-wide { grid-column: span 2; }
-@media (max-width: 720px) { .nta-form-wide { grid-column: auto; } }
+.nta-form-wide,
+.nta-form-section label[data-wide-select] { grid-column: span 2; }
+@media (max-width: 720px) { .nta-form-wide, .nta-form-section label[data-wide-select] { grid-column: auto; } }
 .nta-form select { text-overflow: ellipsis; }
 
 .nta-performance-legacy { display: flex; gap: 8px; align-items: flex-start; margin: 8px 0; padding: 8px 12px; border-left: 4px solid var(--unverified); background: var(--unverified-subtle); }

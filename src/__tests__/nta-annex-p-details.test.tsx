@@ -10,6 +10,7 @@ import { write, type Draft, type Path } from '../components/NtaPerformancePanel/
 import type { MwaPatchOperation } from '../core/nta/KernelClient';
 import { withoutNulls } from '../core/nta/KernelInput';
 import { renderWithProviders, userEvent } from './test-utils';
+import { SLOW_UI_TEST_MS } from './timeouts';
 
 type Body = (draft: Draft, change: (path: Path, value: unknown) => void) => ReactElement;
 
@@ -87,7 +88,7 @@ describe('annex P details without JSON editors', () => {
       method: 'calculated', sourceReference: '', vessels: [{ volumeL: 300 }], pipes: [{ lengthM: 10 }],
       exchanger: { nominalPowerKw: 150, insulated: true },
     });
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 
   it('edits collective solar, flex and sorption generators and clears stale fields', async () => {
     const user = userEvent.setup();
@@ -132,7 +133,7 @@ describe('annex P details without JSON editors', () => {
     });
     await user.selectOptions(screen.getByLabelText('Heat source (table P.10)'), 'collective_heat');
     expect(withoutNulls(generator())).toEqual({ kind: 'sorption_chiller', heat: { source: 'collective_heat', sourceReference: '' } });
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 
   it('edits an area PV system with the chapter 16 fields', async () => {
     const user = userEvent.setup();
@@ -143,17 +144,18 @@ describe('annex P details without JSON editors', () => {
     await user.type(screen.getByLabelText('azimuth ° (0 = north)'), '180');
     expect(withoutNulls(current().externalSupply.areaElectricity[0])).toEqual({
       kind: 'pv', id: 'gebied-pv-1', peakPower: { method: 'panels', panelPeakPowerW: 400, panelCount: 10 }, azimuthDeg: 180,
-      mounting: 'unknown', obstructionFactors: [], sourceReference: '',
+      mounting: 'unknown', obstructionFactors: [null], sourceReference: '',
     });
-    // The obstruction factor is optional: clearing it leaves no blank.
+    // §17.3: without an obstruction situation the kernel needs the factor (one value or twelve),
+    // so clearing it leaves a blank at this field, not an empty list it refuses (review 58).
     const obstruction = screen.getByLabelText(/obstruction/i);
     await user.type(obstruction, '0.9');
     expect(current().externalSupply.areaElectricity[0].obstructionFactors).toEqual([0.9]);
     await user.clear(obstruction);
-    expect(current().externalSupply.areaElectricity[0].obstructionFactors).toEqual([]);
+    expect(current().externalSupply.areaElectricity[0].obstructionFactors).toEqual([null]);
     await user.selectOptions(screen.getByLabelText('gebied-pv-1 — peak power P_pk'), 'table16_1');
     expect(current().externalSupply.areaElectricity[0].peakPower).toEqual({ method: 'table16_1', moduleType: null, panelAreaM2: null });
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 });
 
 describe('lighting, floor edges and measure patches without JSON', () => {
@@ -194,7 +196,26 @@ describe('lighting, floor edges and measure patches without JSON', () => {
     });
     await user.click(screen.getByRole('button', { name: 'Add lighting zone' }));
     expect(current().lighting[0].lightingZones.map((item: Draft) => item.id)).toEqual(['lighting-1', 'lighting-2']);
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
+
+  it('enters a declared F_D;dayl sector without a daylight control (NEN-EN 15193-1 annex F)', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Harness initial={{ labelFunction: 'office' }}
+      body={(draft, change) => <NtaLightingSection draft={draft} change={change} project={project} />} />);
+    await user.click(screen.getByLabelText('Calculate lighting'));
+    await user.selectOptions(screen.getByLabelText('Power'), 'installed');
+    await user.selectOptions(screen.getByLabelText('Daylight'), 'sectors');
+    await user.selectOptions(screen.getByLabelText('Kind'), 'declared');
+    expect(screen.queryByLabelText('Daylight control (table 14.6)')).toBeNull();
+    await user.type(screen.getByLabelText('Daylight sector area A_D, m² (14.27–14.35)'), '48');
+    await user.type(screen.getByLabelText(/Daylight dependency factor F_D;dayl/), '0.781');
+    await user.type(screen.getByLabelText('Evidence: calculation per NEN-EN 15193-1:2017 annex F'), 'rapport 12');
+    expect(withoutNulls(current().lighting[0].lightingZones[0]).daylight).toEqual({
+      method: 'sectors', sourceReference: '', sectors: [{
+        kind: 'declared', areaM2: 48, daylightDependencyFactor: 0.781, sourceReference: 'rapport 12',
+      }],
+    });
+  }, SLOW_UI_TEST_MS);
 
   it('edits the floor-edge ψ values of 8.36', async () => {
     const user = userEvent.setup();
@@ -205,7 +226,7 @@ describe('lighting, floor edges and measure patches without JSON', () => {
     await user.type(screen.getByLabelText('Edge part length ℓ_j, m 1'), '12.5');
     await user.type(screen.getByLabelText('ψ_gr;j, W/(m·K)'), '0.08');
     expect(current().groundFloors[0].edgeThermalBridges.bridges).toEqual([{ lengthM: 12.5, psiWPerMk: 0.08, sourceReference: '' }]);
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 
   it('edits measure patches row by row', async () => {
     expect(parsePatchValue('0.15')).toBe(0.15);
@@ -240,7 +261,7 @@ describe('lighting, floor edges and measure patches without JSON', () => {
     expect(current().patch[0].value).toBe(7);
     await user.selectOptions(screen.getByLabelText('Operation'), 'remove');
     expect(current().patch).toEqual([{ op: 'remove', path: '/constructions/0/uValue' }]);
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 
   it('keeps each patch row its own value after a removal and reopens a saved null as null', async () => {
     const user = userEvent.setup();
@@ -264,5 +285,5 @@ describe('lighting, floor edges and measure patches without JSON', () => {
     // The remaining rows keep their own values and types.
     expect((screen.getByLabelText('New value') as HTMLInputElement).value).toBe('second');
     expect(types().map((select) => select.value)).toEqual(['text', 'null']);
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 });

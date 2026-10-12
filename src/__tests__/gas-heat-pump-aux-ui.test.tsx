@@ -59,7 +59,7 @@ describe('gas heat pump draft auxiliary UI', () => {
     view.unmount();
     const saved = onSave.mock.calls[0][0];
     renderWithProviders(<GasHeatPumpAuxPanel pump={{ ...pump, gasHeatPumpAuxDraft: { ...saved, months: [...saved.months].reverse() } }} onSave={vi.fn()} />);
-    expect(screen.getByLabelText('Generator heat (kWh) 1')).toHaveValue(1000);
+    expect(screen.getByLabelText('Generator heat (kWh) 1')).toHaveValue('1000');
     expect(screen.getByText(/Gas auxiliary input saved in this project/)).toBeInTheDocument();
   });
 

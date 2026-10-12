@@ -11,6 +11,8 @@ use serde_json::Value;
 use std::collections::{BTreeSet, HashSet};
 use std::path::Path;
 
+pub mod new_inputs;
+
 pub fn unescape(segment: &str) -> String {
     segment.replace("~1", "/").replace("~0", "~")
 }

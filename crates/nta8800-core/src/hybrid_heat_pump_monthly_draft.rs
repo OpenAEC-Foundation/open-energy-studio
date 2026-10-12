@@ -84,8 +84,13 @@ pub fn assess_hybrid_heat_pump_monthly_draft(
     let mut issues = Vec::new();
     let lookup = assess_forfait_heat_pump_draft(&input.forfait);
     let boiler_lookup = assess_boiler_forfait_draft(&input.boiler);
-    if lookup.status == "invalid" || lookup.corrected_cop.is_none() {
+    // The lookup's own issues below name the field; the summary only when
+    // none does, so one blank is one open point (review 58).
+    if (lookup.status == "invalid" || lookup.corrected_cop.is_none()) && lookup.issues.is_empty() {
         issues.push(issue("forfait_lookup_invalid", "forfait"));
+    }
+    for item in &lookup.issues {
+        issues.push(issue(item.code, format!("forfait.{}", item.path)));
     }
     if input
         .forfait

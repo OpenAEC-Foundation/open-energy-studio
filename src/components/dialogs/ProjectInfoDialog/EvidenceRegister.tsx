@@ -5,7 +5,11 @@ import type { NtaEvidenceItem, NtaEvidenceKind, NtaRelabelProof } from '../../..
 
 /** Roles of a file in a relabel (BRL 9500-W §4.2.3, p. 23). */
 const RELABEL_PROOFS: NtaRelabelProof[] = ['quote_with_order', 'specified_invoice', 'production_photo', 'review'];
-import { createEvidenceItem, EVIDENCE_KINDS, EVIDENCE_REFERENCE_PREFIX } from '../../../core/nta/Evidence';
+import {
+  checkEvidenceFile, createEvidenceItem, EVIDENCE_ACCEPT, EVIDENCE_KINDS, EVIDENCE_REFERENCE_PREFIX,
+  forgetSessionEvidence, releaseEvidenceIds,
+} from '../../../core/nta/Evidence';
+import { evidenceErrorText } from '../../EvidenceLink/EvidenceLink';
 
 interface EvidenceRegisterProps {
   evidence: NtaEvidenceItem[];
@@ -18,18 +22,33 @@ export function parseGps(text: string): NtaEvidenceItem['gps'] {
   return parts.length === 2 && parts.every(Number.isFinite) ? { latitude: parts[0], longitude: parts[1] } : undefined;
 }
 
-function GpsField({ id, label, value, onChange }: {
-  id: string; label: string; value: NtaEvidenceItem['gps']; onChange: (gps: NtaEvidenceItem['gps']) => void;
+/** Parses "a, b": the trimmed, non-empty paths. */
+export function parsePaths(text: string): string[] {
+  return text.split(',').map((path) => path.trim()).filter(Boolean);
+}
+
+/**
+ * A text field for a parsed value: keeps what the adviser types (a trailing
+ * comma, a half-typed coordinate) and shows the value again when it changes
+ * from outside (Verwerpen, undo), review 35.
+ */
+function ParsedTextField<T>({ id, label, placeholder, value, format, parse, onChange }: {
+  id: string; label: string; placeholder: string; value: T;
+  format: (value: T) => string; parse: (text: string) => T; onChange: (value: T) => void;
 }) {
-  const [text, setText] = useState(value ? `${value.latitude}, ${value.longitude}` : '');
+  const [text, setText] = useState(() => format(value));
+  const shown = JSON.stringify(parse(text)) === JSON.stringify(value) ? text : format(value);
   return (
     <div className="dialog-field">
       <label htmlFor={id}>{label}</label>
-      <input id={id} type="text" placeholder="52.37, 4.89" value={text}
-        onChange={(event) => { setText(event.target.value); onChange(parseGps(event.target.value)); }} />
+      <input id={id} type="text" placeholder={placeholder} value={shown}
+        onChange={(event) => { setText(event.target.value); onChange(parse(event.target.value)); }} />
     </div>
   );
 }
+
+const formatGps = (gps: NtaEvidenceItem['gps']) => (gps ? `${gps.latitude}, ${gps.longitude}` : '');
+const formatPaths = (paths: string[]) => paths.join(', ');
 
 /** BRL 9500 Bijlage 3 evidence register: files with hash, origin and check. */
 export function EvidenceRegister({ evidence, onChange }: EvidenceRegisterProps) {
@@ -53,14 +72,18 @@ export function EvidenceRegister({ evidence, onChange }: EvidenceRegisterProps) 
     setBusy(true);
     setError(null);
     try {
+      const chosen = Array.from(files);
+      // Size and type first, so a huge or unsupported file is never read.
+      for (const file of chosen) checkEvidenceFile({ name: file.name, size: file.size });
       let next = [...evidence];
-      for (const file of Array.from(files)) {
+      for (const file of chosen) {
         const bytes = new Uint8Array(await file.arrayBuffer());
         next = [...next, await createEvidenceItem({ name: file.name, bytes, lastModified: file.lastModified }, next)];
       }
       onChange(next);
+      releaseEvidenceIds(next.slice(evidence.length).map((item) => item.id));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason));
+      setError(evidenceErrorText(reason, t));
     } finally {
       setBusy(false);
     }
@@ -71,7 +94,7 @@ export function EvidenceRegister({ evidence, onChange }: EvidenceRegisterProps) 
       <p className="dialog-hint">{t('evidence.hint', { prefix: EVIDENCE_REFERENCE_PREFIX })}</p>
       <div className="dialog-field">
         <label htmlFor="evidence-add">{t('evidence.add')}</label>
-        <FileButton id="evidence-add" multiple disabled={busy}
+        <FileButton id="evidence-add" multiple disabled={busy} accept={EVIDENCE_ACCEPT}
           onChange={(event) => { void addFiles(event.target.files); event.target.value = ''; }} />
       </div>
       {error && <p role="alert">{error}</p>}
@@ -115,17 +138,17 @@ export function EvidenceRegister({ evidence, onChange }: EvidenceRegisterProps) 
             <input id={`evidence-${item.id}-description`} type="text" value={item.description ?? ''}
               onChange={(event) => update(index, { description: event.target.value || undefined })} />
           </div>
-          <div className="dialog-field">
-            <label htmlFor={`evidence-${item.id}-links`}>{t('evidence.linkedPaths')}</label>
-            <input id={`evidence-${item.id}-links`} type="text" placeholder="/zones/0/surfaces/1"
-              value={(item.linkedPaths ?? []).join(', ')}
-              onChange={(event) => update(index, {
-                linkedPaths: event.target.value.split(',').map((path) => path.trim()).filter(Boolean),
-              })} />
-          </div>
-          <GpsField id={`evidence-${item.id}-gps`} label={t('evidence.gps')} value={item.gps}
-            onChange={(gps) => update(index, { gps })} />
-          <button type="button" onClick={() => onChange(evidence.filter((_, i) => i !== index))}>{t('evidence.remove')}</button>
+          <ParsedTextField id={`evidence-${item.id}-links`} label={t('evidence.linkedPaths')} placeholder="/zones/0/surfaces/1"
+            value={item.linkedPaths ?? []} format={formatPaths} parse={parsePaths}
+            onChange={(linkedPaths) => update(index, { linkedPaths })} />
+          <ParsedTextField id={`evidence-${item.id}-gps`} label={t('evidence.gps')} placeholder="52.37, 4.89"
+            value={item.gps} format={formatGps} parse={parseGps} onChange={(gps) => update(index, { gps })} />
+          <button type="button" onClick={() => {
+            const next = evidence.filter((_, i) => i !== index);
+            onChange(next);
+            // The removed file's bytes are no longer needed in this session.
+            forgetSessionEvidence(item.sha256, next);
+          }}>{t('evidence.remove')}</button>
         </fieldset>
       ))}
     </div>

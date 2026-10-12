@@ -30,6 +30,11 @@ pub fn kernel_interpretations() -> Vec<InterpretationGroup> {
             crate::building_performance::INTERPRETATIONS,
         ),
         group(
+            "hoofdstuk 5, TOjuli",
+            "tojuli",
+            crate::tojuli::INTERPRETATIONS,
+        ),
+        group(
             "hoofdstuk 7",
             "monthly_demand",
             crate::monthly_demand::OMITTED_CORRECTIONS,
@@ -68,6 +73,11 @@ pub fn kernel_interpretations() -> Vec<InterpretationGroup> {
             "hoofdstuk 12",
             "humidification",
             crate::humidification::INTERPRETATIONS,
+        ),
+        group(
+            "hoofdstuk 13",
+            "domestic_hot_water",
+            crate::domestic_hot_water::INTERPRETATIONS,
         ),
         group(
             "hoofdstuk 13, zonneboilers",

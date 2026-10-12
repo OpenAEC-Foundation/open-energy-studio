@@ -123,6 +123,26 @@ pub struct SurveySurface {
     /// (table 8.13, p. 93); `None`/false: uninsulated.
     #[serde(default)]
     pub crawlspace_bottom_insulated: Option<bool>,
+    /// H2 of ISSO 82.1 4e druk afb. 8.23 (p. 73) and ISSO 75.1 4e druk
+    /// (same §): the height from the top of the ground floor to ground
+    /// level, m, for a floor above a crawlspace or unheated cellar. NTA
+    /// 8800:2022 (8.47) (p. 236) takes it as h; there is no forfait value
+    /// for an unknown height. From NTA 8800:2023 h is the fixed 0,125 m
+    /// (p. 240) and this answer is not used.
+    #[serde(default)]
+    pub floor_height_above_ground_m: Option<f64>,
+    /// H1 of ISSO 82.1 7e druk §8.4 afb. 8.9–8.11 (p. 74–75; ISSO 75.1 7e
+    /// druk p. 78–79): for a façade part bordering the ground, the distance
+    /// from the top of the floor to ground level, m (the mean height of the
+    /// wall against the ground). The floor then lies below ground level and
+    /// the façade part is the wall of a heated basement (NTA 8800 8.3.3.2).
+    #[serde(default)]
+    pub depth_below_ground_m: Option<f64>,
+    /// The floor a façade part bordering the ground belongs to (a floor to
+    /// the ground, a crawlspace or an unheated cellar; ISSO 82.1 asks floor
+    /// and wall "als combinatie"). Needed when the zone has more than one.
+    #[serde(default)]
+    pub ground_floor_id: Option<String>,
     /// Insulated at a renovation or in a later extension, thickness not
     /// determinable (§8.7.2.1, afb. 8.14, p. 84–85); only with
     /// `presentUnknownThickness`. Without it, a building from 1965 on keeps
@@ -488,6 +508,25 @@ struct WindowPart {
     reference: String,
 }
 
+/// Source of the crawlspace wall height h (H2), in the active edition: the
+/// 2022 page is known, for 2020+A1 the chapter is cited.
+fn crawl_wall_height_source() -> &'static str {
+    use crate::norm_versions::{current, leak_once, NormVersion};
+    const SOURCE_2022: &str = "NTA 8800:2022 (8.47) p. 236; ISSO 82.1 4e druk p. 73 (H2)";
+    let version = current();
+    if version == NormVersion::V2022 {
+        return SOURCE_2022;
+    }
+    leak_once(
+        version,
+        SOURCE_2022,
+        format!(
+            "{}, hoofdstuk 8 (h van de kruipruimtewand); ISSO 82.1 4e druk p. 73 (H2)",
+            version.label()
+        ),
+    )
+}
+
 fn default_tilt(surface: &SurveySurface) -> f64 {
     surface.tilt_deg.unwrap_or(match surface.element {
         SurfaceElement::Facade => 90.0,
@@ -632,6 +671,7 @@ pub fn derive_envelope_zone(
     let mut floor_above_crawlspace = false;
     let mut crawl_floors: Vec<usize> = Vec::new();
     let mut facade_parts: Vec<(f64, f64)> = Vec::new();
+    let mut ground_walls: Vec<GroundWall> = Vec::new();
     let building = envelope.building_kind.unwrap_or(BuildingKind::Regular);
     // ISSO 82.1 §6.3.4 (p. 41): a sunroom (AOS) counts as outdoor air;
     // water under a houseboat counts as outdoor air for the hull (NTA C.2).
@@ -674,6 +714,16 @@ pub fn derive_envelope_zone(
             recorder.issue("surface_area_invalid", format!("{path}.grossAreaM2"));
             continue;
         }
+        // ISSO 82.1 §8.4 (7e druk p. 74–75) knows a floor and a façade part
+        // against the ground; NTA 8800 8.3 has no ground route for a roof.
+        if matches!(surface.boundary, SurfaceBoundary::Ground)
+            && surface.element == SurfaceElement::Roof
+        {
+            recorder.issue("ground_surface_not_floor", format!("{path}.boundary"));
+            continue;
+        }
+        let ground_wall = matches!(surface.boundary, SurfaceBoundary::Ground)
+            && surface.element == SurfaceElement::Facade;
         let exterior = exterior_boundary(&surface.boundary);
         let solar = matches!(
             surface.boundary,
@@ -681,6 +731,8 @@ pub fn derive_envelope_zone(
         );
         let orientation = match (surface.orientation, surface.element) {
             (Some(orientation), _) => orientation,
+            // A wall against the ground has no solar gains to orient.
+            (None, SurfaceElement::Facade) if ground_wall => Orientation::South,
             (None, SurfaceElement::Facade) => {
                 recorder.issue(
                     "surface_orientation_required",
@@ -1064,6 +1116,7 @@ pub fn derive_envelope_zone(
                 SurfaceBoundary::UnheatedSpace { .. }
             ),
             renovation: renovation.clone(),
+            survey_table_8_10: true,
         };
         let result = if let Some(reed) = surface.reed_thickness_mm {
             match thatch_rc(surface, reed, &path, recorder) {
@@ -1086,6 +1139,26 @@ pub fn derive_envelope_zone(
             format!("R_c {:.2} m²K/W ({})", result.r_c, result.route),
             "ISSO 82.1 p. 84–93 (tables 8.9–8.11), NTA annex I",
         );
+        if ground_wall {
+            match surface.depth_below_ground_m {
+                Some(depth) if depth.is_finite() && depth > 0.0 => ground_walls.push(GroundWall {
+                    path: path.clone(),
+                    area: net,
+                    r_c: result.r_c,
+                    depth,
+                    floor_id: surface.ground_floor_id.clone(),
+                }),
+                Some(_) => recorder.issue(
+                    "depth_below_ground_invalid",
+                    format!("{path}.depthBelowGroundM"),
+                ),
+                None => recorder.issue(
+                    "depth_below_ground_required",
+                    format!("{path}.depthBelowGroundM"),
+                ),
+            }
+            continue;
+        }
         match &surface.boundary {
             SurfaceBoundary::Ground
             | SurfaceBoundary::Crawlspace
@@ -1145,6 +1218,34 @@ pub fn derive_envelope_zone(
                         "wallResistanceM2kPerW": 0.0,
                         "wallUValueWPerM2k": 0.0,
                     });
+                    // NTA 8800:2022 (8.47) (p. 236): h is the measured H2
+                    // (ISSO 82.1 4e druk p. 73); no forfait value exists.
+                    // From 2023 h is fixed and the kernel refuses an input.
+                    if !crate::norm_versions::profile().crawl_wall_height_fixed {
+                        match surface.floor_height_above_ground_m {
+                            Some(height) if height.is_finite() && height >= 0.0 => {
+                                floor["below"]["wallHeightAboveGroundM"] = json!(height);
+                                recorder.record(
+                                    "crawlspace_wall_height_h2",
+                                    &format!("{path}.floorHeightAboveGroundM"),
+                                    format!("h {height} m"),
+                                    crawl_wall_height_source(),
+                                );
+                            }
+                            Some(_) => {
+                                recorder.issue(
+                                    "floor_height_above_ground_invalid",
+                                    format!("{path}.floorHeightAboveGroundM"),
+                                );
+                            }
+                            None => {
+                                recorder.issue(
+                                    "floor_height_above_ground_required",
+                                    format!("{path}.floorHeightAboveGroundM"),
+                                );
+                            }
+                        }
+                    }
                     crawl_floors.push(ground_floors.len());
                 }
                 ground_floors.push(floor);
@@ -1224,6 +1325,7 @@ pub fn derive_envelope_zone(
         format!("ΔU_for {delta_u:.3} W/(m²K)"),
         "NTA 8800 §8.2.1, formula 8.3 (table 8.1)",
     );
+    attach_ground_walls(&mut ground_floors, &ground_walls, delta_u, recorder);
 
     let mut direct_elements = Vec::new();
     let mut opaque_elements = Vec::new();
@@ -1328,6 +1430,82 @@ pub fn derive_envelope_zone(
 
 /// Kernel obstruction of a survey window: declared factors, a situation of
 /// tables 8.24/8.25 (82.1 p. 103, 75.1 p. 105) or minimal obstruction.
+/// A façade part against the ground with its H1 (ISSO 82.1 7e druk §8.4).
+struct GroundWall {
+    path: String,
+    area: f64,
+    r_c: f64,
+    depth: f64,
+    floor_id: Option<String>,
+}
+
+/// ISSO 82.1 7e druk §8.4 (p. 74–75; ISSO 75.1 7e druk p. 78–79) takes a
+/// floor below ground level and its façade part against the ground "als
+/// combinatie", with H1 from the top of the floor to ground level. In NTA
+/// 8800 that is the floor of a heated room below ground level (8.3.3.2,
+/// 2025+C1 p. 253–255): z, the wall R_c, ΔU_for and ΣA_T;bw of the 8.38
+/// forfait, which also counts in A_ls (6.7.2/6.7.3 c). Several wall parts
+/// of one floor: z of 8.42 with ℓ_j = A_j/z_j, so z·Σℓ_j stays ΣA_j, and
+/// R_c as the area-weighted mean of 1/R_c.
+fn attach_ground_walls(
+    ground_floors: &mut [Value],
+    walls: &[GroundWall],
+    delta_u: f64,
+    recorder: &mut Recorder,
+) {
+    let mut per_floor: Vec<Vec<&GroundWall>> = vec![Vec::new(); ground_floors.len()];
+    for wall in walls {
+        let index = match &wall.floor_id {
+            Some(id) => ground_floors
+                .iter()
+                .position(|floor| floor["id"].as_str() == Some(id.as_str())),
+            None if ground_floors.len() == 1 => Some(0),
+            None => None,
+        };
+        match index {
+            Some(index) => per_floor[index].push(wall),
+            None => recorder.issue(
+                if wall.floor_id.is_none() && ground_floors.len() > 1 {
+                    "ground_wall_floor_required"
+                } else {
+                    "ground_wall_floor_unknown"
+                },
+                format!("{}.groundFloorId", wall.path),
+            ),
+        }
+    }
+    for (floor, walls) in ground_floors.iter_mut().zip(per_floor) {
+        let Some(first) = walls.first() else {
+            continue;
+        };
+        if walls
+            .iter()
+            .any(|wall| !(wall.area > 0.0 && wall.r_c > 0.0))
+        {
+            recorder.issue(
+                "surface_area_invalid",
+                format!("{}.grossAreaM2", first.path),
+            );
+            continue;
+        }
+        let area: f64 = walls.iter().map(|wall| wall.area).sum();
+        let depth = area / walls.iter().map(|wall| wall.area / wall.depth).sum::<f64>();
+        let r_c = area / walls.iter().map(|wall| wall.area / wall.r_c).sum::<f64>();
+        floor["heatedBasement"] = json!({
+            "depthM": depth,
+            "wallResistanceM2kPerW": r_c,
+            "forfaitDeltaUWPerM2k": delta_u,
+            "wallAreaM2": area,
+        });
+        recorder.record(
+            "heated_basement_from_ground_wall",
+            &format!("{}.depthBelowGroundM", first.path),
+            format!("z {depth:.2} m, ΣA_T;bw {area:.2} m², R_c {r_c:.2} m²K/W"),
+            "ISSO 82.1 7e druk §8.4 p. 74–75; NTA 8800 8.3.3.2, 8.38, 6.7.2",
+        );
+    }
+}
+
 fn window_obstruction(
     window: &SurveyWindow,
     facade: bool,
@@ -1417,6 +1595,9 @@ mod tests {
             reed_thickness_mm: None,
             exposed_perimeter_m: Some(16.0),
             crawlspace_bottom_insulated: None,
+            floor_height_above_ground_m: None,
+            depth_below_ground_m: None,
+            ground_floor_id: None,
             renovation: None,
             zone_id: None,
             source_reference: "survey".into(),
@@ -1433,6 +1614,114 @@ mod tests {
             rooflights: Vec::new(),
             building_kind: None,
         }
+    }
+
+    fn ground_wall(id: &str, area: f64, depth: Option<f64>, floor: Option<&str>) -> SurveySurface {
+        let mut wall = surface(id, SurfaceElement::Facade, SurfaceBoundary::Ground);
+        wall.gross_area_m2 = area;
+        wall.orientation = None;
+        wall.exposed_perimeter_m = None;
+        wall.depth_below_ground_m = depth;
+        wall.ground_floor_id = floor.map(Into::into);
+        wall
+    }
+
+    fn issue_codes(recorder: &Recorder) -> Vec<(&'static str, String)> {
+        recorder
+            .issues
+            .iter()
+            .map(|issue| (issue.code, issue.path.clone()))
+            .collect()
+    }
+
+    #[test]
+    fn a_facade_part_against_the_ground_makes_its_floor_a_heated_basement() {
+        // ISSO 82.1 7e druk §8.4 (p. 74–75): floor and wall below ground level
+        // "als combinatie", H1 at the wall; NTA 8800 8.3.3.2 with 8.38.
+        let envelope = bare(vec![
+            surface("gevel", SurfaceElement::Facade, SurfaceBoundary::Outdoor),
+            ground_wall("kelderwand-noord", 20.0, Some(2.0), None),
+            ground_wall("kelderwand-zuid", 10.0, Some(1.0), None),
+            surface(
+                "keldervloer",
+                SurfaceElement::Floor,
+                SurfaceBoundary::Ground,
+            ),
+        ]);
+        let mut recorder = Recorder::default();
+        let derived = derive_envelope(&envelope, 1975, &mut recorder);
+        assert!(recorder.issues.is_empty(), "{:?}", recorder.issues);
+        assert_eq!(derived.ground_floors.len(), 1);
+        let basement = &derived.ground_floors[0]["heatedBasement"];
+        // ΣA = 30; ℓ = 20/2 + 10/1 = 20 m, so z = 30/20 = 1,5 m.
+        assert!((basement["wallAreaM2"].as_f64().unwrap() - 30.0).abs() < 1e-9);
+        assert!((basement["depthM"].as_f64().unwrap() - 1.5).abs() < 1e-9);
+        // Both walls 1975 uninsulated with a cavity: the same R_c.
+        let facade_r_c = basement["wallResistanceM2kPerW"].as_f64().unwrap();
+        assert!(facade_r_c > 0.0);
+        assert!(basement["forfaitDeltaUWPerM2k"].as_f64().unwrap() >= 0.0);
+        // The walls are no opaque outdoor element and no floor of their own.
+        assert!(derived
+            .direct_elements
+            .iter()
+            .all(|element| !element["id"].as_str().unwrap().starts_with("kelderwand")));
+        assert!(recorder
+            .applied
+            .iter()
+            .any(|item| item.rule == "heated_basement_from_ground_wall"));
+    }
+
+    #[test]
+    fn a_ground_wall_needs_h1_and_its_floor_and_a_roof_cannot_border_the_ground() {
+        let mut roof = surface("dak", SurfaceElement::Roof, SurfaceBoundary::Ground);
+        roof.exposed_perimeter_m = None;
+        let envelope = bare(vec![
+            ground_wall("zonder-h1", 10.0, None, Some("vloer-a")),
+            ground_wall("nul", 10.0, Some(0.0), Some("vloer-a")),
+            ground_wall("geen-vloer", 10.0, Some(1.0), None),
+            ground_wall("onbekend", 10.0, Some(1.0), Some("vloer-x")),
+            roof,
+            surface("vloer-a", SurfaceElement::Floor, SurfaceBoundary::Ground),
+            surface(
+                "vloer-b",
+                SurfaceElement::Floor,
+                SurfaceBoundary::Crawlspace,
+            ),
+        ]);
+        let mut recorder = Recorder::default();
+        derive_envelope(&envelope, 1975, &mut recorder);
+        let codes = issue_codes(&recorder);
+        for expected in [
+            (
+                "depth_below_ground_required",
+                "envelope.surfaces[0].depthBelowGroundM",
+            ),
+            (
+                "depth_below_ground_invalid",
+                "envelope.surfaces[1].depthBelowGroundM",
+            ),
+            (
+                "ground_wall_floor_required",
+                "envelope.surfaces[2].groundFloorId",
+            ),
+            (
+                "ground_wall_floor_unknown",
+                "envelope.surfaces[3].groundFloorId",
+            ),
+            ("ground_surface_not_floor", "envelope.surfaces[4].boundary"),
+        ] {
+            assert!(
+                codes
+                    .iter()
+                    .any(|(code, path)| *code == expected.0 && path == expected.1),
+                "{expected:?} in {codes:?}"
+            );
+        }
+        // A wall to the ground asks no orientation and no perimeter.
+        assert!(!codes
+            .iter()
+            .any(|(code, _)| *code == "surface_orientation_required"
+                || *code == "exposed_perimeter_required"));
     }
 
     #[test]
@@ -1510,6 +1799,7 @@ mod tests {
             r_si_override: None,
             towards_unheated_space: false,
             renovation: None,
+            survey_table_8_10: true,
         }
         .calculate();
         assert!(hull.is_object());
@@ -1595,6 +1885,7 @@ mod tests {
             r_si_override: None,
             towards_unheated_space: false,
             renovation: None,
+            survey_table_8_10: true,
         }
         .calculate();
         assert_eq!(derived.direct_elements.len(), 1);
@@ -2027,6 +2318,7 @@ mod tests {
             r_si_override: None,
             towards_unheated_space: false,
             renovation: None,
+            survey_table_8_10: true,
         }
         .calculate();
         assert_eq!(r_bw, facade.r_c);
@@ -2076,6 +2368,7 @@ mod tests {
             r_si_override: Some(0.17),
             towards_unheated_space: false,
             renovation: None,
+            survey_table_8_10: true,
         }
         .calculate();
         let overhang = derived

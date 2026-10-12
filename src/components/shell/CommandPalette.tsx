@@ -159,8 +159,8 @@ export function CommandPalette({ entries, onClose }: { entries: PaletteEntry[]; 
         <div className="palette-input-row">
           <Search aria-hidden="true" />
           <input ref={inputRef} className="palette-input" value={query} onChange={(event) => setQuery(event.target.value)}
-            placeholder={t('palette.placeholder')} aria-label={t('palette.placeholder')} role="combobox" aria-expanded="true"
-            aria-controls={listId} aria-autocomplete="list"
+            placeholder={t('palette.placeholder')} aria-label={t('palette.placeholder')} role="combobox" aria-expanded={shown.length > 0}
+            aria-controls={shown.length > 0 ? listId : undefined} aria-autocomplete="list"
             aria-activedescendant={shown[active] ? `${listId}-${active}` : undefined} />
           <Kbd>Esc</Kbd>
         </div>

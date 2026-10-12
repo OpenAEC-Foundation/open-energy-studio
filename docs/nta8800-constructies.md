@@ -30,7 +30,7 @@ Status: **ongeverifieerd**. Er zijn nog geen referentiegevallen vergeleken.
 | Materialen voor ramen en kozijnen | tabel H.1 | λ_for per materiaal. |
 | Overgangsweerstanden | tabel C.2 | R_si naar warmtestroomrichting, R_se = 0,04. |
 | Luchtlagen | C.3, tabel C.3 en C.4, C.12 | Niet, zwak en sterk geventileerd, met en zonder reflecterend oppervlak. Bij een sterk geventileerde laag vervallen de buitenste lagen en geldt de stilstaande-luchtweerstand. |
-| Smalle en buisvormige holten | tabel F.1–F.3 | Bilineair geïnterpoleerd. Factor 1,2 of 0,8 bij verticale warmtestroom. |
+| Smalle en buisvormige holten | tabel F.1–F.3 | Bilineair geïnterpoleerd. Factor 1,2 of 0,8 bij verticale warmtestroom. Een zwak geventileerde smalle luchtlaag (`weaklyVentilated`) krijgt de helft van de tabel F.1-waarde (F.2, p. 814). |
 | Kapruimte en onverwarmde ruimte | tabel C.5, C.15 | Als buitenste laag. Standaardwaarden U_e = 2 en n = 0,3. |
 | R_T | C.3–C.7, tabel C.1 | Homogene opbouw. Samengestelde opbouw met boven- en ondergrens en a′ volgens de Nederlandse formule C.4. |
 | Toeslagen ΔU | 8.8–8.13, tabel 8.2 | ΔU_a, ΔU_fa (via χ of via 8.11/8.12) en ΔU_r. Alleen toegepast boven 3 % van U_T. |

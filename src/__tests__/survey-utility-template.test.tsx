@@ -36,7 +36,7 @@ describe('utility survey template', () => {
     renderWithProviders(<Harness />);
     await user.selectOptions(await screen.findByRole('combobox', { name: 'Building type' }), 'single_layer');
     expect(JSON.parse(screen.getByTestId('survey').textContent ?? '{}').buildingType)
-      .toEqual({ kind: 'single_layer', position: 'detached', roof: 'flat' });
+      .toEqual({ kind: 'single_layer', position: 'detached', roof: 'pitched' });
     expect(screen.getByText('Flat roof (tilt up to 5°): no orientation needed.')).toBeInTheDocument();
   }, 60000);
 });

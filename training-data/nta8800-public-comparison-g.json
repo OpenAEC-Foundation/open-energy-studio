@@ -462,7 +462,8 @@
         },
         "heatedBasement": {
           "depthM": 2.92,
-          "wallResistanceM2kPerW": 3.71
+          "wallResistanceM2kPerW": 3.71,
+          "wallAreaM2": 130.45
         },
         "sourceReference": "openbare bron Uniec 3.3.5.0 printout (vrijstaande woning met kelder 369,10 m2, 29-04-2025): keldervloer onder mv, P 56,13 m, z 2,92 m; kelderwanden Rc 3,71 (130,45 m2); lineaire koudebruggen forfaitair"
       }

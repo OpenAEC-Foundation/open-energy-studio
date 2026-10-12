@@ -4,7 +4,8 @@ import { CheckField, NumberField, read, SelectField, TextField, type Draft, type
 // Chapter 14 details of one lighting zone: several luminaire groups (14.8/
 // 14.9 with table 14.2), the parasitic power of 14.10–14.12 and the daylight
 // sectors of 14.25–14.42 (vertical windows, rooflights and annex Y tilted
-// windows). Field names follow lighting.rs.
+// windows, or an F_D;dayl from NEN-EN 15193-1 annex F, the alternative below
+// table 14.7). Field names follow lighting.rs.
 
 interface SectionProps {
   draft: Draft;
@@ -33,6 +34,8 @@ export function daylightSectorTemplate(kind: string): Draft {
     case 'rooflights':
       return { kind, rooflightDepthM: null, rooflightWidthM: null, clearHeightM: null, wallDistancesM: [null, null, null, null],
         openingAreaM2: null, roomLengthM: null, roomWidthM: null, luminaireHeightM: null, control };
+    case 'declared':
+      return { kind, areaM2: null, daylightDependencyFactor: null, sourceReference: '' };
     case 'tilted_window':
       return { kind, tiltDeg: null, windowLengthM: null, slopeOffsetM: null, slopeStartHeightM: null, ceilingHeightM: null,
         windowWidthM: null, control };
@@ -51,9 +54,9 @@ export function LuminaireGroupsFields({ draft, change, base }: SectionProps & { 
     {groups.map((_, index) => {
       const at = (...rest: Path): Path => [...base, 'luminaires', index, ...rest];
       const method = read(draft, at('power', 'method'));
-      return <div key={index} className="nta-form-row">
+      return <div key={index} className="nta-form-row" role="group" aria-label={`${t('nta.light.group')} ${index + 1}`}>
         <NumberField {...field} path={at('count')} label={`${t('nta.light.group')} ${index + 1} — ${t('nta.light.count')}`} step="1" />
-        <SelectField {...field} path={at('power', 'method')} label={t('nta.light.groupPower')} options={[
+        <SelectField required {...field} path={at('power', 'method')} label={t('nta.light.groupPower')} options={[
           ['system', t('nta.light.groupPower.system')], ['lamps', t('nta.light.groupPower.lamps')]]}
           onChange={(_, value) => change(at('power'), value === 'lamps'
             ? { method: 'lamps', lampPowerW: null, lampCount: null, technology: null }
@@ -81,7 +84,7 @@ export function ParasiticPowerFields({ draft, change, base }: SectionProps & { b
   const field = { draft, onChange: change };
   const method = read(draft, [...base, 'method']);
   return <>
-    <SelectField {...field} path={[...base, 'method']} label={t('nta.light.parasitic')} options={[
+    <SelectField required {...field} path={[...base, 'method']} label={t('nta.light.parasitic')} options={[
       ['forfait', t('nta.light.parasitic.forfait')], ['installed', t('nta.light.parasitic.installed')]]}
       onChange={(_, value) => change(base, value === 'installed'
         ? { method: 'installed', emergencyChargingW: null, controlStandbyW: null, sourceReference: '' } : { method: 'forfait' })} />
@@ -108,7 +111,7 @@ function WallDistances({ draft, change, path }: SectionProps & { path: Path }) {
   </>;
 }
 
-/** One daylight sector at `base` (vertical windows, rooflights or an annex Y tilted window). */
+/** One daylight sector at `base` (vertical windows, rooflights, an annex Y tilted window or a declared F_D;dayl). */
 function DaylightSectorFields({ draft, change, base }: SectionProps & { base: Path }) {
   const { t } = useI18n();
   const field = { draft, onChange: change };
@@ -117,9 +120,9 @@ function DaylightSectorFields({ draft, change, base }: SectionProps & { base: Pa
   const vertical = read(draft, at('vertical')) != null;
   const rooflight = read(draft, at('rooflight')) != null;
   return <>
-    <SelectField {...field} path={at('kind')} label={t('nta.light.sector.kind')} options={[
+    <SelectField required {...field} path={at('kind')} label={t('nta.light.sector.kind')} options={[
       ['vertical_windows', t('nta.light.sector.vertical')], ['rooflights', t('nta.light.sector.rooflights')],
-      ['tilted_window', t('nta.light.sector.tilted')]]}
+      ['tilted_window', t('nta.light.sector.tilted')], ['declared', t('nta.light.sector.declared')]]}
       onChange={(_, value) => change(base, daylightSectorTemplate(String(value ?? 'vertical_windows')))} />
     {kind === 'vertical_windows' && <>
       <NumberField {...field} path={at('sectorWidthM')} label={t('nta.light.sector.width')} />
@@ -169,7 +172,11 @@ function DaylightSectorFields({ draft, change, base }: SectionProps & { base: Pa
         <NumberField {...field} path={at('rooflight', 'luminaireHeightM')} label={t('nta.light.sector.luminaireHeight')} />
       </>}
     </>}
-    <SelectField {...field} path={at('control')} label={t('nta.light.sector.control')} options={CONTROL_OPTIONS(t)} />
+    {kind === 'declared' ? <>
+      <NumberField {...field} path={at('areaM2')} label={t('nta.light.sector.area')} />
+      <NumberField {...field} path={at('daylightDependencyFactor')} label={t('nta.light.sector.declaredFactor')} />
+      <TextField {...field} path={at('sourceReference')} label={t('nta.light.sector.declaredSource')} />
+    </> : <SelectField {...field} path={at('control')} label={t('nta.light.sector.control')} options={CONTROL_OPTIONS(t)} />}
   </>;
 }
 

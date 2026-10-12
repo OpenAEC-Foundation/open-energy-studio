@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { IProject } from '../core/energy/types';
 import { renderWithProviders, userEvent } from './test-utils';
+import { SLOW_UI_TEST_MS } from './timeouts';
 
 const t = (key: string, options?: Record<string, unknown>) =>
   options ? `${key}${JSON.stringify(options)}` : key;
@@ -70,5 +71,5 @@ describe('walkthrough 3 fixes', () => {
     await user.click(screen.getByRole('button', { name: 'opname.zones.addFunction' }));
     rerender(<BuildingFunctionFields draft={draft} change={change} t={(key) => key} />);
     expect((draft.functions as unknown[]).length).toBe(2);
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 });

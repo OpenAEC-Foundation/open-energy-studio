@@ -1,6 +1,6 @@
 [package]
 name = "open-energy-studio"
-version = "0.1.7-alpha"
+version = "0.2.0"
 description = "Energy performance workspace with an experimental NTA 8800 input audit"
 authors = ["Open Energy Studio Contributors"]
 license = "LGPL-3.0-or-later"
@@ -37,7 +37,9 @@ default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
 
 [profile.release]
-panic = "abort"
+# Unwind so a kernel panic in a command becomes an error (`off_main`)
+# instead of ending the app with every unsaved document.
+panic = "unwind"
 codegen-units = 1
 lto = true
 opt-level = "s"

@@ -15,9 +15,9 @@
 //! Corrections this module does not apply are listed in
 //! [`OMITTED_CORRECTIONS`] and returned with every result.
 
-use crate::climate::{self, Orientation, CLIMATE_SOURCE, MONTH_HOURS, OUTDOOR_TEMPERATURE_C};
+use crate::climate::{self, Orientation, MONTH_HOURS, OUTDOOR_TEMPERATURE_C};
 use crate::direct_transmission::{assess_direct_transmission, DirectTransmissionInput};
-use crate::ground::{ground_monthly, slab_coefficients, EdgeThermalBridges, SlabOnGround};
+use crate::ground::{ground_monthly, slab_coefficient_parts, EdgeThermalBridges, SlabOnGround};
 use crate::solar_shading::{
     movable_shading_factor, obstruction_factor, validate_obstruction, Balance, MovableShading,
     Obstruction,
@@ -57,6 +57,8 @@ pub const OMITTED_CORRECTIONS: &[&str] = &[
     "8.5: H_A = 0 for adjacent heated spaces is prescribed by the norm",
     "§17.3.8 extended obstruction method (hourly NEN 5060) enters as declared factors",
     "table 7.10 footnote c is the caller's column choice",
+    "7.38 (p. 187): with several zones bordering one sunroom Σ H_zi,j;ztu is H_zi;ztu / F_zi;ztu of 7.36 and every bordering zone takes its own θ_int;set;H;stc when the project lists the zones (shared sunroom id); a zone on its own uses H_zi;ztu / F_zi;ztu at its own setpoint",
+    "7.6.1 (p. 182) and 7.6.6.1.1 (p. 189) against 7.34 note 2 (p. 185): the partition to an adjacent unheated sunroom gets no solar gain of its own, also not through its windows, in the forfait and the calculated route; the sunroom counts through 7.30b only, with warning sunroom_partition_gain_interpreted (vragen-nen 11)",
 ];
 
 const SCOPE: &str = "nta8800_chapter_7_monthly_need_single_zone_unverified";
@@ -698,6 +700,11 @@ pub struct OpaqueElement {
     /// 7.33/7.39 keep `U_c` and only the TOjuli orientation split adds it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub forfait_delta_u_w_per_m2k: Option<f64>,
+    /// A partition to an unheated space in the forfait route (8.4.1 note 5,
+    /// C.10): part of H_D;for and of the TOjuli split on its orientation,
+    /// but shielded from the sun, so without the 7.33/7.39 solar terms.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub behind_unheated_space: bool,
     pub source_reference: String,
 }
 
@@ -1343,6 +1350,9 @@ pub(crate) fn window_solar_kwh(window: &Window, month: u8, balance: Balance) -> 
 
 /// 7.33 and 7.39: net solar gain of one opaque element in kWh.
 pub(crate) fn opaque_solar_kwh(element: &OpaqueElement, month: u8) -> f64 {
+    if element.behind_unheated_space {
+        return 0.0;
+    }
     let hours = MONTH_HOURS[usize::from(month - 1)];
     let irradiance = climate::irradiance_w_per_m2(element.orientation, element.tilt_deg, month)
         .expect("validated tilt");
@@ -1534,6 +1544,24 @@ fn validate(input: &MonthlyDemandInput, issues: &mut Vec<DemandIssue>) {
         .all(|value| value.is_finite() && (0.0..=1.0).contains(value));
         if !fractions_ok || !finite_nonneg(room.zone_conductance_w_per_k) {
             issues.push(issue("sunroom_invalid", path.clone()));
+        }
+        // 7.38: each bordering zone once, with a finite H_zi,j;ztu ≥ 0 and a
+        // plausible setpoint, and a cap sum that stays finite in every month.
+        let mut seen = std::collections::HashSet::new();
+        let zones_ok = room.bordering_zones.iter().all(|zone| {
+            !zone.zone_id.trim().is_empty()
+                && seen.insert(zone.zone_id.as_str())
+                && finite_nonneg(zone.conductance_w_per_k)
+                && zone.heating_setpoint_c.is_finite()
+                && (-50.0..=100.0).contains(&zone.heating_setpoint_c)
+        }) && room
+            .bordering_zones
+            .iter()
+            .map(|zone| zone.conductance_w_per_k * (zone.heating_setpoint_c.abs() + 100.0))
+            .sum::<f64>()
+            .is_finite();
+        if !zones_ok {
+            issues.push(issue("sunroom_invalid", format!("{path}.borderingZones")));
         }
         if room.surfaces.iter().any(|surface| {
             !(surface.area_m2.is_finite()
@@ -2044,7 +2072,18 @@ fn resolve_transmission(
                 }
                 // Upper bounds are program choices (no building has more
                 // than 200 storeys or is higher than 1000 m).
-                if (pipe.storeys == 0 && pipe.building_height_m.is_none())
+                // A utility zone gives the building height H of 7.17a
+                // instead of storeys, so a missing or too large H is
+                // reported at that field (the form shows no storeys there).
+                let height_route = !input.usage_function.is_residential() && pipe.storeys == 0;
+                if height_route
+                    && !matches!(pipe.building_height_m, Some(height) if height <= 1000.0)
+                {
+                    issues.push(issue(
+                        "vertical_pipe_building_height_invalid",
+                        format!("{path}.buildingHeightM"),
+                    ));
+                } else if (pipe.storeys == 0 && pipe.building_height_m.is_none())
                     || pipe.storeys > MAX_STOREYS
                     || pipe.building_height_m.is_some_and(|height| height > 1000.0)
                 {
@@ -2095,8 +2134,8 @@ fn resolve_transmission(
                         issues,
                     );
                 }
-                match slab_coefficients(slab) {
-                    Some(value) => slabs.push(value),
+                match slab_coefficient_parts(slab) {
+                    Some(parts) => slabs.extend(parts),
                     None => issues.push(issue(
                         crate::ground::combination_issue(slab).unwrap_or("ground_floor_invalid"),
                         path,
@@ -2201,8 +2240,25 @@ pub struct Sunroom {
     /// F_zi;ztu (7.36): this zone's share when several zones border it.
     #[serde(default = "one_f64")]
     pub distribution_factor: f64,
+    /// 7.38: every zone bordering the sunroom (this one included) with its
+    /// H_zi;ztu and heating setpoint. The project route fills this when one
+    /// sunroom id appears in several zones; empty means 7.37 or
+    /// H_zi;ztu / F_zi;ztu with this zone's setpoint.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub bordering_zones: Vec<SunroomBorderingZone>,
     pub surfaces: Vec<SunroomSurface>,
     pub source_reference: String,
+}
+
+/// One zone bordering a shared sunroom, for the 7.38 cap.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SunroomBorderingZone {
+    pub zone_id: String,
+    /// H_zi,j;ztu (8.4.1), W/K.
+    pub conductance_w_per_k: f64,
+    /// θ_int;set;H;stc of that zone, °C.
+    pub heating_setpoint_c: f64,
 }
 
 fn one_f64() -> f64 {
@@ -2234,15 +2290,28 @@ pub fn sunroom_gains_kwh(input: &MonthlyDemandInput, month_index: usize, balance
                 })
                 .sum();
             let gains = f_sol * absorbed * 0.001 * hours;
-            // 7.37: heating only, capped at 1.
+            if room.distribution_factor <= 0.0 {
+                return 0.0;
+            }
+            // 7.37/7.38: heating only, capped at 1. With several bordering
+            // zones 7.38 sums H_zi,j;ztu·(θ_int;set;H;stc;zi − θ_e) over all
+            // of them (2025+C1 p. 186–187). Without the list of bordering
+            // zones the sum is H_zi;ztu / F_zi;ztu (7.36) at this zone's
+            // setpoint, exact for equal setpoints.
+            let outdoor = OUTDOOR_TEMPERATURE_C[month_index];
+            let transfer_w = if room.bordering_zones.is_empty() {
+                (room.zone_conductance_w_per_k / room.distribution_factor)
+                    * (input.setpoints.heating_c - outdoor)
+            } else {
+                room.bordering_zones
+                    .iter()
+                    .map(|zone| zone.conductance_w_per_k * (zone.heating_setpoint_c - outdoor))
+                    .sum()
+            };
             let cap = match balance {
-                Balance::Heating if gains > 0.0 => (room.reduction_factor
-                    * room.zone_conductance_w_per_k
-                    * (input.setpoints.heating_c - OUTDOOR_TEMPERATURE_C[month_index])
-                    * 0.001
-                    * hours
-                    / gains)
-                    .clamp(0.0, 1.0),
+                Balance::Heating if gains > 0.0 => {
+                    (room.reduction_factor * transfer_w * 0.001 * hours / gains).clamp(0.0, 1.0)
+                }
                 _ => 1.0,
             };
             (1.0 - room.reduction_factor) * room.distribution_factor * cap * gains
@@ -2521,7 +2590,7 @@ fn assess_resolved(
         scope: SCOPE,
         target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
-        climate_source: CLIMATE_SOURCE,
+        climate_source: climate::climate_source(crate::norm_versions::current()),
         input_fingerprint: fingerprint,
         final_edition_verified: false,
         reference_verified: false,
@@ -3237,6 +3306,7 @@ mod tests {
             reduction_factor: 0.8,
             zone_conductance_w_per_k: 30.0,
             distribution_factor: 1.0,
+            bordering_zones: Vec::new(),
             surfaces: vec![SunroomSurface {
                 area_m2: 12.0,
                 absorptance: 0.6,
@@ -3257,6 +3327,40 @@ mod tests {
         let base = valid(&sample());
         let with = valid(&input);
         assert!(with.monthly[0].heating.need_kwh < base.monthly[0].heating.need_kwh);
+    }
+
+    #[test]
+    fn a_shared_sunroom_caps_on_all_bordering_zones_7_38() {
+        // Two equal zones border the sunroom: H_zi;ztu 5 W/K each, F 0,5
+        // (7.36). 7.38 caps on b_U·ΣH·Δθ·t = 0,8·10·17,39·0,744 kWh, not on
+        // this zone's 5 W/K alone (2025+C1 p. 187).
+        let mut input = sample();
+        input.sunrooms.push(Sunroom {
+            id: "atrium".into(),
+            glazing_g_heating: 0.6,
+            glazing_g_cooling: 0.6,
+            exterior_frame_fraction: 0.2,
+            reduction_factor: 0.8,
+            zone_conductance_w_per_k: 5.0,
+            distribution_factor: 0.5,
+            bordering_zones: Vec::new(),
+            surfaces: vec![SunroomSurface {
+                area_m2: 40.0,
+                absorptance: 0.6,
+                azimuth_deg: 180.0,
+                tilt_deg: 0.0,
+            }],
+            source_reference: "drawing".into(),
+        });
+        let march_irradiance = climate::irradiance_at(180.0, 0.0, 3).unwrap();
+        let gains = 0.6 * 0.8 * 0.6 * 40.0 * march_irradiance * 0.001 * 744.0;
+        let cap = 0.8 * 10.0 * (20.0 - 5.91) * 0.001 * 744.0 / gains;
+        assert!(cap < 1.0, "the cap binds in this example");
+        let expected = (1.0 - 0.8) * 0.5 * cap * gains;
+        assert!((sunroom_gains_kwh(&input, 2, Balance::Heating) - expected).abs() < 1e-9);
+        // A zone with no share gets nothing.
+        input.sunrooms[0].distribution_factor = 0.0;
+        assert_eq!(sunroom_gains_kwh(&input, 2, Balance::Heating), 0.0);
     }
 
     #[test]
@@ -3840,6 +3944,25 @@ mod tests {
             .collect();
         assert!(codes.contains(&"vertical_pipe_building_height_invalid"));
         assert!(codes.contains(&"vertical_pipe_area_share_requires_building_height"));
+
+        // A utility pipe without H (the form's blank) is reported at H, the
+        // field the utility form shows, not at the storeys of a dwelling.
+        let mut value = serde_json::to_value(&input).unwrap();
+        value["usageFunction"] = json!("office");
+        value["transmission"]["verticalPipes"] = json!([
+            {"id": "blank", "insulated": false, "sourceReference": "x"}
+        ]);
+        let input: MonthlyDemandInput = serde_json::from_value(value).unwrap();
+        let paths: Vec<_> = assess_monthly_demand(&input)
+            .issues
+            .iter()
+            .filter(|issue| issue.code.starts_with("vertical_pipe_"))
+            .map(|issue| format!("{} {}", issue.code, issue.path))
+            .collect();
+        assert_eq!(
+            paths,
+            ["vertical_pipe_building_height_invalid transmission.verticalPipes[0].buildingHeightM"]
+        );
     }
 
     #[test]
@@ -4013,5 +4136,178 @@ mod tests {
         assert!(crate::finite::first_non_finite(&window).is_none());
         let again: Window = serde_json::from_value(written).unwrap();
         assert!(again.g_perpendicular.is_nan());
+    }
+
+    /// Review 52, independent recalculation of 7.30b with 7.34–7.38
+    /// (2025+C1 p. 182, 185–187): this zone has H_zi;ztu 6 W/K of the
+    /// sunroom's 6 + 14 W/K, so F = 0,3 (7.36); February (672 h,
+    /// ϑ_e 4,82 °C of table 17.1), setpoint 20 °C for both zones. 7.38 caps
+    /// on b_U·Σ H·Δθ·t over both zones; the cooling balance has no cap.
+    #[test]
+    fn review52_shared_sunroom_with_unequal_shares() {
+        let mut input = sample();
+        input.sunrooms.push(Sunroom {
+            id: "atrium".into(),
+            glazing_g_heating: 0.55,
+            glazing_g_cooling: 0.35,
+            exterior_frame_fraction: 0.25,
+            reduction_factor: 0.7,
+            zone_conductance_w_per_k: 6.0,
+            distribution_factor: 0.3,
+            bordering_zones: Vec::new(),
+            surfaces: vec![
+                SunroomSurface {
+                    area_m2: 30.0,
+                    absorptance: 0.7,
+                    azimuth_deg: 180.0,
+                    tilt_deg: 0.0,
+                },
+                SunroomSurface {
+                    area_m2: 8.0,
+                    absorptance: 0.5,
+                    azimuth_deg: 180.0,
+                    tilt_deg: 90.0,
+                },
+            ],
+            source_reference: "drawing".into(),
+        });
+        let solar = |g: f64, month: u8, hours: f64| {
+            let absorbed = 0.7 * 30.0 * climate::irradiance_at(180.0, 0.0, month).unwrap()
+                + 0.5 * 8.0 * climate::irradiance_at(180.0, 90.0, month).unwrap();
+            g * (1.0 - 0.25) * absorbed * 0.001 * hours
+        };
+        let february = solar(0.55, 2, 672.0);
+        let cap = (0.7 * (6.0 + 14.0) * (20.0 - 4.82) * 0.001 * 672.0 / february).min(1.0);
+        assert!(cap < 1.0, "the cap binds in this example");
+        let expected = (1.0 - 0.7) * 0.3 * cap * february;
+        let heating = sunroom_gains_kwh(&input, 1, Balance::Heating);
+        assert!((heating - expected).abs() < 1e-9, "{heating} vs {expected}");
+        let july = (1.0 - 0.7) * 0.3 * solar(0.35, 7, 744.0);
+        let cooling = sunroom_gains_kwh(&input, 6, Balance::Cooling);
+        assert!((cooling - july).abs() < 1e-9, "{cooling} vs {july}");
+    }
+
+    /// 7.38 (2025+C1 p. 187) with each bordering zone's own setpoint: the
+    /// review 52 sunroom with this zone (6 W/K, 20 °C) and a second zone
+    /// (14 W/K, 16 °C). February, ϑ_e 4,82 °C, 672 h. With equal setpoints
+    /// the list gives the same cap as H_zi;ztu / F_zi;ztu.
+    #[test]
+    fn a_shared_sunroom_caps_with_each_zone_setpoint_7_38() {
+        let mut input = sample();
+        let zone = |id: &str, h: f64, setpoint: f64| SunroomBorderingZone {
+            zone_id: id.into(),
+            conductance_w_per_k: h,
+            heating_setpoint_c: setpoint,
+        };
+        input.sunrooms.push(Sunroom {
+            id: "atrium".into(),
+            glazing_g_heating: 0.55,
+            glazing_g_cooling: 0.35,
+            exterior_frame_fraction: 0.25,
+            reduction_factor: 0.7,
+            zone_conductance_w_per_k: 6.0,
+            distribution_factor: 0.3,
+            bordering_zones: Vec::new(),
+            surfaces: vec![
+                SunroomSurface {
+                    area_m2: 30.0,
+                    absorptance: 0.7,
+                    azimuth_deg: 180.0,
+                    tilt_deg: 0.0,
+                },
+                SunroomSurface {
+                    area_m2: 8.0,
+                    absorptance: 0.5,
+                    azimuth_deg: 180.0,
+                    tilt_deg: 90.0,
+                },
+            ],
+            source_reference: "drawing".into(),
+        });
+        input.setpoints.heating_c = 20.0;
+        let without_list = sunroom_gains_kwh(&input, 1, Balance::Heating);
+        input.sunrooms[0].bordering_zones = vec![zone("z1", 6.0, 20.0), zone("z2", 14.0, 20.0)];
+        let equal = sunroom_gains_kwh(&input, 1, Balance::Heating);
+        assert!(
+            (equal - without_list).abs() < 1e-9,
+            "{equal} vs {without_list}"
+        );
+
+        input.sunrooms[0].bordering_zones = vec![zone("z1", 6.0, 20.0), zone("z2", 14.0, 16.0)];
+        let absorbed = 0.7 * 30.0 * climate::irradiance_at(180.0, 0.0, 2).unwrap()
+            + 0.5 * 8.0 * climate::irradiance_at(180.0, 90.0, 2).unwrap();
+        let february = 0.55 * (1.0 - 0.25) * absorbed * 0.001 * 672.0;
+        let transfer = 6.0 * (20.0 - 4.82) + 14.0 * (16.0 - 4.82);
+        let cap = (0.7 * transfer * 0.001 * 672.0 / february).min(1.0);
+        assert!(cap < 1.0, "the cap binds in this example");
+        let expected = (1.0 - 0.7) * 0.3 * cap * february;
+        let heating = sunroom_gains_kwh(&input, 1, Balance::Heating);
+        assert!((heating - expected).abs() < 1e-9, "{heating} vs {expected}");
+        assert!(heating < equal, "a colder neighbour lowers the cap");
+        // The cooling balance has no cap.
+        let cooling = sunroom_gains_kwh(&input, 6, Balance::Cooling);
+        input.sunrooms[0].bordering_zones.clear();
+        assert_eq!(cooling, sunroom_gains_kwh(&input, 6, Balance::Cooling));
+    }
+
+    /// Review 54: the 7.38 list of bordering zones comes in through the API
+    /// as well. A negative H_zi,j;ztu, a setpoint outside any table 7.13
+    /// value or overflowing values (1e308 and −1e308 give ∞ − ∞ = NaN in
+    /// the cap) are refused instead of producing a NaN gain.
+    #[test]
+    fn invalid_bordering_zones_are_refused() {
+        let zone = |id: &str, h: f64, setpoint: f64| SunroomBorderingZone {
+            zone_id: id.into(),
+            conductance_w_per_k: h,
+            heating_setpoint_c: setpoint,
+        };
+        let with = |zones: Vec<SunroomBorderingZone>| {
+            let mut input = sample();
+            input.sunrooms.push(Sunroom {
+                id: "atrium".into(),
+                glazing_g_heating: 0.55,
+                glazing_g_cooling: 0.35,
+                exterior_frame_fraction: 0.25,
+                reduction_factor: 0.7,
+                zone_conductance_w_per_k: 6.0,
+                distribution_factor: 0.3,
+                bordering_zones: zones,
+                surfaces: vec![SunroomSurface {
+                    area_m2: 30.0,
+                    absorptance: 0.7,
+                    azimuth_deg: 180.0,
+                    tilt_deg: 0.0,
+                }],
+                source_reference: "drawing".into(),
+            });
+            assess_monthly_demand(&input)
+        };
+        let valid = with(vec![zone("z1", 6.0, 20.0), zone("z2", 14.0, 16.0)]);
+        assert!(
+            !valid
+                .issues
+                .iter()
+                .any(|item| item.code == "sunroom_invalid"),
+            "{:?}",
+            valid.issues
+        );
+        for zones in [
+            vec![zone("z1", -6.0, 20.0)],
+            vec![zone("z1", 1e308, 20.0), zone("z2", -1e308, 20.0)],
+            vec![zone("z1", 6.0, 1e308)],
+            vec![zone("z1", 6.0, 20.0), zone("z1", 14.0, 16.0)],
+        ] {
+            let result = with(zones.clone());
+            assert!(
+                result
+                    .issues
+                    .iter()
+                    .any(|item| item.code == "sunroom_invalid"
+                        && item.path == "sunrooms[0].borderingZones"),
+                "{zones:?}: {:?}",
+                result.issues
+            );
+            assert!(crate::finite::first_non_finite(&result).is_none());
+        }
     }
 }

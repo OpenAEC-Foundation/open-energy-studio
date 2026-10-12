@@ -61,6 +61,9 @@ i18next.use(initReactI18next).init({
   },
   lng: getStoredLocale(),
   fallbackLng: 'en',
+  // One namespace only. Keys may hold a colon (`device.external_screen:dark`),
+  // which i18next would otherwise read as a namespace prefix and show "dark".
+  nsSeparator: false,
   interpolation: {
     escapeValue: false,
   },

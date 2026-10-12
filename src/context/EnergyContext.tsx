@@ -2,7 +2,8 @@ import React, { createContext, useContext, useEffect, useReducer, useRef, useCal
 import { normalizeProject } from '../core/energy/normalizeProject';
 import { applyWindowTypes, detachWindowType } from '../core/energy/windowTypes';
 import { saveDocumentsToLibrary } from '../core/io/projectLibrary';
-import type { NormVersion } from '../core/nta/KernelClient';
+import type { NormVersion, NtaEvidenceItem } from '../core/nta/KernelClient';
+import { appendEvidence } from '../core/nta/Evidence';
 import {
   IProject,
   IZone,
@@ -55,6 +56,12 @@ export type EnergyAction =
   // Project-level
   | { type: 'SET_PROJECT'; payload: IProject }
   | { type: 'UPDATE_PROJECT_INFO'; payload: Partial<Pick<IProject, 'name' | 'description' | 'buildingFunction' | 'address' | 'city' | 'registration'>> }
+  /**
+   * Adds evidence to the register of the project as it is when the action
+   * runs (not as it was when the files were chosen), so a slow file read
+   * never overwrites entries or registration edits made meanwhile.
+   */
+  | { type: 'ADD_EVIDENCE'; payload: NtaEvidenceItem[] }
   | { type: 'SET_UNHEATED_SPACES'; payload: NonNullable<IProject['unheatedSpaces']> }
   | { type: 'SET_NTA_CALCULATION'; payload: IProject['ntaCalculation'] }
   | { type: 'SET_MAATWERKADVIES'; payload: IProject['maatwerkadvies'] }
@@ -437,6 +444,17 @@ function applyEnergyAction(state: EnergyState, action: EnergyAction): EnergyStat
         project: { ...state.project, ...action.payload },
         isDirty: true,
       };
+
+    case 'ADD_EVIDENCE': {
+      if (action.payload.length === 0) return state;
+      const registration = state.project.registration ?? {};
+      const evidence = appendEvidence(registration.evidence ?? [], action.payload);
+      return {
+        ...state,
+        project: { ...state.project, registration: { ...registration, evidence } },
+        isDirty: true,
+      };
+    }
 
     case 'SET_UNHEATED_SPACES':
       return { ...state, project: { ...state.project, unheatedSpaces: action.payload }, isDirty: true };

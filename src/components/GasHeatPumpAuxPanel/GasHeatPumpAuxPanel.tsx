@@ -4,6 +4,7 @@ import type { INtaHeatPumpInput } from '../../core/energy/types';
 import { diagnoseGasHeatPumpAuxDraftWithRust, type GasHeatPumpAuxDraftAssessment, type GasHeatPumpAuxDraftInput } from '../../core/nta/KernelClient';
 import { useI18n } from '../../i18n/i18n';
 import '../HeatPumpForfaitMonthlyPanel/HeatPumpForfaitMonthlyPanel.css';
+import { DecimalInput } from '../ui';
 
 const monthNumbers = Array.from({ length: 12 }, (_, index) => index + 1);
 const blank = () => monthNumbers.map(() => '');
@@ -75,7 +76,7 @@ export function GasHeatPumpAuxPanel({ pump, onSave }: {
     <p>{t('kernel.gasAux.capacity')}: {forfait.thermalCapacityKw} kW · {t('kernel.gasAux.coefficients')}</p>
     <div className="heat-pump-forfait-monthly-references">
       <label>{t('kernel.gasAux.capacityReference')}<input value={capacityReference} onChange={(event) => { invalidate(); setCapacityReference(event.target.value); }} /></label>
-      <label>{t('kernel.gasAux.share')}<input type="number" min="0" max="1" step="any" value={share} onChange={(event) => { invalidate(); setShare(event.target.value); }} /></label>
+      <label>{t('kernel.gasAux.share')}<DecimalInput min="0" max="1" step="any" value={share} onChange={(event) => { invalidate(); setShare(event.target.value); }} /></label>
       <label>{t('kernel.gasAux.shareReference')}<input value={shareReference} onChange={(event) => { invalidate(); setShareReference(event.target.value); }} /></label>
       <label>{t('kernel.gasAux.hoursReference')}<input value={hoursReference} onChange={(event) => { invalidate(); setHoursReference(event.target.value); }} /></label>
       <label>{t('kernel.gasAux.outputReference')}<input value={outputReference} onChange={(event) => { invalidate(); setOutputReference(event.target.value); }} /></label>
@@ -84,9 +85,9 @@ export function GasHeatPumpAuxPanel({ pump, onSave }: {
       <th>{t('kernel.gasAux.month')}</th><th>{t('kernel.gasAux.hours')}</th><th>{t('kernel.gasAux.output')}</th>
     </tr></thead><tbody>{monthNumbers.map((month, index) => <tr key={month}>
       <th scope="row">{month}</th>
-      <td><input type="number" min="0" max="744" step="any" aria-label={`${t('kernel.gasAux.hours')} ${month}`}
+      <td><DecimalInput min="0" max="744" step="any" aria-label={`${t('kernel.gasAux.hours')} ${month}`}
         value={hours[index]} onChange={(event) => update(hours, setHours, index, event.target.value)} /></td>
-      <td><input type="number" min="0" step="any" aria-label={`${t('kernel.gasAux.output')} ${month}`}
+      <td><DecimalInput min="0" step="any" aria-label={`${t('kernel.gasAux.output')} ${month}`}
         value={output[index]} onChange={(event) => update(output, setOutput, index, event.target.value)} /></td>
     </tr>)}</tbody></table></div>
     <button type="button" disabled={loading} onClick={() => void diagnose(false)}>{t('kernel.gasAux.calculate')}</button>

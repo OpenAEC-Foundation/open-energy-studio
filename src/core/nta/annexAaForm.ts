@@ -18,7 +18,7 @@ export const ANNEX_AA_ZONES_PATH = ['activeCooling', 'capacity', 'zoneCalculatio
 
 /**
  * The kernel's edition profile for annex AA (`norm_versions`): `route` is
- * `annex_aa_route` (5.7.1 offers annex AA as capacity evidence: 2025+C1 and
+ * `cooling_capacity_methods_route` (5.7.1 offers annex AA as capacity evidence: 2025+C1 and
  * 2024), `monthly2024` is `AnnexAaVariant::Monthly2024` (SWM and roof areas:
  * 2024 and the older editions that build on it). One helper so the form and
  * its 2024 fields follow the same rule.

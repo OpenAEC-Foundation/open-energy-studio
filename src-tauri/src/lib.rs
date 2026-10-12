@@ -1,5 +1,8 @@
 use tauri::image::Image;
 use tauri::Manager;
+use tauri_plugin_fs::FsExt;
+
+mod project_files;
 
 use nta8800_core::norm_versions::{self, request, NormVersion};
 use serde_json::Value;
@@ -74,12 +77,40 @@ fn in_input_edition<T: serde::Serialize>(
     stamped(version, result)
 }
 
+/// Runs a kernel command off the main thread, so the window stays
+/// responsive, and turns a panic into a `kernel_panic` error instead of
+/// ending the app with every unsaved document. The edition is set inside
+/// `run` by `with_version`, on the same blocking thread, and restored there
+/// even on a panic.
+async fn off_main<F>(run: F) -> Result<Value, String>
+where
+    F: FnOnce() -> Result<Value, String> + Send + 'static,
+{
+    tauri::async_runtime::spawn_blocking(move || {
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(run)).unwrap_or_else(|_| {
+            Err("kernel_panic: the calculation stopped unexpectedly".to_string())
+        })
+    })
+    .await
+    .map_err(|error| format!("kernel_panic: {error}"))?
+}
+
 fn typed<T: serde::de::DeserializeOwned>(input: &Value) -> Result<T, String> {
     serde_json::from_value(input.clone()).map_err(|error| error.to_string())
 }
 
 #[tauri::command]
-fn validate_nta_project(mut project: Value, norm_version: Option<Value>) -> Result<Value, String> {
+async fn validate_nta_project(
+    project: Value,
+    norm_version: Option<Value>,
+) -> Result<Value, String> {
+    off_main(move || validate_nta_project_blocking(project, norm_version)).await
+}
+
+fn validate_nta_project_blocking(
+    mut project: Value,
+    norm_version: Option<Value>,
+) -> Result<Value, String> {
     in_input_edition(
         &mut project,
         "project",
@@ -91,7 +122,14 @@ fn validate_nta_project(mut project: Value, norm_version: Option<Value>) -> Resu
 
 /// Reference cases are compared in the current edition only.
 #[tauri::command]
-fn compare_gas_heat_pump_chain_diagnostic(
+async fn compare_gas_heat_pump_chain_diagnostic(
+    case: nta8800_core::gas_heat_pump_chain_reference::GasChainDiagnosticCase,
+    norm_version: Option<Value>,
+) -> Result<Value, String> {
+    off_main(move || compare_gas_heat_pump_chain_diagnostic_blocking(case, norm_version)).await
+}
+
+fn compare_gas_heat_pump_chain_diagnostic_blocking(
     case: nta8800_core::gas_heat_pump_chain_reference::GasChainDiagnosticCase,
     norm_version: Option<Value>,
 ) -> Result<Value, String> {
@@ -107,7 +145,14 @@ fn compare_gas_heat_pump_chain_diagnostic(
 }
 
 #[tauri::command]
-fn calculate_constructions(
+async fn calculate_constructions(
+    input: nta8800_core::envelope_elements::EnvelopeInput,
+    norm_version: Option<Value>,
+) -> Result<Value, String> {
+    off_main(move || calculate_constructions_blocking(input, norm_version)).await
+}
+
+fn calculate_constructions_blocking(
     input: nta8800_core::envelope_elements::EnvelopeInput,
     norm_version: Option<Value>,
 ) -> Result<Value, String> {
@@ -117,7 +162,14 @@ fn calculate_constructions(
 }
 
 #[tauri::command]
-fn assess_residential_survey(
+async fn assess_residential_survey(
+    survey: Value,
+    norm_version: Option<Value>,
+) -> Result<Value, String> {
+    off_main(move || assess_residential_survey_blocking(survey, norm_version)).await
+}
+
+fn assess_residential_survey_blocking(
     mut survey: Value,
     norm_version: Option<Value>,
 ) -> Result<Value, String> {
@@ -135,7 +187,17 @@ fn assess_residential_survey(
 }
 
 #[tauri::command]
-fn assess_utility_survey(mut survey: Value, norm_version: Option<Value>) -> Result<Value, String> {
+async fn assess_utility_survey(
+    survey: Value,
+    norm_version: Option<Value>,
+) -> Result<Value, String> {
+    off_main(move || assess_utility_survey_blocking(survey, norm_version)).await
+}
+
+fn assess_utility_survey_blocking(
+    mut survey: Value,
+    norm_version: Option<Value>,
+) -> Result<Value, String> {
     in_input_edition(
         &mut survey,
         "survey",
@@ -151,7 +213,14 @@ fn assess_utility_survey(mut survey: Value, norm_version: Option<Value>) -> Resu
 
 /// Every variant is calculated in the base situation's edition.
 #[tauri::command]
-fn assess_maatwerkadvies(mut input: Value, norm_version: Option<Value>) -> Result<Value, String> {
+async fn assess_maatwerkadvies(input: Value, norm_version: Option<Value>) -> Result<Value, String> {
+    off_main(move || assess_maatwerkadvies_blocking(input, norm_version)).await
+}
+
+fn assess_maatwerkadvies_blocking(
+    mut input: Value,
+    norm_version: Option<Value>,
+) -> Result<Value, String> {
     let pointer = match input.pointer("/base/kind").and_then(Value::as_str) {
         Some("building") => "/base/input/normVersion",
         _ => "/base/project/ntaCalculation/normVersion",
@@ -164,7 +233,15 @@ fn assess_maatwerkadvies(mut input: Value, norm_version: Option<Value>) -> Resul
 /// A relabel stays in the original's edition (BRL 9500-W §4.2.4); both
 /// projects get the requested edition.
 #[tauri::command]
-fn assess_relabel(
+async fn assess_relabel(
+    original: Value,
+    current: Value,
+    norm_version: Option<Value>,
+) -> Result<Value, String> {
+    off_main(move || assess_relabel_blocking(original, current, norm_version)).await
+}
+
+fn assess_relabel_blocking(
     mut original: Value,
     mut current: Value,
     norm_version: Option<Value>,
@@ -181,7 +258,14 @@ fn assess_relabel(
 }
 
 #[tauri::command]
-fn calculate_building_performance(
+async fn calculate_building_performance(
+    input: Value,
+    norm_version: Option<Value>,
+) -> Result<Value, String> {
+    off_main(move || calculate_building_performance_blocking(input, norm_version)).await
+}
+
+fn calculate_building_performance_blocking(
     mut input: Value,
     norm_version: Option<Value>,
 ) -> Result<Value, String> {
@@ -196,7 +280,14 @@ fn kernel_interpretations() -> Vec<nta8800_core::interpretations::Interpretation
 }
 
 #[tauri::command]
-fn calculate_project_performance(
+async fn calculate_project_performance(
+    project: Value,
+    norm_version: Option<Value>,
+) -> Result<Value, String> {
+    off_main(move || calculate_project_performance_blocking(project, norm_version)).await
+}
+
+fn calculate_project_performance_blocking(
     mut project: Value,
     norm_version: Option<Value>,
 ) -> Result<Value, String> {
@@ -209,8 +300,34 @@ fn calculate_project_performance(
     )
 }
 
+/// What changes for the project in edition `norm_version` (default 2025+C1);
+/// the project keeps its own edition.
 #[tauri::command]
-fn diagnose_declared_heating_table(
+async fn compare_project_editions(
+    project: Value,
+    norm_version: Option<Value>,
+) -> Result<Value, String> {
+    off_main(move || compare_project_editions_blocking(project, norm_version)).await
+}
+
+fn compare_project_editions_blocking(
+    project: Value,
+    norm_version: Option<Value>,
+) -> Result<Value, String> {
+    let target = requested(norm_version)?.unwrap_or_default();
+    let report = nta8800_core::edition_switch::compare_project_editions(&project, target);
+    serde_json::to_value(report).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+async fn diagnose_declared_heating_table(
+    input: nta8800_core::declared_heating_table::DeclaredHeatingTableInput,
+    norm_version: Option<Value>,
+) -> Result<Value, String> {
+    off_main(move || diagnose_declared_heating_table_blocking(input, norm_version)).await
+}
+
+fn diagnose_declared_heating_table_blocking(
     input: nta8800_core::declared_heating_table::DeclaredHeatingTableInput,
     norm_version: Option<Value>,
 ) -> Result<Value, String> {
@@ -220,7 +337,14 @@ fn diagnose_declared_heating_table(
 }
 
 #[tauri::command]
-fn diagnose_forfait_heat_pump_draft(
+async fn diagnose_forfait_heat_pump_draft(
+    input: nta8800_core::forfait_heat_pump_draft::ForfaitHeatPumpDraftInput,
+    norm_version: Option<Value>,
+) -> Result<Value, String> {
+    off_main(move || diagnose_forfait_heat_pump_draft_blocking(input, norm_version)).await
+}
+
+fn diagnose_forfait_heat_pump_draft_blocking(
     input: nta8800_core::forfait_heat_pump_draft::ForfaitHeatPumpDraftInput,
     norm_version: Option<Value>,
 ) -> Result<Value, String> {
@@ -230,7 +354,14 @@ fn diagnose_forfait_heat_pump_draft(
 }
 
 #[tauri::command]
-fn diagnose_gas_heat_pump_forfait_draft(
+async fn diagnose_gas_heat_pump_forfait_draft(
+    input: nta8800_core::gas_heat_pump_forfait_draft::GasHeatPumpForfaitDraftInput,
+    norm_version: Option<Value>,
+) -> Result<Value, String> {
+    off_main(move || diagnose_gas_heat_pump_forfait_draft_blocking(input, norm_version)).await
+}
+
+fn diagnose_gas_heat_pump_forfait_draft_blocking(
     input: nta8800_core::gas_heat_pump_forfait_draft::GasHeatPumpForfaitDraftInput,
     norm_version: Option<Value>,
 ) -> Result<Value, String> {
@@ -240,7 +371,14 @@ fn diagnose_gas_heat_pump_forfait_draft(
 }
 
 #[tauri::command]
-fn diagnose_gas_heat_pump_aux_draft(
+async fn diagnose_gas_heat_pump_aux_draft(
+    input: nta8800_core::gas_heat_pump_aux_draft::GasHeatPumpAuxDraftInput,
+    norm_version: Option<Value>,
+) -> Result<Value, String> {
+    off_main(move || diagnose_gas_heat_pump_aux_draft_blocking(input, norm_version)).await
+}
+
+fn diagnose_gas_heat_pump_aux_draft_blocking(
     input: nta8800_core::gas_heat_pump_aux_draft::GasHeatPumpAuxDraftInput,
     norm_version: Option<Value>,
 ) -> Result<Value, String> {
@@ -250,7 +388,14 @@ fn diagnose_gas_heat_pump_aux_draft(
 }
 
 #[tauri::command]
-fn diagnose_gas_heat_pump_monthly_draft(
+async fn diagnose_gas_heat_pump_monthly_draft(
+    input: nta8800_core::gas_heat_pump_monthly_draft::GasHeatPumpMonthlyDraftInput,
+    norm_version: Option<Value>,
+) -> Result<Value, String> {
+    off_main(move || diagnose_gas_heat_pump_monthly_draft_blocking(input, norm_version)).await
+}
+
+fn diagnose_gas_heat_pump_monthly_draft_blocking(
     input: nta8800_core::gas_heat_pump_monthly_draft::GasHeatPumpMonthlyDraftInput,
     norm_version: Option<Value>,
 ) -> Result<Value, String> {
@@ -260,7 +405,14 @@ fn diagnose_gas_heat_pump_monthly_draft(
 }
 
 #[tauri::command]
-fn diagnose_gas_heat_pump_chain_draft(
+async fn diagnose_gas_heat_pump_chain_draft(
+    input: nta8800_core::gas_heat_pump_chain_draft::GasHeatPumpChainDraftInput,
+    norm_version: Option<Value>,
+) -> Result<Value, String> {
+    off_main(move || diagnose_gas_heat_pump_chain_draft_blocking(input, norm_version)).await
+}
+
+fn diagnose_gas_heat_pump_chain_draft_blocking(
     input: nta8800_core::gas_heat_pump_chain_draft::GasHeatPumpChainDraftInput,
     norm_version: Option<Value>,
 ) -> Result<Value, String> {
@@ -270,7 +422,14 @@ fn diagnose_gas_heat_pump_chain_draft(
 }
 
 #[tauri::command]
-fn diagnose_gas_collective_source_draft(
+async fn diagnose_gas_collective_source_draft(
+    input: nta8800_core::gas_collective_source_draft::GasCollectiveSourceDraftInput,
+    norm_version: Option<Value>,
+) -> Result<Value, String> {
+    off_main(move || diagnose_gas_collective_source_draft_blocking(input, norm_version)).await
+}
+
+fn diagnose_gas_collective_source_draft_blocking(
     input: nta8800_core::gas_collective_source_draft::GasCollectiveSourceDraftInput,
     norm_version: Option<Value>,
 ) -> Result<Value, String> {
@@ -280,7 +439,14 @@ fn diagnose_gas_collective_source_draft(
 }
 
 #[tauri::command]
-fn diagnose_forfait_heat_pump_monthly_draft(
+async fn diagnose_forfait_heat_pump_monthly_draft(
+    input: nta8800_core::forfait_heat_pump_monthly_draft::ForfaitHeatPumpMonthlyDraftInput,
+    norm_version: Option<Value>,
+) -> Result<Value, String> {
+    off_main(move || diagnose_forfait_heat_pump_monthly_draft_blocking(input, norm_version)).await
+}
+
+fn diagnose_forfait_heat_pump_monthly_draft_blocking(
     input: nta8800_core::forfait_heat_pump_monthly_draft::ForfaitHeatPumpMonthlyDraftInput,
     norm_version: Option<Value>,
 ) -> Result<Value, String> {
@@ -292,7 +458,14 @@ fn diagnose_forfait_heat_pump_monthly_draft(
 }
 
 #[tauri::command]
-fn diagnose_generator_dispatch_draft(
+async fn diagnose_generator_dispatch_draft(
+    input: nta8800_core::generator_dispatch_draft::GeneratorDispatchDraftInput,
+    norm_version: Option<Value>,
+) -> Result<Value, String> {
+    off_main(move || diagnose_generator_dispatch_draft_blocking(input, norm_version)).await
+}
+
+fn diagnose_generator_dispatch_draft_blocking(
     input: nta8800_core::generator_dispatch_draft::GeneratorDispatchDraftInput,
     norm_version: Option<Value>,
 ) -> Result<Value, String> {
@@ -302,7 +475,14 @@ fn diagnose_generator_dispatch_draft(
 }
 
 #[tauri::command]
-fn diagnose_hybrid_heat_pump_monthly_draft(
+async fn diagnose_hybrid_heat_pump_monthly_draft(
+    input: nta8800_core::hybrid_heat_pump_monthly_draft::HybridHeatPumpMonthlyDraftInput,
+    norm_version: Option<Value>,
+) -> Result<Value, String> {
+    off_main(move || diagnose_hybrid_heat_pump_monthly_draft_blocking(input, norm_version)).await
+}
+
+fn diagnose_hybrid_heat_pump_monthly_draft_blocking(
     input: nta8800_core::hybrid_heat_pump_monthly_draft::HybridHeatPumpMonthlyDraftInput,
     norm_version: Option<Value>,
 ) -> Result<Value, String> {
@@ -312,7 +492,14 @@ fn diagnose_hybrid_heat_pump_monthly_draft(
 }
 
 #[tauri::command]
-fn diagnose_boiler_forfait_draft(
+async fn diagnose_boiler_forfait_draft(
+    input: nta8800_core::boiler_forfait_draft::BoilerForfaitDraftInput,
+    norm_version: Option<Value>,
+) -> Result<Value, String> {
+    off_main(move || diagnose_boiler_forfait_draft_blocking(input, norm_version)).await
+}
+
+fn diagnose_boiler_forfait_draft_blocking(
     input: nta8800_core::boiler_forfait_draft::BoilerForfaitDraftInput,
     norm_version: Option<Value>,
 ) -> Result<Value, String> {
@@ -322,7 +509,14 @@ fn diagnose_boiler_forfait_draft(
 }
 
 #[tauri::command]
-fn diagnose_boiler_forfait_monthly_draft(
+async fn diagnose_boiler_forfait_monthly_draft(
+    input: nta8800_core::boiler_forfait_draft::BoilerForfaitMonthlyDraftInput,
+    norm_version: Option<Value>,
+) -> Result<Value, String> {
+    off_main(move || diagnose_boiler_forfait_monthly_draft_blocking(input, norm_version)).await
+}
+
+fn diagnose_boiler_forfait_monthly_draft_blocking(
     input: nta8800_core::boiler_forfait_draft::BoilerForfaitMonthlyDraftInput,
     norm_version: Option<Value>,
 ) -> Result<Value, String> {
@@ -332,7 +526,14 @@ fn diagnose_boiler_forfait_monthly_draft(
 }
 
 #[tauri::command]
-fn diagnose_declared_dhw(
+async fn diagnose_declared_dhw(
+    input: nta8800_core::heat_pumps::HeatPumpInput,
+    norm_version: Option<Value>,
+) -> Result<Value, String> {
+    off_main(move || diagnose_declared_dhw_blocking(input, norm_version)).await
+}
+
+fn diagnose_declared_dhw_blocking(
     input: nta8800_core::heat_pumps::HeatPumpInput,
     norm_version: Option<Value>,
 ) -> Result<Value, String> {
@@ -342,7 +543,14 @@ fn diagnose_declared_dhw(
 }
 
 #[tauri::command]
-fn diagnose_final_energy_draft(
+async fn diagnose_final_energy_draft(
+    input: nta8800_core::final_energy_draft::FinalEnergyDraftInput,
+    norm_version: Option<Value>,
+) -> Result<Value, String> {
+    off_main(move || diagnose_final_energy_draft_blocking(input, norm_version)).await
+}
+
+fn diagnose_final_energy_draft_blocking(
     input: nta8800_core::final_energy_draft::FinalEnergyDraftInput,
     norm_version: Option<Value>,
 ) -> Result<Value, String> {
@@ -352,7 +560,14 @@ fn diagnose_final_energy_draft(
 }
 
 #[tauri::command]
-fn calculate_monthly_demand(
+async fn calculate_monthly_demand(
+    input: nta8800_core::monthly_demand::MonthlyDemandInput,
+    norm_version: Option<Value>,
+) -> Result<Value, String> {
+    off_main(move || calculate_monthly_demand_blocking(input, norm_version)).await
+}
+
+fn calculate_monthly_demand_blocking(
     input: nta8800_core::monthly_demand::MonthlyDemandInput,
     norm_version: Option<Value>,
 ) -> Result<Value, String> {
@@ -362,7 +577,14 @@ fn calculate_monthly_demand(
 }
 
 #[tauri::command]
-fn calculate_ventilation(
+async fn calculate_ventilation(
+    input: nta8800_core::ventilation::VentilationInput,
+    norm_version: Option<Value>,
+) -> Result<Value, String> {
+    off_main(move || calculate_ventilation_blocking(input, norm_version)).await
+}
+
+fn calculate_ventilation_blocking(
     input: nta8800_core::ventilation::VentilationInput,
     norm_version: Option<Value>,
 ) -> Result<Value, String> {
@@ -372,7 +594,14 @@ fn calculate_ventilation(
 }
 
 #[tauri::command]
-fn calculate_space_heating_chain(
+async fn calculate_space_heating_chain(
+    input: nta8800_core::space_heating_chain::SpaceHeatingChainInput,
+    norm_version: Option<Value>,
+) -> Result<Value, String> {
+    off_main(move || calculate_space_heating_chain_blocking(input, norm_version)).await
+}
+
+fn calculate_space_heating_chain_blocking(
     input: nta8800_core::space_heating_chain::SpaceHeatingChainInput,
     norm_version: Option<Value>,
 ) -> Result<Value, String> {
@@ -382,7 +611,14 @@ fn calculate_space_heating_chain(
 }
 
 #[tauri::command]
-fn diagnose_epus_draft(
+async fn diagnose_epus_draft(
+    input: nta8800_core::epus_draft::EpusDraftInput,
+    norm_version: Option<Value>,
+) -> Result<Value, String> {
+    off_main(move || diagnose_epus_draft_blocking(input, norm_version)).await
+}
+
+fn diagnose_epus_draft_blocking(
     input: nta8800_core::epus_draft::EpusDraftInput,
     norm_version: Option<Value>,
 ) -> Result<Value, String> {
@@ -392,7 +628,14 @@ fn diagnose_epus_draft(
 }
 
 #[tauri::command]
-fn diagnose_bacs_draft(
+async fn diagnose_bacs_draft(
+    input: nta8800_core::bacs_draft::BacsDraftInput,
+    norm_version: Option<Value>,
+) -> Result<Value, String> {
+    off_main(move || diagnose_bacs_draft_blocking(input, norm_version)).await
+}
+
+fn diagnose_bacs_draft_blocking(
     input: nta8800_core::bacs_draft::BacsDraftInput,
     norm_version: Option<Value>,
 ) -> Result<Value, String> {
@@ -402,7 +645,14 @@ fn diagnose_bacs_draft(
 }
 
 #[tauri::command]
-fn diagnose_indicators_draft(
+async fn diagnose_indicators_draft(
+    input: nta8800_core::indicators_draft::IndicatorsDraftInput,
+    norm_version: Option<Value>,
+) -> Result<Value, String> {
+    off_main(move || diagnose_indicators_draft_blocking(input, norm_version)).await
+}
+
+fn diagnose_indicators_draft_blocking(
     input: nta8800_core::indicators_draft::IndicatorsDraftInput,
     norm_version: Option<Value>,
 ) -> Result<Value, String> {
@@ -412,7 +662,14 @@ fn diagnose_indicators_draft(
 }
 
 #[tauri::command]
-fn diagnose_heating_aux_draft(
+async fn diagnose_heating_aux_draft(
+    input: nta8800_core::heating_aux_draft::HeatingAuxDraftInput,
+    norm_version: Option<Value>,
+) -> Result<Value, String> {
+    off_main(move || diagnose_heating_aux_draft_blocking(input, norm_version)).await
+}
+
+fn diagnose_heating_aux_draft_blocking(
     input: nta8800_core::heating_aux_draft::HeatingAuxDraftInput,
     norm_version: Option<Value>,
 ) -> Result<Value, String> {
@@ -422,7 +679,14 @@ fn diagnose_heating_aux_draft(
 }
 
 #[tauri::command]
-fn diagnose_heating_aux_measured_draft(
+async fn diagnose_heating_aux_measured_draft(
+    input: nta8800_core::heating_aux_draft::HeatingAuxMeasuredDraftInput,
+    norm_version: Option<Value>,
+) -> Result<Value, String> {
+    off_main(move || diagnose_heating_aux_measured_draft_blocking(input, norm_version)).await
+}
+
+fn diagnose_heating_aux_measured_draft_blocking(
     input: nta8800_core::heating_aux_draft::HeatingAuxMeasuredDraftInput,
     norm_version: Option<Value>,
 ) -> Result<Value, String> {
@@ -713,6 +977,57 @@ fn play_system_beep() {
     }
 }
 
+fn recent_directory(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    app.path()
+        .app_data_dir()
+        .map_err(|failure| project_files::error("app_data_unavailable", failure))
+}
+
+fn in_dialog_scope(app: &tauri::AppHandle, path: &std::path::Path) -> bool {
+    app.try_fs_scope()
+        .is_some_and(|scope| scope.is_allowed(path))
+}
+
+/// Saves a project file atomically (temporary file, flush, rename, `.bak`).
+/// Only a `.json` file picked in a dialog this session or on the recent list
+/// is written; the path is remembered for later sessions.
+#[tauri::command]
+async fn save_project(app: tauri::AppHandle, path: String, text: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let path = std::path::PathBuf::from(path);
+        project_files::check_project_path(&path)?;
+        let directory = recent_directory(&app)?;
+        let mut recent = project_files::RecentFiles::load(&directory);
+        project_files::allowed(&path, in_dialog_scope(&app, &path), &recent)?;
+        project_files::atomic_write(&path, &text)
+            .map_err(|failure| project_files::error("project_save_failed", failure))?;
+        recent.remember(&path);
+        let _ = recent.store(&directory);
+        Ok(())
+    })
+    .await
+    .map_err(|failure| project_files::error("project_save_failed", failure))?
+}
+
+/// Reads a project file picked in a dialog this session or on the recent
+/// list (also after a restart). A missing file gives
+/// `project_file_not_found`; only then should the app forget the entry.
+#[tauri::command]
+async fn read_project_file(app: tauri::AppHandle, path: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let path = std::path::PathBuf::from(path);
+        let directory = recent_directory(&app)?;
+        let mut recent = project_files::RecentFiles::load(&directory);
+        project_files::allowed(&path, in_dialog_scope(&app, &path), &recent)?;
+        let text = project_files::read_project(&path)?;
+        recent.remember(&path);
+        let _ = recent.store(&directory);
+        Ok(text)
+    })
+    .await
+    .map_err(|failure| project_files::error("project_file_unreadable", failure))?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -720,6 +1035,8 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .invoke_handler(tauri::generate_handler![
             play_system_beep,
+            save_project,
+            read_project_file,
             list_printers,
             open_printer_properties,
             validate_nta_project,
@@ -749,6 +1066,7 @@ pub fn run() {
             calculate_constructions,
             calculate_building_performance,
             calculate_project_performance,
+            compare_project_editions,
             kernel_interpretations,
             diagnose_bacs_draft,
             diagnose_indicators_draft,
@@ -794,36 +1112,81 @@ mod tests {
     #[test]
     fn diagnostic_runs_in_the_requested_edition() {
         let input = || serde_json::from_str(CHAIN).unwrap();
-        let current = calculate_space_heating_chain(input(), None).unwrap();
+        let current = calculate_space_heating_chain_blocking(input(), None).unwrap();
         assert_eq!(current["normVersion"], "2025+C1");
         assert_eq!(current["status"], "calculated_unverified");
-        let legacy = calculate_space_heating_chain(input(), Some(json!("2024"))).unwrap();
+        let legacy = calculate_space_heating_chain_blocking(input(), Some(json!("2024"))).unwrap();
         assert_eq!(legacy["normVersion"], "2024");
         assert_eq!(legacy["targetNormVersion"], "NTA 8800:2024 met INT-V1:2024");
         assert_eq!(legacy["status"], "calculated_legacy_edition");
-        let error = calculate_space_heating_chain(input(), Some(json!("2019"))).unwrap_err();
+        let error =
+            calculate_space_heating_chain_blocking(input(), Some(json!("2019"))).unwrap_err();
         assert!(error.starts_with("invalid_norm_version: "), "{error}");
     }
 
     #[test]
     fn project_gets_the_requested_edition_without_contradicting_it() {
-        let result = calculate_project_performance(fixture(DWELLING), Some(json!("2022"))).unwrap();
+        let result =
+            calculate_project_performance_blocking(fixture(DWELLING), Some(json!("2022"))).unwrap();
         assert_eq!(result["normVersion"], "2022");
         assert_eq!(result["status"], "calculated_legacy_edition");
         assert_eq!(result["registrationEligible"], false);
-        let current = calculate_project_performance(fixture(DWELLING), None).unwrap();
+        let current = calculate_project_performance_blocking(fixture(DWELLING), None).unwrap();
         assert_eq!(current["normVersion"], "2025+C1");
         let mut project = fixture(DWELLING);
         project["ntaCalculation"]["normVersion"] = json!("2023");
-        let error = calculate_project_performance(project, Some(json!("2024"))).unwrap_err();
+        let error =
+            calculate_project_performance_blocking(project, Some(json!("2024"))).unwrap_err();
         assert!(error.starts_with("norm_version_conflict: "), "{error}");
     }
 
     #[test]
-    fn validation_follows_the_project_edition() {
-        let result = validate_nta_project(fixture(DWELLING), Some(json!("2023"))).unwrap();
-        assert_eq!(result["normVersion"], "2023");
-        let error = validate_nta_project(fixture(DWELLING), Some(json!(2023))).unwrap_err();
+    fn edition_comparison_keeps_the_project_and_targets_the_request() {
+        let report =
+            compare_project_editions_blocking(fixture(DWELLING), Some(json!("2022"))).unwrap();
+        assert_eq!(report["fromNormVersion"], "2025+C1");
+        assert_eq!(report["toNormVersion"], "2022");
+        assert_eq!(
+            report["adjustedProject"]["ntaCalculation"]["normVersion"],
+            "2022"
+        );
+        let error =
+            compare_project_editions_blocking(fixture(DWELLING), Some(json!("2019"))).unwrap_err();
         assert!(error.starts_with("invalid_norm_version: "), "{error}");
+    }
+
+    #[test]
+    fn validation_follows_the_project_edition() {
+        let result = validate_nta_project_blocking(fixture(DWELLING), Some(json!("2023"))).unwrap();
+        assert_eq!(result["normVersion"], "2023");
+        let error =
+            validate_nta_project_blocking(fixture(DWELLING), Some(json!(2023))).unwrap_err();
+        assert!(error.starts_with("invalid_norm_version: "), "{error}");
+    }
+
+    #[test]
+    fn a_panicking_command_becomes_an_error() {
+        let result = tauri::async_runtime::block_on(off_main(|| panic!("boom")));
+        assert_eq!(
+            result.unwrap_err(),
+            "kernel_panic: the calculation stopped unexpectedly"
+        );
+        // The thread-local edition is back to the default afterwards.
+        let edition = tauri::async_runtime::block_on(off_main(|| {
+            Ok(serde_json::json!(norm_versions::current().label()))
+        }))
+        .unwrap();
+        assert_eq!(edition, serde_json::json!(NormVersion::default().label()));
+    }
+
+    #[test]
+    fn commands_run_off_the_main_thread_with_the_edition() {
+        let input = serde_json::from_str(CHAIN).unwrap();
+        let legacy = tauri::async_runtime::block_on(calculate_space_heating_chain(
+            input,
+            Some(json!("2024")),
+        ))
+        .unwrap();
+        assert_eq!(legacy["normVersion"], "2024");
     }
 }

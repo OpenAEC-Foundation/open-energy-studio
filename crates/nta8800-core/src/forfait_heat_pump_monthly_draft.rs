@@ -123,14 +123,16 @@ pub fn assess_forfait_heat_pump_monthly_draft(
 ) -> ForfaitHeatPumpMonthlyDraftAssessment {
     let mut issues = Vec::new();
     let lookup = assess_forfait_heat_pump_draft(&input.forfait);
-    if lookup.status == "invalid" || lookup.corrected_cop.is_none() {
+    // The lookup's own issues below name the field; the summary only when
+    // none does, so one blank is one open point (review 58).
+    if (lookup.status == "invalid" || lookup.corrected_cop.is_none()) && lookup.issues.is_empty() {
         issues.push(issue("forfait_lookup_invalid", "forfait"));
     }
-    // An input the chosen edition lacks keeps its own code.
+    // Each lookup issue keeps its own code and field, so the adviser sees
+    // why the table row is refused (an edition switch can make the test
+    // standard of table 9.28 or the source-temperature class invalid).
     for item in &lookup.issues {
-        if item.code == "route_not_in_edition" {
-            issues.push(issue(item.code, format!("forfait.{}", item.path)));
-        }
+        issues.push(issue(item.code, format!("forfait.{}", item.path)));
     }
     if input.generator_output_reference.trim().is_empty() {
         issues.push(issue("source_required", "generatorOutputReference"));
@@ -212,7 +214,7 @@ pub fn assess_forfait_heat_pump_monthly_draft(
             "invalid"
         },
         scope: "public_chapter_9_draft_equation_9_62_supplied_monthly_flows_only",
-        consultation_source: DRAFT_SOURCE,
+        consultation_source: crate::norm_versions::cite(DRAFT_SOURCE),
         target_norm_version: crate::norm_versions::current_label(),
         kernel_version: KERNEL_VERSION,
         input_fingerprint: input_fingerprint(&json!(input)),
@@ -364,7 +366,13 @@ mod tests {
         assert_eq!(invalid.status, "invalid");
         assert!(invalid.monthly.is_empty());
         assert!(invalid.corrected_cop.is_none());
+        // The lookup names the correction itself; no summary next to it
+        // (review 58).
         assert!(invalid
+            .issues
+            .iter()
+            .any(|item| item.path.starts_with("forfait.")));
+        assert!(!invalid
             .issues
             .iter()
             .any(|item| item.code == "forfait_lookup_invalid"));

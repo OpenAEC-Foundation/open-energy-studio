@@ -309,6 +309,41 @@ export function linksAfterRemoval(
   });
 }
 
+/**
+ * The register after an edit that keeps every element in its place but may
+ * change ids (a renamed survey surface): each link names in `after` the
+ * element it named in `before`, so a photo stays on its renamed item.
+ */
+export function linksAfterEdit(evidence: NtaEvidenceItem[], before: unknown, after: unknown): NtaEvidenceItem[] {
+  return evidence.map((item) => {
+    if (!item.linkedPaths?.length) return item;
+    let changed = false;
+    const linkedPaths = item.linkedPaths.map((pointer) => {
+      const resolved = resolvePointer(before, pointer);
+      if (resolved == null) return pointer;
+      const moved = stablePointer(after, resolved);
+      if (moved !== pointer) changed = true;
+      return moved;
+    });
+    return changed ? { ...item, linkedPaths } : item;
+  });
+}
+
+/**
+ * The register without the links into `prefix` (a removed block such as
+ * `/basisopname`); the files stay in the register, unlinked.
+ */
+export function linksOutside(evidence: NtaEvidenceItem[], prefix: string): NtaEvidenceItem[] {
+  const inside = (pointer: string) => pointer === prefix || pointer.startsWith(`${prefix}/`);
+  return evidence.map((item) => {
+    if (!(item.linkedPaths ?? []).some(inside)) return item;
+    const linkedPaths = (item.linkedPaths ?? []).filter((pointer) => !inside(pointer));
+    if (linkedPaths.length > 0) return { ...item, linkedPaths };
+    const { linkedPaths: _removed, ...rest } = item;
+    return rest;
+  });
+}
+
 /** The items linked to a pointer (by `linkedPaths`; with `root`, any pointer naming the same place). */
 export function evidenceForPointer(evidence: NtaEvidenceItem[], pointer: string, root?: unknown): NtaEvidenceItem[] {
   return evidence.filter((item) => (item.linkedPaths ?? []).some((path) =>
@@ -333,9 +368,12 @@ export function unlinkEvidence(evidence: NtaEvidenceItem[], id: string, pointer:
   });
 }
 
-/** Whether a file is an image (shown as a thumbnail; a survey photo). */
+/**
+ * Whether a file is a photo or other image (a survey photo, a thumbnail where the
+ * browser can show it): every image type the register accepts, also HEIF and TIFF.
+ */
 export function isImageFile(fileName: string): boolean {
-  return /\.(jpe?g|png|webp|gif|heic)$/i.test(fileName);
+  return /\.(jpe?g|png|webp|gif|heic|heif|tiff?|bmp)$/i.test(fileName);
 }
 
 /**

@@ -1,81 +1,85 @@
 name: CI
 
+# Runs the same gate as locally (scripts/verify-nta.sh): release notes and
+# manual stamp, rustfmt/tests/clippy for the kernel and service, the reference
+# suites, the kernel on Rust 1.77.2 (MSRV), the Tauri check and command tests,
+# TypeScript, the UI tests with the project-form guard, and the frontend
+# bundle. Then it builds the desktop installers per platform as artifacts.
+# Releases come from release tags only (see release.yml), not from this file.
+
 on:
   push:
-    branches: [main]
+    branches: [main, nta8800-kernel]
   pull_request:
-    branches: [main]
+    branches: [main, nta8800-kernel]
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
+  gate:
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v6
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Type check
-        run: npx tsc --noEmit
-
-      - name: UI tests
-        run: npm test -- --run --maxWorkers=2
-
-      - name: Build frontend
-        run: npm run build
-
-  nta-kernel:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
 
       - name: Install Rust stable with Clippy and rustfmt
         uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
 
-      - name: Rust formatting
-        run: |
-          cargo fmt --manifest-path crates/nta8800-core/Cargo.toml --check
-          cargo fmt --manifest-path crates/nta8800-operations/Cargo.toml --check
-          cargo fmt --manifest-path crates/nta8800-service/Cargo.toml --check
-          cargo fmt --manifest-path crates/nta8800-wasm/Cargo.toml --check
+      - name: Install Rust 1.77.2 (kernel MSRV)
+        run: rustup toolchain install 1.77.2 --profile minimal
 
-      - name: Core and service tests
-        run: |
-          cargo test --manifest-path crates/nta8800-core/Cargo.toml
-          cargo test --manifest-path crates/nta8800-operations/Cargo.toml
-          cargo test --manifest-path crates/nta8800-service/Cargo.toml
-          cargo test --manifest-path crates/nta8800-wasm/Cargo.toml
+      - name: Rust cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            crates/nta8800-core/target/
+            crates/nta8800-service/target/
+            src-tauri/target/
+            target/msrv-core/
+          key: ${{ runner.os }}-gate-${{ hashFiles('crates/*/Cargo.lock', 'src-tauri/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-gate-
 
-      - name: Clippy
+      - name: Install system dependencies (Tauri check)
         run: |
-          cargo clippy --manifest-path crates/nta8800-core/Cargo.toml --all-targets -- -D warnings
-          cargo clippy --manifest-path crates/nta8800-operations/Cargo.toml --all-targets -- -D warnings
-          cargo clippy --manifest-path crates/nta8800-service/Cargo.toml --all-targets -- -D warnings
-          cargo clippy --manifest-path crates/nta8800-wasm/Cargo.toml --all-targets -- -D warnings
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
-      - name: WebAssembly kernel compiles
-        run: |
-          rustup target add wasm32-unknown-unknown
-          cargo build --manifest-path crates/nta8800-wasm/Cargo.toml --target wasm32-unknown-unknown --release
+      - name: Install frontend dependencies
+        run: npm ci
 
-      - name: Core minimum Rust version
-        run: |
-          rustup toolchain install 1.77.2 --profile minimal
-          CARGO_TARGET_DIR=target/msrv-core cargo +1.77.2 test --manifest-path crates/nta8800-core/Cargo.toml
+      # No separate `npm run build` here: the gate builds the frontend itself
+      # before the Tauri check, exactly as in a fresh local checkout.
+      - name: NTA gate (scripts/verify-nta.sh)
+        env:
+          NTA_VITEST_MAX_WORKERS: '2'
+        run: scripts/verify-nta.sh
+
+      - name: Keep gate evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: gate-evidence
+          path: nta-evidence/gate
+          if-no-files-found: ignore
+          retention-days: 30
 
   build:
-    needs: [test, nta-kernel]
+    needs: gate
     strategy:
       fail-fast: false
       matrix:
@@ -85,6 +89,8 @@ jobs:
           - platform: 'macos-latest'
 
     runs-on: ${{ matrix.platform }}
+    env:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
 
     steps:
       - uses: actions/checkout@v6
@@ -92,7 +98,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -125,10 +131,10 @@ jobs:
       - name: Build Tauri app
         env:
           APPIMAGE_EXTRACT_AND_RUN: '1'
-        run: npm run tauri build
+        run: npm run tauri:build
 
       - name: Sign Windows exe and installer with Azure Trusted Signing
-        if: matrix.platform == 'windows-latest'
+        if: matrix.platform == 'windows-latest' && env.AZURE_CLIENT_ID != ''
         uses: azure/trusted-signing-action@v1
         with:
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -172,36 +178,3 @@ jobs:
             src-tauri/target/release/bundle/dmg/*.dmg
           retention-days: 30
           if-no-files-found: ignore
-
-  release:
-    needs: [test, nta-kernel, build]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Get version from package.json
-        id: version
-        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v8
-        with:
-          path: artifacts
-
-      - name: List downloaded files
-        run: find artifacts -type f
-
-      - name: Create release and upload assets
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          if gh release view "v${VERSION}" >/dev/null 2>&1; then
-            echo "::notice::Release v${VERSION} already exists; raise the version with scripts/bump-version.js to publish a new prerelease."
-            exit 0
-          fi
-          gh release create "v${VERSION}" --title "v${VERSION}" --prerelease
-          find artifacts -type f \( -name '*.exe' -o -name '*.deb' -o -name '*.AppImage' -o -name '*.dmg' \) \
-            -exec gh release upload "v${VERSION}" {} +

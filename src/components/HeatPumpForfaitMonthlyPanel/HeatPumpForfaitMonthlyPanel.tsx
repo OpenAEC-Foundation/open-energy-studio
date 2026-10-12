@@ -4,6 +4,7 @@ import type { INtaHeatPumpInput } from '../../core/energy/types';
 import { diagnoseForfaitHeatPumpMonthlyDraftWithRust, type ForfaitHeatPumpMonthlyDraftAssessment, type ForfaitHeatPumpMonthlyDraftInput } from '../../core/nta/KernelClient';
 import { useI18n } from '../../i18n/i18n';
 import './HeatPumpForfaitMonthlyPanel.css';
+import { DecimalInput } from '../ui';
 
 type SourceSystem = ForfaitHeatPumpMonthlyDraftInput['sourceSystem'];
 const months = Array.from({ length: 12 }, (_, index) => index + 1);
@@ -81,7 +82,7 @@ export function HeatPumpForfaitMonthlyPanel({ pump }: { pump: INtaHeatPumpInput 
       <thead><tr><th>{t('kernel.forfaitMonthly.month')}</th><th>{t('kernel.forfaitMonthly.generatorOutput')}</th></tr></thead>
       <tbody>{months.map((month, index) => <tr key={month}>
         <th scope="row">{month}</th>
-        <td><input type="number" min="0" step="any" aria-label={`${t('kernel.forfaitMonthly.generatorOutput')} ${month}`}
+        <td><DecimalInput min="0" step="any" aria-label={`${t('kernel.forfaitMonthly.generatorOutput')} ${month}`}
           value={outputValues[index]} onChange={(event) => updateMonth(outputValues, setOutputValues, index, event.target.value)} /></td>
       </tr>)}</tbody>
     </table></div>

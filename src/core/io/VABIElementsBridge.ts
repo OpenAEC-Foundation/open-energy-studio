@@ -13,7 +13,8 @@
  *   Hellingshoek: 0=0°, 90=90°
  */
 
-import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
+import { zipSync, strToU8 } from 'fflate';
+import { safeUnzip } from './safeUnzip';
 import type {
   IProject, IZone, ISurface, IWindow, IThermalBridge, IConstruction,
   IHeatingSystem, IVentilationSystem, ICoolingSystem, IHotWaterSystem,
@@ -22,6 +23,13 @@ import type {
   CoolingSystemType, HotWaterSystemType, SolarThermalType, BuildingFunction,
 } from '../energy/types';
 import { SURFACE_RESISTANCE } from '../energy/Constants';
+import { ASSUMED_QV10 } from '../energy/normalizeProject';
+import { buildNtaCalculationTemplate } from '../nta/NtaCalculationTemplate';
+import {
+  ImportFormatError, ImportIssues, droppedOnExport, lookup, ntaInputNotInFormat, parseDecimalText, unusableRatio,
+  sourceVersionNotCarried, unreadData, type ImportResult, type ReadResult,
+} from './importIssues';
+import { downloadBytes, importFile, pickFile } from './importFile';
 
 // ============================================================
 // VABI EPA enum mappings (based on real file analysis)
@@ -42,7 +50,8 @@ const SURFACE_TO_LOCATIE: Record<SurfaceType, number> = {
   'roof': 0, 'wall': 2, 'floor': 6, 'internal': 7,
 };
 
-// Orientatie: VABI code → compass direction
+// Orientatie: VABI code → compass direction. Horizontal has no code; the
+// tilt (Hellingshoek 0 or 180) says a surface is horizontal.
 const VABI_ORIENT_MAP: Record<number, Orientation> = {
   0: 'N', 1: 'SW', 2: 'W', 3: 'NW', 4: 'S', 5: 'NE', 6: 'E', 7: 'SE',
 };
@@ -146,16 +155,10 @@ function getText(parent: Element, tagName: string): string {
   return el?.textContent?.trim() ?? '';
 }
 
-function getNum(parent: Element, tagName: string, fallback = 0): number {
-  const text = getText(parent, tagName).replace(',', '.');
-  const val = parseFloat(text);
-  return isNaN(val) ? fallback : val;
-}
-
-function getInt(parent: Element, tagName: string, fallback = 0): number {
+/** Element text, or undefined when the element is absent or empty. */
+function textOf(parent: Element, tagName: string): string | undefined {
   const text = getText(parent, tagName);
-  const val = parseInt(text, 10);
-  return isNaN(val) ? fallback : val;
+  return text === '' ? undefined : text;
 }
 
 function getChildren(parent: Element, tagName: string): Element[] {
@@ -169,6 +172,52 @@ function getChildren(parent: Element, tagName: string): Element[] {
 
 function getAllDescendants(parent: Element, tagName: string): Element[] {
   return Array.from(parent.getElementsByTagName(tagName));
+}
+
+/** An integer code; undefined when absent or not an integer. */
+function codeText(parent: Element, tagName: string): number | undefined {
+  const text = textOf(parent, tagName);
+  return text !== undefined && /^[+-]?\d+$/.test(text) ? Number(text) : undefined;
+}
+
+/** A VABI code through its table; a missing or unknown code gives the fallback and an issue. */
+function vabiCode<T>(
+  issues: ImportIssues, path: string, parent: Element, tagName: string, table: Record<number, T>, fallback: T, what: string,
+): T {
+  const raw = textOf(parent, tagName);
+  if (raw === undefined) {
+    issues.add('defaulted', path, `${what} ontbreekt; ${String(fallback)} aangenomen.`, String(fallback));
+    return fallback;
+  }
+  const code = codeText(parent, tagName);
+  const value = code === undefined ? undefined : lookup(table, code);
+  if (value === undefined) {
+    issues.add('invalid', path, `Onbekende code "${raw.slice(0, 40)}" voor ${what.toLowerCase()}; ${String(fallback)} aangenomen.`, raw.slice(0, 40));
+    return fallback;
+  }
+  return value;
+}
+
+/** NTA 8800 tilt of a surface, from `ntaCalculation.surfaceTilts`, when known. */
+function surfaceTilt(project: IProject, surfaceId: string): number | undefined {
+  const tilts = (project.ntaCalculation as { surfaceTilts?: Array<{ surfaceId?: string; tiltDeg?: number | null }> } | undefined)
+    ?.surfaceTilts;
+  const tilt = Array.isArray(tilts) ? tilts.find((item) => item?.surfaceId === surfaceId)?.tiltDeg : undefined;
+  return typeof tilt === 'number' && Number.isFinite(tilt) ? tilt : undefined;
+}
+
+/**
+ * The Hellingshoek a surface is exported with: its NTA tilt when the
+ * project has one; otherwise 0 for horizontal surfaces and floors and 90
+ * for walls. A pitched roof without a known tilt gets none, so the import
+ * does not invent one.
+ */
+function exportTilt(project: IProject, surface: ISurface): number | undefined {
+  const tilt = surfaceTilt(project, surface.id);
+  if (tilt !== undefined) return tilt;
+  if (surface.orientation === 'horizontal' || surface.type === 'floor') return 0;
+  if (surface.type === 'wall' || surface.type === 'internal') return 90;
+  return undefined;
 }
 
 // ============================================================
@@ -193,7 +242,7 @@ export function exportToVABI(project: IProject): Uint8Array {
   lines.push(`${L(3)}${xmlTag('Omschrijving', project.description || '')}`);
   lines.push(`${L(3)}${xmlTag('Adres', project.address || '')}`);
   lines.push(`${L(3)}${xmlTag('Plaats', project.city || '')}`);
-  lines.push(`${L(3)}${xmlTag('Gebruiksfunctie', FUNC_TO_VABI[project.buildingFunction] || 'Woonfunctie')}`);
+  lines.push(`${L(3)}${xmlTag('Gebruiksfunctie', lookup(FUNC_TO_VABI, project.buildingFunction) ?? 'Woonfunctie')}`);
 
   // Rekenzones
   lines.push(`${L(3)}${xmlOpen('Rekenzones')}`);
@@ -209,27 +258,31 @@ export function exportToVABI(project: IProject): Uint8Array {
     lines.push(`${L(5)}${xmlOpen('Geometrie')}`);
     for (const surface of zone.surfaces) {
       const construction = project.constructions.find(c => c.id === surface.constructionId);
+      const tilt = exportTilt(project, surface);
 
       lines.push(`${L(6)}${xmlOpen('Hoofdvlak')}`);
       lines.push(`${L(7)}${xmlTag('Naam', surface.name)}`);
-      lines.push(`${L(7)}${xmlTag('Locatie', SURFACE_TO_LOCATIE[surface.type] ?? 2)}`);
-      lines.push(`${L(7)}${xmlTag('Orientatie', ORIENT_TO_VABI[surface.orientation] ?? 4)}`);
-      lines.push(`${L(7)}${xmlTag('Hellingshoek', surface.type === 'roof' ? 0 : surface.type === 'floor' ? 0 : 90)}`);
+      lines.push(`${L(7)}${xmlTag('Locatie', lookup(SURFACE_TO_LOCATIE, surface.type) ?? 2)}`);
+      lines.push(`${L(7)}${xmlTag('Orientatie', lookup(ORIENT_TO_VABI, surface.orientation) ?? 4)}`);
+      if (tilt !== undefined) lines.push(`${L(7)}${xmlTag('Hellingshoek', tilt)}`);
       lines.push(`${L(7)}${xmlTag('Oppervlakte', surface.area)}`);
 
       // Opaque sub-surfaces (DeelvlakList)
       lines.push(`${L(7)}${xmlOpen('DeelvlakList')}`);
 
-      // Main opaque part (subtract windows)
+      // Main opaque part (subtract windows). Written whenever the surface has a construction,
+      // also when windows fill it: without the Deelvlak the import loses the construction.
       const windowArea = surface.windows.reduce((sum, w) => sum + w.area, 0);
       const opaqueArea = Math.max(0, surface.area - windowArea);
 
-      if (opaqueArea > 0 && construction) {
+      if (construction) {
         lines.push(`${L(8)}${xmlOpen('Deelvlak')}`);
         lines.push(`${L(9)}${xmlTag('Type', 'Dicht')}`);
         lines.push(`${L(9)}${xmlTag('Naam', construction.name)}`);
         lines.push(`${L(9)}${xmlTag('Oppervlakte', opaqueArea)}`);
         lines.push(`${L(9)}${xmlTag('RcWaarde', construction.rcValue)}`);
+        // The U as the project holds it: a construction entered by its U has no Rc to rebuild it from.
+        lines.push(`${L(9)}${xmlTag('UWaarde', construction.uValue)}`);
         lines.push(`${L(8)}${xmlClose('Deelvlak')}`);
       }
 
@@ -245,21 +298,21 @@ export function exportToVABI(project: IProject): Uint8Array {
       }
 
       lines.push(`${L(7)}${xmlClose('DeelvlakList')}`);
-
-      // Thermal bridges for this surface
-      lines.push(`${L(7)}${xmlOpen('KoudebrugList')}`);
-      for (const tb of zone.thermalBridges) {
-        lines.push(`${L(8)}${xmlOpen('Koudebrug')}`);
-        lines.push(`${L(9)}${xmlTag('Naam', tb.name)}`);
-        lines.push(`${L(9)}${xmlTag('PsiWaarde', tb.psiValue)}`);
-        lines.push(`${L(9)}${xmlTag('Lengte', tb.length)}`);
-        lines.push(`${L(8)}${xmlClose('Koudebrug')}`);
-      }
-      lines.push(`${L(7)}${xmlClose('KoudebrugList')}`);
-
       lines.push(`${L(6)}${xmlClose('Hoofdvlak')}`);
     }
     lines.push(`${L(5)}${xmlClose('Geometrie')}`);
+
+    // Thermal bridges belong to the zone: written once, not under every surface
+    // (a list per Hoofdvlak multiplied ΣψL by the number of surfaces on import).
+    lines.push(`${L(5)}${xmlOpen('KoudebrugList')}`);
+    for (const tb of zone.thermalBridges) {
+      lines.push(`${L(6)}${xmlOpen('Koudebrug')}`);
+      lines.push(`${L(7)}${xmlTag('Naam', tb.name)}`);
+      lines.push(`${L(7)}${xmlTag('PsiWaarde', tb.psiValue)}`);
+      lines.push(`${L(7)}${xmlTag('Lengte', tb.length)}`);
+      lines.push(`${L(6)}${xmlClose('Koudebrug')}`);
+    }
+    lines.push(`${L(5)}${xmlClose('KoudebrugList')}`);
 
     lines.push(`${L(4)}${xmlClose('Rekenzone')}`);
   }
@@ -274,8 +327,8 @@ export function exportToVABI(project: IProject): Uint8Array {
     for (const hs of project.heatingSystems) {
       lines.push(`${L(5)}${xmlOpen('Opwekker')}`);
       lines.push(`${L(6)}${xmlTag('Naam', hs.name)}`);
-      lines.push(`${L(6)}${xmlTag('Type', HEATING_TO_VABI[hs.type] ?? 1)}`);
-      lines.push(`${L(6)}${xmlTag('COP', hs.cop)}`);
+      lines.push(`${L(6)}${xmlTag('Type', lookup(HEATING_TO_VABI, hs.type) ?? 1)}`);
+      if (!unusableRatio(hs.cop)) lines.push(`${L(6)}${xmlTag('COP', hs.cop)}`);
       lines.push(`${L(6)}${xmlTag('Dekking', hs.coverageFraction)}`);
       lines.push(`${L(5)}${xmlClose('Opwekker')}`);
     }
@@ -288,7 +341,7 @@ export function exportToVABI(project: IProject): Uint8Array {
     for (const vs of project.ventilationSystems) {
       lines.push(`${L(5)}${xmlOpen('Systeem')}`);
       lines.push(`${L(6)}${xmlTag('Naam', vs.name)}`);
-      lines.push(`${L(6)}${xmlTag('Type', VENT_TO_VABI[vs.type] ?? 0)}`);
+      lines.push(`${L(6)}${xmlTag('Type', lookup(VENT_TO_VABI, vs.type) ?? 0)}`);
       lines.push(`${L(6)}${xmlTag('WTWRendement', vs.heatRecoveryEfficiency)}`);
       lines.push(`${L(6)}${xmlTag('SFP', vs.sfp)}`);
       lines.push(`${L(5)}${xmlClose('Systeem')}`);
@@ -302,8 +355,8 @@ export function exportToVABI(project: IProject): Uint8Array {
     for (const cs of project.coolingSystems) {
       lines.push(`${L(5)}${xmlOpen('Opwekker')}`);
       lines.push(`${L(6)}${xmlTag('Naam', cs.name)}`);
-      lines.push(`${L(6)}${xmlTag('Type', COOL_TO_VABI[cs.type] ?? 0)}`);
-      lines.push(`${L(6)}${xmlTag('EER', cs.eer)}`);
+      lines.push(`${L(6)}${xmlTag('Type', lookup(COOL_TO_VABI, cs.type) ?? 0)}`);
+      if (!unusableRatio(cs.eer, cs.type === 'none')) lines.push(`${L(6)}${xmlTag('EER', cs.eer)}`);
       lines.push(`${L(5)}${xmlClose('Opwekker')}`);
     }
     lines.push(`${L(4)}${xmlClose('Koeling')}`);
@@ -315,8 +368,8 @@ export function exportToVABI(project: IProject): Uint8Array {
     for (const hw of project.hotWaterSystems) {
       lines.push(`${L(5)}${xmlOpen('Opwekker')}`);
       lines.push(`${L(6)}${xmlTag('Naam', hw.name)}`);
-      lines.push(`${L(6)}${xmlTag('Type', HW_TO_VABI[hw.type] ?? 0)}`);
-      lines.push(`${L(6)}${xmlTag('Rendement', hw.efficiency)}`);
+      lines.push(`${L(6)}${xmlTag('Type', lookup(HW_TO_VABI, hw.type) ?? 0)}`);
+      if (!unusableRatio(hw.efficiency)) lines.push(`${L(6)}${xmlTag('Rendement', hw.efficiency)}`);
       lines.push(`${L(6)}${xmlTag('Zonneboiler', hw.hasSolarBoiler)}`);
       lines.push(`${L(6)}${xmlTag('ZonneboilerFractie', hw.solarBoilerFraction)}`);
       lines.push(`${L(5)}${xmlClose('Opwekker')}`);
@@ -334,7 +387,7 @@ export function exportToVABI(project: IProject): Uint8Array {
       lines.push(`${L(4)}${xmlOpen('PVSysteem')}`);
       lines.push(`${L(5)}${xmlTag('Naam', pv.name)}`);
       lines.push(`${L(5)}${xmlTag('Piekvermogen', pv.peakPower)}`);
-      lines.push(`${L(5)}${xmlTag('Orientatie', ORIENT_TO_VABI[pv.orientation] ?? 4)}`);
+      lines.push(`${L(5)}${xmlTag('Orientatie', lookup(ORIENT_TO_VABI, pv.orientation) ?? 4)}`);
       lines.push(`${L(5)}${xmlTag('Hellingshoek', pv.tilt)}`);
       lines.push(`${L(5)}${xmlTag('Oppervlakte', pv.area)}`);
       lines.push(`${L(4)}${xmlClose('PVSysteem')}`);
@@ -344,8 +397,8 @@ export function exportToVABI(project: IProject): Uint8Array {
       lines.push(`${L(4)}${xmlOpen('ZonthermischSysteem')}`);
       lines.push(`${L(5)}${xmlTag('Naam', st.name)}`);
       lines.push(`${L(5)}${xmlTag('CollectorOppervlakte', st.collectorArea)}`);
-      lines.push(`${L(5)}${xmlTag('Type', ST_TO_VABI[st.type] ?? 0)}`);
-      lines.push(`${L(5)}${xmlTag('Orientatie', ORIENT_TO_VABI[st.orientation] ?? 4)}`);
+      lines.push(`${L(5)}${xmlTag('Type', lookup(ST_TO_VABI, st.type) ?? 0)}`);
+      lines.push(`${L(5)}${xmlTag('Orientatie', lookup(ORIENT_TO_VABI, st.orientation) ?? 4)}`);
       lines.push(`${L(5)}${xmlTag('Hellingshoek', st.tilt)}`);
       lines.push(`${L(4)}${xmlClose('ZonthermischSysteem')}`);
     }
@@ -382,199 +435,412 @@ export function exportToVABI(project: IProject): Uint8Array {
 
   const xml = lines.join('\n');
 
-  // Create ZIP with project.xml inside
-  const files: Record<string, Uint8Array> = {
-    'project.xml': strToU8(xml),
-  };
+  // Create ZIP with project.xml inside; copy into this realm (see UNIEC3Exporter).
+  return zipSync({ 'project.xml': new Uint8Array(strToU8(xml)) }, { level: 6 });
+}
 
-  return zipSync(files, { level: 6 });
+/** What a VABI export of this project leaves out (shown to the adviser). */
+export function vabiExportLosses(project: IProject): string[] {
+  return droppedOnExport(project, 'VABI');
 }
 
 // ============================================================
 // IMPORT: VABI EPA ZIP → IProject
 // ============================================================
 
-export function importFromVABI(zipData: Uint8Array): IProject {
-  const files = unzipSync(zipData);
-
-  // Find project.xml in the ZIP
-  let xmlData: Uint8Array | undefined;
-  for (const [path, data] of Object.entries(files)) {
-    if (path.toLowerCase().endsWith('project.xml') || path.toLowerCase().endsWith('.xml')) {
-      xmlData = data;
-      break;
+/**
+ * Decodes an XML file the way its byte-order mark or declaration says
+ * (UTF-8, UTF-16, windows-1252, …), not always as UTF-8.
+ */
+export function decodeXml(bytes: Uint8Array): string {
+  const decode = (label: string, data: Uint8Array) => {
+    let decoder: TextDecoder;
+    try {
+      decoder = new TextDecoder(label, { fatal: true });
+    } catch {
+      throw new ImportFormatError('vabi_encoding_unknown', `Onbekende tekencodering "${label}" in het XML-bestand.`, { encoding: label });
     }
-  }
-
-  if (!xmlData) {
-    throw new Error('Geen project.xml gevonden in EPA bestand');
-  }
-
-  const xmlString = strFromU8(xmlData);
-  return importFromVABIXml(xmlString);
+    try {
+      return decoder.decode(data);
+    } catch {
+      throw new ImportFormatError('vabi_encoding_invalid', `Het XML-bestand is niet geldig in de tekencodering "${label}".`, { encoding: label });
+    }
+  };
+  if (bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) return decode('utf-8', bytes.subarray(3));
+  if (bytes[0] === 0xff && bytes[1] === 0xfe) return decode('utf-16le', bytes.subarray(2));
+  if (bytes[0] === 0xfe && bytes[1] === 0xff) return decode('utf-16be', bytes.subarray(2));
+  // UTF-16 without a byte-order mark starts with "<" and a zero byte.
+  if (bytes[0] === 0x3c && bytes[1] === 0x00) return decode('utf-16le', bytes);
+  if (bytes[0] === 0x00 && bytes[1] === 0x3c) return decode('utf-16be', bytes);
+  let head = '';
+  for (let i = 0; i < Math.min(bytes.length, 256); i++) head += String.fromCharCode(bytes[i]);
+  const declared = head.match(/^<\?xml[^>]*\bencoding\s*=\s*["']([A-Za-z0-9._:-]+)["']/)?.[1];
+  return decode(declared ?? 'utf-8', bytes);
 }
 
-function importFromVABIXml(xmlString: string): IProject {
+/** Picks project.xml from an EPA archive; any other XML only when it is the only one. */
+function projectXml(files: Record<string, Uint8Array>): Uint8Array {
+  const xmlPaths = Object.keys(files).filter((path) => path.toLowerCase().endsWith('.xml'));
+  const named = xmlPaths
+    .filter((path) => path.split('/').pop()!.toLowerCase() === 'project.xml')
+    .sort((a, b) => a.length - b.length);
+  if (named.length > 0) return files[named[0]];
+  if (xmlPaths.length === 1) return files[xmlPaths[0]];
+  throw new ImportFormatError('vabi_no_project_xml',
+    xmlPaths.length === 0 ? 'Geen project.xml gevonden in het EPA-bestand.' : 'Geen project.xml gevonden in het EPA-bestand (wel andere XML-bestanden).');
+}
+
+/** Imports a VABI EPA archive, with the list of what the program filled in or left out. */
+export function readVABI(zipData: Uint8Array): ReadResult {
+  // Only XML entries are read, with a size cap, so a crafted archive cannot
+  // unpack gigabytes into memory.
+  const files = safeUnzip(zipData, (name) => name.toLowerCase().endsWith('.xml'));
+  return readVABIXml(decodeXml(projectXml(files)));
+}
+
+/** The project of a VABI EPA archive (see `readVABI` for the import issues). */
+export function importFromVABI(zipData: Uint8Array): IProject {
+  return readVABI(zipData).project;
+}
+
+/** Imports a VABI EPA archive or a bare project.xml. */
+export function readVABIFile(bytes: Uint8Array): ReadResult {
+  return bytes[0] === 0x50 && bytes[1] === 0x4b ? readVABI(bytes) : readVABIXml(decodeXml(bytes));
+}
+
+/** Signature of a KoudebrugList, to spot the same list repeated under every Hoofdvlak. */
+function bridgeListSignature(listEl: Element | null): string {
+  if (!listEl) return '';
+  return getChildren(listEl, 'Koudebrug')
+    .map((kb) => [getText(kb, 'Naam'), getText(kb, 'PsiWaarde'), getText(kb, 'Lengte')].join('|'))
+    .join(';');
+}
+
+/**
+ * The child elements the importer reads, per element (an Opwekker by its
+ * parent, since a heating, cooling and hot-water generator differ). Any other
+ * child element is reported as not read.
+ */
+const READ_ELEMENTS: Record<string, readonly string[]> = {
+  Project: ['Algemeen', 'Objecten', 'ConstructieBibliotheek'],
+  Algemeen: ['Versie', 'Applicatie', 'Datum'],
+  Objecten: ['Object'],
+  Object: ['Naam', 'Omschrijving', 'Adres', 'Plaats', 'Gebruiksfunctie', 'Rekenzones', 'Installaties', 'Hernieuwbaar'],
+  Rekenzones: ['Rekenzone'],
+  Rekenzone: ['Naam', 'Gebruiksoppervlakte', 'Volume', 'Hoogte', 'Luchtdoorlatendheid', 'Geometrie', 'KoudebrugList'],
+  Geometrie: ['Hoofdvlak'],
+  Hoofdvlak: ['Naam', 'Locatie', 'Orientatie', 'Hellingshoek', 'Oppervlakte', 'DeelvlakList', 'KoudebrugList'],
+  DeelvlakList: ['Deelvlak'],
+  Deelvlak: ['Type', 'Naam', 'Oppervlakte', 'RcWaarde', 'UWaarde', 'GWaarde'],
+  KoudebrugList: ['Koudebrug'],
+  Koudebrug: ['Naam', 'PsiWaarde', 'Lengte'],
+  Installaties: ['Verwarming', 'Ventilatie', 'Koeling', 'Tapwater'],
+  Verwarming: ['Opwekker'],
+  'Verwarming/Opwekker': ['Naam', 'Type', 'COP', 'Dekking'],
+  Ventilatie: ['Systeem'],
+  Systeem: ['Naam', 'Type', 'WTWRendement', 'SFP'],
+  Koeling: ['Opwekker'],
+  'Koeling/Opwekker': ['Naam', 'Type', 'EER'],
+  Tapwater: ['Opwekker'],
+  'Tapwater/Opwekker': ['Naam', 'Type', 'Rendement', 'Zonneboiler', 'ZonneboilerFractie'],
+  Hernieuwbaar: ['PVSysteem', 'ZonthermischSysteem'],
+  PVSysteem: ['Naam', 'Piekvermogen', 'Orientatie', 'Hellingshoek', 'Oppervlakte'],
+  ZonthermischSysteem: ['Naam', 'CollectorOppervlakte', 'Type', 'Orientatie', 'Hellingshoek'],
+  ConstructieBibliotheek: ['Constructie'],
+  Constructie: ['Naam', 'RcWaarde', 'UWaarde', 'Lagen'],
+  Lagen: ['Laag'],
+  Laag: ['Materiaal', 'Dikte', 'Lambda'],
+};
+
+const elementKey = (element: Element) => (element.tagName === 'Opwekker' && element.parentElement
+  ? `${element.parentElement.tagName}/Opwekker` : element.tagName);
+
+/**
+ * Reports the elements of the file the importer has no field for, one issue
+ * per kind of parent element. Only `objectEl` of the Objecten is walked (the
+ * others are reported as 'multiple'); a Rekenzone without Geometrie keeps
+ * the containers its Hoofdvlakken are read from.
+ */
+function reportUnreadElements(root: Element, objectEl: Element, issues: ImportIssues): void {
+  const unread = new Map<string, Map<string, number>>();
+  const walk = (element: Element) => {
+    const key = elementKey(element);
+    const known = READ_ELEMENTS[key];
+    if (!known) return;
+    const noGeometry = key === 'Rekenzone' && !getEl(element, 'Geometrie');
+    for (const child of Array.from(element.children)) {
+      if (child.tagName === 'Object' && child !== objectEl) continue;
+      if (known.includes(child.tagName)) {
+        walk(child);
+        continue;
+      }
+      if (noGeometry && child.getElementsByTagName('Hoofdvlak').length > 0) continue;
+      const names = unread.get(key) ?? new Map<string, number>();
+      names.set(child.tagName, (names.get(child.tagName) ?? 0) + 1);
+      unread.set(key, names);
+    }
+  };
+  walk(root.tagName === 'Project' ? root : objectEl);
+  for (const [key, names] of [...unread.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    unreadData(issues, key, `Elementen onder ${key}`, names);
+  }
+}
+
+/** The program and file version the Algemeen block names ("Vabi Elements, versie 4.0"). */
+function algemeenVersion(doc: Document): string | undefined {
+  const algemeen = Array.from(doc.getElementsByTagName('Algemeen')).find((el) => el.parentElement === doc.documentElement);
+  if (!algemeen) return undefined;
+  const parts = [textOf(algemeen, 'Applicatie'), textOf(algemeen, 'Versie') ? `versie ${textOf(algemeen, 'Versie')}` : undefined]
+    .filter((part): part is string => !!part && part.trim() !== '')
+    .map((part) => part.trim().slice(0, 80));
+  return parts.length > 0 ? parts.join(', ') : undefined;
+}
+
+export function readVABIXml(xmlText: string): ReadResult {
+  const xmlString = xmlText.charCodeAt(0) === 0xfeff ? xmlText.slice(1) : xmlText;
+  // EPA files have no document type; refusing one up front rules out entity
+  // expansion and external entities whatever the parser does with them.
+  if (/<!DOCTYPE/i.test(xmlString)) {
+    throw new ImportFormatError('vabi_doctype', 'Het XML-bestand bevat een DOCTYPE; dat wordt niet ingelezen.');
+  }
   const parser = new DOMParser();
   const doc = parser.parseFromString(xmlString, 'application/xml');
-
-  const parserError = doc.querySelector('parsererror');
-  if (parserError) {
-    throw new Error('Ongeldig VABI EPA XML bestand');
+  if (doc.querySelector('parsererror')) {
+    throw new ImportFormatError('vabi_xml_invalid', 'Ongeldig VABI EPA XML-bestand.');
   }
 
-  // Find first Object element
-  const objectEls = doc.getElementsByTagName('Object');
-  let objectEl: Element | null = null;
-  for (let i = 0; i < objectEls.length; i++) {
-    if (objectEls[i].parentElement?.tagName === 'Objecten') {
-      objectEl = objectEls[i];
-      break;
-    }
-  }
+  const issues = new ImportIssues();
 
+  const objectEls = Array.from(doc.getElementsByTagName('Object'))
+    .filter((element) => element.parentElement?.tagName === 'Objecten');
+  const objectEl = objectEls[0];
   if (!objectEl) {
-    // Try legacy format with <gebouw>
-    const gebouw = doc.getElementsByTagName('gebouw')[0];
-    if (gebouw) {
-      return importFromVABILegacy(doc);
-    }
-    throw new Error('Geen Object element gevonden in EPA bestand');
+    if (doc.getElementsByTagName('gebouw')[0]) return importFromVABILegacy(doc, issues);
+    throw new ImportFormatError('vabi_no_object', 'Geen Object-element gevonden in het EPA-bestand.');
+  }
+  if (objectEls.length > 1) {
+    issues.add('multiple', 'Objecten', `Het bestand bevat ${objectEls.length} objecten; alleen het eerste is ingelezen.`, objectEls.length);
   }
 
   const projectName = getText(objectEl, 'Naam') || 'VABI Import';
   const description = getText(objectEl, 'Omschrijving') || '';
   const address = getText(objectEl, 'Adres') || '';
   const city = getText(objectEl, 'Plaats') || '';
-  const funcText = getText(objectEl, 'Gebruiksfunctie') || '';
-  const buildingFunction = FUNC_FROM_VABI[funcText] || 'residential';
+  const funcText = textOf(objectEl, 'Gebruiksfunctie');
+  let buildingFunction: BuildingFunction = 'residential';
+  if (funcText === undefined) {
+    issues.add('defaulted', 'buildingFunction', 'Gebruiksfunctie ontbreekt; residential aangenomen.', 'residential');
+  } else {
+    const found = lookup(FUNC_FROM_VABI, funcText);
+    if (found) buildingFunction = found;
+    else issues.add('invalid', 'buildingFunction', `Onbekende gebruiksfunctie "${funcText.slice(0, 40)}"; residential aangenomen.`, funcText.slice(0, 40));
+  }
 
-  // Parse construction library
+  // Construction library, by name; a repeated name keeps its first entry.
+  const library = new Map<string, IConstruction>();
   const constructions: IConstruction[] = [];
   const constBib = doc.getElementsByTagName('ConstructieBibliotheek')[0];
   if (constBib) {
-    const constEls = getChildren(constBib, 'Constructie');
-    for (const constEl of constEls) {
+    getChildren(constBib, 'Constructie').forEach((constEl, index) => {
+      const cp = `constructions[${index}]`;
       const layers: { material: string; thickness: number; lambda: number }[] = [];
       const lagenEl = getEl(constEl, 'Lagen');
       if (lagenEl) {
-        for (const laag of getChildren(lagenEl, 'Laag')) {
+        getChildren(lagenEl, 'Laag').forEach((laag, layerIndex) => {
+          const lp = `${cp}.layers[${layerIndex}]`;
           layers.push({
             material: getText(laag, 'Materiaal') || 'Materiaal',
-            thickness: getNum(laag, 'Dikte'),
-            lambda: getNum(laag, 'Lambda', 0.03),
+            thickness: issues.number(`${lp}.thickness`, textOf(laag, 'Dikte'), { fallback: 0, min: 0 }),
+            lambda: issues.number(`${lp}.lambda`, textOf(laag, 'Lambda'), { fallback: 0.03, min: 0, minExclusive: true }),
           });
-        }
+        });
       }
-      constructions.push({
-        id: crypto.randomUUID(),
-        name: getText(constEl, 'Naam') || 'Constructie',
-        layers,
-        rcValue: getNum(constEl, 'RcWaarde'),
-        uValue: getNum(constEl, 'UWaarde'),
-      });
-    }
+      const name = getText(constEl, 'Naam') || 'Constructie';
+      const rcValue = issues.number(`${cp}.rcValue`, textOf(constEl, 'RcWaarde'), { fallback: 0, min: 0, silentWhenMissing: true });
+      const uValue = issues.number(`${cp}.uValue`, textOf(constEl, 'UWaarde'), { fallback: 0, min: 0, silentWhenMissing: true });
+      const construction: IConstruction = { id: crypto.randomUUID(), name, layers, rcValue, uValue };
+      if (library.has(name)) {
+        issues.add('duplicate', cp, `Constructie "${name}" staat meer dan eens in de bibliotheek; de eerste wordt gekoppeld.`, name);
+      } else {
+        library.set(name, construction);
+      }
+      // A library entry without U stays out until a Deelvlak gives it one.
+      if (uValue > 0) constructions.push(construction);
+    });
   }
 
-  // Parse zones (Rekenzones)
+  /**
+   * The construction of an opaque Deelvlak: linked to the library entry of
+   * the same name when the values agree, else its own. The U is the file's
+   * (Deelvlak, then library); only without one is it derived from Rc with
+   * the element type's R_si (NTA 8800 table C.2), and never 0.
+   */
+  const constructionFor = (dvEl: Element, path: string, surfaceType: SurfaceType): string => {
+    const name = getText(dvEl, 'Naam');
+    const lib = name ? library.get(name) : undefined;
+    const ownRc = issues.number(`${path}.rcValue`, textOf(dvEl, 'RcWaarde'), { fallback: 0, min: 0, silentWhenMissing: true });
+    const ownU = issues.number(`${path}.uValue`, textOf(dvEl, 'UWaarde'), { fallback: 0, min: 0, silentWhenMissing: true });
+    const rc = ownRc > 0 ? ownRc : lib?.rcValue ?? 0;
+    let u = ownU > 0 ? ownU : (lib && lib.uValue > 0 ? lib.uValue : 0);
+    if (!(u > 0) && rc > 0) {
+      const { rsi, rse } = SURFACE_RESISTANCE[surfaceType];
+      u = 1 / (rc + rsi + rse);
+      issues.add('defaulted', `${path}.uValue`, `U ontbreekt; berekend uit Rc ${rc} met R_si ${rsi} en R_se ${rse}.`, u);
+    }
+    if (!(u > 0)) {
+      issues.add('dropped', path, `Constructie "${name || '(zonder naam)'}" heeft geen U en geen Rc; niet gekoppeld, vul de constructie aan.`);
+      return '';
+    }
+    if (lib && Math.abs(lib.uValue - u) < 1e-9 && Math.abs(lib.rcValue - rc) < 0.01) {
+      if (!constructions.includes(lib)) constructions.push(lib);
+      return lib.id;
+    }
+    const label = name || 'Constructie';
+    let existing = constructions.find((c) => c.name === label && Math.abs(c.rcValue - rc) < 0.01 && Math.abs(c.uValue - u) < 1e-9);
+    if (!existing) {
+      existing = { id: crypto.randomUUID(), name: label, layers: lib?.layers ?? [], rcValue: rc, uValue: u };
+      constructions.push(existing);
+    }
+    return existing.id;
+  };
+
+  // Tilts of non-horizontal, non-vertical surfaces; they go to ntaCalculation.surfaceTilts.
+  const tilts: Array<{ surfaceId: string; tiltDeg: number }> = [];
+
   const zones: IZone[] = [];
   const rekenzonesEl = getEl(objectEl, 'Rekenzones');
   const rzEls = rekenzonesEl ? getChildren(rekenzonesEl, 'Rekenzone') : [];
 
-  for (const rzEl of rzEls) {
+  rzEls.forEach((rzEl, zoneIndex) => {
+    const zp = `zones[${zoneIndex}]`;
     const zoneName = getText(rzEl, 'Naam') || 'Zone';
-    const floorArea = getNum(rzEl, 'Gebruiksoppervlakte');
-    const volume = getNum(rzEl, 'Volume');
-    const height = getNum(rzEl, 'Hoogte', 2.6);
-    const qv10 = getNum(rzEl, 'Luchtdoorlatendheid', 0.4);
+    const floorArea = issues.number(`${zp}.floorArea`, textOf(rzEl, 'Gebruiksoppervlakte'), { fallback: 0, min: 0 });
+    const volume = issues.number(`${zp}.volume`, textOf(rzEl, 'Volume'), { fallback: 0, min: 0 });
+    const height = issues.number(`${zp}.height`, textOf(rzEl, 'Hoogte'), { fallback: 2.6, min: 0 });
+    const before = issues.list.length;
+    const qv10 = issues.number(`${zp}.airTightness.qv10`, textOf(rzEl, 'Luchtdoorlatendheid'), {
+      fallback: ASSUMED_QV10, min: 0, minExclusive: true, fallbackReason: 'aangenomen waarde, te controleren',
+    });
+    const qv10Assumed = issues.list.length > before;
 
     const surfaces: ISurface[] = [];
     const thermalBridges: IThermalBridge[] = [];
     const zoneId = crypto.randomUUID();
 
-    // Parse Geometrie > Hoofdvlak
     const geoEl = getEl(rzEl, 'Geometrie');
     const hoofdvlakken = geoEl ? getChildren(geoEl, 'Hoofdvlak') : getAllDescendants(rzEl, 'Hoofdvlak');
 
-    for (const hvEl of hoofdvlakken) {
+    hoofdvlakken.forEach((hvEl) => {
+      const sp = `${zp}.surfaces[${surfaces.length}]`;
       const surfName = getText(hvEl, 'Naam') || 'Vlak';
-      const locatie = getInt(hvEl, 'Locatie', 2);
-      const orientCode = getInt(hvEl, 'Orientatie', 4);
-      const area = getNum(hvEl, 'Oppervlakte');
+      const locatie = codeText(hvEl, 'Locatie');
+      const locInfo = locatie === undefined ? undefined : lookup(LOCATIE_MAP, locatie);
+      if (!locInfo) {
+        issues.add(locatie === undefined && textOf(hvEl, 'Locatie') === undefined ? 'defaulted' : 'invalid', `${sp}.type`,
+          `Locatie van hoofdvlak "${surfName}" ontbreekt of is onbekend; gevel aangenomen.`, textOf(hvEl, 'Locatie'));
+      }
+      const surfaceType: SurfaceType = locInfo?.type ?? 'wall';
 
-      const locInfo = LOCATIE_MAP[locatie] || { type: 'wall' as SurfaceType };
-      const surfaceType = locInfo.type;
-      const orientation = VABI_ORIENT_MAP[orientCode] || 'S';
+      // Tilt: 0 or 180 is horizontal; another value than 90 is kept for NTA 8800 (surfaceTilts).
+      const tiltText = textOf(hvEl, 'Hellingshoek');
+      let tilt = tiltText === undefined ? undefined : parseDecimalText(tiltText) ?? undefined;
+      if (tiltText !== undefined && (tilt === undefined || tilt < 0 || tilt > 180)) {
+        issues.add('invalid', `${sp}.tilt`, `Hellingshoek "${tiltText.slice(0, 40)}" van "${surfName}" is ongeldig en genegeerd.`, tiltText.slice(0, 40));
+        tilt = undefined;
+      }
+      const horizontal = (tilt !== undefined && (tilt === 0 || tilt === 180))
+        || (tilt === undefined && surfaceType === 'floor');
+      let orientation: Orientation = 'horizontal';
+      if (!horizontal) {
+        orientation = vabiCode(issues, `${sp}.orientation`, hvEl, 'Orientatie', VABI_ORIENT_MAP, 'S' as Orientation, 'Oriëntatie');
+      }
 
-      // Parse Deelvlakken
+      const area = issues.number(`${sp}.area`, textOf(hvEl, 'Oppervlakte'), { fallback: 0, min: 0 });
+
+      // Deelvlakken: windows on the surface, opaque parts as constructions.
       const windows: IWindow[] = [];
-      let constructionId = '';
+      const opaque: Array<{ el: Element; area: number | undefined }> = [];
       const dvListEl = getEl(hvEl, 'DeelvlakList');
-      const deelvlakken = dvListEl ? getChildren(dvListEl, 'Deelvlak') : [];
-
-      for (const dvEl of deelvlakken) {
+      for (const dvEl of dvListEl ? getChildren(dvListEl, 'Deelvlak') : []) {
         const dvType = getText(dvEl, 'Type');
-        const dvName = getText(dvEl, 'Naam') || 'Element';
-
         if (dvType === 'Transparant' || dvType.toLowerCase().includes('transparant')) {
-          // Window/glass
+          const wp = `${sp}.windows[${windows.length}]`;
           windows.push({
             id: crypto.randomUUID(),
-            name: dvName,
-            area: getNum(dvEl, 'Oppervlakte'),
-            uValue: getNum(dvEl, 'UWaarde', 1.5),
-            gValue: getNum(dvEl, 'GWaarde', 0.5),
+            name: getText(dvEl, 'Naam') || 'Raam',
+            area: issues.number(`${wp}.area`, textOf(dvEl, 'Oppervlakte'), { fallback: 0, min: 0 }),
+            uValue: issues.number(`${wp}.uValue`, textOf(dvEl, 'UWaarde'), { fallback: 1.5, min: 0, minExclusive: true }),
+            gValue: issues.number(`${wp}.gValue`, textOf(dvEl, 'GWaarde'), { fallback: 0.5, min: 0, max: 1, clamp: true }),
             orientation,
             surfaceId: '', // set below
           });
         } else {
-          // Opaque construction
-          const rc = getNum(dvEl, 'RcWaarde');
-          if (rc > 0 || dvName) {
-            // NTA 8800 table C.2: R_si by heat-flow direction (wall 0,13, roof
-            // 0,10, floor 0,17) plus R_se 0,04, which every project U carries.
-            const uValue = rc > 0 ? 1 / (rc + SURFACE_RESISTANCE[surfaceType].rsi + SURFACE_RESISTANCE[surfaceType].rse) : 0;
-            // Find or create construction; one name on a wall and a roof gives two.
-            let existing = constructions.find(c => c.name === dvName && Math.abs(c.rcValue - rc) < 0.01
-              && Math.abs(c.uValue - uValue) < 1e-9);
-            if (!existing && dvName) {
-              existing = {
-                id: crypto.randomUUID(),
-                name: dvName,
-                layers: [],
-                rcValue: rc,
-                uValue,
-              };
-              constructions.push(existing);
-            }
-            if (existing) constructionId = existing.id;
-          }
+          const text = textOf(dvEl, 'Oppervlakte');
+          opaque.push({ el: dvEl, area: text === undefined ? undefined : issues.number(`${sp}.deelvlakken.area`, text, { fallback: 0, min: 0 }) });
         }
       }
 
-      const surfaceId = crypto.randomUUID();
-      for (const w of windows) w.surfaceId = surfaceId;
+      const surfaceOf = (name: string, surfaceArea: number, constructionId: string, surfaceWindows: IWindow[]): ISurface => {
+        const surfaceId = crypto.randomUUID();
+        for (const w of surfaceWindows) w.surfaceId = surfaceId;
+        if (tilt !== undefined && !horizontal && !(tilt === 90 && surfaceType !== 'roof')) {
+          tilts.push({ surfaceId, tiltDeg: tilt });
+        }
+        return { id: surfaceId, name, type: surfaceType, area: surfaceArea, orientation, constructionId, zoneId, windows: surfaceWindows };
+      };
 
-      surfaces.push({
-        id: surfaceId,
-        name: surfName,
-        type: surfaceType,
-        area,
-        orientation,
-        constructionId,
-        zoneId,
-        windows,
-      });
+      // Several opaque parts (a wall with a door or panel) become separate surfaces, each with
+      // its own construction and area; the windows stay on the first.
+      const splittable = opaque.length > 1 && opaque.every((part) => part.area !== undefined && part.area > 0);
+      if (splittable) {
+        const windowArea = windows.reduce((sum, w) => sum + w.area, 0);
+        opaque.forEach((part, partIndex) => {
+          const partPath = `${zp}.surfaces[${surfaces.length}]`;
+          const constructionId = constructionFor(part.el, `${partPath}.construction`, surfaceType);
+          const partName = getText(part.el, 'Naam');
+          surfaces.push(partIndex === 0
+            ? surfaceOf(surfName, part.area! + windowArea, constructionId, windows)
+            : surfaceOf(partName ? `${surfName} – ${partName}` : `${surfName} (${partIndex + 1})`, part.area!, constructionId, []));
+        });
+      } else {
+        if (opaque.length > 1) {
+          issues.add('dropped', `${sp}.constructionId`,
+            `Hoofdvlak "${surfName}" heeft ${opaque.length} dichte deelvlakken zonder oppervlakte; alleen de eerste constructie is gekoppeld.`,
+            opaque.length);
+        }
+        const constructionId = opaque.length > 0 ? constructionFor(opaque[0].el, `${sp}.construction`, surfaceType) : '';
+        surfaces.push(surfaceOf(surfName, area, constructionId, windows));
+      }
 
-      // Parse thermal bridges (KoudebrugList)
-      const kbListEl = getEl(hvEl, 'KoudebrugList');
-      const kbEls = kbListEl ? getChildren(kbListEl, 'Koudebrug') : [];
-      for (const kbEl of kbEls) {
+      if (tilt === undefined && surfaceType === 'roof' && orientation !== 'horizontal') {
+        issues.add('dropped', `${sp}.tilt`, `Hellingshoek van dak "${surfName}" ontbreekt; vul die in bij de NTA-invoer.`);
+      }
+    });
+
+    // Thermal bridges: the zone's own list, plus those under each Hoofdvlak. The same list under
+    // every Hoofdvlak (written so by earlier Open Energy Studio exports) is read once.
+    const bridgeLists: Element[] = [];
+    const zoneList = getEl(rzEl, 'KoudebrugList');
+    if (zoneList) bridgeLists.push(zoneList);
+    const surfaceLists = hoofdvlakken.map((hvEl) => getEl(hvEl, 'KoudebrugList')).filter((el): el is Element => !!el);
+    const signatures = surfaceLists.map(bridgeListSignature);
+    const repeated = surfaceLists.length > 1 && signatures[0] !== '' && signatures.every((signature) => signature === signatures[0]);
+    if (repeated) {
+      bridgeLists.push(surfaceLists[0]);
+      issues.add('duplicate', `${zp}.thermalBridges`,
+        `Dezelfde koudebruglijst staat onder alle ${surfaceLists.length} hoofdvlakken; één keer ingelezen.`, surfaceLists.length);
+    } else {
+      bridgeLists.push(...surfaceLists);
+    }
+    for (const listEl of bridgeLists) {
+      for (const kbEl of getChildren(listEl, 'Koudebrug')) {
+        const bp = `${zp}.thermalBridges[${thermalBridges.length}]`;
         thermalBridges.push({
           id: crypto.randomUUID(),
           name: getText(kbEl, 'Naam') || 'Koudebrug',
-          psiValue: getNum(kbEl, 'PsiWaarde', 0.05),
-          length: getNum(kbEl, 'Lengte'),
+          // ψ may be negative (NTA 8800 §8.2.3); a missing ψ is reported, not silently filled.
+          psiValue: issues.number(`${bp}.psiValue`, textOf(kbEl, 'PsiWaarde'), { fallback: 0.05 }),
+          length: issues.number(`${bp}.length`, textOf(kbEl, 'Lengte'), { fallback: 0, min: 0 }),
           zoneId,
         });
       }
@@ -588,11 +854,11 @@ function importFromVABIXml(xmlString: string): IProject {
       height,
       surfaces,
       thermalBridges,
-      airTightness: { qv10 },
+      airTightness: qv10Assumed ? { qv10, assumed: true } : { qv10 },
     });
-  }
+  });
 
-  // Parse installations
+  // Installations
   const heatingSystems: IHeatingSystem[] = [];
   const ventilationSystems: IVentilationSystem[] = [];
   const coolingSystems: ICoolingSystem[] = [];
@@ -602,90 +868,87 @@ function importFromVABIXml(xmlString: string): IProject {
 
   const installEl = getEl(objectEl, 'Installaties');
   if (installEl) {
-    // Heating
     const verwEl = getEl(installEl, 'Verwarming');
-    if (verwEl) {
-      for (const opwEl of getChildren(verwEl, 'Opwekker')) {
-        heatingSystems.push({
-          id: crypto.randomUUID(),
-          name: getText(opwEl, 'Naam') || 'Verwarming',
-          type: HEATING_FROM_VABI[getInt(opwEl, 'Type', 1)] || 'hr_combi',
-          cop: getNum(opwEl, 'COP', 1),
-          coverageFraction: getNum(opwEl, 'Dekking', 1),
-        });
-      }
+    for (const opwEl of verwEl ? getChildren(verwEl, 'Opwekker') : []) {
+      const hp = `heatingSystems[${heatingSystems.length}]`;
+      heatingSystems.push({
+        id: crypto.randomUUID(),
+        name: getText(opwEl, 'Naam') || 'Verwarming',
+        type: vabiCode(issues, `${hp}.type`, opwEl, 'Type', HEATING_FROM_VABI, 'hr107' as HeatingSystemType, 'Verwarmingssoort'),
+        cop: issues.number(`${hp}.cop`, textOf(opwEl, 'COP'), { fallback: 1, min: 0, minExclusive: true }),
+        coverageFraction: issues.number(`${hp}.coverageFraction`, textOf(opwEl, 'Dekking'), { fallback: 1, min: 0, max: 1, clamp: true }),
+      });
     }
 
-    // Ventilation
     const ventEl = getEl(installEl, 'Ventilatie');
-    if (ventEl) {
-      for (const sysEl of getChildren(ventEl, 'Systeem')) {
-        ventilationSystems.push({
-          id: crypto.randomUUID(),
-          name: getText(sysEl, 'Naam') || 'Ventilatie',
-          type: VENT_FROM_VABI[getInt(sysEl, 'Type', 0)] || 'natural',
-          heatRecoveryEfficiency: getNum(sysEl, 'WTWRendement'),
-          sfp: getNum(sysEl, 'SFP'),
-        });
-      }
+    for (const sysEl of ventEl ? getChildren(ventEl, 'Systeem') : []) {
+      const vp = `ventilationSystems[${ventilationSystems.length}]`;
+      ventilationSystems.push({
+        id: crypto.randomUUID(),
+        name: getText(sysEl, 'Naam') || 'Ventilatie',
+        type: vabiCode(issues, `${vp}.type`, sysEl, 'Type', VENT_FROM_VABI, 'natural' as VentilationType, 'Ventilatiesoort'),
+        heatRecoveryEfficiency: issues.number(`${vp}.heatRecoveryEfficiency`, textOf(sysEl, 'WTWRendement'),
+          { fallback: 0, min: 0, max: 1, clamp: true, silentWhenMissing: true }),
+        sfp: issues.number(`${vp}.sfp`, textOf(sysEl, 'SFP'), { fallback: 0, min: 0, silentWhenMissing: true }),
+      });
     }
 
-    // Cooling
     const koelEl = getEl(installEl, 'Koeling');
-    if (koelEl) {
-      for (const opwEl of getChildren(koelEl, 'Opwekker')) {
-        coolingSystems.push({
-          id: crypto.randomUUID(),
-          name: getText(opwEl, 'Naam') || 'Koeling',
-          type: COOL_FROM_VABI[getInt(opwEl, 'Type', 0)] || 'none',
-          eer: getNum(opwEl, 'EER', 3),
-        });
-      }
+    for (const opwEl of koelEl ? getChildren(koelEl, 'Opwekker') : []) {
+      const cp = `coolingSystems[${coolingSystems.length}]`;
+      const type = vabiCode(issues, `${cp}.type`, opwEl, 'Type', COOL_FROM_VABI, 'none' as CoolingSystemType, 'Koelsoort');
+      coolingSystems.push({
+        id: crypto.randomUUID(),
+        name: getText(opwEl, 'Naam') || 'Koeling',
+        type,
+        // Without cooling the EER is not used, so 0 is kept as it is.
+        eer: issues.number(`${cp}.eer`, textOf(opwEl, 'EER'), { fallback: 3, min: 0, minExclusive: type !== 'none' }),
+      });
     }
 
-    // Hot water
     const tapwEl = getEl(installEl, 'Tapwater');
-    if (tapwEl) {
-      for (const opwEl of getChildren(tapwEl, 'Opwekker')) {
-        hotWaterSystems.push({
-          id: crypto.randomUUID(),
-          name: getText(opwEl, 'Naam') || 'Tapwater',
-          type: HW_FROM_VABI[getInt(opwEl, 'Type', 0)] || 'hr_combi',
-          efficiency: getNum(opwEl, 'Rendement', 1),
-          hasSolarBoiler: getText(opwEl, 'Zonneboiler') === 'true',
-          solarBoilerFraction: getNum(opwEl, 'ZonneboilerFractie'),
-        });
-      }
+    for (const opwEl of tapwEl ? getChildren(tapwEl, 'Opwekker') : []) {
+      const wp = `hotWaterSystems[${hotWaterSystems.length}]`;
+      hotWaterSystems.push({
+        id: crypto.randomUUID(),
+        name: getText(opwEl, 'Naam') || 'Tapwater',
+        type: vabiCode(issues, `${wp}.type`, opwEl, 'Type', HW_FROM_VABI, 'hr_combi' as HotWaterSystemType, 'Tapwatersoort'),
+        efficiency: issues.number(`${wp}.efficiency`, textOf(opwEl, 'Rendement'), { fallback: 1, min: 0, minExclusive: true }),
+        hasSolarBoiler: getText(opwEl, 'Zonneboiler') === 'true',
+        solarBoilerFraction: issues.number(`${wp}.solarBoilerFraction`, textOf(opwEl, 'ZonneboilerFractie'),
+          { fallback: 0, min: 0, max: 1, clamp: true, silentWhenMissing: true }),
+      });
     }
   }
 
-  // Renewables
   const herEl = getEl(objectEl, 'Hernieuwbaar');
   if (herEl) {
     for (const pvEl of getChildren(herEl, 'PVSysteem')) {
+      const pp = `solarPV[${solarPV.length}]`;
       solarPV.push({
         id: crypto.randomUUID(),
         name: getText(pvEl, 'Naam') || 'PV',
-        peakPower: getNum(pvEl, 'Piekvermogen'),
-        orientation: VABI_ORIENT_MAP[getInt(pvEl, 'Orientatie', 4)] || 'S',
-        tilt: getNum(pvEl, 'Hellingshoek', 30),
-        area: getNum(pvEl, 'Oppervlakte'),
+        peakPower: issues.number(`${pp}.peakPower`, textOf(pvEl, 'Piekvermogen'), { fallback: 0, min: 0 }),
+        orientation: vabiCode(issues, `${pp}.orientation`, pvEl, 'Orientatie', VABI_ORIENT_MAP, 'S' as Orientation, 'Oriëntatie'),
+        tilt: issues.number(`${pp}.tilt`, textOf(pvEl, 'Hellingshoek'), { fallback: 30, min: 0, max: 90, clamp: true }),
+        area: issues.number(`${pp}.area`, textOf(pvEl, 'Oppervlakte'), { fallback: 0, min: 0 }),
       });
     }
 
     for (const ztEl of getChildren(herEl, 'ZonthermischSysteem')) {
+      const tp = `solarThermal[${solarThermal.length}]`;
       solarThermal.push({
         id: crypto.randomUUID(),
         name: getText(ztEl, 'Naam') || 'Zonnecollector',
-        collectorArea: getNum(ztEl, 'CollectorOppervlakte'),
-        type: ST_FROM_VABI[getInt(ztEl, 'Type', 0)] || 'flat_plate',
-        orientation: VABI_ORIENT_MAP[getInt(ztEl, 'Orientatie', 4)] || 'S',
-        tilt: getNum(ztEl, 'Hellingshoek', 45),
+        collectorArea: issues.number(`${tp}.collectorArea`, textOf(ztEl, 'CollectorOppervlakte'), { fallback: 0, min: 0 }),
+        type: vabiCode(issues, `${tp}.type`, ztEl, 'Type', ST_FROM_VABI, 'flat_plate' as SolarThermalType, 'Collectorsoort'),
+        orientation: vabiCode(issues, `${tp}.orientation`, ztEl, 'Orientatie', VABI_ORIENT_MAP, 'S' as Orientation, 'Oriëntatie'),
+        tilt: issues.number(`${tp}.tilt`, textOf(ztEl, 'Hellingshoek'), { fallback: 45, min: 0, max: 90, clamp: true }),
       });
     }
   }
 
-  return {
+  const project: IProject = {
     id: crypto.randomUUID(),
     name: projectName,
     description,
@@ -701,17 +964,37 @@ function importFromVABIXml(xmlString: string): IProject {
     solarThermal,
     constructions,
   };
+
+  // Tilts from the file start the NTA input (NTA 8800 surface tilts); the rest of
+  // that input still has to be entered.
+  if (tilts.length > 0) {
+    const block = buildNtaCalculationTemplate(project) as Record<string, unknown> & {
+      surfaceTilts: Array<{ surfaceId: string; tiltDeg: number | null; sourceReference: string }>;
+    };
+    for (const { surfaceId, tiltDeg } of tilts) {
+      const entry = { surfaceId, tiltDeg, sourceReference: `VABI-bestand, Hellingshoek ${tiltDeg}°` };
+      const index = block.surfaceTilts.findIndex((item) => item.surfaceId === surfaceId);
+      if (index >= 0) block.surfaceTilts[index] = entry;
+      else block.surfaceTilts.push(entry);
+    }
+    project.ntaCalculation = block as unknown as IProject['ntaCalculation'];
+  }
+
+  reportUnreadElements(doc.documentElement, objectEl, issues);
+  const sourceVersion = algemeenVersion(doc);
+  sourceVersionNotCarried(issues, 'VABI', sourceVersion);
+  ntaInputNotInFormat(issues, 'VABI');
+  return { project, issues, ...(sourceVersion ? { sourceVersion } : {}) };
 }
 
 // Legacy import for the old custom XML format (backwards compatibility)
-function importFromVABILegacy(doc: Document): IProject {
+function importFromVABILegacy(doc: Document, issues: ImportIssues): ReadResult {
   const gebouw = doc.getElementsByTagName('gebouw')[0];
-  if (!gebouw) throw new Error('Geen gebouw element');
+  if (!gebouw) throw new ImportFormatError('vabi_no_object', 'Geen gebouw-element gevonden.');
 
   const constructions: IConstruction[] = [];
   const zones: IZone[] = [];
 
-  // Parse constructions
   const constEls = gebouw.getElementsByTagName('constructie');
   for (let i = 0; i < constEls.length; i++) {
     const el = constEls[i];
@@ -719,47 +1002,54 @@ function importFromVABILegacy(doc: Document): IProject {
       id: el.getAttribute('id') || `con-${i}`,
       name: getText(el, 'naam') || `Constructie ${i + 1}`,
       layers: [],
-      rcValue: getNum(el, 'rc-waarde'),
-      uValue: getNum(el, 'u-waarde'),
+      rcValue: issues.number(`constructions[${i}].rcValue`, textOf(el, 'rc-waarde'), { fallback: 0, min: 0, silentWhenMissing: true }),
+      uValue: issues.number(`constructions[${i}].uValue`, textOf(el, 'u-waarde'), { fallback: 0, min: 0, silentWhenMissing: true }),
     });
   }
 
-  // Parse zones
   const zoneEls = gebouw.getElementsByTagName('zone');
   for (let i = 0; i < zoneEls.length; i++) {
     const zEl = zoneEls[i];
+    const zp = `zones[${i}]`;
     const zoneId = zEl.getAttribute('id') || `zone-${i}`;
-
     const surfaces: ISurface[] = [];
     const thermalBridges: IThermalBridge[] = [];
 
     const oppEls = zEl.getElementsByTagName('oppervlak');
     for (let j = 0; j < oppEls.length; j++) {
       const oEl = oppEls[j];
+      const sp = `${zp}.surfaces[${j}]`;
       const surfId = oEl.getAttribute('id') || `surf-${i}-${j}`;
       const windows: IWindow[] = [];
 
       const raamEls = oEl.getElementsByTagName('raam');
       for (let k = 0; k < raamEls.length; k++) {
         const rEl = raamEls[k];
+        const wp = `${sp}.windows[${k}]`;
         windows.push({
           id: rEl.getAttribute('id') || `win-${i}-${j}-${k}`,
           name: getText(rEl, 'naam') || 'Raam',
-          area: getNum(rEl, 'oppervlakte'),
-          uValue: getNum(rEl, 'u-waarde', 1.5),
-          gValue: getNum(rEl, 'g-waarde', 0.5),
+          area: issues.number(`${wp}.area`, textOf(rEl, 'oppervlakte'), { fallback: 0, min: 0 }),
+          uValue: issues.number(`${wp}.uValue`, textOf(rEl, 'u-waarde'), { fallback: 1.5, min: 0, minExclusive: true }),
+          gValue: issues.number(`${wp}.gValue`, textOf(rEl, 'g-waarde'), { fallback: 0.5, min: 0, max: 1, clamp: true }),
           orientation: 'S',
           surfaceId: surfId,
         });
       }
 
+      // The legacy format has no element type, orientation or (always) construction.
+      issues.add('defaulted', `${sp}.type`, 'Oud VABI-formaat zonder vlaksoort en oriëntatie; gevel op het zuiden aangenomen.', 'wall/S');
+      const ownConstruction = textOf(oEl, 'constructie-id');
+      if (!ownConstruction && constructions[0]) {
+        issues.add('defaulted', `${sp}.constructionId`, `Geen constructie bij dit vlak; de eerste constructie "${constructions[0].name}" aangenomen.`);
+      }
       surfaces.push({
         id: surfId,
         name: getText(oEl, 'naam') || 'Oppervlak',
         type: 'wall',
-        area: getNum(oEl, 'oppervlakte'),
+        area: issues.number(`${sp}.area`, textOf(oEl, 'oppervlakte'), { fallback: 0, min: 0 }),
         orientation: 'S',
-        constructionId: getText(oEl, 'constructie-id') || (constructions[0]?.id ?? ''),
+        constructionId: ownConstruction || (constructions[0]?.id ?? ''),
         zoneId,
         windows,
       });
@@ -767,42 +1057,53 @@ function importFromVABILegacy(doc: Document): IProject {
 
     const tbEls = zEl.getElementsByTagName('koudebrug');
     for (let j = 0; j < tbEls.length; j++) {
+      const bp = `${zp}.thermalBridges[${j}]`;
       thermalBridges.push({
         id: tbEls[j].getAttribute('id') || `tb-${i}-${j}`,
         name: getText(tbEls[j], 'naam') || 'Koudebrug',
-        psiValue: getNum(tbEls[j], 'psi-waarde', 0.05),
-        length: getNum(tbEls[j], 'lengte'),
+        psiValue: issues.number(`${bp}.psiValue`, textOf(tbEls[j], 'psi-waarde'), { fallback: 0.05 }),
+        length: issues.number(`${bp}.length`, textOf(tbEls[j], 'lengte'), { fallback: 0, min: 0 }),
         zoneId,
       });
     }
 
+    const before = issues.list.length;
+    const qv10 = issues.number(`${zp}.airTightness.qv10`, textOf(zEl, 'qv10'), {
+      fallback: 1.0, min: 0, minExclusive: true, fallbackReason: 'aangenomen waarde, te controleren',
+    });
     zones.push({
       id: zoneId,
       name: getText(zEl, 'naam') || `Zone ${i + 1}`,
-      floorArea: getNum(zEl, 'vloeroppervlak'),
-      volume: getNum(zEl, 'volume'),
-      height: getNum(zEl, 'hoogte', 2.6),
+      floorArea: issues.number(`${zp}.floorArea`, textOf(zEl, 'vloeroppervlak'), { fallback: 0, min: 0 }),
+      volume: issues.number(`${zp}.volume`, textOf(zEl, 'volume'), { fallback: 0, min: 0 }),
+      height: issues.number(`${zp}.height`, textOf(zEl, 'hoogte'), { fallback: 2.6, min: 0 }),
       surfaces,
       thermalBridges,
-      airTightness: { qv10: getNum(zEl, 'qv10', 1.0) },
+      airTightness: issues.list.length > before ? { qv10, assumed: true } : { qv10 },
     });
   }
 
+  issues.add('defaulted', 'buildingFunction', 'Oud VABI-formaat zonder gebruiksfunctie; residential aangenomen.', 'residential');
+  sourceVersionNotCarried(issues, 'VABI', undefined);
+  ntaInputNotInFormat(issues, 'VABI');
   return {
-    id: crypto.randomUUID(),
-    name: getText(gebouw, 'naam') || 'VABI Import',
-    description: getText(gebouw, 'omschrijving'),
-    buildingFunction: 'residential',
-    address: getText(gebouw, 'adres'),
-    city: getText(gebouw, 'plaats'),
-    zones,
-    heatingSystems: [],
-    ventilationSystems: [],
-    coolingSystems: [],
-    hotWaterSystems: [],
-    solarPV: [],
-    solarThermal: [],
-    constructions,
+    project: {
+      id: crypto.randomUUID(),
+      name: getText(gebouw, 'naam') || 'VABI Import',
+      description: getText(gebouw, 'omschrijving'),
+      buildingFunction: 'residential',
+      address: getText(gebouw, 'adres'),
+      city: getText(gebouw, 'plaats'),
+      zones,
+      heatingSystems: [],
+      ventilationSystems: [],
+      coolingSystems: [],
+      hotWaterSystems: [],
+      solarPV: [],
+      solarThermal: [],
+      constructions,
+    },
+    issues,
   };
 }
 
@@ -810,49 +1111,20 @@ function importFromVABILegacy(doc: Document): IProject {
 // Download helper (export as .epa ZIP)
 // ============================================================
 
-export function downloadVABI(project: IProject): void {
-  const zipData = exportToVABI(project);
-  const blob = new Blob([zipData.buffer as ArrayBuffer], { type: 'application/zip' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${project.name || 'project'}.epa`;
-  a.click();
-  URL.revokeObjectURL(url);
+/**
+ * Saves the EPA archive and returns what the format left out (empty when
+ * nothing was lost), so the adviser can be told.
+ */
+export function downloadVABI(project: IProject): string[] {
+  downloadBytes(exportToVABI(project), `${project.name || 'project'}.epa`);
+  return vabiExportLosses(project);
 }
 
 // ============================================================
 // File dialog helper (import .epa ZIP or .xml)
 // ============================================================
 
-export function openVABIFileDialog(): Promise<IProject> {
-  return new Promise((resolve, reject) => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.epa,.xml,.zip';
-    input.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) { reject(new Error('Geen bestand geselecteerd')); return; }
-      const reader = new FileReader();
-      reader.onload = () => {
-        try {
-          const data = new Uint8Array(reader.result as ArrayBuffer);
-
-          // Check if it's a ZIP file (starts with PK)
-          if (data[0] === 0x50 && data[1] === 0x4B) {
-            resolve(importFromVABI(data));
-          } else {
-            // Assume raw XML
-            const xmlString = new TextDecoder('utf-8').decode(data);
-            resolve(importFromVABIXml(xmlString));
-          }
-        } catch (err) {
-          reject(err);
-        }
-      };
-      reader.onerror = () => reject(new Error('Fout bij lezen bestand'));
-      reader.readAsArrayBuffer(file);
-    };
-    input.click();
-  });
+/** Picks and imports a VABI EPA archive or project.xml, with its name, SHA-256 and import issues. */
+export async function openVABIFileDialog(): Promise<ImportResult> {
+  return importFile(await pickFile('.epa,.xml,.zip'), readVABIFile);
 }

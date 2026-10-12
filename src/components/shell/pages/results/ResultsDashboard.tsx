@@ -22,7 +22,7 @@ import {
 import type { Route } from '../../../../core/navigation/routes';
 import { ResultsView } from '../../../ResultsView/ResultsView';
 import {
-  Banner, Card, DataTable, ErrorState, IssueList, Segmented, Skeleton, StaleBanner, StatusPill, type Column,
+  Banner, Button, Card, DataTable, ErrorState, IssueList, Segmented, Skeleton, StaleBanner, StatusPill, type Column,
 } from '../../../ui';
 import { routeLabel } from '../../PageHeader';
 import { MonthlyChart } from './MonthlyChart';
@@ -42,7 +42,9 @@ export function ResultsDashboard({ sub, onNavigate }: { sub: string | undefined;
   const assessment = kernel.settled;
   if (!assessment) {
     if (kernel.phase === 'error') {
-      return <ErrorState title={t('results.dash.errorTitle')}>{kernel.error ?? t('results.dash.errorText')}</ErrorState>;
+      return <ErrorState title={t('results.dash.errorTitle')} details={kernel.error}
+        action={<Button variant="primary" onClick={kernel.refresh}>{t('shell.recalculate')}</Button>}>
+        {t('results.dash.errorText')}</ErrorState>;
     }
     return <div className="results-dash results-dash--loading" role="status" aria-live="polite">
       <p>{t('results.dash.loading')}</p>

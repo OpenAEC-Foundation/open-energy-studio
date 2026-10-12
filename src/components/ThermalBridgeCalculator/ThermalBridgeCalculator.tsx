@@ -12,6 +12,7 @@ import {
   type FrameMaterial,
 } from '../../core/energy/ThermalBridgeCalc';
 import './ThermalBridgeCalculator.css';
+import { DecimalInput } from '../ui';
 
 export function ThermalBridgeCalculator() {
   const { t, locale } = useI18n();
@@ -80,8 +81,7 @@ export function ThermalBridgeCalculator() {
 
             <label className="tb-field">
               <span>{t('tb.rcWall')} (m2K/W)</span>
-              <input
-                type="number"
+              <DecimalInput
                 min={0.5}
                 max={10}
                 step={0.1}
@@ -95,8 +95,7 @@ export function ThermalBridgeCalculator() {
                 <span>
                   {meta.rcFloorRoofLabel === 'roof' ? t('tb.rcRoof') : t('tb.rcFloor')} (m2K/W)
                 </span>
-                <input
-                  type="number"
+                <DecimalInput
                   min={0.5}
                   max={10}
                   step={0.1}
@@ -137,8 +136,7 @@ export function ThermalBridgeCalculator() {
             {meta.needsFrameWidth && (
               <label className="tb-field">
                 <span>{t('tb.frameWidth')} (mm)</span>
-                <input
-                  type="number"
+                <DecimalInput
                   min={40}
                   max={120}
                   step={5}
@@ -151,8 +149,7 @@ export function ThermalBridgeCalculator() {
             {meta.needsFoundationDepth && (
               <label className="tb-field">
                 <span>{t('tb.foundationDepth')} (m)</span>
-                <input
-                  type="number"
+                <DecimalInput
                   min={0.3}
                   max={2.0}
                   step={0.1}

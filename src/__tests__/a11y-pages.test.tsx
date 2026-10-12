@@ -19,6 +19,7 @@ import type { ShellActions } from '../components/shell/ShellActions';
 import { stepStatuses } from '../core/nta/stepStatus';
 import { TOOL_STEP, WORKFLOW_STEPS, type Route } from '../core/navigation/routes';
 import { exampleProject, type ExampleKind } from '../core/nta/ExampleProjects';
+import { SLOW_UI_TEST_MS } from './timeouts';
 
 // The accessible-name algorithm Testing Library uses for *ByRole (a transitive dependency; its
 // package "exports" hide the typings from this tsconfig, hence the typed dynamic import).
@@ -100,5 +101,5 @@ describe.each([['dark', 'terraced_dwelling'], ['light', 'small_office']] as cons
     await waitFor(() => expect(container.querySelector('.lazy-page-loading')).toBeNull(), { timeout: 10000 });
     expect(audit(container)).toEqual([]);
     unmount();
-  }, 30000);
+  }, SLOW_UI_TEST_MS);
 });

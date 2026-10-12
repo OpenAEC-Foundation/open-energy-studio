@@ -94,3 +94,16 @@ describe('in-app manual (BRL 9501 §4.4)', () => {
     expect(navigate).toHaveBeenCalledWith({ step: 'tool', sub: 'manual', chapter: '05-validatie' });
   });
 });
+
+describe('manual labels', () => {
+  it('fills the versions into the kernel mismatch notice and the document reference', async () => {
+    const { default: i18next } = await import('../i18n/i18n');
+    for (const lng of ['nl', 'en']) {
+      const mismatch = i18next.t('manual.kernelMismatch', { lng, manual: '0.4.0', kernel: '0.1.0' });
+      expect(mismatch).toContain('0.4.0');
+      expect(mismatch).toContain('0.1.0');
+      expect(mismatch).not.toMatch(/[{}]/);
+      expect(i18next.t('manual.documentRef', { lng, path: 'docs/x.md' })).toContain('docs/x.md');
+    }
+  });
+});

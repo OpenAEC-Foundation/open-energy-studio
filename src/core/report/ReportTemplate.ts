@@ -31,7 +31,7 @@ const TEXT = {
     noPv: 'Geen zonnepanelen gedefinieerd', solarThermal: 'Zonnecollectoren (thermisch)', noSolarThermal: 'Geen zonnecollectoren gedefinieerd',
     pvKernel: 'Zonnestroom volgens hoofdstuk 16', system: 'Systeem', production: 'Opwekking',
     bengKernel: 'BENG-indicatoren (NTA 8800-kern)',
-    kernelNotice: 'Uit de Rust-rekenkern van Open Energy Studio (NTA 8800:2025+C1:2026). Onverifieerde berekening: geen officieel energielabel, niet geattesteerd en niet geregistreerd.',
+    kernelNotice: (edition: string) => `Uit de Rust-rekenkern van Open Energy Studio (${edition}). Onverifieerde berekening: geen officieel energielabel, niet geattesteerd en niet geregistreerd.`,
     bengIndicative: 'Indicatieve BENG-waarden',
     withheldTitle: 'BENG-resultaten achtergehouden',
     withheldInvalid: 'De NTA-rekenkern keurt de invoer af. Dit rapport bevat daarom geen BENG-waarden, ook geen vereenvoudigde. Los eerst de meldingen in het NTA-paneel op.',
@@ -86,7 +86,7 @@ const TEXT = {
     noPv: 'No solar panels defined', solarThermal: 'Solar collectors (thermal)', noSolarThermal: 'No solar collectors defined',
     pvKernel: 'Solar electricity per chapter 16', system: 'System', production: 'Production',
     bengKernel: 'BENG indicators (NTA 8800 kernel)',
-    kernelNotice: 'From the Open Energy Studio Rust kernel (NTA 8800:2025+C1:2026). Unverified calculation: not an official energy label, not attested and not registered.',
+    kernelNotice: (edition: string) => `From the Open Energy Studio Rust kernel (${edition}). Unverified calculation: not an official energy label, not attested and not registered.`,
     bengIndicative: 'Indicative BENG values',
     withheldTitle: 'BENG results withheld',
     withheldInvalid: 'The NTA kernel refuses the input. This report therefore contains no BENG values, not even simplified ones. Resolve the messages in the NTA panel first.',
@@ -281,7 +281,7 @@ export function generateReportHTML(project: IProject, result: IBENGResult | null
       <tr><td>${L.tojuli}</td><td>${fmt(kernel.tojuli.value, indicatorDecimals('tojuli'))}</td><td>≤ ${fmt(1.2, indicatorDecimals('tojuli'))}</td><td>K</td><td>${status(kernel.tojuli.meets)}</td></tr>` : '';
     bengHTML = `
       <h2>${L.bengKernel}</h2>
-      <p class="verification-notice">${L.kernelNotice}</p>
+      <p class="verification-notice">${escapeHtml(L.kernelNotice(options.kernel?.targetNormVersion ?? 'NTA 8800:2025+C1:2026'))}</p>
       <table class="beng-table">
         <tr><th>${L.indicator}</th><th>${L.calculated}</th><th>${L.limit}</th><th>${L.unit}</th><th>${L.status}</th></tr>
         ${rows}${tojuli}

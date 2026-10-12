@@ -67,22 +67,17 @@ export const zh: Record<string, string> = {
   'ribbon.exportReport': '导出报告',
 
   // Project Browser
-  'browser.project': '项目',
   'browser.zones': '区域',
-  'browser.zone': '区域',
   'browser.surfaces': '表面',
   'browser.windows': '窗户',
   'browser.thermalBridges': '热桥',
   'browser.constructions': '构造',
-  'browser.installations': '设备系统',
   'browser.heating': '供暖',
   'browser.ventilation': '通风',
   'browser.cooling': '制冷',
   'browser.hotWater': '热水',
-  'browser.renewables': '可再生能源',
   'browser.solarPV': '光伏',
   'browser.solarThermal': '太阳能热水',
-  'browser.airTightness': '气密性',
 
   // Properties Panel
   'properties.title': '属性',
@@ -109,7 +104,6 @@ export const zh: Record<string, string> = {
   'dialog.save': '保存',
   'dialog.cancel': '取消',
   'dialog.delete': '删除',
-  'dialog.add': '添加',
   'dialog.edit': '编辑',
   'dialog.close': '关闭',
 
@@ -417,7 +411,6 @@ export const zh: Record<string, string> = {
   'theme.system': '系统 (自动检测)',
   'theme.dark': '深色',
   'theme.light': '浅色',
-  'theme.blue': '蓝色',
   'theme.highContrast': '高对比度',
   'settings.general.autoSave': '\u81ea\u52a8\u4fdd\u5b58',
   'settings.general.autoSaveDesc': '\u5b9a\u671f\u81ea\u52a8\u4fdd\u5b58\u9879\u76ee',
@@ -440,7 +433,6 @@ export const zh: Record<string, string> = {
 
   // Feedback dialog
   'feedback.title': 'Send Feedback',
-  'feedback.sendFeedback': 'Send Feedback',
   'feedback.email': 'Email',
   'feedback.emailPlaceholder': 'your@email.com',
   'feedback.fullName': 'Full Name',

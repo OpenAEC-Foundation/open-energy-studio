@@ -23,7 +23,8 @@ Elke ingang van de kern rekent in een gekozen uitgave en zet die op de uitkomst 
 | Maatwerkadvies (`assess_maatwerkadvies`) | de basissituatie: `ntaCalculation.normVersion` van het project of `normVersion` van de gebouwinvoer | `calculated_legacy_edition` als alle varianten rekenen; een maatregel die de uitgave wijzigt, is ongeldig (`measure_changes_norm_version`) |
 | Herlabelen (`assess_relabel`) | `ntaCalculation.normVersion` van het **oorspronkelijke** project | een andere uitgave in het huidige project is *niet toegestaan* (6b-achtig, eigen cluster) |
 | Constructies en diagnoses (API, MCP en desktop-app) | verzoeklid `normVersion`; de kern rekent met die uitgave actief. De diagnosepanelen en de constructie-editor sturen de uitgave van het project mee | `calculated_unverified` wordt `calculated_legacy_edition` |
-| Referentiegevallen | het geval zelf (alleen 2025+C1) | `normVersion` ≠ `2025+C1` geeft `norm_version_not_applicable` |
+| Referentiegevallen (`audit_reference_case`, `compare_reference_case`) | `case.normVersion` van het geval zelf (elke geïmplementeerde uitgave); de uitkomst krijgt die uitgave als stempel | een verzoeklid `normVersion` dat van het geval afwijkt, geeft `norm_version_conflict` |
+| Diagnosevergelijkingen (`compare_direct_diagnostic`, `compare_gas_heat_pump_chain_diagnostic`) | alleen 2025+C1 | `normVersion` ≠ `2025+C1` geeft `norm_version_not_applicable` |
 | Label-invoer-hash | — (hangt niet van de uitgave af) | ongewijzigd |
 
 **Basisopname in een oudere uitgave.** Het opnameprotocol (ISSO 82.1 en 75.1, 7e druk 2025) hoort bij NTA 8800:2025+C1. Een oudere uitgave is in de kern alleen toegestaan om te **vergelijken**: de kern past dezelfde ISSO-opnameregels en forfaits toe en rekent het gebouw daarna in de gekozen uitgave. De uitkomst krijgt de waarschuwing `survey_protocol_edition_differs`, de status `calculated_legacy_edition` en `registrationEligible: false`. Een oude opname die volgens een eerdere druk van ISSO 82.1/75.1 is gedaan, wordt dus niet nagebootst; de kern kent alleen de 7e druk.
@@ -43,7 +44,7 @@ Elke ingang van de kern rekent in een gekozen uitgave en zet die op de uitkomst 
 | `targetNormVersion` | `NTA 8800:2025+C1:2026` | `NTA 8800:2024 met INT-V1:2024`, `NTA 8800:2023` of `NTA 8800:2022` |
 | `normVersion`, `registrationEligible` | `2025+C1`, `true` | `2024`, `2023` of `2022`, `false` |
 | Registratiecontrole | volgens BRL 9500 | altijd de fout `legacy_edition_not_registrable` |
-| Indicatoren die pas in 2025+C1 bestaan (§5.3.3–5.3.5, 5.5.6.1–2, 5.5.7, 5.6.4, 5.9, bijlage AB) | berekend | `null` |
+| Blok `chapter5` met de indicatoren die pas in 2025+C1 bestaan (§5.3.3–5.3.5, 5.5.6.1–2, 5.5.7, 5.6.4, 5.9, bijlage AB) | berekend | `null`; het hele blok vervalt, dus ook de posten die de oudere uitgave wel kent: E_H;nd (5.3a, alle uitgaven), de standaard voor woningisolatie (2023 p. 74, 2024 p. 76), de renovatiestandaard (2024 p. 73–74), EwePrenTot (2023 p. 73, 2024 p. 75) en 5.17–5.19. Zonder blok geeft de kern in een oudere uitgave ook geen melding `standard_insulation_construction_year_missing` (review 45) |
 
 Invoer voor een route die de gekozen uitgave niet kent, wordt geweigerd met `route_not_in_edition` op het pad van die invoer. Voorbeelden voor 2024: `bacsFactor` ≠ 1, een dakrand als belemmering van PV of collectoren, zonwerend glas (`glazingType: solar_control`), vaste lamellen, en `effectiveMassKgPerM2`/`roofAreaM2` van bijlage AA in 2025+C1. Voor 2023 daarnaast: bijlage AA als bewijs van koelcapaciteit, een spuiopening volgens (11.71a) (`area.method: discharge`), en omgekeerd `kitchenPipeDiameter` (tabel 13.2) in 2024 en 2025+C1.
 
@@ -61,7 +62,7 @@ Dat wijkt bewust af van "alle parameters doorgeven". De kern rekent synchroon op
 
 | # | Onderwerp | 2024 (pagina) | 2025+C1 (pagina) | Kern |
 | --- | --- | --- | --- | --- |
-| 1 | 5.5.8/15.3 f_BACS 1,05 | bestaat niet (p. 87–88) | p. 89–91, 99–101, 676 | `bacsFactor` ≠ 1 → `route_not_in_edition`; projectroute zet 1,0 |
+| 1 | 5.5.8/15.3 f_BACS 1,05 | bestaat niet (p. 87–88) | p. 89–91, 99–101, 676 | `bacsFactor` ≠ 1 → `route_not_in_edition`; projectroute en utiliteitsopname zetten 1,0 (opname: regel `bacs_factor_not_in_edition`) |
 | 2 | 5.14a/b opslagcorrectie | geen (5.10, p. 84–86) | p. 85–87 | `storage_correction_factor` = 0 |
 | 3 | Tabel 5.3 K_CO2 el/gas/olie/biomassa/externe warmte | 0,34 / 0,183 / 0,260 / 0,372 / 0,17 (p. 94–95) | 0,268 / 0,218 / 0,326 / 0,104 / 0,09 (p. 96–98) | `NormProfile`; ook koude-forfait K_el/3 |
 | 4 | Tabel 5.6 AVI | 0,113 (p. 117) | 0,138 (p. 125) | `SystemCarrier::co2` |
@@ -71,6 +72,7 @@ Dat wijkt bewust af van "alle parameters doorgeven". De kern rekent synchroon op
 | 8 | Bronwarmte warmtepomp (5.20) | elke tabelbron ≥ 15 °C, f_P 0,9 of bijlage P, plus Q/EER (p. 93, 323, 346; INT-V1 p. 5) | alleen collectieve bron, < 20 °C f_P;el/23 (p. 72, 90, 362–363) | `SystemHeatPump::source_heat_booked`, `source_factors`, `realisedFrom2013` |
 | 9 | 17.3.2 f) dakrand als belemmering | bestaat niet (p. 678–687) | p. 695–708 | `collector_obstruction_factor` → geen waarde; PV-invoer `route_not_in_edition` |
 | 10 | 7.6.6.1.2–7.6.6.1.3.4 zonwerend glas, vaste en draaibare lamellen (ook TOjuli-uitzondering 5.7.1) | bestaan niet (p. 179–180, 106) | p. 190–196, 114–115 | invoer `route_not_in_edition` |
+| 10a | TOjuli-uitzondering 5.7.1 methode 3: zonwering die de zoninstraling beperkt | zonwering van tabel 7.5 of 7.6 (screens, jaloezieën, rolluiken, gemetalliseerde weefsels, uitval- en knikarmschermen) telt mee (p. 106) | alleen de vaste lamellen van tabel 7.4a/7.4b (punt 10); zonwering van tabel 7.5/7.6 telt niet (p. 114) | `solar_limitation_movable_shading`: in 2024 telt een raam met `movableShading.device`; een gedeclareerde F_c noemt geen tabeltype en telt niet (review 40) |
 | 11 | (13.157)/(13.160) f_gebouw;si;W | /365, hulpenergie zonder f_gebouw (p. 611–612) | /(365·f_gebouw), × f_gebouw (p. 627–628) | `book_generator` |
 | 12 | Tabel 13.18 c_W,EU;gen | kolom (p. 614) | lineair geïnterpoleerd (p. 630–631) | `european_profile_correction` |
 | 13 | (11.136) gemeten motorrendement | alleen als hoger dan tabel 11.20 (p. 499) | vrije keuze (p. 515) | `nominal_fan_power` |
@@ -79,6 +81,7 @@ Dat wijkt bewust af van "alle parameters doorgeven". De kern rekent synchroon op
 | 16 | Tabel E.11/E.12 biobased λ, riet | vlas/schapenwol/katoen 0,050, kokos 0,055, stro 0,060, hennep 0,100; riet 0,200 geen isolatie (p. 791) | p. 810 | `ForfaitMaterial::lambda` |
 | 17 | (I.3) rieten dak | d/0,2 (p. 814) | d/0,105 (p. 833) | `ForfaitOpaque::calculate` |
 | 18 | (W.9) ondergrens noemer boosterwarmtepomp | geen (p. 1103) | ≥ E_ls (p. 1123) | `calculate_booster` |
+| 18a | P.3 item 6 oppervlaktewater en andere LT-bronnen als collectieve bron | alleen bodem en grondwater (p. 916) | ruimere lijst (p. 936) | `wide_collective_low_temperature_sources`; geen eigen invoer (zie "Niet omgeschakeld") |
 
 ## Verschillen 2023 → 2024 die de kern omschakelt
 
@@ -98,7 +101,7 @@ Bovenop de achttien punten hierboven. Pagina's links uit NTA 8800:2023, rechts u
 | 28 | (P.25) referentievermogen | Q/8 800 × 3,6 (p. 950) | Q/5 400 × 3,6 (p. 948) | `annex_p` |
 | 29 | P.6.5.4.8 rendement geothermie | forfait 20 (p. 960) | met temperatuurcorrectie (p. 958) | `geothermal_efficiency` |
 | 30 | Biomassagrens bmA | 100 kW (p. 90–93) | 500 kW (p. 92–95) | `biomass_class_limit_kw`; het invoerveld `biomassAbove500Kw` betekent "boven de grens van de uitgave" |
-| 31 | Bijlage AA als bewijs koelcapaciteit (5.7.1) | bestaat niet; actieve koeling met voldoende capaciteit geldt als voldaan (p. 103–104) | p. 106, 1115–1127 | `capacity.method: annex_aa` → `route_not_in_edition` |
+| 31 | Bijlage AA en toets op beperking van de zoninstraling als bewijs koelcapaciteit (5.7.1 methode 2 en 3) | bestaan niet; actieve koeling met voldoende capaciteit geldt als voldaan (p. 103–104) | p. 105–106, 1115–1127 | `cooling_capacity_methods_route`: `capacity.method: annex_aa` en `solar_limitation` → `route_not_in_edition` (methode 3 sinds review 40) |
 | 32 | Renovatiestandaard (tabel 5.7) | bestaat niet (p. 70–72) | p. 73–74 | `null` (hoofdstuk-5-indicatoren zijn in beide oudere uitgaven al `null`) |
 | 33 | Tabel 14.3 kolom "led vanaf 2017" | één kolom (p. 648) | 16 / 12 W/m² (p. 646) | `ledFrom2017: true` → `route_not_in_edition` |
 | 34 | Roeden in U_w (8.17)/(8.18) | geen term (p. 214–218) | p. 219–222 | `glazingBars` → `route_not_in_edition` |
@@ -135,7 +138,7 @@ Bovenop de punten 1–48. Pagina's links uit NTA 8800:2022, rechts uit NTA 8800:
 | 56 | Ventilatorvermogen getest volgens NEN-EN 16430 | bestaat niet (p. 282) | p. 286 | `emission.fans.testedPowerW` → `route_not_in_edition` |
 | 57 | Tabel 7.5 "onbekende kleur" | bestaat niet (p. 176) | p. 180 | `colour: unknown` → `route_not_in_edition` |
 | 58 | Tabel 7.10 specifieke interne warmtecapaciteit | naar massa per m² (< 250, 250–500, 500–750, > 750 kg/m²) (p. 181–182) | naar vloer- en wandtype, tabellen 7.10–7.12 (p. 185–186) | `thermalMass.massKgPerM2` (alleen 2022); zonder die invoer de vloer/wandklassen (zelfde D_m-waarden; interpretatie) |
-| 59 | (8.47) hoogte h boven maaiveld | werkelijke hoogte (p. 236) | vast 0,125 m (p. 240) | `wallHeightAboveGroundM` op kruipruimte/onverwarmde kelder: verplicht in 2022 (`ground_floor_wall_height_required`), daarna `route_not_in_edition` |
+| 59 | (8.47) hoogte h boven maaiveld | werkelijke hoogte (p. 236) | vast 0,125 m (p. 240) | `wallHeightAboveGroundM` op kruipruimte/onverwarmde kelder: verplicht in 2022 (`ground_floor_wall_height_required`), daarna `route_not_in_edition`. De basisopname vraagt H2 (ISSO 82.1 4e druk afb. 8.23, p. 73; ISSO 75.1 4e druk dezelfde §) als `floorHeightAboveGroundM` en geeft die in 2022 en 2020+A1 door; zonder antwoord `floor_height_above_ground_required` op dat opnameveld. Er is geen forfaitaire waarde. |
 | 60 | Tabel E.5 minerale-wolvlokken F_A;iso | 1,05 (p. 775) | 1,00 (p. 785) | `mineral_wool_flakes_ageing` |
 | 61 | (I.2) λ_equi;ntr | 0,06 (p. 805) | 0,045 of een bekende hogere λ (p. 814) | `knownLambdaEquivalent` → `route_not_in_edition` |
 | 62 | Zwembad in (11.57) | bestaat niet (p. 451) | q_usi;spec sport × 2 (p. 459) | `swimmingPool` → `route_not_in_edition` |
@@ -237,8 +240,63 @@ Het interpretatiedocument bij NTA 8800:2024 (INT-V1:2024) brengt deze punten al 
 - **Bijlage AB** en de nieuwe indicatoren: alleen 2025+C1; in 2024 zijn ze `null`.
 - **c_source van bijlage V** (gecontroleerd 9 oktober 2026): tabel V.1 (1,00 / 1,02 / 1,04 naar de mate van regeneratie) en tabel V.3 (1,00 recirculatie, 1,04 doublet) hebben dezelfde getallen in 2020+A1 (p. 1069 en 1072), 2022, 2023, 2024 en 2025+C1 (p. 1114). De kern laat daarom in elke uitgave alleen 1,00, 1,02 en 1,04 toe; er is geen schakelpunt.
 
+## Verschillen per uitgave op de openbare gevallen (10 oktober 2026)
+
+De openbare gevallen A–O, de twee voorbeeldprojecten en ISSO 54 EPW001/EPU001 zijn in alle vijf uitgaven doorgerekend met `cargo test --release --test edition_deltas -- --ignored --nocapture print_edition_delta_table`. Invoer van een route die een uitgave niet kent (`route_not_in_edition`) laat de test weg of zet hem uit (`ledFrom2017 = false`). Het testrapport van tabel 9.28 krijgt de NEN-EN 14511-2 die de uitgave noemt (punt 67a). Elke afwijking van meer dan 0,5 % op een BENG-waarde tussen twee opeenvolgende uitgaven is herleid tot een schakelpunt.
+
+BENG 1 / 2 / 3 per uitgave, alleen waar een uitgave verschilt van de vorige:
+
+| Geval | 2020+A1 | 2022 | 2023 | 2024 = 2025+C1 | Oorzaak |
+|---|---|---|---|---|---|
+| A | n.b. (h, punt 59) | n.b. (h, punt 59) | 94,00 / 34,72 / 74,8 | 94,00 / 34,37 / 74,9 | afgifte verwarming en koeling (punten 47, 48), distributie (punt 41) |
+| B | n.b. (h) | n.b. (h) | 52,96 / 29,10 / 62,5 | 52,96 / 28,84 / 62,6 | idem |
+| C | n.b. (h) | n.b. (h) | 64,70 / 31,79 / 69,0 | 64,70 / 31,54 / 69,0 | idem |
+| D | 86,35 / 39,07 / 83,6 | 86,35 / 41,79 / 82,6 | n.b. | n.b. | 2022: hulpenergie warmtepomp (punt 74); vanaf 2023 vraagt de bron "grondwater < 15 °C" een brontemperatuur met bewijs (tabel 9.27, 2023 p. 322) |
+| E | 88,61 / 31,72 / 72,5 | 88,61 / 31,68 / 72,6 | gelijk aan 2022 | 88,61 / 31,49 / 72,6 | 2022: koudeterugwinning (11.106a, punt 79); 2024: punten 41, 47, 48 |
+| F | 74,06 / 3,79 / 96,3 | gelijk | gelijk | 67,25 / 1,53 / 98,4 | f_sh;with = 0 op de warmtebalans bij handbediende rolluiken (punt 35, 2024 p. 181); behoefte −9 % |
+| G | 65,16 / 28,37 / 73,2 | 65,16 / 29,35 / 72,5 | gelijk aan 2022 | 65,07 / 29,31 / 72,5 | 2022: hulpenergie warmtepomp (punt 74) |
+| H | 30,20 / 81,53 / 30,1 | 30,20 / 81,86 / 30,0 | gelijk aan 2022 | 30,20 / 81,62 / 29,8 | 2022: punt 74; 2024: afgifte verwarming (punt 47) |
+| I | 75,51 / −19,41 / 119,4 | 75,51 / −18,58 / 118,4 | gelijk aan 2022 | 75,51 / −11,06 / 110,0 | 2022: punt 74; 2024: afgifte koeling naar tabel 10.35 (punt 48), koelenergie +21 % |
+| J | 63,75 / 51,46 / 27,9 | 63,75 / 52,73 / 27,4 | n.b. (h) | n.b. (h) | 2022: punt 74 |
+| K | 29,57 / −1,29 / 101,6 | 29,57 / −0,90 / 101,1 | 29,57 / −0,51 / 100,6 | 29,57 / −0,64 / 100,8 | 2022: punt 74; 2023: f_sto;dis;ls 1,5 vervalt (punt 64); 2024: punten 41, 47, 48 |
+| L | 111,44 / 17,72 / 81,0 | 111,44 / 18,63 / 80,2 | n.b. (h) | n.b. (h) | 2022: punt 74 |
+| M | 170,87 / 48,26 / 80,3 | 170,87 / 47,85 / 80,6 | gelijk aan 2022 | 166,86 / 45,97 / 80,9 | 2022: punt 74 en de PV-afronding (punt 68); 2024: f_τ = min(0,38 + 0,006·A_g; 0,8) = 0,64 bij 43 m² (punt 23) |
+| N | 54,52 / −24,34 / 122,7 | 54,52 / −24,25 / 122,3 | gelijk aan 2022 | 54,52 / −25,59 / 124,2 | 2022: punt 74 en punt 68; 2024: punten 47, 48 |
+| O | 88,25 / 47,78 / 44,2 | 88,25 / 47,75 / 44,2 | 88,29 / 47,77 / 44,3 | 88,29 / 47,41 / 44,1 | 2022: PV-afronding (punt 68); 2023: vaste h 0,125 m (punt 59); 2024: distributie met afleverset (punt 41) en afgifte verwarming (punt 47) |
+| woning | n.b. (paneelroute, punt 68) | 51,37 / 80,56 / 22,3 | gelijk | gelijk | geen invoer op een route die verschilt |
+| kantoor | n.b. (paneelroute) | 74,55 / 61,43 / 43,7 | gelijk aan 2022 | 74,55 / 48,33 / 49,6 | ledkolom van tabel 14.3 (punt 33): verlichting 17 000 → 13 000 kWh |
+| EPW001 | 74,15 / 104,61 / 0,0 | 74,15 / 105,07 / 0,0 | gelijk aan 2022 | 74,15 / 105,13 / 0,0 | 2022: A 13,0 → 43,8 kWh van de ketel (punt 74) |
+| EPU001 | 95,43 / 135,82 / 0,0 | 95,43 / 136,28 / 0,0 | gelijk aan 2022 | 95,43 / 135,79 / 0,0 | idem; 2024: punt 48 |
+
+"n.b." is niet berekend; "(h)" betekent dat de kruipruimte in 2022 en 2020+A1 de werkelijke hoogte h vraagt en vanaf 2023 de vaste 0,125 m (punt 59). Beide kanten weigeren de invoer van de andere, zoals bedoeld.
+
+**Wat de controle opleverde:**
+- **Alle afwijkingen zijn herleid.** Er is geen verschil zonder schakelpunt gevonden, en geen schakelpunt dat in een verkeerde uitgave of op een verkeerde post werkt.
+  - 2024 → 2025+C1 geeft op alle gevallen dezelfde BENG-waarden. De utiliteitsgevallen geven f_BACS 1,0 op; de nieuwe schakelpunten van 2025+C1 (f_BACS, opslagkrediet, nieuwe indicatoren) raken BENG 1–3 hier niet.
+  - 2022 → 2023 verandert alleen K (f_sto;dis;ls).
+  - 2020+A1 → 2022 is in elk geval met een warmtepomp of ketel de hulpenergie van 9.85 (punt 74); de tekst is nagelezen (2020 p. 334–336, 2022 p. 338).
+- **Rechtgezet: de melding over f_BACS in oudere uitgaven.** `bacs_factor_without_capacity_evidence` (§5.5.8) verscheen ook in 2024, 2023, 2022 en 2020+A1, die geen f_BACS kennen. De melding geldt nu alleen in 2025+C1 (test `bacs_evidence_warning_is_2025_only`).
+- **Rechtgezet: de reden achter `forfait_lookup_invalid`.** Een forfaitaire warmtepomp die bij een andere uitgave ongeldig wordt, gaf alleen die code op `generator.forfait`. Nu krijgt elke oorzaak een eigen melding op haar eigen veld, naast `forfait_lookup_invalid`. Voorbeelden zijn `source_temperature_class_mismatch` op `sourceTemperatureC` en `high_test_standard_invalid` op `testStandardEdition` (test `edition_switch_names_the_forfait_field_it_invalidates`). Dat geldt ook voor de hybride warmtepomp.
+- **Rechtgezet: het diagnosepaneel.** Het forfaitaire-COP-paneel schreef bij elke uitgave NEN-EN 14511-2:2022 in het testbewijs. Onder 2020+A1 en 2022 weigert de kern dat, omdat die uitgaven de versie van 2007 noemen (punt 67a). Het paneel volgt nu de uitgave (`heatPumpHighTestStandard`). De meldingtekst noemt beide versies.
+
+## Uitgave wijzigen: omschakelpunten per invoer (10 oktober 2026)
+
+`crates/nta8800-core/src/norm_versions/switches.rs` koppelt elk veld van `NormProfile` aan precies één omschakelpunt uit de tabellen hierboven, met de invoerleden waarop het punt werkt (`area.method`, `wallHeightAboveGroundM`, `testStandardEdition`, …) en de codes die het op een omsluitend pad geeft. Een punt zonder invoerleden verandert alleen getallen of routes. Punt 18a (P.3 item 6) staat sindsdien als eigen rij in de tabel.
+
+`crates/nta8800-core/src/edition_switch.rs` (`compare_project_editions`) gebruikt die koppeling bij het wijzigen van de uitgave van een project:
+1. het rekent het project in de eigen en in de doeluitgave door; wat de doeluitgave weigert of extra vraagt, is wat de kern daar meldt en in de eigen uitgave niet;
+2. het voert veilige aanpassingen uit (een geweigerd lid dat het omschakelpunt noemt verwijderen, een vlag uitzetten) en rekent opnieuw, tot er niets nieuws meer bijkomt. De beproevingsnorm van tabel 9.28 (punt 67a) is bewijs bij een testrapport en wordt niet herschreven; het item noemt de norm die de doeluitgave vraagt (review 29);
+3. een verwijderd lid dat daarna verplicht blijkt of waarvan het weglaten het blok onleesbaar maakt, wordt teruggezet en blijft een keuze van de adviseur;
+4. leden van een route die de doeluitgave niet heeft en niet weigert, staan als "niet gebruikt"; `biomassAbove500Kw` staat als "anders gelezen" (punten 30 en 53);
+5. elke melding krijgt het omschakelpunt dat de code noemt, anders dat met het langste overeenkomende invoerpad, en alleen als de velden van dat punt tussen de twee uitgaven verschillen. Een samenvattende melding op een omsluitend object (`forfait_lookup_invalid`) neemt het punt van de oorzaak eronder over.
+
+De lijst is dus geen handmatige opsomming: de meldingen komen van de kern, de koppeling aan omschakelpunten van de profielen. De handleiding (hoofdstuk 10) beschrijft het venster in de app.
+
 ## Tests
 
+- `crates/nta8800-core/src/norm_versions/switches.rs`: elk profielveld hoort bij één omschakelpunt; elk veld dat tussen twee uitgaven verschilt heeft er een; elke genummerde rij van dit document is een omschakelpunt en omgekeerd; de toeschrijving.
+- `crates/nta8800-core/tests/edition_switch.rs`: de openbare gevallen A, B, C, D, J en L van hun eigen uitgave naar 2025+C1 en terug, en beide voorbeelden tussen elk paar uitgaven. Elke `route_not_in_edition` direct na de omschakeling staat in de lijst, elke weigering of eis heeft een omschakelpunt, en na de automatische aanpassingen blijft precies over wat de lijst aan de adviseur laat. Daarnaast de wandhoogte van 8.47 (punt 59) heen en terug, de PV-paneelroute (punt 68) en de beproevingsnorm (punt 67a, genoemd maar niet herschreven).
+- `crates/nta8800-core/tests/edition_deltas.rs` (genegeerd, op aanvraag): de tabel hierboven (`print_edition_delta_table`), alle verschillende uitvoerwaarden van één geval tussen twee uitgaven (`EDITION_DIFF=K,2020+A1,2022`) en de meldingen van één geval in één uitgave (`EDITION_PROBE=D,2023`).
 - `crates/nta8800-core/src/norm_versions/tests.rs`: standaarduitgave, serde, het herstellen van de thread-local (ook na een paniek) en de profielwaarden met paginaverwijzing.
 - Per schakelpunt een eenheidstest in de module van het schakelpunt, met de paginaverwijzing in de test.
 - `crates/nta8800-core/tests/norm_versions.rs`: de projectroute (status, vingerafdruk, registratie, niet-geïmplementeerde en onbekende uitgaven) en verschiltests van de voorbeeldprojecten in 2024 tegen 2025+C1 en 2023 tegen 2024. Daarin verandert alleen wat de lijsten hierboven voorspellen: in 2023 tegen 2024 verandert de woning niet en het kantoor alleen in TOjuli (ΔT_fan, punt 25). Het voorbeeldkantoor gebruikt de ledkolom van tabel 14.3; die invoer wordt in 2023 geweigerd (punt 33), dus de verschiltest zet hem in beide uitgaven op "overig". De invoer `kitchenPipeDiameter` wordt buiten 2023 geweigerd.

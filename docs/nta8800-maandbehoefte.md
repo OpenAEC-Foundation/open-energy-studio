@@ -80,6 +80,7 @@ Invoer voor de zontoetreding per raam:
 ## Kelderdiepte per wanddeel (8.42/D.12) en vochtfactor (E.8/E.9)
 
 - `heatedBasement.wallDepths` geeft z_j per wanddeel. Dan is z = Σℓ_j·z_j/Σℓ_j, en Σℓ_j moet gelijk zijn aan de omtrek P. `depthM` mag dan niet ook worden opgegeven.
+- De vloer rekent met die gemiddelde z (8.40/8.41 met 8.42). De wanden rekenen per wanddeel: Σz_j·ℓ_j·U_bw;j (8.39), met U_bw;j van 8.45 op de eigen diepte z_j (2025+C1 p. 255 en 260). In de forfaitaire route (8.38) wordt ΣA_T;bw naar z_j·ℓ_j over de wanddelen verdeeld. Een wanddeel met z_j = 0 heeft geen wand onder maaiveld. De periodieke termen van D.10/D.11 nemen de gemiddelde z van D.12.
 - Voor kruipruimten en onverwarmde kelders zijn z_j een klasse (0 of 0,5 m) en h_j vast 0,125 m (8.47). D.17 en D.18 vallen daar samen met de enkele waarde.
 - `moistureConversion` bij een opgegeven isolatie-λ_D rekent F_M = e^{f·(x₂ − 0)}: E.8 voor Ψ, E.9 voor u. De coëfficiënt komt uit tabel 4 van NEN-EN-ISO 10456. Deze F_M vervangt tabel E.2.
 
@@ -132,6 +133,12 @@ De vloerconstructie zelf krijgt aan de onderzijde R_se = 0,04 (8.43 via 8.2.2.2.
 - forfaitair volgens 8.38: 0,5·P plus ΔU_for over de wandoppervlakte z·P (ΔU_for opgeven);
 - maandwaarden volgens D.10/D.11.
 
+Een verwarmde ruimte met de vloer onder maaiveld boven een kruipruimte of onverwarmde kelder krijgt `below` én `heatedBasement` (ISSO 54 EP-W006f):
+
+- H_g volgens 8.39 met U_fl uit 8.43 (8.3.4.2). Voor zo'n vloer geldt U_x;T = 0 (2025+C1 p. 262; 2022 p. 236), dus U_x = U_x;V en h van (8.47) doet niet mee. In 2022 is h daar niet verplicht; vanaf 2023 wordt een opgegeven h geweigerd.
+- De wanden onder maaiveld: z·P·U_bw met de werkelijke diepte z, en d_1 van 8.45 tegen d_bf;equi van de kruipruimte- of keldervloer.
+- Bijlage D geeft voor deze combinatie geen formule. De vloer wordt gesplitst in een vloerdeel (D.13/D.14, tabel D.1 (0, 0); bij een onverwarmde kelder D.15/D.16 zonder h·P·U_xw, (0, 1)) en een wanddeel (de wandtermen van D.10/D.11, (0, 1)). Basis: de opbouw van 8.39 en opmerking 3 van 8.3.2 (een deels verzonken vloer gesplitst en elk deel apart gerekend). Randtermen horen bij het vloerdeel, ΔU_for van 8.38 over z·P bij het wanddeel.
+
 ## Rekenzone met meerdere gebruiksfuncties (§6.5.3)
 
 `functionAreas` geeft de gebruiksfuncties met hun oppervlakte. De volgende rekenwaarden worden dan naar gebruiksoppervlakte gewogen:
@@ -157,7 +164,7 @@ De toetsen op setpointverschil, ventilatiecapaciteit en warmtecapaciteit staan i
 - g en kozijnfractie van de serrebeglazing, apart voor verwarming en koeling;
 - b_U en H_zi;ztu uit §8.4, en de verdeelfactor (7.36).
 
-De winst is (1 − b_U)·F·f_gn;max·Q_sol;ztu. Q_sol;ztu volgt uit 7.34/7.35 met F_sh;obst = 1. De begrenzing f_gn;max (7.37) geldt alleen in de verwarmingsstand. Het warmteverlies via de serre loopt via de onverwarmde ruimte van §8.4. De vereenvoudigde route uit de norm (de serre negeren) blijft mogelijk door geen `sunrooms` op te geven.
+De winst is (1 − b_U)·F·f_gn;max·Q_sol;ztu. Q_sol;ztu volgt uit 7.34/7.35 met F_sh;obst = 1. De begrenzing f_gn;max (7.37/7.38) geldt alleen in de verwarmingsstand. Grenzen meerdere rekenzones aan dezelfde serre, dan neemt 7.38 de som van H_zi,j;ztu·(θ_int;set;H;stc;zi − θ_e) over al die zones, elk met het eigen setpoint. In de projectroute herkent de kern een gedeelde serre aan dezelfde serre-id in meer dan één zone en geeft elke kopie die zones mee (`borderingZones`); die lijst leidt alleen de projectroute af, een in het project ingevulde lijst telt niet, en een lege serre-id deelt nooit. In de directe invoer van de maandbehoefte moet elke zone in `borderingZones` één keer voorkomen, met H_zi,j;ztu ≥ 0 en een instelwaarde tussen −50 en 100 °C (anders `sunroom_invalid`); zonder die lijst rekent de kern H_zi;ztu / F (7.36) met het setpoint van de eigen zone. Het warmteverlies via de serre loopt via de onverwarmde ruimte van §8.4. De vereenvoudigde route uit de norm (de serre negeren) blijft mogelijk door geen `sunrooms` op te geven. De scheidingsconstructie naar de serre krijgt geen eigen zonnewinst, ook niet door haar ramen en ook niet in de forfaitaire route; dat is vraag 11 aan NEN (melding `sunroom_partition_gain_interpreted`).
 
 ## H_D naar een onverwarmde ruimte (8.4.2.1)
 
@@ -180,11 +187,11 @@ Beide velden tegelijk geeft `unheated_factor_declared_and_derived`. Geen van bei
 
 ## Forfaitaire thermische bruggen in de projectroute
 
-Een forfaitaire vloerrand kiest de forfaitaire route voor het hele gebouw. De kern berekent dan ΔU_for volgens 8.3 uit de ondoorschijnende vlakken naar buitenlucht (oppervlak min ramen, U van de constructie) en telt die op bij elke U in H_D, ramen inbegrepen (opmerking 7 bij 8.3). Ook de zoninstraling op ondoorschijnende delen en de ramen gebruiken die U. Staan er dan nog ψ-waarden in `zones[].thermalBridges` of een gedetailleerde vloerrand met ψ_gr, dan geeft de kern `thermal_bridge_methods_mixed`. In de forfaitaire route is H_U;for = 0 en hoort de scheiding met een onverwarmde ruimte in H_D;for met U_iu;equi (C.1.3). Dat leidt de projectroute niet af; een grensvlak met een onverwarmde ruimte geeft dan `forfait_thermal_bridges_unheated_space_unsupported`.
+Een forfaitaire vloerrand kiest de forfaitaire route voor het hele gebouw. De kern berekent dan ΔU_for volgens 8.3 uit de ondoorschijnende vlakken naar buitenlucht (oppervlak min ramen, U van de constructie) en telt die op bij elke U in H_D, ramen inbegrepen (opmerking 7 bij 8.3). Ook de zoninstraling op ondoorschijnende delen en de ramen gebruiken die U. Staan er dan nog ψ-waarden in `zones[].thermalBridges` of een gedetailleerde vloerrand met ψ_gr, dan geeft de kern `thermal_bridge_methods_mixed`. In de forfaitaire route is H_U;for = 0 (8.4.1 opmerking 5): de onverwarmde ruimte telt als buitenlucht en de scheiding ermee hoort in H_D;for met U_iu;equi = U_C·b_U (C.10). U_C is de U-waarde van het project met R_se 0,04, b_U die van de ruimte in `unheatedSpaces` (opgegeven of afgeleid, 8.4.1). De scheiding telt mee in Ū van 8.3 en krijgt ΔU_for zoals elk element van H_D. Zonder b_U voor de ruimte geeft de kern `unheated_transmission_unresolved`.
 
 ## Plausibiliteitswaarschuwingen in de projectroute
 
-`warnings` in de projectbeoordeling houdt de berekening niet tegen, maar meldt opgegeven waarden die met de norm of andere invoer botsen:
+`warnings` in de projectbeoordeling houdt de berekening niet tegen, maar meldt opgegeven waarden die met de norm of andere invoer botsen. Daarnaast staan er de waarschuwingen van de gebouwberekening (`performance.warnings`), elk op het pad van de projectinvoer waar ze vandaan komen en met het pad in de berekening als `detail` (`derivedInput.<pad>`); zo komen ze in de lijst *Open punten* met **Ga naar**. De eigen plausibiliteitstoetsen zijn:
 
 - `declared_hot_water_efficiency_above_one`: een opgegeven brandstofgebruik voor warm tapwater is lager dan Q_W;nd (13.15 voor woningen, tabel 13.1 voor utiliteit). Dat impliceert een opwekkingsrendement boven 1 op bovenwaarde.
 - `declared_ventilation_below_required_flow`: alleen bij woningen. Het gaat om een mechanisch systeem zonder warmteterugwinning waarvan de opgegeven H_ve onder ρc·q_V;ODA;req ligt.
@@ -198,6 +205,8 @@ Een forfaitaire vloerrand kiest de forfaitaire route voor het hele gebouw. De ke
 - `ground_floor_perimeter_implausible`: de blootgestelde omtrek P is groter dan 2·A/w + 2·w met w = 1 m. Een vloer met een gemiddelde breedte van minstens 1 m kan zo'n omtrek niet hebben.
 - `detailed_thermal_bridges_none_entered`: de gedetailleerde route (geen forfaitaire vloerrand, 8.2.1) zonder één lineaire thermische brug naar buitenlucht. H_D krijgt dan geen ψ·ℓ. Voer de bruggen in of kies de forfaitaire ΔU_for (8.3).
 - `sunroom_values_differ_from_unheated_space`: een serre (`sunrooms`) met dezelfde id als een onverwarmde ruimte van het project, waarvan de opgegeven b_U of H_zi;ztu meer dan 10 % afwijkt van de afgeleide waarde (8.4.1, 8.53–8.59).
+- `sunroom_id_duplicate` (ontbrekend gegeven): dezelfde serre-id staat twee keer in één serrelijst (van het blok of van één zone); de serre zou dan twee keer meetellen in 7.30b en in de begrenzing van 7.38.
+- `sunroom_partition_gain_interpreted`: een serre met een scheidingsconstructie naar de rekenzone. In de forfaitaire route (8.4.1) krijgt die scheiding geen eigen zonnewinst en telt 7.30b; in de berekende route krijgen ramen in de scheiding geen directe zonnewinst (7.6.6.1.1). Zie vraag 11 aan NEN.
 
 BENG 1 (`needIndicatorKwhPerM2Year`, ook in `indicators`) staat alleen ingevuld als de behoefte uit de vaste C1-ventilatierun van §5.4 komt. E_H+C;nd met de opgegeven ventilatie staat in het hoofdstuk 5-blok (`chapter5.heatingAndCoolingNeedKwhPerM2`). `tojuliMeetsBblLimit` geldt alleen voor woonfuncties (Bbl art. 4.149b) en is bij utiliteit leeg.
 

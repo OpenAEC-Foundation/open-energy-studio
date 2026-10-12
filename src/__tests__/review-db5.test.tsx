@@ -9,6 +9,7 @@ import { deleteZoneFromProject } from '../core/energy/projectDelete';
 import { deleteTarget } from '../core/energy/projectItems';
 import { buildProjectDossier, checkDossierCompleteness, openDossierItems, type DossierItem } from '../core/report/ProjectDossier';
 import { DialogShell } from '../components/dialogs/DialogShell';
+import { SLOW_UI_TEST_MS } from './timeouts';
 
 function load(name: string): IProject {
   return JSON.parse(readFileSync(resolve(process.cwd(), `training-data/${name}`), 'utf8')) as IProject;
@@ -124,7 +125,7 @@ describe('dialog stack order follows DOM nesting', () => {
     await user.keyboard('{Escape}');
     expect(innerClosed).toBe(true);
     expect(outerClosed).toBe(false);
-  }, 60000);
+  }, SLOW_UI_TEST_MS);
 });
 
 describe('pending never reaches an exported dossier', () => {
