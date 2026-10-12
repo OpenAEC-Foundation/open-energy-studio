@@ -1,6 +1,6 @@
 import type { IProject } from '../energy/types';
 import type {
-  BuildingPerformanceAssessment, MonthlyDemandAssessment, NtaInterpretationGroup, NtaLabelStatements,
+  BuildingPerformanceAssessment, KernelTraceStep, MonthlyDemandAssessment, NtaInterpretationGroup, NtaLabelStatements,
   ProjectPerformanceAssessment,
 } from '../nta/KernelClient';
 import { attestMark, type AttestMark } from '../nta/Attest';
@@ -36,7 +36,7 @@ export type ReportLevel = 'summary' | 'standard' | 'detailed';
 
 export const DETAIL_SECTIONS = [
   'transmission', 'ventilation', 'gains', 'balance', 'heatingChain', 'hotWater', 'cooling',
-  'lighting', 'pv', 'primary', 'tojuli', 'beng1',
+  'lighting', 'pv', 'primary', 'tojuli', 'beng1', 'trace',
 ] as const;
 export type DetailSection = (typeof DETAIL_SECTIONS)[number];
 
@@ -54,6 +54,7 @@ export const DETAIL_SECTION_TITLES: Record<DetailSection, string> = {
   primary: 'Primaire energie, export en hernieuwbaar aandeel',
   tojuli: 'TOjuli per oriëntatie',
   beng1: 'BENG 1 met vast ventilatiesysteem C1',
+  trace: 'Rekenspoor van de rekenkern (bijlage)',
 };
 
 /** A survey default the kernel applied (OpnameAssessment.appliedDefaults), for the basisopname appendix. */
@@ -183,6 +184,46 @@ const EVIDENCE_KIND: Record<string, string> = {
   photo_overview: 'overzichtsfoto', photo_detail: 'detailfoto', invoice: 'factuur', drawing: 'tekening', datasheet: 'productblad',
   declaration_of_performance: 'prestatieverklaring', quality_declaration: 'kwaliteitsverklaring', client_statement: 'verklaring opdrachtgever', other: 'overig',
 };
+
+/** Project names behind the kernel element ids (`surface:wall-N:opaque`, `window:win-S`), as in the Rekenspoor tab. */
+function traceNames(project: IProject): (id: string) => string {
+  const names = new Map<string, string>();
+  for (const zone of project.zones) {
+    for (const surface of zone.surfaces) {
+      names.set(`surface:${surface.id}`, surface.name);
+      for (const window of surface.windows ?? []) names.set(`window:${window.id}`, `${window.name} (${surface.name})`);
+    }
+  }
+  return (id) => names.get(id.replace(/:opaque$/, '')) ?? id;
+}
+
+/**
+ * Bijlage rekenspoor (feedback 9 Oct 2026): the kernel's calculation trace, every step with its
+ * formula, the values the kernel used, the result, the NTA 8800 formula number and the source of the
+ * input, one table per module (transmission, ventilation, balances, installations, primary energy).
+ */
+function traceAppendix(doc: ReportDocument, project: IProject, trace: KernelTraceStep[]): string {
+  const name = traceNames(project);
+  const byKey = new Map<string, KernelTraceStep>();
+  const index = (steps: KernelTraceStep[]) => steps.forEach((step) => { byKey.set(step.key, step); index(step.children ?? []); });
+  index(trace);
+  const digits = (value: number) => (Math.abs(value) < 10 ? 3 : Math.abs(value) < 1000 ? 2 : 0);
+  const rows = (step: KernelTraceStep, depth: number): string => {
+    const uses = (step.uses ?? []).map((key) => byKey.get(key)).filter((item): item is KernelTraceStep => item != null)
+      .map((item) => name(item.quantity));
+    const source = [step.source ? dutchSource(step.source) : '', uses.length ? `gebruikt: ${uses.join(', ')}` : ''].filter(Boolean).join('; ');
+    return `<tr class="trace-d${Math.min(depth, 3)}"><td style="padding-left:${1 + depth * 3}mm">${titleHtml(name(step.quantity))}</td>`
+      + `<td class="f">${escapeHtml(step.formula)}</td><td class="f">${escapeHtml(step.values.replace(/(\d)\.(\d)/g, '$1,$2'))}</td>`
+      + `<td class="n">${n(step.result, digits(step.result))}&nbsp;${escapeHtml(step.unit)}</td><td>${escapeHtml(step.reference)}</td>`
+      + `<td class="src">${escapeHtml(source)}</td></tr>`
+      + (step.children ?? []).map((child) => rows(child, depth + 1)).join('');
+  };
+  const head = '<tr><th>Grootheid</th><th>Formule</th><th>Waarden</th><th>Uitkomst</th><th>Formule&nbsp;nr.</th><th>Bron</th></tr>';
+  const body = trace.map((step) => `<h3>${titleHtml(name(step.quantity))}</h3>` + doc.table(`Rekenspoor: ${escapeHtml(name(step.quantity))}`, head, rows(step, 0))).join('');
+  return doc.chapter('rekenspoor', 'Bijlage: rekenspoor van de rekenkern', `<div class="trace-appendix"><p>Elke stap zoals de rekenkern hem rekende:
+    de grootheid, de formule, de formule met de gebruikte waarden, de uitkomst en het formulenummer uit NTA 8800. Ingesprongen regels
+    zijn de stappen waaruit de regel erboven volgt; bij invoer staat de bron. Dezelfde stappen staan in de app onder Resultaten → Rekenspoor.</p>${body}</div>`);
+}
 
 /** The evidence of the project: file, kind, date and the answers it supports. */
 function evidenceAppendix(doc: ReportDocument, project: IProject): string {
@@ -877,6 +918,10 @@ const STYLE = `
   td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
   tr.total th,tr.total td{font-weight:700;background:#f2f5f8}
   p.note{color:var(--muted);font-size:8.5pt;margin:1mm 0 0}
+  .trace-appendix figure.tbl{break-inside:auto}
+  .trace-appendix td.f{font-family:ui-monospace,Consolas,monospace;font-size:7.5pt;overflow-wrap:anywhere}
+  .trace-appendix tr.trace-d0 td{font-weight:600;border-top:1px solid #999}
+  .trace-appendix tr.trace-d0 td.f{font-weight:400}
   .notice{border-left:4px solid #b45309;background:#fff8e7;padding:3mm 4mm;margin:4mm 0}
   .attest-mark{display:inline-block;border:1px solid #1f3a5f;padding:2mm 4mm;margin-top:3mm;font-weight:600}
   .step{display:grid;grid-template-columns:30mm 1fr;gap:0 3mm;border-left:3px solid var(--accent);background:#f6f9fc;padding:1.5mm 3mm;margin:1.5mm 0;font-size:9.5pt}
@@ -948,9 +993,11 @@ export function generateEnergyPerformanceReportHTML(project: IProject, assessmen
         primary: () => primaryDetail(doc, assessment, performance),
         tojuli: () => tojuliDetail(doc, performance),
         beng1: () => beng1Detail(doc, assessment, performance),
+        // The trace is an appendix at the end of the report.
+        trace: () => '',
       };
       for (const section of DETAIL_SECTIONS) {
-        if (!detailEnabled(options, section)) continue;
+        if (!detailEnabled(options, section) || section === 'trace') continue;
         // A chapter whose kernel values are missing (an older or partial answer) must not take the
         // whole report down: it says so and the other chapters follow.
         let body: string;
@@ -975,6 +1022,10 @@ export function generateEnergyPerformanceReportHTML(project: IProject, assessmen
       .map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : ''));
   if (options.surveyDefaults?.length) chapters += surveyDefaultsAppendix(doc, options.surveyDefaults);
   if (project.registration?.evidence?.length) chapters += evidenceAppendix(doc, project);
+  if (options.level === 'detailed' && detailEnabled(options, 'trace') && performance?.trace?.length
+    && kernelVerdict(assessment) === 'calculated') {
+    chapters += traceAppendix(doc, project, performance.trace);
+  }
   if (options.interpretations?.length) {
     chapters += doc.chapter('interpretaties', 'Bijlage: interpretaties van de rekenkern',
       interpretationsSection(options.interpretations).replace(/<h2>[^<]*<\/h2>/, ''));

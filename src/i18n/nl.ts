@@ -4420,6 +4420,7 @@ export const nl: Record<string, string> = {
   'report.builder.section.pv': 'Zonnestroom en elektriciteitsbalans',
   'report.builder.section.primary': 'Primaire energie, BENG 2 en BENG 3',
   'report.builder.section.tojuli': 'TOjuli per oriëntatie',
+  'report.builder.section.trace': 'Rekenspoor van de rekenkern (bijlage)',
   'report.builder.section.beng1': 'BENG 1 met vast ventilatiesysteem C1',
 
   // ── UI-herontwerp F1/F2: bouwstenen, meldingen, 3D-model ──

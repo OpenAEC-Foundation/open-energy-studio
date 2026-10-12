@@ -4420,6 +4420,7 @@ export const en: Record<string, string> = {
   'report.builder.section.pv': 'PV and electricity balance',
   'report.builder.section.primary': 'Primary energy, BENG 2 and BENG 3',
   'report.builder.section.tojuli': 'TOjuli per orientation',
+  'report.builder.section.trace': 'Calculation trace of the kernel (appendix)',
   'report.builder.section.beng1': 'BENG 1 with the fixed C1 ventilation system',
 
   // ── UI redesign F1/F2: building blocks, notifications, 3D model ──

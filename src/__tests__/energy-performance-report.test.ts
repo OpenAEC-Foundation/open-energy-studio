@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { IProject } from '../core/energy/types';
-import type { ProjectPerformanceAssessment } from '../core/nta/KernelClient';
+import type { KernelTraceStep, ProjectPerformanceAssessment } from '../core/nta/KernelClient';
 import { DETAIL_SECTIONS, generateEnergyPerformanceReportHTML } from '../core/report/EnergyPerformanceReport';
 import { dutchNumber } from '../core/report/DutchReportText';
 
@@ -56,6 +56,28 @@ describe('Rapportage Energieprestatie (NTA 8800)', () => {
       expect(detailed).toContain('Berekening: Primaire energie');
     });
   }
+
+  it('adds the kernel calculation trace as an appendix at the detailed level', () => {
+    const { project, assessment } = load('terraced-dwelling');
+    const surface = project.zones[0].surfaces[0];
+    const trace: KernelTraceStep[] = [{
+      key: 'z1.transmission', quantity: 'Transmissie z1', formula: 'Σ Q_H;tr over de maanden', values: '1234.5 + 10',
+      result: 1244.5, unit: 'kWh', reference: '7.14',
+      children: [{ key: 'z1.transmission.hd.x', quantity: `surface:${surface.id}:opaque`, formula: 'A·U', values: '10.5 × 0.2',
+        result: 2.1, unit: 'W/K', reference: '8.1', uses: ['z1.transmission'] }],
+    }];
+    const withTrace: ProjectPerformanceAssessment = { ...assessment, performance: { ...assessment.performance!, trace } };
+    const html = generateEnergyPerformanceReportHTML(project, withTrace, { level: 'detailed', generatedAt: at });
+    expect(html).toContain('Bijlage: rekenspoor van de rekenkern');
+    // Project names instead of kernel ids, decimal commas in the values, the links between steps.
+    expect(html).toContain(surface.name);
+    expect(html).toContain('10,5 × 0,2');
+    expect(html).toContain('gebruikt: Transmissie z1');
+    // Off when deselected, and not at the standard level.
+    const off = generateEnergyPerformanceReportHTML(project, withTrace, { level: 'detailed', details: { trace: false }, generatedAt: at });
+    expect(off).not.toContain('Bijlage: rekenspoor');
+    expect(generateEnergyPerformanceReportHTML(project, withTrace, { level: 'standard', generatedAt: at })).not.toContain('Bijlage: rekenspoor');
+  });
 
   it('omits unselected detail chapters', () => {
     const { project, assessment } = load('terraced-dwelling');
