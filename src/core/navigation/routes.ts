@@ -82,6 +82,7 @@ export const WORKFLOW_STEPS: StepDefinition[] = [
       { id: 'zones', labelKey: 'nav.sub.results.zones' },
       { id: 'monthly', labelKey: 'nav.sub.results.monthly' },
       { id: 'provenance', labelKey: 'nav.sub.results.provenance' },
+      { id: 'trace', labelKey: 'nav.sub.results.trace' },
     ],
   },
   {

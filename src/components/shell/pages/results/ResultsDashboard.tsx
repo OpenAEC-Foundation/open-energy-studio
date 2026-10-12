@@ -26,13 +26,14 @@ import {
 } from '../../../ui';
 import { routeLabel } from '../../PageHeader';
 import { MonthlyChart } from './MonthlyChart';
+import { TraceTab } from './TraceTab';
 import {
   energySeries, gauges, isResidential, keyFigures, LABEL_CLASSES, labelColor, labelTextColor, monthlyNeed, monthlyPv,
   zoneDemands, type ChartMode, type Gauge,
 } from './resultsData';
 import './results.css';
 
-export type ResultsSub = 'overview' | 'services' | 'zones' | 'monthly' | 'provenance';
+export type ResultsSub = 'overview' | 'services' | 'zones' | 'monthly' | 'provenance' | 'trace';
 
 export function ResultsDashboard({ sub, onNavigate }: { sub: string | undefined; onNavigate: (route: Route) => void }) {
   const { t } = useI18n();
@@ -66,6 +67,7 @@ export function ResultsDashboard({ sub, onNavigate }: { sub: string | undefined;
         {sub === 'zones' && <ZonesTab assessment={assessment} />}
         {sub === 'monthly' && <MonthlyTab assessment={assessment} />}
         {sub === 'provenance' && <ProvenanceTab assessment={assessment} />}
+        {sub === 'trace' && <TraceTab assessment={assessment} />}
       </div>
     </div>
   );

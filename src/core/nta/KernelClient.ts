@@ -3975,6 +3975,8 @@ export interface BuildingPerformanceAssessment {
   labelRenewableSharePercent?: number | null;
   indicativeLabelClass: string | null;
   labelSource: string;
+  /** Calculation trace per zone (crates/nta8800-core/src/trace.rs); transmission first. */
+  trace?: KernelTraceStep[];
   bblCheck: NtaBblCheck | null;
   a0Check: null | {
     source: string;
@@ -5015,4 +5017,20 @@ export function projectCalculated(status: ProjectPerformanceAssessment['status']
 /** True when the result follows an older edition and therefore may not be registered. */
 export function legacyEdition(assessment: Pick<ProjectPerformanceAssessment, 'status' | 'registrationEligible'> | null | undefined): boolean {
   return assessment?.status === 'calculated_legacy_edition' || assessment?.registrationEligible === false;
+}
+
+/** One step of the kernel calculation trace ("rekenspoor", crates/nta8800-core/src/trace.rs). */
+export interface KernelTraceStep {
+  key: string;
+  quantity: string;
+  formula: string;
+  /** The formula with the values the kernel used (decimal point). */
+  values: string;
+  result: number;
+  unit: string;
+  /** NTA 8800 formula, table or paragraph number. */
+  reference: string;
+  source?: string;
+  uses?: string[];
+  children?: KernelTraceStep[];
 }
