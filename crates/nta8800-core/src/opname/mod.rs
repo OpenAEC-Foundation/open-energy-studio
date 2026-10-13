@@ -830,7 +830,7 @@ pub fn derive_residential_input(
         // that storey: N storey crossings in total, which is one pipe through
         // all N storeys (formula 7.17, 1,8 W/K per crossing). Counting N pipes
         // through N storeys each gave N² crossings; ISSO 54 EDR test
-        // EPWReal B03 (three storeys, "onbekend") confirms N.
+        // EPWReal B03 (three storeys, "onbekend") confirms N (vragen-nen 14).
         recorder.record(
             "vertical_pipes_unknown_one_per_storey",
             "verticalPipes",
@@ -1777,6 +1777,37 @@ mod tests {
         // Table 9.25: conventional, inside the boundary, 0,75.
         assert!((efficiency(&result) - 0.75).abs() < 1e-12);
         assert!(!rules(&result).contains(&"pilot_flame_unknown_present"));
+    }
+
+    /// 9.6.2.1: an HR boiler with an unknown pilot flame books no pilot
+    /// (ISSO 54 EPWReal B03); a conventional gas boiler still does.
+    #[test]
+    fn condensing_boiler_has_no_pilot_flame_when_unknown() {
+        for (boiler_type, present) in [
+            (heating::BoilerType::Hr107, false),
+            (heating::BoilerType::Hr100, false),
+            (heating::BoilerType::Conventional, true),
+        ] {
+            let mut survey = fixture("1930");
+            survey.heating.generator = heating::HeatingGenerator::Boiler {
+                boiler_type,
+                pilot_flame: None,
+                inside_thermal_boundary: true,
+                manufacture_year: Some(2015),
+                installation_year: None,
+            };
+            let (result, input) = calculated(&survey);
+            let boiler = &input["spaceHeating"]["generator"]["boiler"];
+            assert_eq!(boiler["pilotFlamePresent"], present, "{boiler_type:?}");
+            assert_eq!(
+                rules(&result).contains(&"pilot_flame_unknown_absent_condensing"),
+                !present
+            );
+            assert_eq!(
+                rules(&result).contains(&"pilot_flame_unknown_present"),
+                present
+            );
+        }
     }
 
     #[test]

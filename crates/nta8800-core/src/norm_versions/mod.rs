@@ -371,6 +371,11 @@ pub struct NormProfile {
     /// (13.69a)/(13.137a): ϑ_sto;amb = ϑ_int;set;H;stc with an exhaust-air
     /// heat pump for hot water.
     pub storage_ambient_exhaust_air: bool,
+    /// Table 13.25 with 13.27: the forfait individual heat pump (1,4 and
+    /// 1,4·c_source) takes c_W;gen, class 4 when the class is unknown. The
+    /// BRL 9501 test set of 2025+C1 reads it so (ISSO 54 EPWReal B01); the
+    /// public reports of the older editions book 1,4 as is (cases J, M).
+    pub forfait_heat_pump_class_correction: bool,
     /// 13.153b: C_W;mixed air of combi heat pumps on mixed air.
     pub mixed_air_route: bool,
     /// (14.15) with table 14.4: F_C from the maintenance factor MF of

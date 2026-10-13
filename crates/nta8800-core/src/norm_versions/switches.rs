@@ -429,6 +429,11 @@ pub const SWITCH_POINTS: &[SwitchPoint] = &[
         "ϑ_sto;amb ventilatieretourluchtwarmtepomp",
         &["storage_ambient_exhaust_air"],
     ),
+    values(
+        &["80"],
+        "c_W;gen forfaitaire tapwaterwarmtepomp",
+        &["forfait_heat_pump_class_correction"],
+    ),
     inputs(
         &["66"],
         "C_W;mixed air (13.153b)",

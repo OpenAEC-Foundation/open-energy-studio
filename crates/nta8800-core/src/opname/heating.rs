@@ -1290,6 +1290,23 @@ fn convert_generator(
                     recorder.issue("pilot_flame_gas_only", "heating.generator.pilotFlame");
                 }
                 false
+            } else if matches!(
+                boiler_type,
+                BoilerType::Hr100 | BoilerType::Hr104 | BoilerType::Hr107 | BoilerType::Hydrogen
+            ) {
+                // 9.6.2.1 books 695 kWh only for a pilot flame that is
+                // present. A condensing boiler ignites electronically, so an
+                // unknown pilot flame is absent: the BRL 9501 test set books
+                // none for an HR 107 boiler from 2015 (ISSO 54 EPWReal B03).
+                pilot_flame.unwrap_or_else(|| {
+                    recorder.record(
+                        "pilot_flame_unknown_absent_condensing",
+                        "heating.generator.pilotFlame",
+                        "false".into(),
+                        "NTA 8800 9.6.2.1; ISSO 54 EPWReal B03",
+                    );
+                    false
+                })
             } else {
                 pilot_flame.unwrap_or_else(|| {
                     recorder.record(

@@ -81,6 +81,7 @@ Dat wijkt bewust af van "alle parameters doorgeven". De kern rekent synchroon op
 | 16 | Tabel E.11/E.12 biobased λ, riet | vlas/schapenwol/katoen 0,050, kokos 0,055, stro 0,060, hennep 0,100; riet 0,200 geen isolatie (p. 791) | p. 810 | `ForfaitMaterial::lambda` |
 | 17 | (I.3) rieten dak | d/0,2 (p. 814) | d/0,105 (p. 833) | `ForfaitOpaque::calculate` |
 | 18 | (W.9) ondergrens noemer boosterwarmtepomp | geen (p. 1103) | ≥ E_ls (p. 1123) | `calculate_booster` |
+| 80 | Tabel 13.25/13.27 c_W;gen op de forfaitaire tapwaterwarmtepomp (1,4 en 1,4·c_source) | geen klassecorrectie, zoals de openbare rapporten J (2020+A1) en M (2022) rekenen | klasse 4 bij een onbekende klasse, anders de opgegeven klasse (p. 641–643), zoals ISSO 54 EPWReal B01 rekent | `forfait_heat_pump_class_correction` |
 | 18a | P.3 item 6 oppervlaktewater en andere LT-bronnen als collectieve bron | alleen bodem en grondwater (p. 916) | ruimere lijst (p. 936) | `wide_collective_low_temperature_sources`; geen eigen invoer (zie "Niet omgeschakeld") |
 
 ## Verschillen 2023 → 2024 die de kern omschakelt
@@ -218,6 +219,8 @@ Het interpretatiedocument bij NTA 8800:2024 (INT-V1:2024) brengt deze punten al 
 - **θH,max in (13.141b):** INT-V1 p. 5 definieert die, net als 2025+C1 p. 611.
 
 ## Interpretaties
+
+- **c_W;gen op de forfaitaire tapwaterwarmtepomp (punt 80):** de warmtepomprijen van tabel 13.25 tonen geen factor c_W;gen, maar de toelichting onder de tabel vraagt c_W;gen bij de forfaitaire waarden, met klasse 4 als de klasse onbekend is. De BRL 9501-toetsset voor 2025+C1 past de correctie toe (ISSO 54 EPWReal B01: E_W 2 806 kWh bij Q_W;dis;nren 1 874 kWh). De openbare rapporten in 2020+A1 en 2022 (gevallen J en M) rekenen 1,4 zonder correctie. De kern volgt per uitgave de toets of het openbare rapport; vraag 13 aan NEN.
 
 - **Tabel 13.4 in 2023 (p. 542):** de rij "klein" heeft geen definitie. De kern leest "klein" als een systeem met ten hoogste 500 m² aangesloten gebruiksoppervlakte, de grens die 2024 (p. 538) voor utiliteitsgebouwen gebruikt.
 - **Tabel 13.18 in 2024 (p. 614):** de tabel geeft geen interpolatieregel. De kern neemt de kolom van de grootste tabelwaarde die niet groter is dan de jaarlijkse tapwarmtevraag. 2025+C1 (p. 630–631) interpoleert lineair.

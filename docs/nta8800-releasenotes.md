@@ -13,6 +13,12 @@ Dit bestand is de wijzigingsregistratie van de rekenkern (BRL 9501 §5.2, §6.2 
 
 ## Onuitgebracht
 
+### 13 oktober 2026 — ISSO 54-toets: c_W;gen op de forfaitaire tapwaterwarmtepomp en geen waakvlam bij een HR-ketel
+- **Uitgangspunt:** waar de BRL 9501-toetsset ISSO 54 en de letterlijke tekst uiteenlopen, volgt de kern de toetsset en staat het punt als vraag aan NEN in de [vragenlijst](nta8800-vragen-nen.md) (vragen 13 en 14).
+- **Tapwaterwarmtepomp (tabellen 13.25/13.27):** onder 2025+C1 krijgt de forfaitaire warmtepomp (1,4 en 1,4·c_source) weer c_W;gen van tabel 13.27, klasse 4 bij een onbekende klasse. ISSO 54 EPWReal B01: tapwater 2 790 kWh (referentie 2 806), BENG 2 73,65 (referentie 73,89); zonder correctie was het 1 339 kWh en 49,33. Oudere uitgaven rekenen zoals de openbare rapporten J en M zonder correctie (normversies, punt 80).
+- **Waakvlam (9.6.2.1):** een HR 100-, HR 104-, HR 107- of waterstofketel zonder opgave krijgt in de opname geen waakvlam meer (regel `pilot_flame_unknown_absent_condensing`); een conventionele of VR-ketel houdt de standaard van ISSO 82.1. ISSO 54 EPWReal B03: BENG 2 158,15 (referentie 157,77), was 163,74.
+- **Verticale leidingen (7.3.3):** ongewijzigd één leiding door alle bouwlagen, zoals ISSO 54 EPWReal B03; nu vastgelegd als vraag 14.
+
 ### 12 oktober 2026 — Review 64: hoofdstuk 11 onafhankelijk nagerekend (geen rekenwijziging)
 - **Herberekening:** hoofdstuk 11 is voor de tussenwoning (C1) en het kantoor (D2 met wtw) in 2025+C1 opnieuw afgeleid vanaf de normpagina's, vanaf de afgeleide invoer van de kern. Vergeleken zijn de benodigde buitenluchtvolumestroom (11.22, 11.56, tabellen 11.5, 11.8, 11.9), infiltratie en spuien (11.68, 11.84, 11.85), het luchtstroommodel met de routine voor de interne referentiedruk (11.1–11.21), de toevoertemperatuur met wtw en bypass (11.99–11.108), H_ve met b_v (7.19, 7.20) en het ventilatorgebruik (11.132, 11.142), plus de run met vast systeem C1 (§5.4.2, §5.4.3) door hoofdstuk 7.
 - **Uitkomst:** 1 041 grootheden vergeleken tegen 10⁻⁶ relatief; alle gelijk, ook BENG 1 van het kantoor (74,55) uit de eigen C1-run. Geen kernfout, geen gewijzigde uitkomst. Zie de [verificatiestatus](nta8800-verificatiestatus.md), stand 12 oktober.

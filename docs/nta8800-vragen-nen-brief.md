@@ -19,7 +19,7 @@ Geachte leden van de normcommissie,
 
 [organisatie] ontwikkelt Open Energy Studio, rekensoftware voor de energieprestatie van woningen en utiliteitsgebouwen volgens NTA 8800. Wij bereiden de aanvraag van een attest volgens BRL 9501 voor. De versie waar deze vragen over gaan is programmaversie 0.2.0 met rekenkern 0.4.0 (nog niet uitgebracht); de standaarduitgave is NTA 8800:2025+C1:2026.
 
-Bij het narekenen van openbare BENG-berekeningen van geattesteerde software (vragen 1–7) en bij een systematische controle van de rekenkern tegen de normtekst (vragen 8–12) zijn wij twaalf punten tegengekomen waar de tekst van de norm (of, bij vraag 4, de Omgevingsregeling) meer dan één lezing toelaat. Bij vijf daarvan verklaart het verschil in lezing een meetbaar verschil in BENG 2 tussen onze uitkomst en het gepubliceerde rapport; vragen 8–12 veranderen geen vergeleken uitkomst van de openbare gevallen. Wij volgen steeds de letterlijke tekst, en waar twee bepalingen elkaar tegenspreken (vragen 9 en 10) de lezing die aansluit op de rest van de berekening, maar willen voor de attestering zeker weten welke lezing bedoeld is. Per vraag noemen wij de plaats in de norm, de twee lezingen, het gevolg in een openbaar geval en de concrete vraag. De openbare gevallen en de verschilanalyse per post staan in onze vergelijking van openbare rapporten; die sturen wij desgewenst mee.
+Bij het narekenen van openbare BENG-berekeningen van geattesteerde software (vragen 1–7) bij een systematische controle van de rekenkern tegen de normtekst (vragen 8–12) en bij de BRL 9501-toetsset ISSO 54 (vragen 13 en 14) zijn wij veertien punten tegengekomen waar de tekst van de norm (of, bij vraag 4, de Omgevingsregeling) meer dan één lezing toelaat. Bij vijf daarvan verklaart het verschil in lezing een meetbaar verschil in BENG 2 tussen onze uitkomst en het gepubliceerde rapport; vragen 8–12 veranderen geen vergeleken uitkomst van de openbare gevallen. Wij volgen de letterlijke tekst, waar twee bepalingen elkaar tegenspreken (vragen 9 en 10) de lezing die aansluit op de rest van de berekening, en waar de toetsset ISSO 54 een andere lezing gebruikt dan de letterlijke tekst (vragen 13 en 14) de lezing van de toetsset, maar willen voor de attestering zeker weten welke lezing bedoeld is. Per vraag noemen wij de plaats in de norm, de twee lezingen, het gevolg in een openbaar geval en de concrete vraag. De openbare gevallen en de verschilanalyse per post staan in onze vergelijking van openbare rapporten; die sturen wij desgewenst mee.
 
 Wij stellen een antwoord per vraag zeer op prijs, ook als het een verwijzing is naar een bestaande toelichting of een geplande correctie.
 
@@ -130,6 +130,22 @@ Deze vraag gaat over de Omgevingsregeling (BWBR0045528, versie 2026-10-01), niet
 - **Lezing B.** Een gedeclareerde waarde vervangt de tabelwaarde en houdt f_prpr 1.
 - **Gevolg.** Geen openbaar geval of ISSO 54-deeltest heeft een gedeclareerde koudeopwekker. Lezing B verlaagt het aandrijfenergiegebruik van zo'n opwekker met 10 %; een kamerairco met een verklaarde EER zou dan gunstiger uitkomen dan dezelfde airco met volledige NEN-EN 14511-gegevens in methode 2 (f_prpr 0,60).
 - **Vraag.** Welke f_prpr hoort bij een gedeclareerde EER of ζ die een waarde van tabel 10.29 of 10.30 vervangt?
+
+### Vraag 13. Klassecorrectie c_W;gen op de forfaitaire tapwaterwarmtepomp (tabellen 13.25 en 13.27, 13.8.4.7.3, p. 641–643)
+
+- **Plaats.** Tabel 13.25 geeft een individuele warmtepomp 1,4 of 1,4·c_source, zonder c_W;gen in de cel; de toelichting onder de tabel vraagt c_W;gen bij de forfaitaire rendementen, klasse 4 als de klasse onbekend is. Tabel 13.27 begint bij 1 805 kWh.
+- **Lezing A (onze keuze voor 2025+C1, zoals ISSO 54).** De forfaitaire warmtepomp krijgt c_W;gen van tabel 13.27, klasse 4 bij een onbekende klasse.
+- **Lezing B (letterlijke cel, zoals de openbare rapporten in 2020+A1 en 2022).** De forfaitaire warmtepomp houdt 1,4 zonder correctie.
+- **Gevolg.** ISSO 54 EPWReal B01: lezing A geeft 2 790 kWh voor tapwater (referentie 2 806 kWh) en BENG 2 73,65 (referentie 73,89); lezing B 1 339 kWh en BENG 2 49,33.
+- **Vraag.** Geldt c_W;gen voor de forfaitaire warmtepomp, en welke waarde geldt onder 1 805 kWh?
+
+### Vraag 14. Aantal fictieve verticale leidingen bij een onbekende situatie (7.3.3, formule 7.17)
+
+- **Plaats.** Bij een onbekende situatie neemt 7.3.3 voor een woonfunctie buiten een woongebouw één ongeïsoleerde fictieve leiding per rekenzone per bouwlaag aan; opmerking 2 bij 7.17 telt per leiding het werkelijke aantal bouwlagen van de rekenzone.
+- **Lezing A (onze keuze, zoals ISSO 54).** Eén leiding door alle N bouwlagen: N·1,8 W/K.
+- **Lezing B (letterlijk).** N leidingen die elk N bouwlagen tellen: N²·1,8 W/K.
+- **Gevolg.** Drie bouwlagen: 5,4 tegen 16,2 W/K. ISSO 54 EPWReal B03 (drie bouwlagen, "onbekend") sluit aan bij lezing A.
+- **Vraag.** Welke van beide is bedoeld?
 
 ---
 

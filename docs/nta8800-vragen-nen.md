@@ -2,7 +2,7 @@
 
 Concepten voor vragen over de interpretatie van NTA 8800:2025+C1:2026. Ze zijn in eigen woorden opgesteld en verwijzen alleen naar paginanummers. Aanleiding voor vragen 1–7 is de vergelijking met openbare BENG-rapporten van geattesteerde software ([nta8800-vergelijking-openbare-rapporten.md](nta8800-vergelijking-openbare-rapporten.md)); vragen 8–12 kwamen uit de controle van de rekenkern tegen de normtekst per hoofdstuk (reviews 40–48 in [nta8800-releasenotes.md](nta8800-releasenotes.md)).
 
-Alle twaalf vragen staan ook in een verzendklare brief aan NEN en RVO, met per vraag de twee lezingen en het gevolg in de openbare gevallen: [nta8800-vragen-nen-brief.md](nta8800-vragen-nen-brief.md). Werk die brief bij als een vraag hier verandert.
+Alle veertien vragen staan ook in een verzendklare brief aan NEN en RVO, met per vraag de twee lezingen en het gevolg in de openbare gevallen: [nta8800-vragen-nen-brief.md](nta8800-vragen-nen-brief.md). Werk die brief bij als een vraag hier verandert.
 
 ## 1. Afgifteverlies koeling, formule 10.15 (p. 376)
 
@@ -143,3 +143,23 @@ Deze punten gaan over de Omgevingsregeling (BWBR0045528, versie 2026-10-01), nie
 **Gevolg.** Geen openbaar geval en geen ISSO 54-deeltest heeft een gedeclareerde koudeopwekker. Bij lezing f_prpr 1 daalt het aandrijfenergiegebruik van een gedeclareerde koudeopwekker met 10 % (een verklaarde EER van 4,37 telt dan als 4,35 in plaats van 3,915). Opvallend is dat een kamerairco met een verklaarde EER in methode 3 bij lezing f_prpr 1 gunstiger uitkomt dan dezelfde airco met volledige NEN-EN 14511-gegevens in methode 2, waar f_prpr 0,60 geldt.
 
 **Vraag.** Welke f_prpr hoort bij een gedeclareerde EER of ζ die volgens §10.1 een waarde van tabel 10.29 of 10.30 vervangt: 1, zoals bij de tabelwaarden, of die van methode 1/2 (0,9, of 0,60 bij directe condensatie tegen de buitenlucht)?
+
+## 13. Klassecorrectie c_W;gen op de forfaitaire tapwaterwarmtepomp (tabellen 13.25 en 13.27, 13.8.4.7.3, p. 641–643)
+
+**Situatie.** Tabel 13.25 geeft een individuele warmtepomp de forfaitaire waarde 1,4 of 1,4·c_source. Bij de gasrijen staat c_W;gen in de cel, bij de warmtepomprijen niet. De toelichting onder de tabel vraagt c_W;gen bij de forfaitaire rendementen, met klasse 4 als de klasse onbekend is. 13.8.4.7.3 c) neemt c_W;gen van tabel 13.27 uit de klasse waarbij het rendement van de warmtepomp is gemeten. Tabel 13.27 begint bij 1 805 kWh.
+
+**Gekozen lezing.** Waar de toetsset en de letterlijke tekst uiteenlopen, volgt de kern de BRL 9501-toetsset (besluit 13 oktober 2026). Onder 2025+C1 krijgt de forfaitaire warmtepomp c_W;gen van tabel 13.27, klasse 4 bij een onbekende klasse; onder de oudere uitgaven niet, zoals de openbare rapporten rekenen (normversies, punt 80).
+
+**Gevolg.** ISSO 54 EPWReal B01 (bodemwarmtepomp, 1 874 kWh): zonder correctie 1 339 kWh voor tapwater en BENG 2 49,33 tegen referentie 73,89; met klasse 4 2 790 kWh en BENG 2 73,65 (referentie: 2 806 kWh). De openbare rapporten J (winkel, 2020+A1, 126 kWh) en M (woning, 2022) rekenen 1,4 zonder correctie; met correctie zou BENG 2 van M stijgen van 47,85 naar 87,2.
+
+**Vraag.** Geldt c_W;gen van tabel 13.27 ook voor de forfaitaire waarde 1,4 (·c_source) van een individuele warmtepomp, met klasse 4 als de klasse onbekend is? En zo ja, welke waarde geldt onder 1 805 kWh, waar tabel 13.27 geen kolom heeft?
+
+## 14. Aantal fictieve verticale leidingen bij een onbekende situatie (7.3.3, formule 7.17)
+
+**Situatie.** Is niet bekend of er een verticale leiding door de thermische schil is, dan neemt 7.3.3 voor een woonfunctie buiten een woongebouw één ongeïsoleerde fictieve leiding per rekenzone per bouwlaag aan. Formule 7.17 telt per leiding het aantal bouwlagen van de rekenzone; opmerking 2 zegt dat dit het werkelijke aantal bouwlagen is, ook als de leiding maar door een deel ervan loopt. Letterlijk geeft dat bij N bouwlagen N leidingen van elk N bouwlagen: N²·1,8 W/K.
+
+**Gekozen lezing.** De kern volgt de BRL 9501-toetsset: één leiding door alle N bouwlagen, N·1,8 W/K (ISSO 54 EPWReal B03, drie bouwlagen, "onbekend").
+
+**Gevolg.** Bij drie bouwlagen 5,4 W/K in plaats van 16,2 W/K. EPWReal B03 valt met de gekozen lezing voor de warmtebehoefte binnen 1 % van de referentie (100,32 tegen 100,01 kWh/m²).
+
+**Vraag.** Is bij een onbekende situatie de bedoeling één leiding per bouwlaag die elk alleen die bouwlaag telt (samen N·1,8 W/K), of N leidingen die elk alle N bouwlagen tellen (N²·1,8 W/K)?

@@ -3011,18 +3011,31 @@ fn generation_values(
             // declared for one tapping class takes c_W;gen for that class;
             // without a class it is the declaration's value interpolated
             // for this system's demand (allowed before rounding), so no
-            // class correction applies. The forfait rows of table 13.25
-            // for heat pumps (1,4 and 1,4·c_source; 2025+C1 p. 641, 2020+A1
-            // p. 612) carry no c_W;gen, unlike the gas rows: 13.8.4.7.3 c)
-            // (2025+C1 p. 643, 2020+A1 p. 615) takes c_W;gen from the class
-            // "waarbij het rendement van de warmtepomp is gemeten", so only
-            // a declared value with its measured class corrects. A forfait
-            // value has no measured class: a class given next to it is
-            // ignored here (it still sets the shower class, 13.30).
+            // class correction applies. The forfait value 1,4 (·c_source)
+            // of table 13.25 takes c_W;gen of table 13.27: the legend under
+            // table 13.25 requires c_W;gen with the forfait values and class
+            // 4 when the class is unknown (2025+C1 p. 641-643). The heat pump
+            // rows print no c_W;gen factor, so this is an interpretation; it
+            // is the reading of the BRL 9501 test set (ISSO 54 EPWReal B01:
+            // E_W 2 806 kWh on Q_W;dis;nren 1 874 kWh), which the kernel
+            // follows where test set and literal text differ (vragen-nen 13).
+            // The public reports of the older editions (cases J and M, Uniec
+            // under 2020+A1 and 2022) book 1,4 uncorrected, so the correction
+            // is a switch point of the edition (normversies 80).
             let correction = match (declared, measured_class) {
+                (Some(_), None) => 1.0,
                 (Some(_), Some(class)) => heat_pump_class_correction(*class, annual_output_kwh)
                     .ok_or("hot_water_heat_pump_class_exceeded")?,
-                _ => 1.0,
+                (None, class)
+                    if crate::norm_versions::profile().forfait_heat_pump_class_correction =>
+                {
+                    heat_pump_class_correction(
+                        class.unwrap_or(ApplicationClass::Class4),
+                        annual_output_kwh,
+                    )
+                    .ok_or("hot_water_heat_pump_class_exceeded")?
+                }
+                (None, _) => 1.0,
             };
             // 13.152 (p. 616–617): f_prac;gi = 1,0 only for the forfait
             // values of 13.8.4.5–13.8.4.7; a declared value is not a forfait
@@ -5890,13 +5903,11 @@ mod tests {
         assert!((jan.carrier_input_kwh - carrier).abs() < 1e-9);
     }
 
-    /// Table 13.25 (2025+C1 p. 641, 2020+A1 p. 612) gives the forfait heat
-    /// pumps 1,4 and 1,4·c_source without c_W;gen; 13.8.4.7.3 c) (2025+C1
-    /// p. 643) corrects a measured class only. Public case J (Uniec, COP
-    /// 1,40 on a 126 kWh demand) uses the table value as is, where class 4
-    /// would give 1,4·0,45.
+    /// The forfait heat pump of table 13.25 takes c_W;gen of table 13.27,
+    /// class 4 when the class is unknown, as the BRL 9501 test set reads it
+    /// (ISSO 54 EPWReal B01; vragen-nen 13).
     #[test]
-    fn forfait_heat_pump_takes_no_class_correction() {
+    fn forfait_heat_pump_takes_the_class_4_correction() {
         for (exhaust_air_source, source_correction, expected) in
             [(true, None, 1.4), (false, Some(1.04), 1.4 * 1.04)]
         {
@@ -5909,7 +5920,6 @@ mod tests {
                 outdoor_air_fraction: None,
             });
             let result = assess_hot_water(&input, context()).unwrap();
-            // Class 4 would correct this demand.
             let class4 = heat_pump_class_correction(
                 ApplicationClass::Class4,
                 result.annual_generator_output_kwh,
@@ -5917,16 +5927,16 @@ mod tests {
             .unwrap();
             assert!(class4 < 1.0, "{class4}");
             for month in &result.months {
-                assert!((month.generation_efficiency - expected).abs() < 1e-12);
+                assert!((month.generation_efficiency - expected * class4).abs() < 1e-12);
             }
         }
     }
 
-    /// A forfait value has no measured class (13.8.4.7.3 c), 2025+C1 p. 643,
-    /// 2020+A1 p. 615): a class given next to it neither corrects 1,4 nor
-    /// fails on a larger demand.
+    /// The older editions book the forfait 1,4 as the public reports do: a
+    /// class given next to it neither corrects nor fails on a larger demand
+    /// (normversies 80).
     #[test]
-    fn forfait_heat_pump_ignores_a_measured_class() {
+    fn forfait_heat_pump_ignores_a_class_in_older_editions() {
         for class in [ApplicationClass::Class1, ApplicationClass::Class3] {
             let input = system(HotWaterGenerator::HeatPump {
                 declared: None,
@@ -5936,9 +5946,16 @@ mod tests {
                 measured_class: Some(class),
                 outdoor_air_fraction: None,
             });
-            let result = assess_hot_water(&input, context()).unwrap();
-            for month in &result.months {
-                assert!((month.generation_efficiency - 1.4).abs() < 1e-12);
+            for version in [
+                crate::norm_versions::NormVersion::V2024,
+                crate::norm_versions::NormVersion::V2022,
+            ] {
+                let result = crate::norm_versions::with_version(version, || {
+                    assess_hot_water(&input, context()).unwrap()
+                });
+                for month in &result.months {
+                    assert!((month.generation_efficiency - 1.4).abs() < 1e-12);
+                }
             }
         }
     }

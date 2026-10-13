@@ -138,6 +138,7 @@ pub(super) const PROFILE: NormProfile = NormProfile {
     en_13053_route: true,
     electric_boiler_insulated_pipe_factor: false,
     storage_ambient_exhaust_air: true,
+    forfait_heat_pump_class_correction: false,
     mixed_air_route: true,
     lighting_maintenance_factor: false,
     pv_kpk_per_m2_floor: false,
