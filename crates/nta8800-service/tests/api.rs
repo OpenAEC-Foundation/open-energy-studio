@@ -963,7 +963,7 @@ fn assert_within_contract(
 fn every_emitted_error_code_is_listed() {
     let root = env!("CARGO_MANIFEST_DIR");
     let sources = [
-        "src/operations.rs",
+        "../nta8800-operations/src/lib.rs",
         "src/http.rs",
         "src/bin/mcp.rs",
         "../nta8800-core/src/norm_versions/request.rs",
