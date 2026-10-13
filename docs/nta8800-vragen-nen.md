@@ -2,13 +2,15 @@
 
 Concepten voor vragen over de interpretatie van NTA 8800:2025+C1:2026. Ze zijn in eigen woorden opgesteld en verwijzen alleen naar paginanummers. Aanleiding voor vragen 1–7 is de vergelijking met openbare BENG-rapporten van geattesteerde software ([nta8800-vergelijking-openbare-rapporten.md](nta8800-vergelijking-openbare-rapporten.md)); vragen 8–12 kwamen uit de controle van de rekenkern tegen de normtekst per hoofdstuk (reviews 40–48 in [nta8800-releasenotes.md](nta8800-releasenotes.md)).
 
-Alle vijftien vragen staan ook in een verzendklare brief aan NEN en RVO, met per vraag de twee lezingen en het gevolg in de openbare gevallen: [nta8800-vragen-nen-brief.md](nta8800-vragen-nen-brief.md). Werk die brief bij als een vraag hier verandert.
+Alle zestien vragen staan ook in een verzendklare brief aan NEN en RVO, met per vraag de twee lezingen en het gevolg in de openbare gevallen: [nta8800-vragen-nen-brief.md](nta8800-vragen-nen-brief.md). Werk die brief bij als een vraag hier verandert.
 
 ## 1. Afgifteverlies koeling, formule 10.15 (p. 376)
 
 **Situatie.** Formule 10.15 geldt als θ_int,inc − θ_e,comb kleiner is dan 0. Het verlies is dan de koudeafgifte maal het maximum van twee waarden: de verhouding Δθ_int,inc / (θ_int,inc − θ_e,comb) en 0,15. Bij vloerkoeling met forfaitaire waterzijdige inregeling en regeling volgt uit tabel 10.35 en tabel 10.5 een Δθ_int,inc van −3,05 tot −3,55 K. In de tussenmaanden (mei, september) ligt θ_e,comb maar net boven θ_int,inc, zodat de noemer klein is en de verhouding groot wordt.
 
 **Gevolg bij letterlijke toepassing.** Over het jaar is het afgifteverlies 80–83 % van de koudebehoefte. In mei en september is het groter dan de behoefte zelf. In drie woningen leidt dit tot +1,5 tot +8,6 kWh/(m²·jr) BENG 2 ten opzichte van de gepubliceerde rapporten. Die rapporten impliceren een verlies van 16–42 % van de behoefte, dicht bij de ondergrens van 0,15.
+
+**Ook in de toetsset.** In ISSO 54 EPUReal B01 (utiliteit, koudelevering derden, ventilatorconvectoren) geeft de letterlijke lezing 137 307 kWh koude in zone 1 tegen de referentie 120 378 kWh (+14 %); de lezing met MIN in plaats van MAX geeft 108 145 kWh (−10 %). De toetsset gebruikt dus een derde lezing.
 
 **Vraag.**
 - Is het de bedoeling dat de verhouding onbegrensd groot kan worden als θ_e,comb maar net boven θ_int,inc ligt, zodat het verlies groter wordt dan de behoefte?
@@ -173,3 +175,13 @@ Deze punten gaan over de Omgevingsregeling (BWBR0045528, versie 2026-10-01), nie
 **Gevolg.** EPWReal B01: RER 58,0 % (referentie 57,8 %), zonder deze lezing 54,7 %. EPWReal D01: de hernieuwbare tapwaterwarmte stijgt van 0 naar circa 1 120 kWh.
 
 **Vraag.** Geldt in 5.36–5.38 voor een forfaitaire warmtepomp met c_W;gen het rendement met of zonder c_W;gen, en op welke warmte?
+
+## 16. TOjuli bij utiliteitsbouw (§5.7, p. 114–120)
+
+**Situatie.** §5.7.2 bepaalt TOjuli per rekenzone en oriëntatie zonder onderscheid naar gebruiksfunctie. De lijst van actieve koelsystemen in §5.7.1 noemt woningbouw, en de grenswaarde (Bbl art. 4.149b) geldt alleen voor woonfuncties. De BRL 9501-toetsset geeft voor alle 59 utiliteits-deeltests (EPU) en voor EPUReal B01 TOjuli 0, met en zonder koeling; bij de woningen is TOjuli in 259 van de 264 deeltests groter dan 0.
+
+**Gekozen lezing.** De kern volgt de toetsset (besluit 13 oktober 2026): een utiliteitsgebouw registreert TOjuli 0. De waarden per oriëntatie blijven in de uitkomst ter informatie.
+
+**Gevolg.** EPUReal B01: TOjuli 0 (was 5,02 K). Op de labelregistratie van utiliteit staat "Temperatuuroverschrijding" 0.
+
+**Vraag.** Wordt TOjuli voor utiliteitsbouw niet bepaald (en als 0 geregistreerd), of geldt §5.7.2 ook voor utiliteitsrekenzones?

@@ -3966,6 +3966,7 @@
       "heating",
       "heatingInstallation",
       "cooling",
+      "additionalCoolingSystems",
       "ventilation",
       "humidification",
       "hotWater",
@@ -3988,6 +3989,7 @@
   {
     "kind": "field",
     "options": [
+      "above290Kw",
       "systemPowerKw",
       "servedAreaM2",
       "present",
@@ -4044,6 +4046,7 @@
       "uncooledPipeLengthM",
       "maxPipeLengthM",
       "additionalGenerators",
+      "zoneIds",
       "sourceReference"
     ],
     "path": "/cooling",

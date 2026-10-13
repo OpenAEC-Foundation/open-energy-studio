@@ -3681,12 +3681,20 @@ fn assess_in_edition(input: &BuildingPerformanceInput) -> BuildingPerformanceAss
         && tojuli
             .iter()
             .all(|item| item.status == "calculated_unverified" && item.max_tojuli_k.is_some());
-    let tojuli_max = tojuli_complete.then(|| {
-        tojuli
-            .iter()
-            .filter_map(|item| item.max_tojuli_k)
-            .fold(0.0_f64, f64::max)
-    });
+    // §5.7 with the BRL 9501 test set: a utility building registers TOjuli 0
+    // (every one of the 59 ISSO 54 EPU deeltests, with or without cooling;
+    // the Bbl limit is for woonfuncties only, art. 4.149b; vragen-nen 16).
+    // The values per orientation stay in `tojuli` for information.
+    let tojuli_max = if matches!(input.calculation_scope, CalculationScope::Utility) {
+        valid.then_some(0.0)
+    } else {
+        tojuli_complete.then(|| {
+            tojuli
+                .iter()
+                .filter_map(|item| item.max_tojuli_k)
+                .fold(0.0_f64, f64::max)
+        })
+    };
     let bbl_functions: Vec<BblFunctionArea> = if input.bbl_functions.is_empty() {
         input
             .bbl_function

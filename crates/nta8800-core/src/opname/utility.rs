@@ -137,6 +137,11 @@ pub enum UtilityBuildingType {
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SurveyBacs {
+    /// Whether a heating or cooling system above 290 kW is present, as the
+    /// survey form states it (ISSO 54 EPUReal B01: "geen installatie met
+    /// vermogen > 290 kW"); decides before `systemPowerKw`.
+    #[serde(default, rename = "above290Kw")]
+    pub above_290_kw: Option<bool>,
     /// Summed nominal power of the largest heating or cooling system, kW.
     #[serde(default)]
     pub system_power_kw: Option<f64>,
@@ -329,6 +334,10 @@ pub struct SurveyCooling {
     /// kernel ranks them by table 10.15 and sums equal priorities.
     #[serde(default)]
     pub additional_generators: Vec<SurveyCoolingGenerator>,
+    /// §10.2 with several calculation zones: the zones this system cools.
+    /// Empty: every zone no other system cools (with one system: all).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub zone_ids: Vec<String>,
     pub source_reference: String,
 }
 
@@ -790,6 +799,11 @@ pub struct UtilitySurvey {
     pub heating_installation: HeatingInstallation,
     #[serde(default)]
     pub cooling: Option<SurveyCooling>,
+    /// §10.2: further cooling systems, each with the zones it cools
+    /// (`zoneIds`), e.g. external cold in one zone and split units in another
+    /// (ISSO 54 EPUReal B01).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub additional_cooling_systems: Vec<SurveyCooling>,
     pub ventilation: UtilityVentilation,
     #[serde(default)]
     pub humidification: Option<SurveyHumidification>,
@@ -1224,6 +1238,7 @@ pub fn bacs_factor(
     let all_known =
         !system_powers_kw.is_empty() && system_powers_kw.iter().all(|power| power.is_some());
     let large = match bacs.system_power_kw {
+        _ if bacs.above_290_kw.is_some() => bacs.above_290_kw == Some(true),
         Some(power) => power > 290.0,
         None if surveyed_large || all_known => {
             let largest = system_powers_kw
@@ -4382,6 +4397,20 @@ fn derive_utility_input_cited(survey: &UtilitySurvey, recorder: &mut Recorder) -
             recorder,
         )
     });
+    let additional_cooling: Vec<Value> = survey
+        .additional_cooling_systems
+        .iter()
+        .map(|cooling| {
+            cooling_value(
+                cooling,
+                year,
+                survey.storeys,
+                CoolingBook::Utility,
+                false,
+                recorder,
+            )
+        })
+        .collect();
     let pv: Vec<Value> = survey
         .pv
         .iter()
@@ -4584,15 +4613,83 @@ fn derive_utility_input_cited(survey: &UtilitySurvey, recorder: &mut Recorder) -
             "ISSO 75.1 p. 61–62 (§7.1.7)",
         ),
     }
-    if let (Some(mut value), Some(answer)) = (cooling, survey.cooling.as_ref()) {
-        apply_cooling_heat_pump_source(
-            &mut value,
-            answer,
-            &input["spaceHeating"]["generator"],
-            CoolingBook::Utility,
-            recorder,
-        );
-        input["cooling"] = value;
+    let per_zone = !survey.additional_cooling_systems.is_empty()
+        || survey
+            .cooling
+            .as_ref()
+            .is_some_and(|answer| !answer.zone_ids.is_empty());
+    if !per_zone {
+        if let (Some(mut value), Some(answer)) = (cooling, survey.cooling.as_ref()) {
+            apply_cooling_heat_pump_source(
+                &mut value,
+                answer,
+                &input["spaceHeating"]["generator"],
+                CoolingBook::Utility,
+                recorder,
+            );
+            input["cooling"] = value;
+        }
+    } else {
+        // §10.2: each cooling system for its own zones (coolingSystems).
+        let zone_ids: Vec<String> = survey.zones.iter().map(|zone| zone.id.clone()).collect();
+        if zone_ids.len() < 2 {
+            recorder.issue(
+                "cooling_per_zone_requires_zones",
+                "additionalCoolingSystems",
+            );
+        }
+        if survey.cooling.is_none() {
+            recorder.issue(
+                "additional_cooling_requires_cooling",
+                "additionalCoolingSystems",
+            );
+        }
+        let claimed: Vec<&String> = survey
+            .additional_cooling_systems
+            .iter()
+            .flat_map(|answer| &answer.zone_ids)
+            .collect();
+        let mut systems = Vec::new();
+        if let (Some(mut value), Some(answer)) = (cooling, survey.cooling.as_ref()) {
+            apply_cooling_heat_pump_source(
+                &mut value,
+                answer,
+                &input["spaceHeating"]["generator"],
+                CoolingBook::Utility,
+                recorder,
+            );
+            let ids: Vec<String> = if answer.zone_ids.is_empty() {
+                zone_ids
+                    .iter()
+                    .filter(|id| !claimed.contains(id))
+                    .cloned()
+                    .collect()
+            } else {
+                answer.zone_ids.clone()
+            };
+            systems.push(json!({ "zoneIds": ids, "system": value }));
+        }
+        for (index, (mut value, answer)) in additional_cooling
+            .into_iter()
+            .zip(&survey.additional_cooling_systems)
+            .enumerate()
+        {
+            if answer.zone_ids.is_empty() {
+                recorder.issue(
+                    "cooling_zones_required",
+                    format!("additionalCoolingSystems[{index}].zoneIds"),
+                );
+            }
+            apply_cooling_heat_pump_source(
+                &mut value,
+                answer,
+                &input["spaceHeating"]["generator"],
+                CoolingBook::Utility,
+                recorder,
+            );
+            systems.push(json!({ "zoneIds": answer.zone_ids, "system": value }));
+        }
+        input["coolingSystems"] = json!(systems);
     }
     if let Some(renewable) = heating.heat_pump_renewable {
         input["heatPumpRenewable"] = renewable;
@@ -5230,6 +5327,7 @@ mod tests {
             uncooled_pipe_length_m: None,
             max_pipe_length_m: None,
             additional_generators: Vec::new(),
+            zone_ids: Vec::new(),
             source_reference: "survey".into(),
         }
     }
@@ -5998,6 +6096,55 @@ mod tests {
             }
         }
         survey
+    }
+
+    /// §10.2 per zone (ISSO 54 EPUReal B01): one cooling system per zone becomes
+    /// coolingSystems with zoneIds; a utility building registers TOjuli 0.
+    #[test]
+    fn cooling_per_zone_becomes_cooling_systems() {
+        let mut survey = school_with_sports_hall();
+        let cooling = |generator: &str, zones: &[&str]| -> SurveyCooling {
+            serde_json::from_value(json!({
+                "generator": generator, "emitter": "fan_coil_on_ceiling", "fanCoilCount": 1,
+                "waterBased": false, "directExpansion": "room", "zoneIds": zones,
+                "sourceReference": "test"
+            }))
+            .unwrap()
+        };
+        survey.cooling = Some(cooling("compression", &["school"]));
+        survey.additional_cooling_systems = vec![cooling("room_air_conditioner", &["sporthal"])];
+        let (input, _) = derive(&survey);
+        assert!(input.get("cooling").map_or(true, Value::is_null));
+        let systems = input["coolingSystems"].as_array().unwrap();
+        assert_eq!(systems.len(), 2);
+        assert_eq!(systems[0]["zoneIds"], json!(["school"]));
+        assert_eq!(systems[1]["zoneIds"], json!(["sporthal"]));
+        let result = assess_utility_survey(&survey);
+        assert_eq!(
+            result.status, "calculated_unverified",
+            "{:?}",
+            result.issues
+        );
+        assert_eq!(result.performance.as_ref().unwrap().tojuli_max_k, Some(0.0));
+        // Without zones on the further system, the survey names it.
+        survey.additional_cooling_systems[0].zone_ids.clear();
+        let mut recorder = Recorder::default();
+        derive_utility_input(&survey, &mut recorder);
+        assert!(recorder
+            .issues
+            .iter()
+            .any(|item| item.code == "cooling_zones_required"));
+    }
+
+    /// Table 7.3: the form's "geen installatie > 290 kW" decides f_BACS.
+    #[test]
+    fn bacs_takes_the_stated_290_kw_answer() {
+        let mut recorder = Recorder::default();
+        let none: SurveyBacs = serde_json::from_value(json!({ "above290Kw": false })).unwrap();
+        assert_eq!(bacs_factor(&none, &[None], 5000.0, &mut recorder).0, 1.0);
+        let large: SurveyBacs =
+            serde_json::from_value(json!({ "above290Kw": true, "present": false })).unwrap();
+        assert!(bacs_factor(&large, &[None], 100.0, &mut recorder).0 > 1.0);
     }
 
     #[test]

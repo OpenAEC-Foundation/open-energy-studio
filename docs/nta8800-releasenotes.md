@@ -13,6 +13,11 @@ Dit bestand is de wijzigingsregistratie van de rekenkern (BRL 9501 §5.2, §6.2 
 
 ## Onuitgebracht
 
+### 13 oktober 2026 — Utiliteitsopname: koeling per zone, 290 kW-antwoord, TOjuli 0
+- **Koeling per zone (§10.2):** de utiliteitsopname kent `zoneIds` per koelsysteem en `additionalCoolingSystems`; de kern rekent dan met `coolingSystems`. ISSO 54 EPUReal B01: koudelevering in zone 1 en multi-split op elektriciteit in zone 2 (18 942 kWh, referentie circa 19 483).
+- **f_BACS (tabel 7.3):** `bacs.above290Kw` legt het antwoord van het formulier vast ("geen installatie met vermogen > 290 kW") en gaat voor het vermogen.
+- **TOjuli utiliteit (§5.7):** een utiliteitsgebouw registreert TOjuli 0, zoals de toetsset voor alle 59 EPU-deeltests (vraag 16); de waarden per oriëntatie blijven ter informatie.
+
 ### 13 oktober 2026 — ISSO 54 D-gevallen en utiliteit: vier rekenkernpunten
 - **Hernieuwbare tapwaterwarmte (5.36):** de forfaitaire tapwaterwarmtepomp met c_W;gen boekt onder 2025+C1 E_W;gen;in · (1,4·c_source − 1) als hernieuwbaar, zoals de toetsset (vraag 15). EPWReal B01: RER 58,0 % (referentie 57,8 %), was 54,7 %.
 - **ΔU_for alleen in H_D (8.3):** de basisopname gaf de forfaitaire koudebrugtoeslag mee in de U van de zonnewinsttermen 7.33/7.39; die rekenen nu met U_c en de toeslag gaat apart mee (`forfaitDeltaUWPerM2k`). TOjuli EPWReal B06 en B07 nu exact (1,99 en 2,30).

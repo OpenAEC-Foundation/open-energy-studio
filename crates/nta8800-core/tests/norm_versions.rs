@@ -245,15 +245,19 @@ fn changed_keys(a: &ProjectPerformanceAssessment, b: &ProjectPerformanceAssessme
 /// 2023 against 2024 on the example projects (the office without the LED
 /// column in both). The dwelling has no input on a route that differs. The
 /// office changes only TOjuli, through ΔT_C;fan of utility buildings: 1,5 K
-/// in 2023 (p. 496) against 0,7 K in 2024 (p. 491).
+/// in 2023 (p. 496) against 0,7 K in 2024 (p. 491). A utility building
+/// registers TOjuli 0 (vragen-nen 16), so the difference shows in the values
+/// per orientation, not in the scalar outputs.
 #[test]
 fn example_projects_2023_differ_from_2024_only_where_the_editions_differ() {
     let run = |json, edition| assess_project_performance(&project_2023_compatible(json, edition));
     assert!(changed_keys(&run(DWELLING, "2024"), &run(DWELLING, "2023")).is_empty());
-    assert_eq!(
-        changed_keys(&run(OFFICE, "2024"), &run(OFFICE, "2023")),
-        ["tojuliMaxK"]
-    );
+    let (office_2024, office_2023) = (run(OFFICE, "2024"), run(OFFICE, "2023"));
+    assert!(changed_keys(&office_2024, &office_2023).is_empty());
+    let orientations = |result: &ProjectPerformanceAssessment| {
+        serde_json::to_value(&result.performance.as_ref().unwrap().tojuli).unwrap()
+    };
+    assert_ne!(orientations(&office_2024), orientations(&office_2023));
 }
 
 /// Table 13.2 diameter rows exist in NTA 8800:2023 only (p. 533; 2024

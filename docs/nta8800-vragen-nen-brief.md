@@ -19,7 +19,7 @@ Geachte leden van de normcommissie,
 
 [organisatie] ontwikkelt Open Energy Studio, rekensoftware voor de energieprestatie van woningen en utiliteitsgebouwen volgens NTA 8800. Wij bereiden de aanvraag van een attest volgens BRL 9501 voor. De versie waar deze vragen over gaan is programmaversie 0.2.0 met rekenkern 0.4.0 (nog niet uitgebracht); de standaarduitgave is NTA 8800:2025+C1:2026.
 
-Bij het narekenen van openbare BENG-berekeningen van geattesteerde software (vragen 1–7) bij een systematische controle van de rekenkern tegen de normtekst (vragen 8–12) en bij de BRL 9501-toetsset ISSO 54 (vragen 13–15) zijn wij vijftien punten tegengekomen waar de tekst van de norm (of, bij vraag 4, de Omgevingsregeling) meer dan één lezing toelaat. Bij vijf daarvan verklaart het verschil in lezing een meetbaar verschil in BENG 2 tussen onze uitkomst en het gepubliceerde rapport; vragen 8–12 veranderen geen vergeleken uitkomst van de openbare gevallen. Wij volgen de letterlijke tekst, waar twee bepalingen elkaar tegenspreken (vragen 9 en 10) de lezing die aansluit op de rest van de berekening, en waar de toetsset ISSO 54 een andere lezing gebruikt dan de letterlijke tekst (vragen 13–15) de lezing van de toetsset, maar willen voor de attestering zeker weten welke lezing bedoeld is. Per vraag noemen wij de plaats in de norm, de twee lezingen, het gevolg in een openbaar geval en de concrete vraag. De openbare gevallen en de verschilanalyse per post staan in onze vergelijking van openbare rapporten; die sturen wij desgewenst mee.
+Bij het narekenen van openbare BENG-berekeningen van geattesteerde software (vragen 1–7) bij een systematische controle van de rekenkern tegen de normtekst (vragen 8–12) en bij de BRL 9501-toetsset ISSO 54 (vragen 13–16) zijn wij zestien punten tegengekomen waar de tekst van de norm (of, bij vraag 4, de Omgevingsregeling) meer dan één lezing toelaat. Bij vijf daarvan verklaart het verschil in lezing een meetbaar verschil in BENG 2 tussen onze uitkomst en het gepubliceerde rapport; vragen 8–12 veranderen geen vergeleken uitkomst van de openbare gevallen. Wij volgen de letterlijke tekst, waar twee bepalingen elkaar tegenspreken (vragen 9 en 10) de lezing die aansluit op de rest van de berekening, en waar de toetsset ISSO 54 een andere lezing gebruikt dan de letterlijke tekst (vragen 13–16) de lezing van de toetsset, maar willen voor de attestering zeker weten welke lezing bedoeld is. Per vraag noemen wij de plaats in de norm, de twee lezingen, het gevolg in een openbaar geval en de concrete vraag. De openbare gevallen en de verschilanalyse per post staan in onze vergelijking van openbare rapporten; die sturen wij desgewenst mee.
 
 Wij stellen een antwoord per vraag zeer op prijs, ook als het een verwijzing is naar een bestaande toelichting of een geplande correctie.
 
@@ -154,6 +154,13 @@ Deze vraag gaat over de Omgevingsregeling (BWBR0045528, versie 2026-10-01), niet
 - **Lezing B (letterlijk).** Het gecorrigeerde rendement geldt ook in 5.36–5.38, dus geen hernieuwbare warmte onder rendement 1.
 - **Gevolg.** ISSO 54 EPWReal B01: lezing A geeft RER 58,0 % (referentie 57,8 %), lezing B 54,7 %.
 - **Vraag.** Welk rendement en welke warmte gelden in 5.36–5.38 voor een forfaitaire warmtepomp met c_W;gen?
+
+### Vraag 16. TOjuli bij utiliteitsbouw (§5.7, p. 114–120)
+
+- **Plaats.** §5.7.2 bepaalt TOjuli per rekenzone zonder onderscheid naar gebruiksfunctie; §5.7.1 noemt bij actieve koeling woningbouw en de grenswaarde geldt alleen voor woonfuncties.
+- **Lezing A (onze keuze, zoals ISSO 54).** Utiliteitsbouw registreert TOjuli 0; de toetsset geeft 0 voor alle 59 EPU-deeltests en EPUReal B01.
+- **Lezing B (letterlijk).** TOjuli wordt ook voor utiliteitsrekenzones bepaald (EPUReal B01: 5,02 K).
+- **Vraag.** Wordt TOjuli voor utiliteitsbouw niet bepaald, of geldt §5.7.2 ook daar?
 
 ---
 
