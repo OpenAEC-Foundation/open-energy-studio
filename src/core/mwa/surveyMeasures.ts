@@ -123,11 +123,13 @@ export function patchesOverlap(a: MwaPatchOperation[], b: MwaPatchOperation[]): 
   return a.some((first) => b.some((second) => within(first.path, second.path)));
 }
 
-async function deriveInput(stored: StoredSurvey, survey: Json): Promise<{ input: unknown; assessment: OpnameAssessment }> {
+type Edition = Parameters<typeof asResidential>[1];
+
+async function deriveInput(stored: StoredSurvey, survey: Json, edition?: Edition): Promise<{ input: unknown; assessment: OpnameAssessment }> {
   const variant: StoredSurvey = { ...stored, survey };
   const assessment = stored.kind === 'residential'
-    ? await assessResidentialSurveyWithRust(asResidential(variant))
-    : await assessUtilitySurveyWithRust(asUtility(variant));
+    ? await assessResidentialSurveyWithRust(asResidential(variant, edition))
+    : await assessUtilitySurveyWithRust(asUtility(variant, edition));
   if (!assessment.derivedInput) throw new Error(`survey_not_calculated: ${assessment.issues.map((issue) => issue.code).join(', ')}`);
   return { input: assessment.derivedInput, assessment };
 }
@@ -143,14 +145,14 @@ function withProfileSource<U extends { profile: string; sourceReference?: string
 }
 
 /** Runs the maatwerkadvies of a survey project: the survey's derived input is the base. */
-export async function assessSurveyMaatwerkadvies(stored: StoredSurvey, definition: NtaMaatwerkadvies): Promise<SurveyMwaRun> {
-  const base = await deriveInput(stored, stored.survey);
+export async function assessSurveyMaatwerkadvies(stored: StoredSurvey, definition: NtaMaatwerkadvies, edition?: Edition): Promise<SurveyMwaRun> {
+  const base = await deriveInput(stored, stored.survey, edition);
   const patches: Record<string, MwaPatchOperation[]> = {};
   const measures: MwaMeasure[] = [];
   for (const measure of definition.measures) {
     const template = surveyTemplateOf(measure);
     if (!template) continue;
-    const variant = await deriveInput(stored, applySurveyChange(stored.survey as Json, template.change));
+    const variant = await deriveInput(stored, applySurveyChange(stored.survey as Json, template.change), edition);
     const patch = jsonDiff(base.input, variant.input);
     patches[measure.id] = patch;
     // The kernel keeps no unknown fields: the template stays in the app.

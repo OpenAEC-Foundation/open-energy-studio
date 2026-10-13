@@ -9,9 +9,13 @@ import type { OpnameAssessment } from '../nta/KernelClient';
 import { assessResidentialSurveyWithRust, assessUtilitySurveyWithRust } from '../nta/KernelClient';
 import { asResidential, asUtility, missingSurveyAnswers, type StoredSurvey } from '../nta/SurveyTemplates';
 
+type Edition = Parameters<typeof asResidential>[1];
+
 export interface SurveyAssessmentState {
   /** JSON of the survey the result belongs to. */
   surveyJson: string | null;
+  /** The NTA 8800 edition it was calculated in (the project's; absent is the default edition). */
+  edition?: Edition;
   result: OpnameAssessment | null;
   busy: boolean;
   error: string | null;
@@ -41,26 +45,26 @@ export function currentResult(assessment: SurveyAssessmentState, stored: StoredS
   return assessment.result;
 }
 
-/** Runs the kernel on the survey; a newer call wins. */
-export async function assessSurvey(stored: StoredSurvey): Promise<void> {
+/** Runs the kernel on the survey in the project's edition; a newer call wins. */
+export async function assessSurvey(stored: StoredSurvey, edition?: Edition): Promise<void> {
   const surveyJson = JSON.stringify(stored.survey);
-  if (state.surveyJson === surveyJson && (state.result || state.busy)) return;
+  if (state.surveyJson === surveyJson && (state.edition ?? null) === (edition ?? null) && (state.result || state.busy)) return;
   const current = ++request;
   // Required answers still open: name them instead of a survey the kernel cannot read.
   const missing = missingSurveyAnswers(stored);
   if (missing.length > 0) {
-    set({ surveyJson, busy: false, error: null, result: {
+    set({ surveyJson, edition, busy: false, error: null, result: {
       status: 'derived_input_rejected', scope: stored.kind, source: 'app', appliedDefaults: [], warnings: [],
       issues: missing.map((path) => ({ code: 'survey_answer_required', path })),
       derivedInput: null, performance: null, referenceVerified: false,
     } });
     return;
   }
-  set({ surveyJson, busy: true, error: null });
+  set({ surveyJson, edition, busy: true, error: null });
   try {
     const assessment = stored.kind === 'residential'
-      ? await assessResidentialSurveyWithRust(asResidential(stored))
-      : await assessUtilitySurveyWithRust(asUtility(stored));
+      ? await assessResidentialSurveyWithRust(asResidential(stored, edition))
+      : await assessUtilitySurveyWithRust(asUtility(stored, edition));
     // A survey the kernel cannot read comes back as `{ error, message }` without issues.
     const refused = assessment as Partial<OpnameAssessment> & { error?: string; message?: string };
     if (!Array.isArray(refused.issues)) throw new Error(refused.message ?? refused.error ?? 'invalid response');

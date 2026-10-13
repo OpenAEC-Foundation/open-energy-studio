@@ -56,6 +56,8 @@ describe('project setup', () => {
     expect(project.registration).toMatchObject({
       postcode: '2807CB', houseNumber: '85', bagObjectId: '0513010013073557', certificateNumber: 'C9',
       surveyingAdvisor: { name: 'A. Adviseur', competenceNumber: 'V123' },
+      // BRL 9500 §3.1 reads the construction year from the registration.
+      constructionYear: 1932,
     });
     expect(survey(project)).toMatchObject({
       constructionYear: 1932, usableFloorAreaM2: 145,
@@ -79,6 +81,15 @@ describe('project setup', () => {
     });
     expect(survey(applySetup(createDefaultProject(), setup({ dwelling: 'caravan' })))).toMatchObject({
       envelope: { buildingKind: { kind: 'caravan' } },
+    });
+  });
+
+  it('asks the side of an apartment and leaves an unanswered side unknown (table 11.14)', () => {
+    expect(survey(applySetup(createDefaultProject(), setup({ dwelling: 'apartment', apartmentFloor: 'top' })))).toMatchObject({
+      dwelling: { kind: 'apartment', floor: 'top', side: 'unknown' },
+    });
+    expect(survey(applySetup(createDefaultProject(), setup({ dwelling: 'apartment', apartmentSide: 'end_or_corner' })))).toMatchObject({
+      dwelling: { kind: 'apartment', side: 'end_or_corner' },
     });
   });
 

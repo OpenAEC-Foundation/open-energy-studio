@@ -68,18 +68,16 @@ describe('component bar in the question flow', () => {
   }, 60000);
 
 
-  it('asks a declaration only with Met verklaring and clears it with Standaardwaarde', async () => {
+  it('asks a required declaration without a standard value the kernel does not have', async () => {
     const user = userEvent.setup();
     renderWithProviders(<Harness part="ventilation" />);
     const bar = within(await screen.findByRole('group', { name: 'What does it have?' }));
     expect(screen.queryByRole('group', { name: 'Evidence for the controls' })).toBeNull();
     await user.click(bar.getByRole('button', { name: /Controls/ }));
+    // The kernel requires evidence for controls (ventilation_controls_evidence_required): no "Standard value".
     const group = within(screen.getByRole('group', { name: 'Evidence for the controls' }));
-    expect(group.getByRole('button', { name: 'Standard value' })).toHaveAttribute('aria-pressed', 'true');
+    expect(group.queryByRole('button', { name: 'Standard value' })).toBeNull();
     await declare(user, 'Evidence for the controls', 'BCRG 77');
     expect(stored().survey.ventilation.controls.evidenceReference).toBe('BCRG 77');
-    await user.click(group.getByRole('button', { name: 'Standard value' }));
-    expect(stored().survey.ventilation.controls.evidenceReference).toBe('');
-    expect(screen.queryByRole('textbox', { name: /Declaration number/ })).toBeNull();
   }, 60000);
 });

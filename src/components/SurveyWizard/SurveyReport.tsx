@@ -69,10 +69,11 @@ export function SurveyReport({ actions }: { actions: ShellActions }) {
   }, [surveyJson]);
 
   // The report needs the survey outcome, also when the survey pages were not opened in this session.
+  const edition = project.ntaCalculation?.normVersion;
   useEffect(() => {
-    if (stored) void assessSurvey(stored);
+    if (stored) void assessSurvey(stored, edition);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [surveyJson]);
+  }, [surveyJson, edition]);
 
   if (!stored) return null;
   const result = currentResult(assessment, stored);

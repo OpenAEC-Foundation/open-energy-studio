@@ -34,10 +34,11 @@ export function SurveyRegistration({ actions }: { actions: Pick<ShellActions, 'n
   const evidenceRef = useRef<HTMLDetailsElement>(null);
   const [evidenceOpen, setEvidenceOpen] = useState(false);
 
+  const edition = project.ntaCalculation?.normVersion;
   useEffect(() => {
-    if (stored) void assessSurvey(stored);
+    if (stored) void assessSurvey(stored, edition);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [surveyJson]);
+  }, [surveyJson, edition]);
   // The survey's answers are part of the registration (EP-Online export, dossier).
   const pending = takeoversPending(project);
   useEffect(() => {

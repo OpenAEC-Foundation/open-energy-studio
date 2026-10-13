@@ -29,7 +29,9 @@ export { default as userEvent } from '@testing-library/user-event';
 /** Chooses "With declaration" at a declaration field and types its number (feedback 9 Oct 2026). */
 export async function declare(user: { click: (element: Element) => Promise<void>; type: (element: Element, text: string) => Promise<void> }, label: string | RegExp, text: string) {
   const group = screen.getByRole('group', { name: label });
-  await user.click(within(group).getByRole('button', { name: 'With declaration' }));
+  // A required declaration has no choice: its number field is there at once.
+  const choice = within(group).queryByRole('button', { name: 'With declaration' });
+  if (choice) await user.click(choice);
   const box = group.closest('.survey-declaration') as HTMLElement;
   await user.type(within(box).getByRole('textbox', { name: /Declaration number/ }), text);
 }

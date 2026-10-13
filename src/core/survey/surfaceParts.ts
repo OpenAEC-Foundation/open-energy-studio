@@ -11,7 +11,7 @@
 import type { StoredSurvey } from '../nta/SurveyTemplates';
 
 /** What a part takes over from its surface. */
-export const PART_SYNC_KEYS = ['element', 'boundary', 'orientation', 'tiltDeg', 'zoneId'] as const;
+export const PART_SYNC_KEYS = ['element', 'boundary', 'orientation', 'tiltDeg', 'zoneId', 'depthBelowGroundM', 'groundFloorId'] as const;
 
 type Surface = Record<string, unknown>;
 const surfacesOf = (stored: StoredSurvey): Surface[] =>

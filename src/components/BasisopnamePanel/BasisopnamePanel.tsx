@@ -116,13 +116,25 @@ function KindSelect({ draft, path, label, kinds, prefix, template, change, t }: 
  * A declaration (kwaliteitsverklaring, project document) or the standard value
  * (feedback 9 Oct 2026): "Met verklaring" asks its number and links the file
  * into the dossier; "Standaardwaarde" leaves it empty, so the kernel applies
- * the forfait value.
+ * the forfait value. `required`: the kernel has no forfait for it (passive
+ * cooling, ventilation controls, rooflight, heat pump above 70 °C), so there is
+ * no standard choice; without a declaration the component is switched off.
  */
-export function DeclarationField({ draft, change, path, label, t }: { draft: Draft; change: Change; path: Path; label: string; t: T }) {
+export function DeclarationField({ draft, change, path, label, t, required = false }: { draft: Draft; change: Change; path: Path; label: string; t: T; required?: boolean }) {
   const value = read(draft, path);
   const filled = typeof value === 'string' && value.trim() !== '';
   const [chosen, setChosen] = useState(filled);
   const declared = filled || chosen;
+  if (required) {
+    return <div className="survey-declaration" role="group" aria-label={label}>
+      <span className="survey-declaration__label">{label}</span>
+      <p className="nta-form-note">{t('survey.declaration.required')}</p>
+      <div className="survey-declaration__body">
+        <TextField draft={draft} onChange={change} path={path} label={t('survey.declaration.number')} />
+        <EvidenceAttach pointer={surveyPointer(path)} title={t('survey.declaration.file')} />
+      </div>
+    </div>;
+  }
   return <div className="survey-declaration">
     <span className="survey-declaration__label">{label}</span>
     <span className="survey-components__chips" role="group" aria-label={label}>
@@ -263,7 +275,7 @@ export function PassiveCoolingFields({ draft, change, t, toggles = true }: {
       {t('opname.passiveCooling.present')}
     </label>}
     {present && <>
-      <DeclarationField draft={draft} change={change} path={['ventilation', 'passiveCooling', 'evidenceReference']} label={t('opname.passiveCooling.evidence')} t={t} />
+      <DeclarationField draft={draft} change={change} path={['ventilation', 'passiveCooling', 'evidenceReference']} label={t('opname.passiveCooling.evidence')} t={t} required />
       <NumberField {...field} path={['ventilation', 'passiveCooling', 'installedCapacityDm3PerS']} label={t('opname.passiveCooling.installed')} />
     </>}
     <p className="nta-form-note">{t('opname.passiveCooling.note')}</p>
@@ -351,7 +363,7 @@ export function VentilationSurveyFields({ draft, change, t, withControls = true,
       <TriStateField {...field} {...yesNo} path={['ventilation', 'controls', 'zoning']} label={t('opname.ventilation.zoning')} />
       <TriStateField {...field} {...yesNo} path={['ventilation', 'controls', 'extractPerHabitableRoom']}
         label={t('opname.ventilation.extractPerRoom')} />
-      <DeclarationField draft={draft} change={change} path={['ventilation', 'controls', 'evidenceReference']} label={t('opname.ventilation.controlsEvidence')} t={t} />
+      <DeclarationField draft={draft} change={change} path={['ventilation', 'controls', 'evidenceReference']} label={t('opname.ventilation.controlsEvidence')} t={t} required />
     </>}
     {toggle(['ventilation', 'combined'], t('opname.ventilation.combined'), combined,
       { decentralAreaM2: 0, totalResidenceAreaM2: 0 })}
@@ -1049,8 +1061,13 @@ function tableEnter(event: React.KeyboardEvent<HTMLTableElement>) {
   if (target) { event.preventDefault(); target.focus(); }
 }
 
-function surfaceTemplateOf(index: number, element: 'facade' | 'roof' | 'floor'): Record<string, unknown> {
-  const base = { id: `${element === 'facade' ? 'gevel' : element === 'roof' ? 'dak' : 'vloer'}-${index + 1}`, element, cavity: false,
+function surfaceTemplateOf(surfaces: Array<Record<string, unknown>>, element: 'facade' | 'roof' | 'floor'): Record<string, unknown> {
+  // The first free id: a reused id would take a window off two surfaces (the kernel refuses it too).
+  const prefix = element === 'facade' ? 'gevel' : element === 'roof' ? 'dak' : 'vloer';
+  const taken = new Set(surfaces.map((surface) => String(surface.id ?? '')));
+  let number = 1;
+  while (taken.has(`${prefix}-${number}`)) number += 1;
+  const base = { id: `${prefix}-${number}`, element, cavity: false,
     insulation: { kind: 'none_or_unknown' }, grossAreaM2: 10, sourceReference: '' };
   if (element === 'facade') return { ...base, boundary: { kind: 'outdoor' }, orientation: 'south' };
   if (element === 'roof') return { ...base, boundary: { kind: 'outdoor' }, orientation: 'south', tiltDeg: 45 };
@@ -1367,8 +1384,8 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
           const parent = parentOf(stored, id)!;
           names.set(id, `${names.get(parent) ?? parent} · ${t('survey.part')} ${partsOf(stored, parent).indexOf(id) + 2}`);
         });
-        // Openings stay on the surface itself, not on one of its opaque parts.
-        const surfaceOptions: Array<[string, string]> = surfaces.filter((surface) => !isPart(surface))
+        // Openings may sit on the surface or on one of its opaque parts: they come off that part's net area.
+        const surfaceOptions: Array<[string, string]> = surfaces
           .map((surface) => [String(surface.id), names.get(String(surface.id)) ?? String(surface.id)]);
         // A surface's own answers that its parts take over follow at once.
         const sharedField = { draft, onChange: (path: Path, value: unknown) => save(syncParts({ ...stored, kind, survey: write(draft, path, value) })) };
@@ -1432,7 +1449,8 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
             const boundaryText = t(`opname.surface.boundaryKind.${String((surface.boundary as { kind?: string } | undefined)?.kind ?? 'outdoor')}`);
             const own = <tr key={id}>
               <th scope="row">{names.get(id) ?? id}</th>
-              {roofFloor && <td>{element === 'roof' ? <NumberField {...sharedField} path={[...b, 'tiltDeg']} label={t('opname.tilt')} /> : muted(t('survey.element.floor'))}</td>}
+              {roofFloor && <td>{element === 'roof' ? <NumberField {...sharedField} path={[...b, 'tiltDeg']} label={t('opname.tilt')} />
+                : <NumberField {...field} path={[...b, 'exposedPerimeterM']} label={t('opname.surface.perimeter')} />}</td>}
               <td>{oriented ? <SelectField {...sharedField} path={[...b, 'orientation']} label={t('opname.orientation')} options={opts(t, 'opname.orientationKind', ORIENTATIONS)} /> : muted('—')}</td>
               <td><label>{t('opname.surface.boundary')}
                 <select value={String(read(draft, [...b, 'boundary', 'kind']) ?? '')} onChange={(event) => sharedField.onChange(b, withoutStaleGroundWall({ ...(read(draft, b) as Draft), boundary: event.target.value === 'unheated_space'
@@ -1452,8 +1470,9 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
               const partAt = surfaces.findIndex((item) => item.id === partId);
               const pb: Path = ['envelope', 'surfaces', partAt];
               const partGross = Number(surfaces[partAt]?.grossAreaM2) || 0;
+              const partNet = partGross - area(windows, partId) - area(doors, partId) - area(rooflights, partId);
               grossTotal += partGross;
-              netTotal += partGross;
+              netTotal += partNet;
               return <tr key={partId} className="survey-table__part">
                 <th scope="row">↳ {t('survey.part')} {n + 2}</th>
                 {roofFloor && <td>{muted('')}</td>}
@@ -1461,12 +1480,12 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
                 <td>{muted(boundaryText)}</td>
                 <td><NumberField {...field} path={[...pb, 'grossAreaM2']} label={t('opname.surface.area')} /></td>
                 {insulationCells(pb)}
-                {result(partId, partGross)}
+                {result(partId, partNet)}
               </tr>;
             });
             return [own, ...parts];
           });
-          const shownIds = new Set(shown.map(([surface]) => String(surface.id ?? '')));
+          const shownIds = new Set(shown.flatMap(([surface]) => [String(surface.id ?? ''), ...partsOf(stored, String(surface.id ?? ''))]));
           const openings = [
             ...windows.map((item, at) => ({ item, at, type: 'window' as const })),
             ...(roofFloor ? [] : doors.map((item, at) => ({ item, at, type: 'door' as const }))),
@@ -1483,7 +1502,7 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
               </colgroup>
               <thead><tr>
                 <th scope="col">{t('survey.table.surface')}</th>
-                {roofFloor && <th scope="col">{t('opname.tilt')}</th>}
+                {roofFloor && <th scope="col">{t('survey.table.tiltPerimeter')}</th>}
                 <th scope="col">{t('opname.orientation')}</th>
                 <th scope="col">{t('opname.surface.boundary')}</th>
                 <th scope="col" className="survey-table__num">{t('survey.table.gross')}</th>
@@ -1495,12 +1514,12 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
               <tfoot><tr>
                 <td colSpan={roofFloor ? 4 : 3}>
                   {!roofFloor && <button type="button" className="btn btn-sm"
-                    onClick={() => change(['envelope', 'surfaces'], [...surfaces, surfaceTemplateOf(surfaces.length, 'facade')])}>+ {t('survey.element.facade')}</button>}
+                    onClick={() => change(['envelope', 'surfaces'], [...surfaces, surfaceTemplateOf(surfaces, 'facade')])}>+ {t('survey.element.facade')}</button>}
                   {roofFloor && <>
                     <button type="button" className="btn btn-sm"
-                      onClick={() => change(['envelope', 'surfaces'], [...surfaces, surfaceTemplateOf(surfaces.length, 'roof')])}>+ {t('survey.element.roof')}</button>{' '}
+                      onClick={() => change(['envelope', 'surfaces'], [...surfaces, surfaceTemplateOf(surfaces, 'roof')])}>+ {t('survey.element.roof')}</button>{' '}
                     <button type="button" className="btn btn-sm"
-                      onClick={() => change(['envelope', 'surfaces'], [...surfaces, surfaceTemplateOf(surfaces.length, 'floor')])}>+ {t('survey.element.floor')}</button>
+                      onClick={() => change(['envelope', 'surfaces'], [...surfaces, surfaceTemplateOf(surfaces, 'floor')])}>+ {t('survey.element.floor')}</button>
                   </>}
                 </td>
                 <td className="survey-table__num"><strong>{formatNumber(grossTotal, locale, 1)}</strong></td>
@@ -1600,7 +1619,7 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
               <NumberField {...field} path={[...base, 'areaM2']} label={t('opname.rooflight.area')} />
               <NumberField {...field} path={[...base, 'uValue']} label={t('opname.rooflight.uValue')} />
               <SelectField {...field} path={[...base, 'glass']} label={t('opname.window.glass')} options={glassOptions} />
-              <DeclarationField draft={draft} change={change} path={[...base, 'qualityDeclarationReference']} label={t('opname.rooflight.declaration')} t={t} />
+              <DeclarationField draft={draft} change={change} path={[...base, 'qualityDeclarationReference']} label={t('opname.rooflight.declaration')} t={t} required />
               <SurveyPhotos path={base} />
               <RemoveButton label={t('opname.remove')} onRemove={() => removeAt(['envelope', 'rooflights'], index)} />
             </div>
@@ -1616,12 +1635,13 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
           const orientation = read(draft, [...base, 'orientation']);
           // A roof up to 5° is flat: no orientation (the kernel asks one only above 5°).
           const oriented = element === 'facade' || (element === 'roof' && Number(read(draft, [...base, 'tiltDeg']) ?? 0) > 5);
-          const ownWindows = windows.map((item, at) => [item, at] as const).filter(([item]) => item.surfaceId === id);
-          const ownDoors = doors.map((item, at) => [item, at] as const).filter(([item]) => item.surfaceId === id);
-          const ownRooflights = rooflights.map((item, at) => [item, at] as const).filter(([item]) => item.surfaceId === id);
+          const ownParts = partsOf(stored, id);
+          const onCard = (item: Record<string, unknown>) => item.surfaceId === id || ownParts.includes(String(item.surfaceId ?? ''));
+          const ownWindows = windows.map((item, at) => [item, at] as const).filter(([item]) => onCard(item));
+          const ownDoors = doors.map((item, at) => [item, at] as const).filter(([item]) => onCard(item));
+          const ownRooflights = rooflights.map((item, at) => [item, at] as const).filter(([item]) => onCard(item));
           const gross = Number(surface.grossAreaM2) || 0;
           const net = gross - area(windows, id) - area(doors, id) - area(rooflights, id);
-          const ownParts = partsOf(stored, id);
           return <details key={index} className="opname-card" open>
             <summary className="opname-card-head">
               <strong>{names.get(id) ?? id}</strong>
@@ -1664,7 +1684,7 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
                 <ZoneSelect draft={draft} change={sharedField.onChange} path={[...base, 'zoneId']} label={t('opname.surface.zone')}
                   ids={zoneIds} empty={t('opname.zones.splitByArea')} unknown={t('opname.zones.unknownZone')} />}
               {insulationFields(base)}
-              <SurfaceExtrasFields draft={draft} change={change} t={t} base={base} edition={edition} />
+              <SurfaceExtrasFields draft={draft} change={sharedField.onChange} t={t} base={base} edition={edition} />
               {/* The kernel branch's surface geometry, without the orientation and tilt the card already asks:
                   the cavity, and a façade part against the ground with its depth and floor (ISSO 82.1 §8.4). */}
               <CheckField {...field} path={[...base, 'cavity']} label={t('opname.surface.cavity')} />
@@ -1689,8 +1709,9 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
                 <p className="opname-sub-kind">{t('survey.part')} {n + 2}
                   {rc != null && <span className="opname-tag" title={t('survey.derivedRcHint')}>R_c {formatNumber(rc, locale, 2)}</span>}</p>
                 <div className="nta-form-grid">
-                  <NumberField {...field} path={[...partBase, 'grossAreaM2']} label={t('opname.surface.area')} />
+                  <NumberField {...field} path={[...partBase, 'grossAreaM2']} label={t('survey.part.grossArea')} />
                   {insulationFields(partBase)}
+                  <CheckField {...field} path={[...partBase, 'cavity']} label={t('opname.surface.cavity')} />
                   <SurveyPhotos path={partBase} />
                   <RemoveButton label={t('survey.removePart')} onRemove={() => save(removeSurface(stored, partId).stored)} />
                 </div>
@@ -1743,12 +1764,12 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
       })()}
       {!(embedded && envelopeView === 'table') && <div className="opname-list-controls">
         {part !== 'roofFloor' && <button type="button" className="btn"
-          onClick={() => change(['envelope', 'surfaces'], [...surfaces, surfaceTemplateOf(surfaces.length, 'facade')])}>{t('survey.addFacade')}</button>}
+          onClick={() => change(['envelope', 'surfaces'], [...surfaces, surfaceTemplateOf(surfaces, 'facade')])}>{t('survey.addFacade')}</button>}
         {part !== 'walls' && <>
           <button type="button" className="btn"
-            onClick={() => change(['envelope', 'surfaces'], [...surfaces, surfaceTemplateOf(surfaces.length, 'roof')])}>{t('survey.addRoof')}</button>
+            onClick={() => change(['envelope', 'surfaces'], [...surfaces, surfaceTemplateOf(surfaces, 'roof')])}>{t('survey.addRoof')}</button>
           <button type="button" className="btn"
-            onClick={() => change(['envelope', 'surfaces'], [...surfaces, surfaceTemplateOf(surfaces.length, 'floor')])}>{t('survey.addFloor')}</button>
+            onClick={() => change(['envelope', 'surfaces'], [...surfaces, surfaceTemplateOf(surfaces, 'floor')])}>{t('survey.addFloor')}</button>
         </>}
       </div>}
     </Section></>}
@@ -1756,8 +1777,9 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
     {show('heating') && <><Section title={part === 'heatingRest' ? t('survey.section.heatingRest') : t('opname.heating')}>
       {heatingGenerator && <>
       <HeatingGeneratorFields draft={draft} path={['heating', 'generator']} change={change} t={t} hideKind={part === 'heatingGenerator'} />
-      {shows('heatingExtra') && <NumberField {...field} path={['heating', 'nominalPowerKw']} label={`${t('opname.nominalPowerKw')} (${t('survey.onlyWithMoreGenerators')})`}
-        disabled={heatingExtras.length === 0} />}
+      {/* The kernel uses the power without further generators too: a collective boiler needs it, a heat
+          pump above 25 kW takes table 9.29, a fired heater its auxiliary power. */}
+      <NumberField {...field} path={['heating', 'nominalPowerKw']} label={t('opname.nominalPowerKw')} optional unit="kW" />
       <SurveyPhotos path={['heating', 'generator']} />
       </>}
       {heatingRest && <>
@@ -1769,7 +1791,7 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
       <SelectField {...field} path={['heating', 'designClass']} label={t('opname.heating.designClass')}
         options={opts(t, 'opname.heating.designClassKind', DESIGN_CLASSES)} />
       {DESIGN_CLASSES_ABOVE_70.includes(String(read(draft, ['heating', 'designClass']))) &&
-        <DeclarationField draft={draft} change={change} path={['heating', 'heatPumpAbove70Declaration']} label={t('opname.heating.above70Declaration')} t={t} />}
+        <DeclarationField draft={draft} change={change} path={['heating', 'heatPumpAbove70Declaration']} label={t('opname.heating.above70Declaration')} t={t} required />}
       <HeatingControlFields draft={draft} change={change} t={t} />
       <SurveyHeatingBalanceFields draft={draft} change={change} t={t} />
       <DistributionFields draft={draft} change={change} t={t} />
@@ -1815,8 +1837,7 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
     {show('hotWater') && <><Section title={part === 'hotWaterRest' ? t('survey.section.hotWaterRest') : t('opname.hotWater')}>
       {hotWaterGenerator && <>
       <HotWaterGeneratorFields draft={draft} path={['hotWater', 'generator']} kind={kind} change={change} t={t} hideKind={part === 'hotWaterGenerator'} />
-      {shows('hotWaterExtra') && <NumberField {...field} path={['hotWater', 'nominalPowerKw']} label={`${t('opname.nominalPowerKw')} (${t('survey.onlyWithMoreGenerators')})`}
-        disabled={hotWaterExtras.length === 0} />}
+      <NumberField {...field} path={['hotWater', 'nominalPowerKw']} label={t('opname.nominalPowerKw')} optional unit="kW" />
       <SurveyPhotos path={['hotWater', 'generator']} />
       {kind === 'residential' && read(draft, ['hotWater', 'generator', 'kind']) === 'heat_pump' &&
         <p className="nta-form-note">{t('survey.hotWater.heatPumpVessel')}</p>}

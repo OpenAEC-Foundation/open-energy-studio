@@ -38,6 +38,8 @@ export interface NewProjectSetup {
   dwelling?: SetupDwelling | null;
   roofType?: 'pitched' | 'partly_flat' | 'flat';
   apartmentFloor?: 'ground_or_intermediate' | 'top' | 'roof_and_floor';
+  /** Table 11.14: middle or end/corner apartment; unknown takes the end/corner row (ISSO 82.1 p. 51). */
+  apartmentSide?: 'middle' | 'end_or_corner' | 'unknown';
   heating?: string | null;
   ventilation?: string | null;
   /** false: not present, the question is settled; true or null: asked in the flow. */
@@ -59,7 +61,7 @@ export function nameFromAddress(address: BagAddress): string {
 function dwellingAnswer(setup: NewProjectSetup): Record<string, unknown> | null {
   const roofType = setup.roofType ?? 'pitched';
   switch (setup.dwelling) {
-    case 'apartment': return { kind: 'apartment', floor: setup.apartmentFloor ?? 'ground_or_intermediate', side: 'middle' };
+    case 'apartment': return { kind: 'apartment', floor: setup.apartmentFloor ?? 'ground_or_intermediate', side: setup.apartmentSide ?? 'unknown' };
     case 'houseboat': case 'houseboat_2018': case 'caravan': return { kind: 'single_family', position: 'detached', roofType };
     case 'terraced': case 'end_or_corner': case 'detached': return { kind: 'single_family', position: setup.dwelling, roofType };
     default: return null;
@@ -81,6 +83,8 @@ export function applySetup(base: IProject, setup: NewProjectSetup): IProject {
     registration.houseNumber = address.houseNumber || undefined;
     registration.houseNumberAddition = address.addition || undefined;
     registration.bagObjectId = address.bagObjectId || undefined;
+    // BRL 9500 §3.1 refuses a basisopname for a building completed from 2021 on; the kernel reads this year.
+    if (address.constructionYear) registration.constructionYear = address.constructionYear;
   }
   if (setup.adviser?.name) {
     const adviser = { name: setup.adviser.name, competenceNumber: setup.adviser.competenceNumber };

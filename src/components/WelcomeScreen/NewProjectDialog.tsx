@@ -80,6 +80,7 @@ export function NewProjectDialog({ onCreate, onOpenExample, onClose }: {
   const setDwelling = (value: SetupDwelling | null) => { setDwellingValue(value); if (value != null) setPendingGroup(null); };
   const [roofType, setRoofType] = useState<NonNullable<NewProjectSetup['roofType']>>('pitched');
   const [apartmentFloor, setApartmentFloor] = useState<NonNullable<NewProjectSetup['apartmentFloor']>>('ground_or_intermediate');
+  const [apartmentSide, setApartmentSide] = useState<NonNullable<NewProjectSetup['apartmentSide']>>('unknown');
   const [heating, setHeating] = useState<string | null>(null);
   const [ventilation, setVentilation] = useState<string | null>(null);
   const [cooling, setCooling] = useState<boolean | null>(null);
@@ -121,7 +122,7 @@ export function NewProjectDialog({ onCreate, onOpenExample, onClose }: {
     if (adviser.name.trim()) rememberAdviser(adviser);
     onCreate({
       kind, address: chosen,
-      ...(dwellingKind ? { dwelling, roofType, apartmentFloor } : {}),
+      ...(dwellingKind ? { dwelling, roofType, apartmentFloor, apartmentSide } : {}),
       ...(survey ? { heating, ventilation, cooling, pv, components: [
         ...(solarWater ? ['solarWater' as const] : []), ...(showerWtw && dwellingKind ? ['showerWtw' as const] : []),
       ] } : {}),
@@ -209,6 +210,11 @@ export function NewProjectDialog({ onCreate, onOpenExample, onClose }: {
       {dwelling === 'apartment' && <label className="new-project__inline">{t('opname.dwelling.floor')}
         <select value={apartmentFloor} onChange={(event) => setApartmentFloor(event.target.value as typeof apartmentFloor)}>
           {(['ground_or_intermediate', 'top', 'roof_and_floor'] as const).map((key) => <option key={key} value={key}>{t(`opname.dwelling.floorKind.${key}`)}</option>)}
+        </select></label>}
+      {/* Table 11.14 has middle and end/corner rows; an unknown side takes end/corner (ISSO 82.1 p. 51). */}
+      {dwelling === 'apartment' && <label className="new-project__inline">{t('opname.dwelling.side')}
+        <select value={apartmentSide} onChange={(event) => setApartmentSide(event.target.value as typeof apartmentSide)}>
+          {(['middle', 'end_or_corner', 'unknown'] as const).map((key) => <option key={key} value={key}>{t(`opname.dwelling.sideKind.${key}`)}</option>)}
         </select></label>}
       {dwelling != null && dwelling !== 'apartment' && <label className="new-project__inline">{t('survey.dwelling.roofType')}
         <select value={roofType} onChange={(event) => setRoofType(event.target.value as typeof roofType)}>

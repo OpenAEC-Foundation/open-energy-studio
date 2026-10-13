@@ -92,7 +92,7 @@ export function SurveyMwa({ route, navigate }: { route: Route; navigate: (route:
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const request = useRef(0);
-  const key = useMemo(() => JSON.stringify([stored?.survey, definition]), [stored?.survey, definition]);
+  const key = useMemo(() => JSON.stringify([stored?.survey, definition, project.ntaCalculation?.normVersion]), [stored?.survey, definition, project.ntaCalculation?.normVersion]);
 
   // Recalculate after a change, once the typing pauses; the newest run wins.
   useEffect(() => {
@@ -100,7 +100,7 @@ export function SurveyMwa({ route, navigate }: { route: Route; navigate: (route:
     const current = ++request.current;
     const timer = window.setTimeout(() => {
       setBusy(true);
-      assessSurveyMaatwerkadvies(stored, definition)
+      assessSurveyMaatwerkadvies(stored, definition, project.ntaCalculation?.normVersion)
         .then((result) => { if (request.current === current) { setRun(result); setError(null); } })
         .catch((failure: unknown) => { if (request.current === current) setError(failure instanceof Error ? failure.message : String(failure)); })
         .finally(() => { if (request.current === current) setBusy(false); });

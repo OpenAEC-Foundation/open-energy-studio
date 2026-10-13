@@ -107,10 +107,11 @@ export function SurveyRelabel({ actions }: { actions: Pick<ShellActions, 'naviga
   const [proofRole, setProofRole] = useState<NtaRelabelProof>('specified_invoice');
   const request = useRef(0);
 
+  const edition = project.ntaCalculation?.normVersion;
   useEffect(() => {
-    if (stored) void assessSurvey(stored);
+    if (stored) void assessSurvey(stored, edition);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [surveyJson]);
+  }, [surveyJson, edition]);
   useEffect(() => {
     let live = true;
     void labelInputSha256(project).then((sha) => { if (live) setCurrentSha(sha); }).catch(() => undefined);
@@ -127,7 +128,8 @@ export function SurveyRelabel({ actions }: { actions: Pick<ShellActions, 'naviga
     setOriginalResult(null);
     if (originalStored) {
       const run = originalStored.kind === 'residential'
-        ? assessResidentialSurveyWithRust(asResidential(originalStored)) : assessUtilitySurveyWithRust(asUtility(originalStored));
+        ? assessResidentialSurveyWithRust(asResidential(originalStored, original?.ntaCalculation?.normVersion))
+        : assessUtilitySurveyWithRust(asUtility(originalStored, original?.ntaCalculation?.normVersion));
       void run.then((result) => { if (live) setOriginalResult(result); }).catch(() => undefined);
     }
     return () => { live = false; };

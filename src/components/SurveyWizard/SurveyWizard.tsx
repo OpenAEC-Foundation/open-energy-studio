@@ -106,12 +106,12 @@ function QuestionBody({ part, stored, draft, change, changeAll, t }: {
         const current = read(draft, ['envelope', 'buildingKind', 'kind']);
         const entries: Array<[Path, unknown]> = building || current === 'caravan' || current === 'floating' ? [[['envelope', 'buildingKind'], building]] : [];
         if (building) {
-          changeAll([...entries, [['dwelling'], { kind: 'single_family', position: 'detached', roofType: read(draft, ['dwelling', 'roofType']) ?? 'flat' }]]);
+          changeAll([...entries, [['dwelling'], { kind: 'single_family', position: 'detached', roofType: read(draft, ['dwelling', 'roofType']) ?? 'pitched' }]]);
         } else if (id === 'apartment') {
           changeAll([...entries, [['dwelling'], {
             kind: 'apartment',
             floor: read(draft, ['dwelling', 'floor']) ?? 'ground_or_intermediate',
-            side: read(draft, ['dwelling', 'side']) ?? 'middle',
+            side: read(draft, ['dwelling', 'side']) ?? 'unknown',
           }]]);
         } else {
           changeAll([...entries, [['dwelling'], { kind: 'single_family', position: id, roofType: read(draft, ['dwelling', 'roofType']) ?? 'pitched' }]]);
@@ -582,10 +582,10 @@ export function SurveyWizard({ route, navigate }: SurveyWizardProps) {
   // Recalculate after each change, once the typing pauses.
   useEffect(() => {
     if (!stored) return undefined;
-    const timer = window.setTimeout(() => { void assessSurvey(stored); }, 400);
+    const timer = window.setTimeout(() => { void assessSurvey(stored, state.project.ntaCalculation?.normVersion); }, 400);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [surveyJson]);
+  }, [surveyJson, state.project.ntaCalculation?.normVersion]);
 
   // The question is part of the route, so the navigation can show it; "Ga naar" lands on the
   // question of the kernel path. A step without a question starts at its first.
