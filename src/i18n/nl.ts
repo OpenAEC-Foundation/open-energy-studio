@@ -416,6 +416,8 @@ export const nl: Record<string, string> = {
   'orientation.W': 'West',
   'orientation.NW': 'Noordwest',
   'orientation.horizontal': 'Horizontaal',
+  'kernel.bridge.orientations': "Ligt op bouwdelen met oriëntatie (TOjuli, NTA 8800 §5.7.2)",
+  'kernel.bridge.orientationsNote': "Niets aangevinkt: naar rato verdeeld over de oriëntaties. Bij bouwdelen met verschillende oriëntaties telt de brug gelijk verdeeld.",
 
   // Results
   'results.title': 'BENG Resultaten',

@@ -1,9 +1,10 @@
 import { useState, useId } from 'react';
 import { useI18n } from '../../../i18n/i18n';
 import { useEnergy } from '../../../context/EnergyContext';
-import { IThermalBridge, ThermalBoundary } from '../../../core/energy/types';
+import { IThermalBridge, Orientation, ThermalBoundary } from '../../../core/energy/types';
 import { DialogShell } from '../DialogShell';
 import { DecimalInput } from '../../ui';
+import { BridgeOrientationsField } from '../BridgeOrientationsField';
 
 interface ThermalBridgeDialogProps {
   editId?: string | null;
@@ -38,6 +39,7 @@ export function ThermalBridgeDialog({ editId, onClose }: ThermalBridgeDialogProp
   const [thermalBoundary, setThermalBoundary] = useState<ThermalBoundary | ''>(existingBridge?.thermalBoundary ?? '');
   const [unheatedSpaceId, setUnheatedSpaceId] = useState(existingBridge?.unheatedSpaceId ?? '');
   const [zoneId, setZoneId] = useState(existingZoneId ?? (project.zones[0]?.id ?? ''));
+  const [orientations, setOrientations] = useState<Orientation[]>(existingBridge?.orientations ?? []);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleSave = () => {
@@ -58,7 +60,8 @@ export function ThermalBridgeDialog({ editId, onClose }: ThermalBridgeDialogProp
           zoneId: existingZoneId,
           bridgeId: existingBridge.id,
           data: { name, psiValue, length, thermalBoundary: thermalBoundary || undefined,
-            unheatedSpaceId: thermalBoundary === 'unheated_space' ? unheatedSpaceId : undefined },
+            unheatedSpaceId: thermalBoundary === 'unheated_space' ? unheatedSpaceId : undefined,
+            orientations: orientations.length > 0 ? orientations : undefined },
         },
       });
     } else {
@@ -70,6 +73,7 @@ export function ThermalBridgeDialog({ editId, onClose }: ThermalBridgeDialogProp
         thermalBoundary: thermalBoundary || undefined,
         unheatedSpaceId: thermalBoundary === 'unheated_space' ? unheatedSpaceId : undefined,
         zoneId,
+        orientations: orientations.length > 0 ? orientations : undefined,
       };
       dispatch({ type: 'ADD_THERMAL_BRIDGE', payload: { zoneId, bridge } });
     }
@@ -152,6 +156,8 @@ export function ThermalBridgeDialog({ editId, onClose }: ThermalBridgeDialogProp
           </select>
           {errors.zoneId && <span className="field-error-text">{errors.zoneId}</span>}
         </div>
+
+        <BridgeOrientationsField value={orientations} onChange={setOrientations} />
     </DialogShell>
   );
 }

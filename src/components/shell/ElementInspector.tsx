@@ -95,6 +95,7 @@ export function ElementInspector() {
   const { project } = state;
   const found = findBuildingElement(project, state.selectedItemType, state.selectedItemId);
   if (!found) return null;
+  const bridgeSides = (sides?: Orientation[]) => sides?.length ? sides.map((side) => t(`orientation.${side}`)).join(', ') : '—';
   const n = (value: number | null | undefined, digits = 2) => formatNumber(value, locale, digits);
 
   let title: string;
@@ -182,6 +183,7 @@ export function ElementInspector() {
         <Row label="ψ"><NumberInput value={bridge.psiValue} unit="W/(m·K)" digits={3} step={0.01} onChange={(value) => { if (value != null && Number.isFinite(value)) update({ psiValue: value }); }} /></Row>
         <Row label={t('properties.length')}><NumberInput value={bridge.length} unit="m" digits={2} onChange={positive((value) => update({ length: value }))} /></Row>
         <Readout label="H" value={`${n(bridge.psiValue * bridge.length, 2)} W/K`} />
+        <Readout label={t('kernel.bridge.orientations')} value={bridgeSides(bridge.orientations)} />
       </>;
       break;
     }
@@ -192,6 +194,7 @@ export function ElementInspector() {
       body = <>
         <Row label="χ"><NumberInput value={bridge.chiValue} unit="W/K" digits={3} step={0.01} onChange={(value) => { if (value != null && Number.isFinite(value)) update({ chiValue: value }); }} /></Row>
         <Readout label={t('kernel.pointBridge.source')} value={bridge.sourceReference || '—'} />
+        <Readout label={t('kernel.bridge.orientations')} value={bridgeSides(bridge.orientations)} />
       </>;
       break;
     }

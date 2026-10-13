@@ -18,6 +18,7 @@ function BridgeEditor() {
   const bridge = state.project.zones[0].thermalBridges.find((item) => item.id === 'tb-1');
   return <><ThermalBridgeDialog editId="tb-1" onClose={() => {}} />
     <output data-testid="bridge-boundary">{bridge?.thermalBoundary ?? 'unknown'}</output>
+    <output data-testid="bridge-orientations">{(bridge?.orientations ?? []).join(',') || 'pro rata'}</output>
   </>;
 }
 
@@ -37,5 +38,16 @@ describe('explicit thermal boundary editors', () => {
     await user.selectOptions(screen.getByLabelText('Thermal boundary'), 'ground');
     await user.click(screen.getByRole('button', { name: 'Save' }));
     expect(screen.getByTestId('bridge-boundary')).toHaveTextContent('ground');
+  });
+
+  // NTA 8800 §5.7.2 step 2: the parts a bridge lies on decide its TOjuli orientation.
+  it('persists the orientations a thermal bridge lies on', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<BridgeEditor />);
+    expect(screen.getByTestId('bridge-orientations')).toHaveTextContent('pro rata');
+    await user.click(screen.getByRole('checkbox', { name: 'Northwest' }));
+    await user.click(screen.getByRole('checkbox', { name: 'South' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(screen.getByTestId('bridge-orientations')).toHaveTextContent('S,NW');
   });
 });

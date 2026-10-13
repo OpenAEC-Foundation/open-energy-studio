@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useEnergy } from '../../../context/EnergyContext';
-import type { IPointThermalBridge, ThermalBoundary } from '../../../core/energy/types';
+import type { IPointThermalBridge, Orientation, ThermalBoundary } from '../../../core/energy/types';
 import { useI18n } from '../../../i18n/i18n';
 import { DialogShell } from '../DialogShell';
 import { DecimalInput } from '../../ui';
+import { BridgeOrientationsField } from '../BridgeOrientationsField';
 
 const boundaries: ThermalBoundary[] = ['outdoor', 'ground', 'unheated_space', 'adjacent_conditioned', 'internal'];
 
@@ -19,6 +20,7 @@ export function PointBridgeDialog({ editId, onClose }: { editId?: string | null;
   const [unheatedSpaceId, setUnheatedSpaceId] = useState(existing?.unheatedSpaceId ?? '');
   const [source, setSource] = useState(existing?.sourceReference ?? '');
   const [zoneId, setZoneId] = useState(existingZone?.id ?? state.project.zones[0]?.id ?? '');
+  const [orientations, setOrientations] = useState<Orientation[]>(existing?.orientations ?? []);
   const [error, setError] = useState<string | null>(null);
 
   const save = () => {
@@ -32,6 +34,7 @@ export function PointBridgeDialog({ editId, onClose }: { editId?: string | null;
       id: existing?.id ?? crypto.randomUUID(), name: name.trim(), chiValue,
       zoneId, thermalBoundary: boundary || undefined, sourceReference: source.trim(),
       unheatedSpaceId: boundary === 'unheated_space' ? unheatedSpaceId : undefined,
+      orientations: orientations.length > 0 ? orientations : undefined,
     };
     if (existing && existingZone) {
       dispatch({ type: 'UPDATE_POINT_BRIDGE', payload: {
@@ -77,6 +80,7 @@ export function PointBridgeDialog({ editId, onClose }: { editId?: string | null;
         {state.project.zones.map((zone) => <option key={zone.id} value={zone.id}>{zone.name}</option>)}
       </select>
     </div>
+    <BridgeOrientationsField value={orientations} onChange={setOrientations} />
     {error && <p role="alert" className="field-error-text">{error}</p>}
   </DialogShell>;
 }

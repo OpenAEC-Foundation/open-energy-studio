@@ -416,6 +416,8 @@ export const en: Record<string, string> = {
   'orientation.W': 'West',
   'orientation.NW': 'Northwest',
   'orientation.horizontal': 'Horizontal',
+  'kernel.bridge.orientations': "Lies on construction parts facing (TOjuli, NTA 8800 §5.7.2)",
+  'kernel.bridge.orientationsNote': "None ticked: distributed pro rata over the orientations. On parts of several orientations the bridge counts in equal shares.",
 
   // Results
   'results.title': 'BENG Results',
