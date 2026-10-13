@@ -2,6 +2,22 @@ import type { NtaEvidenceItem } from './KernelClient';
 import type { IProject } from '../energy/types';
 import { EVIDENCE_REFERENCE_PREFIX } from './Evidence';
 
+/** The links after a whole survey part (`cleared`, a pointer) was emptied: links into it are dropped. */
+export function linksAfterClear(evidence: NtaEvidenceItem[], before: unknown, cleared: string): NtaEvidenceItem[] {
+  return evidence.map((item) => {
+    if (!item.linkedPaths?.length) return item;
+    const linkedPaths = item.linkedPaths.filter((pointer) => {
+      const resolved = resolvePointer(before, pointer);
+      return !(resolved === cleared || resolved?.startsWith(`${cleared}/`));
+    });
+    if (linkedPaths.length === item.linkedPaths.length) return item;
+    if (linkedPaths.length > 0) return { ...item, linkedPaths };
+    const { linkedPaths: _removed, ...rest } = item;
+    void _removed;
+    return rest;
+  });
+}
+
 /**
  * Links between the evidence register (BRL 9500 Bijlage 3) and the project.
  * An input refers to a file in two ways: a `…Reference` text holding

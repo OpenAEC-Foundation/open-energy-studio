@@ -7,7 +7,7 @@
  */
 import type { IProject } from '../energy/types';
 import type { NtaRegistration } from '../nta/KernelClient';
-import { heatingGeneratorTemplate, surveyTemplate, type StoredSurvey } from '../nta/SurveyTemplates';
+import { heatingGeneratorTemplate, surveyTemplate, type StoredSurvey, BAG_AREA_SOURCE } from '../nta/SurveyTemplates';
 import { markProgress, questionKey, stepState, surveySteps, type SurveyProgress } from '../survey/surveyFlow';
 import type { BagAddress } from './bagLookup';
 import { toggleComponent, type SurveyComponentId } from '../survey/surveyComponents';
@@ -111,7 +111,7 @@ export function applySetup(base: IProject, setup: NewProjectSetup): IProject {
   if (address?.constructionYear) survey.constructionYear = address.constructionYear;
   if (surveyKind === 'residential' && address?.floorAreaM2) {
     survey.usableFloorAreaM2 = address.floorAreaM2;
-    survey.areaSourceReference = 'BAG gebruiksoppervlakte (PDOK); controleren bij de opname';
+    survey.areaSourceReference = BAG_AREA_SOURCE;
   }
   if (surveyKind === 'residential') {
     const dwelling = dwellingAnswer(setup);

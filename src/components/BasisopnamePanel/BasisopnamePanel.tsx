@@ -12,7 +12,7 @@ import {
 } from '../../core/nta/KernelClient';
 import {
   asResidential, asUtility, calculationZoneTemplate, heatingGeneratorTemplate, hotWaterGeneratorTemplate, pvTemplate,
-  solarTemplate, surveyTemplate, windowTemplate, type StoredSurvey, type SurveyKind,
+  solarTemplate, surveyTemplate, windowTemplate, type StoredSurvey, type SurveyKind, BAG_AREA_CHECKED_SOURCE, BAG_AREA_SOURCE,
 } from '../../core/nta/SurveyTemplates';
 import { KernelCode } from '../KernelCode/KernelCode';
 import { EvidenceAttach } from '../EvidenceLink/EvidenceLink';
@@ -27,13 +27,13 @@ import {
   SurveyPanelsFields, SurveyShowerHeatRecoveryField, UtilityCoolingCoverageFields, UtilityHotWaterStorageFields,
   VentilationBypassField, WindowDeclaredObstructionFields,
 } from './SurveyCoverageFields';
-import { freshItemId, jsonPointer, linksAfterEdit, linksAfterRemoval, linksOutside } from '../../core/nta/EvidenceLinks';
+import { freshItemId, jsonPointer, linksAfterClear, linksAfterEdit, linksAfterRemoval, linksOutside } from '../../core/nta/EvidenceLinks';
 import { formatNumber } from '../../i18n/format';
 import { dutchDefaultValue, dutchSource, snakeCase } from '../../core/nta/OpnameValueText';
 import type { SurveyPart } from '../../core/survey/surveyFlow';
 import { addPart, parentOf, partsOf, removeSurface, syncParts } from '../../core/survey/surfaceParts';
 import {
-  componentActive, componentFilledIn, componentsOf, toggleComponent, type SurveyComponentId,
+  componentActive, componentFilledIn, componentPath, componentsOf, toggleComponent, type SurveyComponentId,
 } from '../../core/survey/surveyComponents';
 import { currentResult, useSurveyAssessment } from '../../core/survey/surveyAssessment';
 import '../NtaPerformancePanel/NtaPerformancePanel.css';
@@ -239,7 +239,7 @@ export function DistributionFields({ draft, change, t }: { draft: Draft; change:
  * answers asks first, since it clears them.
  */
 function ComponentBar({ stored, part, onChange, t }: {
-  stored: StoredSurvey; part: SurveyPart | undefined; onChange: (next: StoredSurvey) => void; t: T;
+  stored: StoredSurvey; part: SurveyPart | undefined; onChange: (next: StoredSurvey, cleared: SurveyComponentId | null) => void; t: T;
 }) {
   const ids = componentsOf(part, stored.kind);
   if (ids.length === 0) return null;
@@ -251,7 +251,7 @@ function ComponentBar({ stored, part, onChange, t }: {
         const flip = () => {
           if (on && componentFilledIn(id, stored.survey as Record<string, unknown>)
             && !window.confirm(t('survey.components.clearConfirm', { name: t(`survey.component.${id}`) }))) return;
-          onChange(toggleComponent(stored, id, !on));
+          onChange(toggleComponent(stored, id, !on), on ? id : null);
         };
         return <button key={id} type="button" className="survey-component" aria-pressed={on} onClick={flip}>{t(`survey.component.${id}`)}</button>;
       })}
@@ -1248,7 +1248,17 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
   const done = result ? sections.filter((name) => name !== 'result' && issueCount(name) === 0).length : 0;
 
   return <section className={`nta-performance opname-panel${wizard ? ' opname-wizard' : ''}${embedded ? ' opname-embedded' : ''}`} aria-label={t('opname.title')}>
-    {embedded && <ComponentBar stored={stored} part={part} onChange={(next) => save(next)} t={t} />}
+    {embedded && <ComponentBar stored={stored} part={part} t={t} onChange={(next, cleared) => {
+      save(next);
+      // The photos and declarations of a part switched off go with its data.
+      const registration = state.project.registration;
+      const evidence = registration?.evidence ?? [];
+      if (!cleared || evidence.length === 0) return;
+      const kept = linksAfterClear(evidence, state.project, surveyPointer(componentPath(cleared)));
+      if (kept.some((item, position) => item !== evidence[position])) {
+        dispatch({ type: 'UPDATE_PROJECT_INFO', payload: { registration: { ...registration, evidence: kept } } });
+      }
+    }} />}
     {wizard && <nav className="opname-progress" aria-label={t('opname.progress')}>
       <p className="opname-progress-title">{t('opname.progress')}</p>
       <div className="opname-progress-bar" role="progressbar" aria-label={t('opname.progress')}
@@ -1292,6 +1302,10 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
       <p className="nta-form-note nta-form-hint">{t('survey.sourceReference.hint')}</p>
       <p className="nta-form-subhead">{t('survey.group.size')}</p>
       {kind === 'residential' && <NumberField {...field} path={['usableFloorAreaM2']} label={t('opname.usableFloorArea')} />}
+      {kind === 'residential' && read(draft, ['areaSourceReference']) === BAG_AREA_SOURCE && <p className="nta-form-note">
+        {t('survey.area.bagCheck')}{' '}
+        <button type="button" className="btn btn-sm" onClick={() => change(['areaSourceReference'], BAG_AREA_CHECKED_SOURCE)}>{t('survey.area.bagConfirm')}</button>
+      </p>}
       <NumberField {...field} path={['buildingHeightM']} label={t('opname.buildingHeight')} />
       <NumberField {...field} path={['storeys']} label={t('opname.storeys')} step="1" />
       <SurveyGeneralCoverageFields draft={draft} change={change} t={t} />

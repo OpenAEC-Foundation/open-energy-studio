@@ -81,9 +81,22 @@ export function componentFilledIn(id: SurveyComponentId, survey: Survey): boolea
   return def.present(value) && JSON.stringify(value) !== JSON.stringify(def.start?.());
 }
 
-/** Shown: ticked, or holding data. */
+/** The survey path a part keeps its data in. */
+export function componentPath(id: SurveyComponentId): string[] {
+  return [...BY_ID.get(id)!.path];
+}
+
+/**
+ * Shown: holding data, or ticked while its value is not the switched-off one.
+ * A ticked part cleared elsewhere (a checkbox in the full panel writes its off
+ * value) shows off, as the kernel gets nothing for it.
+ */
 export function componentActive(stored: StoredSurvey, id: SurveyComponentId): boolean {
-  return Boolean(stored.components?.includes(id)) || componentHasData(id, stored.survey);
+  const def = BY_ID.get(id)!;
+  if (componentHasData(id, stored.survey)) return true;
+  if (!stored.components?.includes(id)) return false;
+  const value = at(stored.survey as Survey, def.path);
+  return JSON.stringify(value ?? null) !== JSON.stringify(def.off);
 }
 
 /** Ticks or unticks a part: ticking starts its data, unticking clears it. */

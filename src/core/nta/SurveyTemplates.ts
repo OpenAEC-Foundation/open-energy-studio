@@ -65,6 +65,11 @@ export function surveyExample(kind: SurveyKind): StoredSurvey {
   return { kind, survey: structuredClone(source) as Record<string, unknown> };
 }
 
+/** Source of a usable floor area taken from the BAG and not yet checked by the adviser. */
+export const BAG_AREA_SOURCE = 'BAG gebruiksoppervlakte (PDOK); controleren bij de opname';
+/** The same area once the adviser has checked it at the survey. */
+export const BAG_AREA_CHECKED_SOURCE = 'BAG gebruiksoppervlakte (PDOK), gecontroleerd bij de opname';
+
 /**
  * The answers a dwelling survey needs before the kernel can read it, as survey
  * paths. The kernel rejects a survey without them as unreadable, so the app
@@ -97,6 +102,8 @@ export function missingSurveyAnswers(stored: StoredSurvey): string[] {
     'heating.generator', 'heating.emitters', 'hotWater.generator', 'ventilation.principle']) {
     if (blank(at(path))) missing.push(path);
   }
+  // A_g from the BAG is a start, not a measurement (NEN 2580): it counts once the adviser has checked it.
+  if (at('areaSourceReference') === BAG_AREA_SOURCE && !missing.includes('usableFloorAreaM2')) missing.push('usableFloorAreaM2');
   return missing;
 }
 
