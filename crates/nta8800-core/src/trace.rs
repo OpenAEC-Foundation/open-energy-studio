@@ -14,7 +14,9 @@
 //! installations: the energy use per energy function and carrier (5.20)
 //! and the heating chain of chapter 9 per month (9.1–9.24); primary energy
 //! and label: E_P;Tot per carrier (5.9–5.14a), EP2 (5.2), RER (5.3) and the
-//! indicative label class.
+//! indicative label class; under the installations also the chains of hot
+//! water (13.3–13.25), cooling (10.1–10.7), the fans (11.133) and lighting
+//! (14.6/14.7), and the PV yield (16.2).
 
 use serde::Serialize;
 
@@ -912,8 +914,20 @@ pub fn installations_trace(
             "5.20",
         );
         step.children = carriers;
-        if service == "heating" {
-            step.children.extend(heating_chain_trace(performance));
+        match service {
+            "heating" => step.children.extend(heating_chain_trace(performance)),
+            "hotWater" => step.children.extend(
+                performance
+                    .hot_water
+                    .as_ref()
+                    .and_then(hot_water_chain_trace),
+            ),
+            "cooling" => step
+                .children
+                .extend(performance.cooling.as_ref().and_then(cooling_chain_trace)),
+            "ventilation" => step.children.extend(fans_trace(performance)),
+            "lighting" => step.children.extend(lighting_trace(performance)),
+            _ => {}
         }
         functions.push(step);
     }
@@ -1339,6 +1353,530 @@ pub fn primary_energy_trace(
     Some(root)
 }
 
+/// A sum of signed terms as the trace shows it: `a + b − c`.
+fn signed_terms(terms: &[f64]) -> String {
+    let mut text = String::new();
+    for (index, value) in terms.iter().enumerate() {
+        if index == 0 {
+            text.push_str(&number(*value));
+        } else if *value < 0.0 {
+            text.push_str(&format!(" − {}", number(-value)));
+        } else {
+            text.push_str(&format!(" + {}", number(*value)));
+        }
+    }
+    text
+}
+
+/// The carriers a generator took in one month, as a step with a leaf per
+/// carrier that is not zero.
+fn carriers_step(
+    key: String,
+    quantity: String,
+    carriers: &[(&str, f64)],
+    reference: &'static str,
+) -> TraceStep {
+    let used: Vec<&(&str, f64)> = carriers.iter().filter(|(_, value)| *value != 0.0).collect();
+    let mut step = leaf(
+        key.clone(),
+        quantity.clone(),
+        "Σ E_in;ci van de opwekkers",
+        used.iter()
+            .map(|(carrier, value)| format!("{carrier} {}", number(*value)))
+            .collect::<Vec<_>>()
+            .join(" + "),
+        used.iter().map(|(_, value)| value).sum(),
+        "kWh",
+        reference,
+    );
+    step.children = used
+        .iter()
+        .map(|(carrier, value)| {
+            leaf(
+                format!("{key}.{carrier}"),
+                format!("{quantity} · {carrier}"),
+                "opwekker",
+                number(*value),
+                *value,
+                "kWh",
+                reference,
+            )
+        })
+        .collect();
+    step
+}
+
+/// Chapter 13 per month: the need over the emission (13.9) and distribution
+/// (13.25) to the heat the generators deliver (13.7, 13.4 after solar heat),
+/// and the carriers they took in (13.3) with the auxiliary energy.
+fn hot_water_chain_trace(
+    hot_water: &crate::domestic_hot_water::HotWaterAssessment,
+) -> Option<TraceStep> {
+    if hot_water.months.is_empty() {
+        return None;
+    }
+    let eta_em = hot_water.emission_efficiency;
+    let months: Vec<TraceStep> = hot_water
+        .months
+        .iter()
+        .map(|month| {
+            let m = month.month;
+            let name = MONTHS[usize::from(m - 1)];
+            let key = |part: &str| format!("installations.hotWater.chain.{part}.{m}");
+            let mut emission = leaf(
+                key("qem"),
+                format!("Q_W;em {name}"),
+                "Q_W;nd / η_W;em − Q_W;rcd",
+                format!(
+                    "{} / {} − {}",
+                    number(month.net_need_kwh),
+                    number(eta_em),
+                    number(month.recovered_kwh)
+                ),
+                month.emission_input_kwh,
+                "kWh",
+                "13.9",
+            );
+            emission.children.push(leaf(
+                key("qnd"),
+                format!("Q_W;nd {name}"),
+                "netto warmtebehoefte warm tapwater",
+                number(month.net_need_kwh),
+                month.net_need_kwh,
+                "kWh",
+                "13.15/13.19",
+            ));
+            emission.children.push(leaf(
+                key("etaem"),
+                "η_W;em".into(),
+                "afgifterendement",
+                number(eta_em),
+                eta_em,
+                "-",
+                "13.21–13.23",
+            ));
+            if month.recovered_kwh != 0.0 {
+                emission.children.push(leaf(
+                    key("qrcd"),
+                    format!("Q_W;rcd {name}"),
+                    "douchewarmteterugwinning",
+                    number(month.recovered_kwh),
+                    month.recovered_kwh,
+                    "kWh",
+                    "13.51",
+                ));
+            }
+            let mut distribution = leaf(
+                key("etadis"),
+                format!("η_W;dis {name}"),
+                "Q_W;em / (Q_W;em + Q_W;dis;ls − Q_W;dis;aux;rvd)",
+                number(month.distribution_efficiency),
+                month.distribution_efficiency,
+                "-",
+                "13.25",
+            );
+            if month.circulation_loss_kwh != 0.0 {
+                distribution.children.push(leaf(
+                    key("circ"),
+                    format!("Q_W;dis;ls {name}"),
+                    "circulatieverlies",
+                    number(month.circulation_loss_kwh),
+                    month.circulation_loss_kwh,
+                    "kWh",
+                    "13.26",
+                ));
+            }
+            let storage = month.storage_loss_kwh + month.solar_backup_storage_loss_kwh;
+            let terms = [
+                month.emission_input_kwh / month.distribution_efficiency,
+                storage,
+                month.conversion_loss_kwh,
+                -month.solar_renewable_kwh,
+            ];
+            let mut output = leaf(
+                key("genout"),
+                format!("Q_W;dis;nren {name}"),
+                "Q_W;em / η_W;dis + Q_W;sto;ls;tot + Q_W;dis;conv;ls − Q_W;ren;sol",
+                signed_terms(&terms),
+                month.generator_output_kwh,
+                "kWh",
+                "13.4/13.7",
+            );
+            output.children = vec![emission, distribution];
+            for (part, quantity, value, reference) in [
+                ("sto", "Q_W;sto;ls;tot", storage, "13.8/13.58"),
+                (
+                    "conv",
+                    "Q_W;dis;conv;ls",
+                    month.conversion_loss_kwh,
+                    "13.24",
+                ),
+                ("sol", "Q_W;ren;sol", month.solar_renewable_kwh, "13.4a"),
+            ] {
+                if value != 0.0 {
+                    output.children.push(leaf(
+                        key(part),
+                        format!("{quantity} {name}"),
+                        quantity,
+                        number(value),
+                        value,
+                        "kWh",
+                        reference,
+                    ));
+                }
+            }
+            let input = carriers_step(
+                key("genin"),
+                format!("E_W;gen;in {name}"),
+                &[
+                    ("el", month.electricity_kwh),
+                    ("gas", month.natural_gas_kwh),
+                    ("oil", month.oil_kwh),
+                    ("dh", month.district_heat_kwh),
+                    ("bm", month.biomass_kwh),
+                ],
+                "13.3",
+            );
+            let mut step = leaf(
+                key("month"),
+                format!("Tapwaterketen {name}"),
+                "Q_W;dis;nren → E_W;gen;in",
+                format!(
+                    "{} kWh warmte uit {} kWh energie",
+                    number(month.generator_output_kwh),
+                    number(input.result)
+                ),
+                input.result,
+                "kWh",
+                "13.3",
+            );
+            step.children = vec![output, input];
+            for (part, quantity, formula, value, reference) in [
+                (
+                    "aux",
+                    "W_W;aux",
+                    "hulpenergie pomp, elektronica en zonneboiler",
+                    month.auxiliary_electricity_kwh,
+                    "13.46/13.67",
+                ),
+                (
+                    "amb",
+                    "Q_W;amb",
+                    "omgevingswarmte van de warmtepomp",
+                    month.ambient_heat_kwh,
+                    "13.3",
+                ),
+            ] {
+                if value != 0.0 {
+                    step.children.push(leaf(
+                        key(part),
+                        format!("{quantity} {name}"),
+                        formula,
+                        number(value),
+                        value,
+                        "kWh",
+                        reference,
+                    ));
+                }
+            }
+            step
+        })
+        .collect();
+    Some(month_root(
+        "installations.hotWater.chain",
+        "Tapwaterketen",
+        "Σ E_W;gen;in over de maanden",
+        months,
+        "13.1",
+    ))
+}
+
+/// Chapter 10 per month: the load on the cooling generators (10.5, less the
+/// booster heat pump of 10.7) and the carriers they took in (10.2/10.3)
+/// with the auxiliary energy (10.1).
+fn cooling_chain_trace(cooling: &crate::space_cooling::CoolingAssessment) -> Option<TraceStep> {
+    if cooling.months.is_empty() {
+        return None;
+    }
+    let months: Vec<TraceStep> = cooling
+        .months
+        .iter()
+        .map(|month| {
+            let m = month.month;
+            let name = MONTHS[usize::from(m - 1)];
+            let key = |part: &str| format!("installations.cooling.chain.{part}.{m}");
+            let parts = [
+                ("qnd", "Q_C;nd", month.need_kwh, "10.5"),
+                ("emls", "Q_C;em;ls", month.emission_loss_kwh, "10.5"),
+                ("disls", "Q_C;dis;ls", month.distribution_loss_kwh, "10.21"),
+                ("aux", "Q_C;dis;aux;rvd", month.pump_recovered_kwh, "10.45"),
+                ("dhum", "Q_C;dhum", month.dehumidification_kwh, "12.5"),
+                ("ahu", "Q_C;ahu;in;req", month.ahu_cooling_kwh, "11.116"),
+                ("hp", "Q_C;HP", -month.booster_extraction_kwh, "10.7"),
+            ];
+            let shown: Vec<_> = parts
+                .iter()
+                .filter(|(part, _, value, _)| *value != 0.0 || *part == "qnd")
+                .collect();
+            let mut load = leaf(
+                key("genin"),
+                format!("Q_C;gen;in;req {name}"),
+                "Q_C;nd + Q_C;em;ls + Q_C;dis;ls + Q_C;dis;aux;rvd + Q_C;dhum + Q_C;ahu − Q_C;HP",
+                signed_terms(&shown.iter().map(|item| item.2).collect::<Vec<_>>()),
+                month.generator_cold_kwh,
+                "kWh",
+                "10.5/10.7",
+            );
+            load.children = shown
+                .iter()
+                .map(|(part, quantity, value, reference)| {
+                    leaf(
+                        key(part),
+                        format!("{quantity} {name}"),
+                        quantity,
+                        number(*value),
+                        *value,
+                        "kWh",
+                        reference,
+                    )
+                })
+                .collect();
+            let input = carriers_step(
+                key("in"),
+                format!("E_C;gen;in {name}"),
+                &[
+                    ("el", month.electricity_kwh),
+                    ("gas", month.natural_gas_kwh + month.chp_heat_kwh),
+                    ("dh", month.district_heat_kwh),
+                    ("dc", month.district_cold_kwh),
+                ],
+                "10.2/10.3",
+            );
+            let mut step = leaf(
+                key("month"),
+                format!("Koelketen {name}"),
+                "Q_C;gen;in;req → E_C;gen;in",
+                format!(
+                    "{} kWh koude uit {} kWh energie",
+                    number(month.generator_cold_kwh),
+                    number(input.result)
+                ),
+                input.result,
+                "kWh",
+                "10.2",
+            );
+            step.children = vec![load, input];
+            if month.auxiliary_electricity_kwh != 0.0 {
+                step.children.push(leaf(
+                    key("waux"),
+                    format!("W_C;aux {name}"),
+                    "W_C;aux;gen + W_C;aux;dis + W_C;aux;em",
+                    number(month.auxiliary_electricity_kwh),
+                    month.auxiliary_electricity_kwh,
+                    "kWh",
+                    "10.1",
+                ));
+            }
+            step
+        })
+        .collect();
+    Some(month_root(
+        "installations.cooling.chain",
+        "Koelketen",
+        "Σ E_C;gen;in over de maanden",
+        months,
+        "10.2",
+    ))
+}
+
+/// Chapter 11 per zone: the fan energy (11.133) with the frost protection
+/// (11.105) and the preheating of grilles, per month.
+fn fans_trace(
+    performance: &crate::building_performance::BuildingPerformanceAssessment,
+) -> Vec<TraceStep> {
+    let chain = &performance.space_heating;
+    std::iter::once(&chain.demand)
+        .chain(&chain.additional_zone_demands)
+        .filter_map(|demand| demand.ventilation.as_ref())
+        .filter(|result| !result.months.is_empty())
+        .map(|result| {
+            let zone = &result.zone_id;
+            let months: Vec<TraceStep> = result
+                .months
+                .iter()
+                .map(|month| {
+                    let terms = [
+                        month.fan_electricity_kwh,
+                        month.frost_protection_electricity_kwh,
+                        month.grille_preheating_electricity_kwh,
+                    ];
+                    leaf(
+                        format!("installations.ventilation.{zone}.{}", month.month),
+                        format!("E_V {}", MONTHS[usize::from(month.month - 1)]),
+                        "W_V;fan + E_V;eldf + E_V;preh",
+                        signed_terms(&terms),
+                        terms.iter().sum(),
+                        "kWh",
+                        "11.133/11.105",
+                    )
+                })
+                .collect();
+            month_root(
+                &format!("installations.ventilation.{zone}"),
+                &format!("Ventilatoren {zone}"),
+                "Σ E_V over de maanden",
+                months,
+                "11.133",
+            )
+        })
+        .collect()
+}
+
+/// Chapter 14 per zone: per lighting zone `W_t = W_L + W_P` (14.6) with the
+/// installed power, the occupancy and daylight factors of `W_L` (14.7).
+fn lighting_trace(
+    performance: &crate::building_performance::BuildingPerformanceAssessment,
+) -> Vec<TraceStep> {
+    performance
+        .lighting
+        .iter()
+        .filter(|zone| zone.annual_kwh != 0.0)
+        .map(|zone| {
+            let key = format!("installations.lighting.{}", zone.zone_id);
+            let parts: Vec<TraceStep> = zone
+                .lighting_zones
+                .iter()
+                .map(|item| {
+                    let mut step = leaf(
+                        format!("{key}.{}", item.id),
+                        format!("W_t {}", item.id),
+                        "W_L + W_P",
+                        format!(
+                            "{} + {}",
+                            number(item.lighting_kwh),
+                            number(item.parasitic_kwh)
+                        ),
+                        item.lighting_kwh + item.parasitic_kwh,
+                        "kWh",
+                        "14.6",
+                    );
+                    step.children = vec![
+                        leaf(
+                            format!("{key}.{}.wl", item.id),
+                            format!("W_L {}", item.id),
+                            "P_n · F_C · (t_D · F_o;D · F_D + t_N · F_o;N) / 1000",
+                            format!(
+                                "P_n {} W, F_o;D {}, F_o;N {}, F_D {}",
+                                number(item.installed_power_w),
+                                number(item.occupancy_day),
+                                number(item.occupancy_night),
+                                number(item.daylight_factor)
+                            ),
+                            item.lighting_kwh,
+                            "kWh",
+                            "14.7",
+                        ),
+                        leaf(
+                            format!("{key}.{}.wp", item.id),
+                            format!("W_P {}", item.id),
+                            "parasitair energiegebruik",
+                            number(item.parasitic_kwh),
+                            item.parasitic_kwh,
+                            "kWh",
+                            "14.10–14.14",
+                        ),
+                    ];
+                    step
+                })
+                .collect();
+            let mut step = leaf(
+                key,
+                format!("Verlichting {}", zone.zone_id),
+                "Σ W_t over de verlichtingszones, verdeeld over de maanden",
+                zone.monthly_kwh
+                    .iter()
+                    .map(|value| number(*value))
+                    .collect::<Vec<_>>()
+                    .join(" + "),
+                zone.annual_kwh,
+                "kWh",
+                "14.6",
+            );
+            step.children = parts;
+            step
+        })
+        .collect()
+}
+
+/// Chapter 16: the electricity of every PV system per month (16.2/16.3).
+pub fn pv_trace(
+    performance: &crate::building_performance::BuildingPerformanceAssessment,
+) -> Option<TraceStep> {
+    if performance.pv_systems.is_empty() {
+        return None;
+    }
+    let systems: Vec<TraceStep> = performance
+        .pv_systems
+        .iter()
+        .map(|system| {
+            leaf(
+                format!("pv.{}", system.id),
+                format!("E_el;PV;out {}", system.id),
+                "E_sol · P_pk · f_perf · c_sh;PV · f_prac;PV / I_ref, per maand",
+                system
+                    .monthly_kwh
+                    .iter()
+                    .map(|value| number(*value))
+                    .collect::<Vec<_>>()
+                    .join(" + "),
+                system.annual_kwh,
+                "kWh",
+                "16.2/16.3",
+            )
+        })
+        .collect();
+    let mut root = leaf(
+        "pv".into(),
+        "Zonnestroom (PV)".into(),
+        "Σ E_el;PV;out over de systemen",
+        systems
+            .iter()
+            .map(|step| number(step.result))
+            .collect::<Vec<_>>()
+            .join(" + "),
+        systems.iter().map(|step| step.result).sum(),
+        "kWh",
+        "16.2",
+    );
+    root.children = systems;
+    Some(root)
+}
+
+/// A root that sums its month steps.
+fn month_root(
+    key: &str,
+    quantity: &str,
+    formula: &str,
+    months: Vec<TraceStep>,
+    reference: &'static str,
+) -> TraceStep {
+    let mut root = leaf(
+        key.into(),
+        quantity.into(),
+        formula,
+        months
+            .iter()
+            .map(|step| number(step.result))
+            .collect::<Vec<_>>()
+            .join(" + "),
+        months.iter().map(|step| step.result).sum(),
+        "kWh",
+        reference,
+    );
+    root.children = months;
+    root
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1662,6 +2200,88 @@ mod tests {
                     "{:?}",
                     function.uses
                 );
+            }
+        }
+    }
+
+    /// The chains of hot water, cooling, fans and lighting add up to the kernel's own
+    /// monthly values, for the example dwelling and office.
+    #[test]
+    fn installation_chains_match_the_kernel_results() {
+        for name in ["terraced-dwelling", "office"] {
+            let text = std::fs::read_to_string(format!(
+                "{}/../../training-data/nta8800-example-{name}.json",
+                env!("CARGO_MANIFEST_DIR")
+            ))
+            .unwrap();
+            let project: serde_json::Value = serde_json::from_str(&text).unwrap();
+            let assessment = crate::project_performance::assess_project_performance(&project);
+            let performance = assessment.performance.as_ref().expect("performance");
+            if let Some(hot_water) = &performance.hot_water {
+                let chain = hot_water_chain_trace(hot_water).expect("hot water chain");
+                for (step, month) in chain.children.iter().zip(&hot_water.months) {
+                    let output = &step.children[0];
+                    let rebuilt = month.emission_input_kwh / month.distribution_efficiency
+                        + month.storage_loss_kwh
+                        + month.solar_backup_storage_loss_kwh
+                        + month.conversion_loss_kwh
+                        - month.solar_renewable_kwh;
+                    assert!(
+                        (rebuilt - output.result).abs() < 1e-6,
+                        "{name} hot water {}: {rebuilt} vs {}",
+                        month.month,
+                        output.result
+                    );
+                    let emission = &output.children[0];
+                    let rebuilt =
+                        month.net_need_kwh / hot_water.emission_efficiency - month.recovered_kwh;
+                    assert!(
+                        (rebuilt - emission.result).abs() < 1e-6,
+                        "{name} Q_W;em {}",
+                        month.month
+                    );
+                    let input = &step.children[1];
+                    assert!(
+                        (input.result - month.carrier_input_kwh).abs() < 1e-6,
+                        "{name} E_W;gen;in {}",
+                        month.month
+                    );
+                }
+            }
+            if let Some(cooling) = &performance.cooling {
+                let chain = cooling_chain_trace(cooling).expect("cooling chain");
+                for (step, month) in chain.children.iter().zip(&cooling.months) {
+                    let load = &step.children[0];
+                    assert!(
+                        (children_sum(load) - load.result).abs() < 1e-6,
+                        "{name} cooling {}",
+                        month.month
+                    );
+                }
+            }
+            for zone in fans_trace(performance) {
+                assert!((children_sum(&zone) - zone.result).abs() < 1e-9);
+            }
+            for zone in lighting_trace(performance) {
+                if !zone.children.is_empty() {
+                    assert!(
+                        (children_sum(&zone) - zone.result).abs() < 1e-6,
+                        "{name} lighting {} vs {}",
+                        children_sum(&zone),
+                        zone.result
+                    );
+                }
+            }
+            // Every installations step still sums its carriers.
+            let installations = installations_trace(performance).expect("installations");
+            for function in &installations.children {
+                let carriers: f64 = function
+                    .children
+                    .iter()
+                    .filter(|child| child.quantity.starts_with("E_EPus;"))
+                    .map(|child| child.result)
+                    .sum();
+                assert!((function.result - carriers).abs() < 1e-6);
             }
         }
     }
