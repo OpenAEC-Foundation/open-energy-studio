@@ -13,6 +13,9 @@ Dit bestand is de wijzigingsregistratie van de rekenkern (BRL 9501 §5.2, §6.2 
 
 ## Onuitgebracht
 
+### 13 oktober 2026 — Opname: dubbele vlakcodes en ramen zonder vlak worden geweigerd
+- **Schil (opname):** een vlakcode die twee keer voorkomt geeft nu `survey_surface_id_duplicate`, en een raam, deur, dakraam of paneel waarvan het vlak niet bestaat `opening_surface_unknown`. Tot nu toe trok de kern zo'n raam van beide vlakken af en telde het dubbel, of liet hij het zonder melding weg. Een opgeslagen opname met zo'n fout wordt nu geweigerd tot de code is hersteld; de app maakt geen dubbele codes meer.
+
 ### 13 oktober 2026 — ISSO 54-toets: c_W;gen op de forfaitaire tapwaterwarmtepomp en geen waakvlam bij een HR-ketel
 - **Uitgangspunt:** waar de BRL 9501-toetsset ISSO 54 en de letterlijke tekst uiteenlopen, volgt de kern de toetsset en staat het punt als vraag aan NEN in de [vragenlijst](nta8800-vragen-nen.md) (vragen 13 en 14).
 - **Tapwaterwarmtepomp (tabellen 13.25/13.27):** onder 2025+C1 krijgt de forfaitaire warmtepomp (1,4 en 1,4·c_source) weer c_W;gen van tabel 13.27, klasse 4 bij een onbekende klasse. ISSO 54 EPWReal B01: tapwater 2 790 kWh (referentie 2 806), BENG 2 73,65 (referentie 73,89); zonder correctie was het 1 339 kWh en 49,33. Oudere uitgaven rekenen zoals de openbare rapporten J en M zonder correctie (normversies, punt 80).

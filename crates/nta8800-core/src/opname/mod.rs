@@ -1779,6 +1779,30 @@ mod tests {
         assert!(!rules(&result).contains(&"pilot_flame_unknown_present"));
     }
 
+    /// A surface id names one surface and every opening names an existing
+    /// surface; otherwise a window would be booked twice or silently dropped.
+    #[test]
+    fn surface_ids_are_unique_and_openings_find_their_surface() {
+        let mut survey = fixture("1930");
+        let first = survey.envelope.surfaces[0].clone();
+        survey.envelope.surfaces.push(first);
+        let result = assess_residential_survey(&survey);
+        assert!(result
+            .issues
+            .iter()
+            .any(|item| item.code == "survey_surface_id_duplicate"));
+
+        let mut survey = fixture("1930");
+        assert!(!survey.envelope.windows.is_empty());
+        survey.envelope.windows[0].surface_id = "bestaat-niet".into();
+        let result = assess_residential_survey(&survey);
+        assert!(result
+            .issues
+            .iter()
+            .any(|item| item.code == "opening_surface_unknown"
+                && item.path == "envelope.windows[0].surfaceId"));
+    }
+
     /// 9.6.2.1: an HR boiler with an unknown pilot flame books no pilot
     /// (ISSO 54 EPWReal B03); a conventional gas boiler still does.
     #[test]

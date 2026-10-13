@@ -698,6 +698,55 @@ pub fn derive_envelope_zone(
             _ => {}
         }
     }
+    // Openings find their surface by id (net area and U of 8.2), so a surface
+    // id names one surface only and every opening names a surface: a
+    // duplicate id takes an opening off two surfaces and books it twice, an
+    // unknown one drops it from the calculation without notice.
+    let mut surface_ids: Vec<&str> = Vec::new();
+    for (index, surface) in envelope.surfaces.iter().enumerate() {
+        if surface_ids.contains(&surface.id.as_str()) {
+            recorder.issue(
+                "survey_surface_id_duplicate",
+                format!("envelope.surfaces[{index}].id"),
+            );
+        } else {
+            surface_ids.push(&surface.id);
+        }
+    }
+    let openings = envelope
+        .windows
+        .iter()
+        .enumerate()
+        .map(|(index, item)| ("windows", index, item.surface_id.as_str()))
+        .chain(
+            envelope
+                .doors
+                .iter()
+                .enumerate()
+                .map(|(index, item)| ("doors", index, item.surface_id.as_str())),
+        )
+        .chain(
+            envelope
+                .rooflights
+                .iter()
+                .enumerate()
+                .map(|(index, item)| ("rooflights", index, item.surface_id.as_str())),
+        )
+        .chain(
+            envelope
+                .panels
+                .iter()
+                .enumerate()
+                .map(|(index, item)| ("panels", index, item.surface_id.as_str())),
+        );
+    for (list, index, surface_id) in openings {
+        if !surface_ids.contains(&surface_id) {
+            recorder.issue(
+                "opening_surface_unknown",
+                format!("envelope.{list}[{index}].surfaceId"),
+            );
+        }
+    }
     let exterior_boundary = |boundary: &SurfaceBoundary| {
         matches!(
             boundary,
