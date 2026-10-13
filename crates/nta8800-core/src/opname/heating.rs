@@ -434,9 +434,11 @@ pub struct SurveyHeating {
     /// erratum §4).
     #[serde(default)]
     pub heat_pump_above_70_declaration: Option<String>,
-    /// `None`: not determinable.
+    /// Hydronic balancing: `true`/`false` (older surveys: static or none) or
+    /// `none`/`static`/`dynamic` as the ISSO 54 forms record it
+    /// ("dynamisch gebalanceerd", EPWReal B01). `None`: not determinable.
     #[serde(default)]
-    pub balanced: Option<bool>,
+    pub balanced: Option<super::utility::CoolingBalanceAnswer>,
     pub control: ControlAnswer,
     /// Pipes in unheated spaces (afb. 9.1); `None`: spaces not inspectable
     /// and unknown whether pipes run there → present, forfait length.
@@ -652,9 +654,11 @@ pub fn derive_heating(
     let balancing = if !hydronic {
         "not_applicable"
     } else {
+        use super::utility::{CoolingBalanceAnswer as Answer, CoolingBalanceKind as Kind};
         match heating.balanced {
-            Some(true) => "static",
-            Some(false) => "none_or_unknown",
+            Some(Answer::Flag(true)) | Some(Answer::Kind(Kind::Static)) => "static",
+            Some(Answer::Kind(Kind::Dynamic)) => "dynamic",
+            Some(Answer::Flag(false)) | Some(Answer::Kind(Kind::None)) => "none_or_unknown",
             None => {
                 recorder.record(
                     "hydronic_balancing_unknown_none",

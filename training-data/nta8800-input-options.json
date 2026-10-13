@@ -2013,7 +2013,8 @@
       "productReference",
       "testReportReference",
       "testStandardEdition",
-      "points"
+      "points",
+      "complianceStated"
     ],
     "path": "/ntaCalculation/generator/forfait/highEfficiencyEvidence",
     "route": "project"

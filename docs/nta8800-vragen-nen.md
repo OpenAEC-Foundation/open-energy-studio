@@ -2,7 +2,7 @@
 
 Concepten voor vragen over de interpretatie van NTA 8800:2025+C1:2026. Ze zijn in eigen woorden opgesteld en verwijzen alleen naar paginanummers. Aanleiding voor vragen 1–7 is de vergelijking met openbare BENG-rapporten van geattesteerde software ([nta8800-vergelijking-openbare-rapporten.md](nta8800-vergelijking-openbare-rapporten.md)); vragen 8–12 kwamen uit de controle van de rekenkern tegen de normtekst per hoofdstuk (reviews 40–48 in [nta8800-releasenotes.md](nta8800-releasenotes.md)).
 
-Alle veertien vragen staan ook in een verzendklare brief aan NEN en RVO, met per vraag de twee lezingen en het gevolg in de openbare gevallen: [nta8800-vragen-nen-brief.md](nta8800-vragen-nen-brief.md). Werk die brief bij als een vraag hier verandert.
+Alle vijftien vragen staan ook in een verzendklare brief aan NEN en RVO, met per vraag de twee lezingen en het gevolg in de openbare gevallen: [nta8800-vragen-nen-brief.md](nta8800-vragen-nen-brief.md). Werk die brief bij als een vraag hier verandert.
 
 ## 1. Afgifteverlies koeling, formule 10.15 (p. 376)
 
@@ -163,3 +163,13 @@ Deze punten gaan over de Omgevingsregeling (BWBR0045528, versie 2026-10-01), nie
 **Gevolg.** Bij drie bouwlagen 5,4 W/K in plaats van 16,2 W/K. EPWReal B03 valt met de gekozen lezing voor de warmtebehoefte binnen 1 % van de referentie (100,32 tegen 100,01 kWh/m²).
 
 **Vraag.** Is bij een onbekende situatie de bedoeling één leiding per bouwlaag die elk alleen die bouwlaag telt (samen N·1,8 W/K), of N leidingen die elk alle N bouwlagen tellen (N²·1,8 W/K)?
+
+## 15. Hernieuwbare warmte van de forfaitaire tapwaterwarmtepomp met c_W;gen (5.36–5.38; tabellen 13.25 en 13.27)
+
+**Situatie.** Met de klassecorrectie van vraag 13 wordt het opwekkingsrendement van de forfaitaire tapwaterwarmtepomp 1,4·c_W;gen, bij een kleine tapvraag onder 1. Formule 5.38 zet de hernieuwbare warmte dan op 0. De BRL 9501-toetsset telt wel hernieuwbare warmte: in ISSO 54 EPWReal B01 en D01 boeken alle referentieprogramma's E_W;gen;in · (1,4 − 1), circa 1 120 kWh.
+
+**Gekozen lezing.** De kern volgt de toetsset (besluit 13 oktober 2026): c_W;gen corrigeert de energie voor de tapvraag, niet het rendement van de warmtepomp zelf. Formule 5.36 rekent met het ongecorrigeerde 1,4·c_source op de warmte die dat rendement uit de elektriciteit levert. Alleen onder 2025+C1 (normversies, punt 80).
+
+**Gevolg.** EPWReal B01: RER 58,0 % (referentie 57,8 %), zonder deze lezing 54,7 %. EPWReal D01: de hernieuwbare tapwaterwarmte stijgt van 0 naar circa 1 120 kWh.
+
+**Vraag.** Geldt in 5.36–5.38 voor een forfaitaire warmtepomp met c_W;gen het rendement met of zonder c_W;gen, en op welke warmte?

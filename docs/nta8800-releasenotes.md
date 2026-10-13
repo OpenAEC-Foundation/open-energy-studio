@@ -13,6 +13,12 @@ Dit bestand is de wijzigingsregistratie van de rekenkern (BRL 9501 §5.2, §6.2 
 
 ## Onuitgebracht
 
+### 13 oktober 2026 — ISSO 54 D-gevallen en utiliteit: vier rekenkernpunten
+- **Hernieuwbare tapwaterwarmte (5.36):** de forfaitaire tapwaterwarmtepomp met c_W;gen boekt onder 2025+C1 E_W;gen;in · (1,4·c_source − 1) als hernieuwbaar, zoals de toetsset (vraag 15). EPWReal B01: RER 58,0 % (referentie 57,8 %), was 54,7 %.
+- **ΔU_for alleen in H_D (8.3):** de basisopname gaf de forfaitaire koudebrugtoeslag mee in de U van de zonnewinsttermen 7.33/7.39; die rekenen nu met U_c en de toeslag gaat apart mee (`forfaitDeltaUWPerM2k`). TOjuli EPWReal B06 en B07 nu exact (1,99 en 2,30).
+- **Tabel 9.28:** het bewijs voor de hoge rij mag de verklaring van het testrapport zijn dat de warmtepomp aan tabel 9.28 voldoet (`complianceStated`), met product- en rapportverwijzing maar zonder COP-waarden, zoals de ISSO 54-formulieren het vastleggen.
+- **Waterzijdig inregelen verwarming:** de basisopname kent naast ja/nee nu `none`, `static` en `dynamic` ("dynamisch gebalanceerd", EPWReal B01); verwarming van B01 nu op 0,05 % van de referentie.
+
 ### 13 oktober 2026 — Opname: dubbele vlakcodes en ramen zonder vlak worden geweigerd
 - **Schil (opname):** een vlakcode die twee keer voorkomt geeft nu `survey_surface_id_duplicate`, en een raam, deur, dakraam of paneel waarvan het vlak niet bestaat `opening_surface_unknown`. Tot nu toe trok de kern zo'n raam van beide vlakken af en telde het dubbel, of liet hij het zonder melding weg. Een opgeslagen opname met zo'n fout wordt nu geweigerd tot de code is hersteld; de app maakt geen dubbele codes meer.
 

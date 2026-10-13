@@ -1386,10 +1386,16 @@ pub fn derive_envelope_zone(
             "sourceReference": part.reference,
         }));
         if part.solar {
-            opaque_elements.push(json!({
+            // 8.3: ΔU_for belongs in H_D only; the solar terms 7.33/7.39 keep U_c
+            // and the TOjuli orientation split adds ΔU_for back (5.7.2 step 2).
+            let mut element = json!({
                 "id": part.id, "areaM2": part.area, "orientation": part.orientation,
-                "tiltDeg": part.tilt, "uValueWPerM2k": u, "sourceReference": part.reference,
-            }));
+                "tiltDeg": part.tilt, "uValueWPerM2k": part.u, "sourceReference": part.reference,
+            });
+            if delta_u != 0.0 {
+                element["forfaitDeltaUWPerM2k"] = json!(delta_u);
+            }
+            opaque_elements.push(element);
         }
     }
     for window in &windows {
@@ -1401,12 +1407,17 @@ pub fn derive_envelope_zone(
         if !window.solar {
             continue;
         }
-        window_values.push(json!({
+        // As for opaque parts: the sky-radiation term 7.39 keeps U_c.
+        let mut value = json!({
             "id": window.id, "areaM2": window.area, "orientation": window.orientation,
             "tiltDeg": window.tilt, "gPerpendicular": window.g,
-            "frameFraction": FRAME_FRACTION_FORFAIT, "uValueWPerM2k": u,
+            "frameFraction": FRAME_FRACTION_FORFAIT, "uValueWPerM2k": window.u,
             "obstruction": window.obstruction, "sourceReference": window.reference,
-        }));
+        });
+        if delta_u != 0.0 {
+            value["forfaitDeltaUWPerM2k"] = json!(delta_u);
+        }
+        window_values.push(value);
     }
     if !windows.is_empty() {
         recorder.record(

@@ -3489,8 +3489,25 @@ fn book_generator(
             }
             _ => 0.0,
         };
-        if renewable_share > 0.0 && practical_efficiency >= 1.0 {
-            booking.ambient[index] = output * (1.0 - 1.0 / practical_efficiency) * renewable_share;
+        // 5.36 with the forfait heat pump of table 13.25: c_W;gen corrects the
+        // energy for the tapping demand, not the heat pump's own efficiency.
+        // The BRL 9501 test set books Q_W;ren = E_W;gen;in · (1,4·c_source − 1)
+        // (ISSO 54 EPWReal B01 and D01), i.e. 5.36 with the uncorrected
+        // efficiency on the heat that efficiency gives (vragen-nen 15).
+        let (ambient_output, ambient_efficiency) = match generator {
+            HotWaterGenerator::HeatPump {
+                declared: None,
+                source_correction,
+                ..
+            } if crate::norm_versions::profile().forfait_heat_pump_class_correction => {
+                let uncorrected = 1.4 * source_correction.unwrap_or(1.0) * practical;
+                (booking.input[index] * uncorrected, uncorrected)
+            }
+            _ => (output, practical_efficiency),
+        };
+        if renewable_share > 0.0 && ambient_efficiency >= 1.0 {
+            booking.ambient[index] =
+                ambient_output * (1.0 - 1.0 / ambient_efficiency) * renewable_share;
         }
         // 13.179: electric instantaneous heaters (individual appliances).
         if matches!(generator, HotWaterGenerator::ElectricInstantaneous) && recoverable_counts {
@@ -5928,6 +5945,18 @@ mod tests {
             assert!(class4 < 1.0, "{class4}");
             for month in &result.months {
                 assert!((month.generation_efficiency - expected * class4).abs() < 1e-12);
+                // 5.36 as the test set books it: E_W;gen;in · (1,4·c_source − 1), with
+                // no renewable share for an exhaust-air source without outdoor air.
+                let ambient = if exhaust_air_source {
+                    0.0
+                } else {
+                    month.carrier_input_kwh * (expected - 1.0)
+                };
+                assert!(
+                    (month.ambient_heat_kwh - ambient).abs() < 1e-9,
+                    "{} vs {ambient}",
+                    month.ambient_heat_kwh
+                );
             }
         }
     }

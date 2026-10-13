@@ -86,7 +86,16 @@ pub struct HighEfficiencyEvidence {
     pub product_reference: String,
     pub test_report_reference: String,
     pub test_standard_edition: String,
+    /// The measured COP per test condition of table 9.28.
+    #[serde(default)]
     pub points: Vec<HighEfficiencyTestPoint>,
+    /// The test report states that the heat pump meets the minimum COPs of
+    /// table 9.28 without the adviser recording the measured values. Table
+    /// 9.27 asks that the COPs meet table 9.28, not that they are listed; the
+    /// ISSO 54 survey forms record only "voldoet aan tabel 9.28" (EPWReal B01,
+    /// D01). The product and test report references stay required.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub compliance_stated: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -367,7 +376,9 @@ fn high_evidence_issues(input: &ForfaitHeatPumpDraftInput) -> Vec<TableIssue> {
             "highEfficiencyEvidence.testStandardEdition",
         ));
     }
-    if let Some(limits) = high_test_limits(input.source) {
+    // A stated compliance without listed values has no points to check.
+    let listed = !(evidence.compliance_stated && evidence.points.is_empty());
+    if let Some(limits) = high_test_limits(input.source).filter(|_| listed) {
         let mut seen = Vec::new();
         for point in &evidence.points {
             if seen.contains(&point.condition) {
@@ -844,6 +855,7 @@ mod tests {
                     measured_cop: *measured_cop,
                 })
                 .collect(),
+            compliance_stated: false,
         }
     }
 
@@ -1258,5 +1270,40 @@ mod tests {
         let codes: Vec<&str> = invalid.issues.iter().map(|item| item.code).collect();
         assert!(codes.contains(&"source_required"));
         assert!(codes.contains(&"heat_pump_declared_fraction_invalid"));
+    }
+
+    /// A stated compliance with table 9.28 (product and report given, no
+    /// COP values listed) opens the high row; without the statement the
+    /// missing conditions are still reported.
+    #[test]
+    fn stated_table_9_28_compliance_needs_no_listed_cops() {
+        let mut input = example(
+            TableScope::ResidentialAtMost25Kw,
+            TableSource::OutdoorAir,
+            35.0,
+        );
+        input.row_variant = TableRowVariant::Table928HighEfficiency;
+        input.high_efficiency_evidence = Some(evidence(&[]));
+        assert!(high_evidence_issues(&input)
+            .iter()
+            .any(|issue| issue.code == "high_test_condition_missing"));
+        input
+            .high_efficiency_evidence
+            .as_mut()
+            .unwrap()
+            .compliance_stated = true;
+        assert!(
+            high_evidence_issues(&input).is_empty(),
+            "{:?}",
+            high_evidence_issues(&input)
+        );
+        input
+            .high_efficiency_evidence
+            .as_mut()
+            .unwrap()
+            .test_report_reference = " ".into();
+        assert!(high_evidence_issues(&input)
+            .iter()
+            .any(|issue| issue.path == "highEfficiencyEvidence.testReportReference"));
     }
 }

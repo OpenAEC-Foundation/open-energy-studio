@@ -1803,6 +1803,56 @@ mod tests {
                 && item.path == "envelope.windows[0].surfaceId"));
     }
 
+    /// 8.3: the forfait ΔU_for is in H_D only; the solar elements keep U_c and
+    /// carry ΔU_for apart for the TOjuli split.
+    #[test]
+    fn forfait_delta_u_stays_out_of_the_solar_terms() {
+        let (_, input) = calculated(&fixture("2015"));
+        let demand = &input["spaceHeating"]["demand"];
+        let direct = demand["transmission"]["direct"]["elements"]
+            .as_array()
+            .unwrap();
+        let mut checked = 0;
+        for element in demand["opaqueElements"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .chain(demand["windows"].as_array().unwrap())
+        {
+            let Some(delta) = element["forfaitDeltaUWPerM2k"].as_f64() else {
+                continue;
+            };
+            let h_d = direct
+                .iter()
+                .find(|item| item["id"] == element["id"])
+                .unwrap();
+            let u_c = element["uValueWPerM2k"].as_f64().unwrap();
+            assert!((h_d["uValueWPerM2k"].as_f64().unwrap() - (u_c + delta)).abs() < 1e-12);
+            checked += 1;
+        }
+        assert!(checked > 0, "the 2015 survey uses the forfait ΔU_for");
+    }
+
+    /// ISSO 54 forms record "dynamisch gebalanceerd"; true/false stay static/none.
+    #[test]
+    fn heating_balancing_takes_none_static_and_dynamic() {
+        for (answer, expected) in [
+            (json!(true), "static"),
+            (json!(false), "none_or_unknown"),
+            (json!("dynamic"), "dynamic"),
+            (json!("static"), "static"),
+            (json!("none"), "none_or_unknown"),
+        ] {
+            let mut survey = fixture("1930");
+            survey.heating.balanced = serde_json::from_value(answer.clone()).unwrap();
+            let (_, input) = calculated(&survey);
+            assert_eq!(
+                input["spaceHeating"]["emission"]["balancing"], expected,
+                "{answer}"
+            );
+        }
+    }
+
     /// 9.6.2.1: an HR boiler with an unknown pilot flame books no pilot
     /// (ISSO 54 EPWReal B03); a conventional gas boiler still does.
     #[test]
