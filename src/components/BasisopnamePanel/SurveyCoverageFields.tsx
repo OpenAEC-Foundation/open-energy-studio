@@ -243,17 +243,17 @@ export function SurveyShowerHeatRecoveryField({ draft, change, t }: Props) {
  * The design temperature and the pipe insulation belong to a water distribution; the kernel reads them
  * only for water-based cooling (opname/utility.rs), so they are shown only then.
  */
-export function UtilityCoolingCoverageFields({ draft, change, t }: Props) {
+export function UtilityCoolingCoverageFields({ draft, change, t, base = ['cooling'] }: Props & { base?: Path }) {
   const field = { draft, onChange: change };
-  const waterBased = read(draft, ['cooling', 'waterBased']) === true;
+  const waterBased = read(draft, [...base, 'waterBased']) === true;
   return <>
-    {waterBased && <SelectField {...field} path={['cooling', 'designTemperature']} label={t('opname.cooling.designTemperature')}
+    {waterBased && <SelectField {...field} path={[...base, 'designTemperature']} label={t('opname.cooling.designTemperature')}
       options={opts(t, 'opname.cooling.designTemperatureKind', ['t6_to12', 't12_to16', 't12_to18', 't17_to21'])}
       onChange={omitEmpty(change)} />}
-    <SelectField {...field} path={['cooling', 'control']} label={t('opname.cooling.control')}
+    <SelectField {...field} path={[...base, 'control']} label={t('opname.cooling.control')}
       options={opts(t, 'opname.cooling.controlKind', ['standalone', 'central_with_room_control', 'other_or_unknown'])}
       onChange={omitEmpty(change)} />
-    {waterBased && <TriStateField {...field} yes={t('opname.yes')} no={t('opname.no')} path={['cooling', 'pipesInsulated']}
+    {waterBased && <TriStateField {...field} yes={t('opname.yes')} no={t('opname.no')} path={[...base, 'pipesInsulated']}
       label={t('opname.cooling.pipesInsulated')} />}
   </>;
 }

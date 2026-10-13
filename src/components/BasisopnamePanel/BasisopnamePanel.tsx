@@ -713,42 +713,94 @@ export function CalculationZoneFields({ draft, change, replace, t }: {
 }
 
 /** ISSO 75.1 §10.3.2–§10.4.5 (p. 131–137): further generators and the distribution answers. */
-export function UtilityCoolingFields({ draft, change, t }: { draft: Draft; change: Change; t: T }) {
+export function UtilityCoolingFields({ draft, change, t, base = ['cooling'] }: { draft: Draft; change: Change; t: T; base?: Path }) {
   const field = { draft, onChange: change };
   const yesNo = { yes: t('opname.yes'), no: t('opname.no') };
-  const waterBased = read(draft, ['cooling', 'waterBased']) === true;
-  const extras = list(draft, ['cooling', 'additionalGenerators']);
+  const waterBased = read(draft, [...base, 'waterBased']) === true;
+  const extras = list(draft, [...base, 'additionalGenerators']);
   return <>
-    {read(draft, ['cooling', 'generator']) === 'gas_engine_compression' &&
-      <GasEngineFields draft={draft} base={['cooling']} change={change} t={t} />}
-    {!waterBased && <SelectField {...field} path={['cooling', 'directExpansion']} label={t('opname.cooling.directExpansion')}
+    {read(draft, [...base, 'generator']) === 'gas_engine_compression' &&
+      <GasEngineFields draft={draft} base={base} change={change} t={t} />}
+    {!waterBased && <SelectField {...field} path={[...base, 'directExpansion']} label={t('opname.cooling.directExpansion')}
       options={opts(t, 'opname.cooling.directExpansionKind', ['room', 'air_handling_unit'])} />}
     {waterBased && <>
-      <TriStateField {...field} {...yesNo} path={['cooling', 'fittingsInsulated']} label={t('opname.cooling.fittingsInsulated')} />
-      <TriStateField {...field} {...yesNo} path={['cooling', 'coldMeters']} label={t('opname.cooling.coldMeters')} />
-      <NumberField {...field} path={['cooling', 'pipeLengthM']} label={t('opname.cooling.pipeLength')} />
-      <NumberField {...field} path={['cooling', 'uncooledPipeLengthM']} label={t('opname.cooling.uncooledPipeLength')} />
-      <NumberField {...field} path={['cooling', 'maxPipeLengthM']} label={t('opname.cooling.maxPipeLength')} />
+      <TriStateField {...field} {...yesNo} path={[...base, 'fittingsInsulated']} label={t('opname.cooling.fittingsInsulated')} />
+      <TriStateField {...field} {...yesNo} path={[...base, 'coldMeters']} label={t('opname.cooling.coldMeters')} />
+      <NumberField {...field} path={[...base, 'pipeLengthM']} label={t('opname.cooling.pipeLength')} />
+      <NumberField {...field} path={[...base, 'uncooledPipeLengthM']} label={t('opname.cooling.uncooledPipeLength')} />
+      <NumberField {...field} path={[...base, 'maxPipeLengthM']} label={t('opname.cooling.maxPipeLength')} />
     </>}
     {extras.map((_, index) => {
-      const base: Path = ['cooling', 'additionalGenerators', index];
+      const generatorBase: Path = [...base, 'additionalGenerators', index];
       return <div key={index} className="opname-item" role="group" aria-label={`${t('opname.additionalGenerator')} ${index + 1}`}>
         <strong>{t('opname.additionalGenerator')} {index + 1}</strong>
-        <SelectField {...field} path={[...base, 'generator']} label={t('opname.cooling.generator')}
+        <SelectField {...field} path={[...generatorBase, 'generator']} label={t('opname.cooling.generator')}
           options={opts(t, 'opname.cooling.generatorKind', COOLING_GENERATORS)} />
-        <NumberField {...field} path={[...base, 'capacityKw']} label={t('opname.cooling.capacityKw')} />
-        {read(draft, [...base, 'generator']) === 'aquifer_year_unknown' &&
-          <NumberField {...field} path={[...base, 'aquiferPermitYear']} label={t('opname.cooling.aquiferPermitYear')} step="1" />}
-        {read(draft, [...base, 'generator']) === 'gas_engine_compression' &&
-          <GasEngineFields draft={draft} base={base} change={change} t={t} />}
+        <NumberField {...field} path={[...generatorBase, 'capacityKw']} label={t('opname.cooling.capacityKw')} />
+        {read(draft, [...generatorBase, 'generator']) === 'aquifer_year_unknown' &&
+          <NumberField {...field} path={[...generatorBase, 'aquiferPermitYear']} label={t('opname.cooling.aquiferPermitYear')} step="1" />}
+        {read(draft, [...generatorBase, 'generator']) === 'gas_engine_compression' &&
+          <GasEngineFields draft={draft} base={generatorBase} change={change} t={t} />}
         <RemoveButton label={t('opname.remove')}
-          onRemove={() => change(['cooling', 'additionalGenerators'], extras.filter((_, item) => item !== index))} />
+          onRemove={() => change([...base, 'additionalGenerators'], extras.filter((_, item) => item !== index))} />
       </div>;
     })}
     <ListControls label={t('opname.addGenerator')}
-      onAdd={() => change(['cooling', 'additionalGenerators'], [...extras, { generator: 'compression', capacityKw: null }])} />
+      onAdd={() => change([...base, 'additionalGenerators'], [...extras, { generator: 'compression', capacityKw: null }])} />
     <p className="nta-form-note">{t('opname.cooling.priorityNote')}</p>
   </>;
+}
+
+/** One cooling system of the survey (the main one at `cooling`, further ones at `additionalCoolingSystems[i]`). */
+function CoolingSystemFields({ draft, change, t, base, kind }: { draft: Draft; change: Change; t: T; base: Path; kind: string }) {
+  const field = { draft, onChange: change };
+  return <>
+    <SelectField {...field} path={[...base, 'generator']} label={t('opname.cooling.generator')}
+      options={opts(t, 'opname.cooling.generatorKind', COOLING_GENERATORS)} />
+    <SelectField {...field} path={[...base, 'emitter']} label={t('opname.cooling.emitter')}
+      options={opts(t, 'opname.cooling.emitterKind', COOLING_EMITTERS)} />
+    <NumberField {...field} path={[...base, 'fanCoilCount']} label={t('opname.cooling.fanCoilCount')} step="1" />
+    <NumberField {...field} path={[...base, 'capacityKw']} label={t('opname.cooling.capacityKw')} />
+    <label className="nta-form-check">
+      <input type="checkbox" checked={read(draft, [...base, 'waterBased']) === true}
+        onChange={(event) => {
+          // §10.4.1: direct expansion only without a water distribution; without one the design
+          // temperature and pipe insulation no longer apply (opname/utility.rs). One write per system.
+          const { directExpansion: _de, designTemperature: _dt, pipesInsulated: _pi, ...rest } = (read(draft, base) as Draft) ?? {};
+          void _de; void _dt; void _pi;
+          const current = (read(draft, base) as Draft) ?? {};
+          change(base, event.target.checked
+            ? { ...rest, designTemperature: current.designTemperature, pipesInsulated: current.pipesInsulated, waterBased: true }
+            : { ...rest, directExpansion: current.directExpansion, waterBased: false });
+        }} />
+      {t('opname.cooling.waterBased')}
+    </label>
+    <SelectField {...field} path={[...base, 'balanced']} label={t('opname.cooling.balanced')}
+      options={[['none', t('opname.cooling.balanced.none')], ['static', t('opname.cooling.balanced.static')],
+        ['dynamic', t('opname.cooling.balanced.dynamic')]]} />
+    {['static', 'dynamic', true].includes(read(draft, [...base, 'balanced']) as string | boolean) &&
+      <DeclarationField draft={draft} change={change} path={[...base, 'balancingEvidenceReference']} label={t('opname.cooling.balancingEvidence')} t={t} />}
+    <CheckField {...field} path={[...base, 'heatPumpSource']} label={t('opname.cooling.heatPumpSource')} />
+    <CheckField {...field} path={[...base, 'groundAboveZeroDemonstrated']} label={t('opname.cooling.groundAboveZero')} />
+    {kind === 'utility' && <UtilityCoolingFields draft={draft} change={change} t={t} base={base} />}
+    {kind === 'utility' && <UtilityCoolingCoverageFields draft={draft} change={change} t={t} base={base} />}
+    <TextField {...field} path={[...base, 'sourceReference']} label={t('opname.sourceReference')} />
+    <SurveyPhotos path={base} />
+  </>;
+}
+
+/** The calculation zones one cooling system cools (§10.2); none ticked: every zone no other system cools. */
+function CoolingZonesField({ draft, change, base, zoneIds, t }: { draft: Draft; change: Change; base: Path; zoneIds: string[]; t: T }) {
+  const chosen = list(draft, [...base, 'zoneIds']).map(String);
+  return <fieldset className="nta-form-group">
+    <legend>{t('survey.cooling.zones')}</legend>
+    {zoneIds.map((id) => <label key={id} className="nta-form-check">
+      <input type="checkbox" checked={chosen.includes(id)}
+        onChange={(event) => change([...base, 'zoneIds'], event.target.checked ? [...chosen, id] : chosen.filter((item) => item !== id))} />
+      {id}
+    </label>)}
+    <p className="nta-form-note">{t('survey.cooling.zonesNote')}</p>
+  </fieldset>;
 }
 
 /** ISSO 82.1 p. 94: solar-control glass or film with the product g-value. */
@@ -1171,6 +1223,8 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
   const kind = stored.kind;
   const draft = stored.survey as Draft;
   const change: Change = (path, value) => save({ kind, survey: write(draft, path, value) });
+  // Calculation zones of a utility survey (ISSO 75.1 §6.5), for cooling per zone (§10.2).
+  const surveyZoneIds = list(draft, ['zones']).map((zone) => String(zone.id ?? '')).filter(Boolean);
   // Removes a survey item and keeps the photo links of the other items on their item
   // (items without an id are linked by position, so the ones after it move up).
   const removeAt = (path: Path, index: number, after: (survey: Draft) => Draft = (survey) => survey) => {
@@ -2015,39 +2069,24 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
         {t('opname.cooling.present')}
       </label>
       {read(draft, ['cooling']) != null && <>
-        <SelectField {...field} path={['cooling', 'generator']} label={t('opname.cooling.generator')}
-          options={opts(t, 'opname.cooling.generatorKind', COOLING_GENERATORS)} />
-        <SelectField {...field} path={['cooling', 'emitter']} label={t('opname.cooling.emitter')}
-          options={opts(t, 'opname.cooling.emitterKind', COOLING_EMITTERS)} />
-        <NumberField {...field} path={['cooling', 'fanCoilCount']} label={t('opname.cooling.fanCoilCount')} step="1" />
-        <NumberField {...field} path={['cooling', 'capacityKw']} label={t('opname.cooling.capacityKw')} />
-        <label className="nta-form-check">
-          <input type="checkbox" checked={read(draft, ['cooling', 'waterBased']) === true}
-            onChange={(event) => {
-              // §10.4.1: direct expansion only without a water distribution; the
-              // hidden answer is cleared so it cannot block the survey.
-              const next = write(draft, ['cooling', 'waterBased'], event.target.checked);
-              // Without a water distribution the design temperature and pipe insulation no longer
-              // apply (opname/utility.rs reads them only for water-based cooling); they are cleared too.
-              save({ kind, survey: event.target.checked
-                ? write(next, ['cooling', 'directExpansion'], undefined)
-                : write(write(next, ['cooling', 'designTemperature'], undefined), ['cooling', 'pipesInsulated'], undefined) });
-            }} />
-          {t('opname.cooling.waterBased')}
-        </label>
-        <SelectField {...field} path={['cooling', 'balanced']} label={t('opname.cooling.balanced')}
-          options={[['none', t('opname.cooling.balanced.none')], ['static', t('opname.cooling.balanced.static')],
-            ['dynamic', t('opname.cooling.balanced.dynamic')]]} />
-        {['static', 'dynamic', true].includes(read(draft, ['cooling', 'balanced']) as string | boolean) &&
-          <DeclarationField draft={draft} change={change} path={['cooling', 'balancingEvidenceReference']} label={t('opname.cooling.balancingEvidence')} t={t} />}
-        <CheckField {...field} path={['cooling', 'heatPumpSource']} label={t('opname.cooling.heatPumpSource')} />
-        <CheckField {...field} path={['cooling', 'groundAboveZeroDemonstrated']} label={t('opname.cooling.groundAboveZero')} />
+        <CoolingSystemFields draft={draft} change={change} t={t} base={['cooling']} kind={kind} />
         {kind === 'residential' &&
           <CheckField {...field} path={['coolingCollective']} label={t('opname.cooling.collective')} />}
-        {kind === 'utility' && <UtilityCoolingFields draft={draft} change={change} t={t} />}
-        {kind === 'utility' && <UtilityCoolingCoverageFields draft={draft} change={change} t={t} />}
-        <TextField {...field} path={['cooling', 'sourceReference']} label={t('opname.sourceReference')} />
-        <SurveyPhotos path={['cooling']} />
+        {kind === 'utility' && surveyZoneIds.length > 1 && <>
+          <CoolingZonesField draft={draft} change={change} base={['cooling']} zoneIds={surveyZoneIds} t={t} />
+          {list(draft, ['additionalCoolingSystems']).map((_, index) =>
+            <div key={index} className="opname-item" role="group" aria-label={`${t('survey.cooling.additional')} ${index + 1}`}>
+              <strong>{t('survey.cooling.additional')} {index + 1}</strong>
+              <CoolingSystemFields draft={draft} change={change} t={t} base={['additionalCoolingSystems', index]} kind={kind} />
+              <CoolingZonesField draft={draft} change={change} base={['additionalCoolingSystems', index]} zoneIds={surveyZoneIds} t={t} />
+              <RemoveButton label={t('opname.remove')} onRemove={() => change(['additionalCoolingSystems'],
+                list(draft, ['additionalCoolingSystems']).filter((__, item) => item !== index))} />
+            </div>)}
+          <ListControls label={t('survey.cooling.addSystem')} onAdd={() => change(['additionalCoolingSystems'], [
+            ...list(draft, ['additionalCoolingSystems']),
+            { generator: 'compression', emitter: 'split_indoor_units_on_ceiling', fanCoilCount: 1, waterBased: false, zoneIds: [], sourceReference: '' },
+          ])} />
+        </>}
       </>}
     </Section></>}
 

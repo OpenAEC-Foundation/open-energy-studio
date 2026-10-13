@@ -248,6 +248,8 @@ export function UtilityInstallationExtrasFields({ draft, change, t }: Props) {
       <CheckField {...field} path={['humidification', 'absorptionWheel']} label={t('opname.humidification.wheel')} />
       <TextField {...field} path={['humidification', 'sourceReference']} label={t('opname.humidification.source')} />
     </>}
+    {/* Table 7.3 / §5.5.8: the survey forms state whether a system above 290 kW is present. */}
+    <TriStateField {...field} {...yesNo} path={['bacs', 'above290Kw']} label={t('survey.bacs.above290')} />
     <TriStateField {...field} {...yesNo} path={['bacs', 'present']} label={t('opname.bacs.present')} />
     {read(draft, ['bacs', 'present']) === true && <>
       <NumberField {...field} path={['bacs', 'systemPowerKw']} label={t('opname.bacs.power')} optional unit="kW" />

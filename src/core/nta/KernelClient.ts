@@ -2679,6 +2679,8 @@ export interface UtilitySurvey {
   heating: ResidentialSurvey['heating'];
   heatingInstallation: { collective: boolean; capacityKw?: number | null };
   cooling?: {
+    /** §10.2: the calculation zones this system cools; empty: every zone no other system cools. */
+    zoneIds?: string[];
     generator:
       | 'compression' | 'room_air_conditioner' | 'gas_absorption' | 'external_cold' | 'unknown_collective'
       | 'aquifer_before2013' | 'aquifer_from2013' | 'aquifer_year_unknown' | 'surface_water'
@@ -2725,6 +2727,8 @@ export interface UtilitySurvey {
     }>;
     sourceReference: string;
   } | null;
+  /** §10.2: further cooling systems, each for its own zones (zoneIds). */
+  additionalCoolingSystems?: Array<NonNullable<UtilitySurvey['cooling']>>;
   ventilation: Omit<ResidentialSurvey['ventilation'], 'sourceReference' | 'controls'> & {
     ductsLukaAbc?: boolean | null;
     /** ISSO 75.1 table 11.13; overrides `ductsLukaAbc`. */
@@ -2826,6 +2830,8 @@ export interface UtilitySurvey {
   }>;
   pv?: ResidentialSurvey['pv'];
   bacs?: {
+    /** A heating or cooling system above 290 kW present, as the survey form states it. */
+    above290Kw?: boolean | null;
     systemPowerKw?: number | null;
     servedAreaM2?: number | null;
     present?: boolean | null;
