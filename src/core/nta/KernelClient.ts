@@ -880,6 +880,8 @@ export interface ForfaitHeatPumpDraftInput {
     testStandardEdition: string;
     points: Array<{ condition: 'b0_w45' | 'b0_w35' | 'w10_w45' | 'w10_w35'
       | 'a7_wet6_w45' | 'a7_wet6_w35' | 'a_minus7_wet_minus8_w45'; measuredCop: number }>;
+    /** The test report states compliance with table 9.28 without listing the COPs (points may be empty). */
+    complianceStated?: boolean;
   } | null;
   sourceTemperatureC?: number | null;
   sourceTemperatureEvidenceReference?: string | null;
@@ -2511,7 +2513,8 @@ export interface ResidentialSurvey {
     designClass?: 'c30_27' | 'c35_30' | 'c40_35' | 'c45_40' | 'c50_42' | 'c55_47' | 'c60_45' | 'c60_50' | 'c65_55' | 'c70_50' | 'c70_60' | 'c75_65' | 'c80_60' | 'c90_70' | null;
     /** Controlled declaration for a heat pump above 70 °C (table 9.9, erratum §4). */
     heatPumpAbove70Declaration?: string | null;
-    balanced?: boolean | null;
+    /** Older surveys: true = static, false = none; ISSO 54 forms also record "dynamisch gebalanceerd". */
+    balanced?: 'none' | 'static' | 'dynamic' | boolean | null;
     control: 'room_thermostat' | 'central_with_radiator_valves' | 'individual_room_control' | 'unknown';
     /** Afb. 9.1; absent: present with the forfait length when unheated spaces exist. */
     unheatedPipes?: { kind: 'absent' } | { kind: 'present'; lengthM?: number | null } | null;

@@ -149,6 +149,29 @@ export function DeclarationField({ draft, change, path, label, t, required = fal
   </div>;
 }
 
+/**
+ * A surface with another insulation answer. A renovation (ISSO 82.1 §8.7.2.1,
+ * afb. 8.14) belongs to "dikte onbekend" only, so it goes with any other answer
+ * (the kernel refuses it there: renovation_requires_present_unknown_thickness).
+ */
+function withInsulation(surface: Draft, kind: string): Draft {
+  const { renovation: _renovation, ...rest } = surface ?? {};
+  void _renovation;
+  const insulation = kind === 'thickness' ? { kind: 'thickness', thicknessMm: 50 } : { kind };
+  return kind === 'present_unknown_thickness' && surface?.renovation != null
+    ? { ...rest, insulation, renovation: surface.renovation }
+    : { ...rest, insulation };
+}
+
+/** Insulation added at a renovation or extension, thickness unknown: the year class of the renovation (ISSO 82.1 §8.7.2.1; ISSO 75.1 p. 88–89). */
+function RenovationFields({ draft, change, base, t }: { draft: Draft; change: Change; base: Path; t: T }) {
+  const field = { draft, onChange: change };
+  return <>
+    <NumberField {...field} path={[...base, 'renovation', 'year']} label={t('opname.surface.renovationYear')} step="1" />
+    <CheckField {...field} path={[...base, 'renovation', 'meetsRequirementsOfYear']} label={t('opname.surface.renovationEvidence')} />
+  </>;
+}
+
 /** Photos of one survey item (BRL 9500 Bijlage 3), linked by JSON pointer into the stored survey. */
 /**
  * H1 and the floor of a façade part against the ground (ISSO 82.1 §8.4) only apply to a façade with
@@ -840,7 +863,16 @@ export function HeatingGeneratorFields({ draft, path, change, t, hideKind = fals
           <TextField {...field} path={[...evidencePath, 'productReference']} label={t('opname.heating.table928Product')} />
           <TextField {...field} path={[...evidencePath, 'testReportReference']} label={t('opname.heating.table928Report')} />
           <TextField {...field} path={[...evidencePath, 'testStandardEdition']} label={t('opname.heating.table928Standard')} />
-          {(table928Conditions ?? []).map((condition, index) =>
+          <label className="nta-form-check">
+            <input type="checkbox" checked={read(draft, [...evidencePath, 'complianceStated']) === true}
+              onChange={(event) => change(evidencePath, {
+                ...(read(draft, evidencePath) as Draft),
+                complianceStated: event.target.checked || undefined,
+                points: event.target.checked ? [] : (table928Conditions ?? []).map((condition) => ({ condition, measuredCop: null })),
+              })} />
+            {t('survey.heating.table928Stated')}
+          </label>
+          {read(draft, [...evidencePath, 'complianceStated']) !== true && (table928Conditions ?? []).map((condition, index) =>
             <NumberField key={condition} {...field} path={[...evidencePath, 'points', index, 'measuredCop']}
               label={`${t('opname.heating.table928Cop', { condition: t(`opname.heating.table928Condition.${condition}`) })} (${t('survey.heating.table928Minimum', { value: String(TABLE_9_28_MINIMUM[condition] ?? '').replace('.', ',') })})`} />)}
           <p className="nta-form-note">{t('opname.heating.table928Note')}</p>
@@ -1408,17 +1440,13 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
           return <>
             <label>{t('opname.surface.insulation')}
               <select value={typeof kindOf === 'string' ? kindOf : ''}
-                onChange={(event) => change([...b, 'insulation'], event.target.value === 'thickness'
-                  ? { kind: 'thickness', thicknessMm: 50 } : { kind: event.target.value })}>
+                onChange={(event) => change(b, withInsulation(read(draft, b) as Draft, event.target.value))}>
                 {['none_or_unknown', 'present_unknown_thickness', 'cavity_filled_unknown_width', 'thickness'].map((key) =>
                   <option key={key} value={key}>{t(`opname.surface.insulationKind.${key}`)}</option>)}
               </select>
             </label>
             {kindOf === 'thickness' && <NumberField {...field} path={[...b, 'insulation', 'thicknessMm']} label={t('opname.surface.thicknessMm')} />}
-            {kindOf === 'present_unknown_thickness' && <>
-              <NumberField {...field} path={[...b, 'renovation', 'year']} label={t('opname.surface.renovationYear')} step="1" />
-              <CheckField {...field} path={[...b, 'renovation', 'meetsRequirementsOfYear']} label={t('opname.surface.renovationEvidence')} />
-            </>}
+            {kindOf === 'present_unknown_thickness' && <RenovationFields draft={draft} change={change} base={b} t={t} />}
           </>;
         };
         const area = (items: Array<Record<string, unknown>>, id: string) =>
@@ -1435,8 +1463,7 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
             const value = read(draft, [...b, 'insulation', 'kind']);
             return <>
               <td><label>{t('opname.surface.insulation')}
-                <select value={typeof value === 'string' ? value : ''} onChange={(event) => change([...b, 'insulation'], event.target.value === 'thickness'
-                  ? { kind: 'thickness', thicknessMm: 50 } : { kind: event.target.value })}>
+                <select value={typeof value === 'string' ? value : ''} onChange={(event) => change(b, withInsulation(read(draft, b) as Draft, event.target.value))}>
                   {['none_or_unknown', 'present_unknown_thickness', 'cavity_filled_unknown_width', 'thickness'].map((key) =>
                     <option key={key} value={key}>{t(`opname.surface.insulationKind.${key}`)}</option>)}
                 </select></label></td>
@@ -1809,7 +1836,16 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
       <HeatingControlFields draft={draft} change={change} t={t} />
       <SurveyHeatingBalanceFields draft={draft} change={change} t={t} />
       <DistributionFields draft={draft} change={change} t={t} />
-      <TriStateField {...field} yes={t('opname.yes')} no={t('opname.no')} path={['heating', 'balanced']} label={t('survey.heating.balanced')} />
+      {(() => {
+        // ISSO 54 forms record "dynamisch gebalanceerd" next to "onbekend/nee"; older surveys hold true/false.
+        const value = read(draft, ['heating', 'balanced']);
+        const shown = value === true ? 'static' : value === false ? 'none' : typeof value === 'string' ? value : '';
+        return <label>{t('survey.heating.balanced')}
+          <select value={shown} onChange={(event) => change(['heating', 'balanced'], event.target.value === '' ? null : event.target.value)}>
+            <option value="">—</option>
+            {(['none', 'static', 'dynamic'] as const).map((key) => <option key={key} value={key}>{t(`opname.cooling.balanced.${key}`)}</option>)}
+          </select></label>;
+      })()}
       <SelectField {...field} path={['heating', 'control']} label={t('survey.heating.control')}
         options={opts(t, 'survey.heating.controlKind', ['room_thermostat', 'central_with_radiator_valves', 'individual_room_control', 'unknown'])}
         onChange={(path, value) => change(path, value ?? 'unknown')} />

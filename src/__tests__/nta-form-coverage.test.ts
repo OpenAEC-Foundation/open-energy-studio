@@ -28,7 +28,8 @@ interface FormFile { file: string; text: string }
 
 function routeFiles(route: CoverageRoute): FormFile[] {
   return FORM_SOURCES[route].flatMap((source) => sourceFiles(source))
-    .map((file) => ({ file, text: stripComments(readFileSync(file, 'utf8')) }));
+    // Forward slashes, so FORM_BUILDERS paths match on Windows as well.
+    .map((file) => ({ file: file.split('\\').join('/'), text: stripComments(readFileSync(file, 'utf8')) }));
 }
 
 const files: Record<CoverageRoute, FormFile[]> = {

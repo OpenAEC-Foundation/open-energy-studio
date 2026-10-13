@@ -62,6 +62,8 @@ export function HeatPumpForfaitDiagnosticPanel({ pump, buildingFunction, onSave 
   const [rowVariant, setRowVariant] = useState<NonNullable<ForfaitHeatPumpDraftInput['rowVariant']>>(saved?.rowVariant ?? 'base');
   const [productReference, setProductReference] = useState(saved?.highEfficiencyEvidence?.productReference ?? '');
   const [testReportReference, setTestReportReference] = useState(saved?.highEfficiencyEvidence?.testReportReference ?? '');
+  // The test report may only state compliance with table 9.28 (as the ISSO 54 forms record it).
+  const [complianceStated, setComplianceStated] = useState(saved?.highEfficiencyEvidence?.complianceStated === true);
   const [testCops, setTestCops] = useState<Partial<Record<TestCondition, string>>>(() => Object.fromEntries(
     saved?.highEfficiencyEvidence?.points.map((point) => [point.condition, String(point.measuredCop)]) ?? [],
   ));
@@ -109,10 +111,10 @@ export function HeatPumpForfaitDiagnosticPanel({ pump, buildingFunction, onSave 
       || (scope === 'utility_collective_or_over25_kw' && buildingFunction === 'residential'
         && collective === 'false' && thermalCapacity <= 25)
       || (highRow && (!highRowAvailable || !productReference.trim() || !testReportReference.trim()
-        || conditions.some((item) => {
+        || (!complianceStated && conditions.some((item) => {
           const measured = Number(testCops[item.condition]);
           return !testCops[item.condition]?.trim() || !Number.isFinite(measured) || measured <= item.threshold;
-        })))
+        }))))
       || (scope === 'residential_at_most25_kw' && buildingFunction !== 'residential')
       || (pump.sink === 'hydronic' && (supply === null || !Number.isFinite(supply) || supply <= 0 || supply > 70))
       || (scope === 'residential_at_most25_kw' && source === 'surface_water')
@@ -139,7 +141,8 @@ export function HeatPumpForfaitDiagnosticPanel({ pump, buildingFunction, onSave 
         productReference: productReference.trim(),
         testReportReference: testReportReference.trim(),
         testStandardEdition: heatPumpHighTestStandard(edition),
-        points: conditions.map((item) => ({ condition: item.condition, measuredCop: Number(testCops[item.condition]) })),
+        points: complianceStated ? [] : conditions.map((item) => ({ condition: item.condition, measuredCop: Number(testCops[item.condition]) })),
+        ...(complianceStated ? { complianceStated: true } : {}),
       } : null,
       sourceTemperatureC: sourceTemperatureValue,
       sourceTemperatureEvidenceReference: sourceTemperatureBounds ? sourceTemperatureReference.trim() : null,
@@ -205,7 +208,10 @@ export function HeatPumpForfaitDiagnosticPanel({ pump, buildingFunction, onSave 
           onChange={(event) => { invalidate(); setProductReference(event.target.value); }} /></label>
         <label><span>{t('kernel.forfait.testReportReference')}</span><input type="text" value={testReportReference}
           onChange={(event) => { invalidate(); setTestReportReference(event.target.value); }} /></label>
-        {conditions.map((item) => <label key={item.condition}><span>{item.label} · COP &gt; {item.threshold}</span>
+        <label className="nta-form-check"><input type="checkbox" checked={complianceStated}
+          onChange={(event) => { invalidate(); setComplianceStated(event.target.checked); }} />
+          <span>{t('kernel.forfait.complianceStated')}</span></label>
+        {!complianceStated && conditions.map((item) => <label key={item.condition}><span>{item.label} · COP &gt; {item.threshold}</span>
           <DecimalInput min={item.threshold} step="any" value={testCops[item.condition] ?? ''}
             onChange={(event) => { invalidate(); setTestCops((current) => ({ ...current, [item.condition]: event.target.value })); }} /></label>)}
       </>}

@@ -858,6 +858,7 @@ export const en: Record<string, string> = {
   'kernel.forfait.highRow': 'Higher efficiency row (table 9.28 test)',
   'kernel.forfait.productReference': 'Tested product or combination',
   'kernel.forfait.testReportReference': 'NEN-EN 14511-2 test report (table 9.28)',
+  'kernel.forfait.complianceStated': "Test report only states compliance with table 9.28 (no COP values)",
   'kernel.forfait.choose': 'Choose a source class',
   'kernel.forfait.source.ground': 'Ground loop',
   'kernel.forfaitMonthly.open': 'Draft monthly input',
