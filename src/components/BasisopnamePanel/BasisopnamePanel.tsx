@@ -1246,6 +1246,56 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
       dispatch({ type: 'UPDATE_PROJECT_INFO', payload: { registration: { ...registration, evidence: moved } } });
     }
   };
+  /**
+   * Removes surface `id` with its opaque parts, or one part. Openings on a removed surface go with it (the
+   * kernel rejects an opening without its surface); openings on a removed part move to its surface. The
+   * photo links of everything removed are dropped (the files stay in the register), as in `removeAt`, so a
+   * surface or window added later under the same free id does not show them.
+   */
+  const removeSurfaceAt = (id: string) => {
+    const parent = parentOf(stored, id);
+    const without = removeSurface(stored, id);
+    const gone = new Set(without.removed);
+    const removed: Array<[Path, number]> = list(draft, ['envelope', 'surfaces']).flatMap((surface, at) =>
+      gone.has(String(surface.id ?? '')) ? [[['envelope', 'surfaces'], at] as [Path, number]] : []);
+    let survey = without.stored.survey as Draft;
+    const removedWindowIds: unknown[] = [];
+    for (const key of ['windows', 'doors', 'rooflights'] as const) {
+      const items = list(draft, ['envelope', key]);
+      if (!items.some((item) => gone.has(String(item.surfaceId ?? '')))) continue;
+      if (parent != null) {
+        survey = write(survey, ['envelope', key], items.map((item) => gone.has(String(item.surfaceId ?? '')) ? { ...item, surfaceId: parent } : item));
+        continue;
+      }
+      items.forEach((item, at) => {
+        if (!gone.has(String(item.surfaceId ?? ''))) return;
+        removed.push([['envelope', key], at]);
+        if (key === 'windows' && item.id != null) removedWindowIds.push(item.id);
+      });
+      survey = write(survey, ['envelope', key], items.filter((item) => !gone.has(String(item.surfaceId ?? ''))));
+    }
+    // A removed window leaves no id in the solar-control list (`solar_control_window_unknown`).
+    const solarControl = read(survey, ['solarControlWindowIds']);
+    if (removedWindowIds.length > 0 && Array.isArray(solarControl)) {
+      survey = write(survey, ['solarControlWindowIds'], solarControl.filter((item) => !removedWindowIds.includes(item)));
+    }
+    save({ ...without.stored, kind, survey });
+    const registration = state.project.registration;
+    const evidence = registration?.evidence ?? [];
+    if (evidence.length === 0) return;
+    // One removal at a time, from the last position, so the positions still to remove stay where they are.
+    let current = draft;
+    let moved = evidence;
+    for (const [path, index] of removed.sort((a, b) => b[1] - a[1])) {
+      const after = write(current, path, list(current, path).filter((_, item) => item !== index));
+      moved = linksAfterRemoval(moved, { ...state.project, basisopname: { kind, survey: current } },
+        { ...state.project, basisopname: { kind, survey: after } }, surveyPointer(path), index);
+      current = after;
+    }
+    if (moved.some((item, position) => item !== evidence[position])) {
+      dispatch({ type: 'UPDATE_PROJECT_INFO', payload: { registration: { ...registration, evidence: moved } } });
+    }
+  };
   /** Saves an edit that keeps every item in place (a renamed surface); photo links follow the item. */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- the surface rename (IdField) is not in the cards yet.
   const replaceKeepingLinks = (survey: Draft) => {
@@ -1808,7 +1858,7 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
                   {insulationFields(partBase)}
                   <CheckField {...field} path={[...partBase, 'cavity']} label={t('opname.surface.cavity')} />
                   <SurveyPhotos path={partBase} />
-                  <RemoveButton label={t('survey.removePart')} onRemove={() => save(removeSurface(stored, partId).stored)} />
+                  <RemoveButton label={t('survey.removePart')} onRemove={() => removeSurfaceAt(partId)} />
                 </div>
               </div>;
             })}
@@ -1827,17 +1877,8 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
                 onClick={() => change(['envelope', 'rooflights'], [...rooflights, {
                   id: `lichtkoepel-${rooflights.length + 1}`, surfaceId: id, areaM2: 1, uValue: 2.5, glass: 'double', qualityDeclarationReference: '',
                 }])}>{t('opname.addRooflight')}</button>}
-              <RemoveButton label={t('survey.removeSurface')} onRemove={() => {
-                // Openings on the removed surface go with it: the kernel rejects an opening without its surface.
-                const keep = (items: Array<Record<string, unknown>>) => items.filter((item) => item.surfaceId !== id);
-                // Its opaque parts go with it.
-                const without = removeSurface(stored, id).stored;
-                let next = without.survey as Draft;
-                next = write(next, ['envelope', 'windows'], keep(windows));
-                next = write(next, ['envelope', 'rooflights'], keep(rooflights));
-                if (doors.length > 0) next = write(next, ['envelope', 'doors'], keep(doors));
-                save({ ...without, kind, survey: next });
-              }} />
+              {/* Its opaque parts and openings go with it, and their photo links (`removeSurfaceAt`). */}
+              <RemoveButton label={t('survey.removeSurface')} onRemove={() => removeSurfaceAt(id)} />
             </div>
           </details>;
         });

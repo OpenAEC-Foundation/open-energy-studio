@@ -1,7 +1,8 @@
 /**
- * The inputs added for kernel 0.4.0 end to end in the full app, as an adviser enters them: the step page,
- * the apply bar, the request the kernel gets, and what the app makes of the kernel's answer (result pages,
- * report, "Ga naar"). The HTTP kernel is stubbed with the real answers of the examples
+ * The inputs added for kernel 0.4.0 end to end in the full app, as an adviser enters them: the question
+ * flow (its "Next" applies the NTA draft; the bar does so in a survey project), the request the kernel gets,
+ * and what the app makes of the kernel's answer (result pages, report, "Ga naar"). The HTTP kernel is stubbed
+ * with the real answers of the examples
  * (training-data/*.kernel-output.json), extended with what the kernel returns for the new input; the kernel
  * side of each input is covered by the Rust tests named per case.
  */
@@ -61,11 +62,23 @@ afterEach(() => {
 type User = ReturnType<typeof userEvent.setup>;
 const nav = () => screen.getByRole('navigation', { name: 'Workflow steps' });
 const main = () => within(screen.getByRole('main'));
-const bar = () => within(screen.getByRole('region', { name: 'NTA input draft' }));
 
-async function openStep(user: User, step: RegExp, sub?: string) {
-  await user.click(within(nav()).getByRole('button', { name: step }));
-  if (sub) await user.click(within(nav()).getByRole('button', { name: sub }));
+const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** A workflow step by its label ("2 Building, to do") and optionally one of its pages ("· Calculation zones"). */
+async function openStep(user: User, step: string, sub?: string) {
+  // Results and report are one step; its two pages are listed under it.
+  if (step === 'Results' || step === 'Report & dossier') {
+    await user.click(within(nav()).getByRole('button', { name: /^Results and report, / }));
+    await user.click(within(nav()).getByRole('button', { name: step }));
+    if (sub) await user.click(main().getByRole('button', { name: new RegExp(escape(sub) + '$') }));
+    return;
+  }
+  await user.click(within(nav()).getByRole('button', { name: new RegExp(`${escape(step)}, `) }));
+  if (!sub) return;
+  // Flow steps list their questions in the navigation; Report & dossier has its pages as tabs on the page.
+  const name = new RegExp(`${escape(sub)}$`);
+  await user.click(within(nav()).queryByRole('button', { name }) ?? main().getByRole('button', { name }));
 }
 
 async function kernelRuns(count: number) {
@@ -101,9 +114,26 @@ async function kernelSettled() {
   }, { timeout: 5000, interval: 100 });
 }
 
+/** The primary button of the question flow ("Next question", "Next: …"), which applies the shared NTA draft. */
+const nextButton = () => {
+  const button = screen.getByRole('main').querySelector<HTMLButtonElement>('.survey-actions .btn-primary');
+  if (!button) throw new Error('no question-flow next button on this page');
+  return button;
+};
+
+/** Applies the NTA draft the way the question flow does: by moving on to the next question. */
 async function applyDraft(user: User) {
   const runs = projectBodies().length;
-  await user.click(bar().getByRole('button', { name: /^Apply/ }));
+  await user.click(nextButton());
+  await kernelRuns(runs + 1);
+  await kernelSettled();
+}
+
+/** Applies the NTA draft with the bar, where a page is not a question of the flow (a survey project). */
+async function applyDraftWithBar(user: User) {
+  const runs = projectBodies().length;
+  const bar = within(screen.getByRole('region', { name: 'NTA input draft' }));
+  await user.click(bar.getByRole('button', { name: /^Apply/ }));
   expect(screen.queryByRole('region', { name: 'NTA input draft' })).toBeNull();
   await kernelRuns(runs + 1);
   await kernelSettled();
@@ -116,9 +146,7 @@ async function typeNumber(user: User, field: HTMLElement, value: string) {
 }
 
 describe('common spaces (6.6.4)', () => {
-  // Kernel-branch e2e (12 Oct 2026 merge): it applies the input through the NTA draft bar and the old menu names;
-  // main applies it per question. The kernel side is covered by the Rust tests; to be ported to the question flow.
-  it.skip('enters a common space on a single utility zone, lets the kernel fill hot water and lighting, and reports the split', async () => {
+  it('enters a common space on a single utility zone, lets the kernel fill hot water and lighting, and reports the split', async () => {
     const user = userEvent.setup();
     // What crates/nta8800-core/src/common_space.rs returns for this input (tests: case_h_common_space_*).
     const split = {
@@ -136,7 +164,7 @@ describe('common spaces (6.6.4)', () => {
     await openProject(user, officeProject);
 
     // A single utility zone: its own data hold the function areas and the common space.
-    await openStep(user, /^Building/, 'Calculation zones');
+    await openStep(user, 'Building', 'Calculation zones');
     await user.click(main().getByRole('button', { name: 'Own data for this calculation zone' }));
     await user.click(main().getByRole('button', { name: 'Add a part with another use function (§6.5.3)' }));
     await user.click(main().getByRole('button', { name: 'Add a part with another use function (§6.5.3)' }));
@@ -154,9 +182,9 @@ describe('common spaces (6.6.4)', () => {
     await user.type(space.getByLabelText(/Source of the common space/), 'NEN 2580-meetstaat');
 
     // Hot water and lighting: the kernel fills their function lists from the split.
-    await openStep(user, /^Installations/, 'Domestic hot water');
+    await openStep(user, 'Installations', 'Domestic hot water');
     await user.click(main().getByLabelText('Let the kernel split the areas per function from the common spaces (6.6.4)'));
-    await openStep(user, /^Installations/, 'Lighting');
+    await openStep(user, 'Installations', 'Lighting');
     await user.click(main().getByLabelText('Let the kernel split the areas per function from the common spaces (6.6.4)'));
     await applyDraft(user);
 
@@ -169,7 +197,7 @@ describe('common spaces (6.6.4)', () => {
     expect(nta.lighting[0].functions).toEqual([]);
 
     // The report traces the split and the lists the kernel filled.
-    await openStep(user, /^Report/);
+    await openStep(user, 'Report & dossier');
     const preview = () => (main().getByTestId('report-builder-preview') as HTMLIFrameElement).getAttribute('srcdoc') ?? '';
     await user.click(await main().findByRole('radio', { name: /^Detailed/ }, { timeout: 10000 }));
     await waitFor(() => expect(preview()).toContain('Gemeenschappelijke ruimten (6.6.4)'));
@@ -180,9 +208,7 @@ describe('common spaces (6.6.4)', () => {
 });
 
 describe('heated basement walls (6.7.3 c, annex K)', () => {
-  // Kernel-branch e2e (12 Oct 2026 merge): it applies the input through the NTA draft bar and the old menu names;
-  // main applies it per question. The kernel side is covered by the Rust tests; to be ported to the question flow.
-  it.skip('enters the basement wall area, sends it to the kernel and shows the larger A_ls and BENG 1 limit', async () => {
+  it('enters the basement wall area, sends it to the kernel and shows the larger A_ls and BENG 1 limit', async () => {
     const user = userEvent.setup();
     // 30 m² of basement wall at f_ls 0,7 adds 21 m² to A_ls (tests: heated_basement_walls_count_in_the_loss_area,
     // heated_basement_forfait_takes_the_entered_wall_area); BENG 1 limit 55 + 30·(A_ls/A_g − 1,5) for this dwelling.
@@ -194,7 +220,7 @@ describe('heated basement walls (6.7.3 c, annex K)', () => {
       ? withBasement : terracedOutput);
     await openProject(user, terracedProject);
 
-    await openStep(user, /^Building/, 'Envelope & windows');
+    await openStep(user, 'Building', 'Envelope & windows');
     expect(main().getByText(/A_ls 165[.,]7 m²/)).toBeInTheDocument();
     await user.click(main().getByLabelText('Heated room below ground level (8.3.3.2)'));
     await typeNumber(user, main().getByLabelText(/Depth of the floor below ground level z/), '2,5');
@@ -205,14 +231,16 @@ describe('heated basement walls (6.7.3 c, annex K)', () => {
       .toEqual({ depthM: 2.5, wallResistanceM2kPerW: 3.5, wallAreaM2: 30 });
 
     // The kernel's larger loss area and limit reach the pages.
-    await openStep(user, /^Building/, 'Envelope & windows');
+    await openStep(user, 'Building', 'Envelope & windows');
     await waitFor(() => expect(main().getByText(/A_ls 186[.,]7 m²/)).toBeInTheDocument());
-    await openStep(user, /^Results/);
+    await openStep(user, 'Results');
     const page = () => screen.getByRole('main').textContent ?? '';
     // BENG 1 against its limit.
     await waitFor(() => expect(page()).toMatch(/≤ 66[.,]0/));
-    await openStep(user, /^Project/);
-    await waitFor(() => expect(page()).toMatch(/100[.,]0 m² · 1[.,]867/));
+    // A_g and A_ls/A_g: a project in the question flow shows the kernel's geometry with all NTA input on Check.
+    await openStep(user, 'Check');
+    await user.click(main().getByRole('button', { name: 'All NTA input' }));
+    await waitFor(() => expect(page()).toMatch(/Ag = 100[.,]0 m² · Als = 186[.,]7 m² · Als\/Ag = 1[.,]867/));
   }, SLOW_UI_TEST_MS);
 });
 
@@ -227,9 +255,7 @@ describe('declared daylight factor (14.36, NEN-EN 15193-1 annex F)', () => {
   const sector = (block: NtaBlock | undefined) =>
     (block as Record<string, any> | undefined)?.lighting?.[0]?.lightingZones?.[0]?.daylight?.sectors?.[0] as Record<string, unknown> | undefined;
 
-  // Kernel-branch e2e (12 Oct 2026 merge): it applies the input through the NTA draft bar and the old menu names;
-  // main applies it per question. The kernel side is covered by the Rust tests; to be ported to the question flow.
-  it.skip('enters a declared F_D;dayl with its evidence and finds it in the report input overview', async () => {
+  it('enters a declared F_D;dayl with its evidence and finds it in the report input overview', async () => {
     const user = userEvent.setup();
     // The kernel echoes the input in derivedInput (tests: declared_sector_takes_no_daylight_control, lighting.rs).
     projectAnswer = (block) => {
@@ -239,7 +265,7 @@ describe('declared daylight factor (14.36, NEN-EN 15193-1 annex F)', () => {
     };
     await openProject(user, officeWithInstalledLighting());
 
-    await openStep(user, /^Installations/, 'Lighting');
+    await openStep(user, 'Installations', 'Lighting');
     await user.selectOptions(main().getByLabelText('Daylight'), 'sectors');
     await user.selectOptions(main().getByLabelText('Kind'), 'declared');
     // A declared factor already holds the daylight control: no control choice.
@@ -250,16 +276,14 @@ describe('declared daylight factor (14.36, NEN-EN 15193-1 annex F)', () => {
     await applyDraft(user);
     expect(sector(lastNta())).toEqual({ kind: 'declared', areaM2: 120, daylightDependencyFactor: 0.78, sourceReference: 'daglichtrapport bijlage F' });
 
-    await openStep(user, /^Report/);
+    await openStep(user, 'Report & dossier');
     const preview = () => (main().getByTestId('report-builder-preview') as HTMLIFrameElement).getAttribute('srcdoc') ?? '';
     await waitFor(() => expect(preview()).toContain('Invoeroverzicht'), { timeout: 10000 });
     expect(preview()).toContain('lighting[1].lightingZones[1].daylight.sectors[1].daylightDependencyFactor');
     expect(preview()).toContain('daglichtrapport bijlage F');
   }, SLOW_UI_TEST_MS);
 
-  // Kernel-branch e2e (12 Oct 2026 merge): it applies the input through the NTA draft bar and the old menu names;
-  // main applies it per question. The kernel side is covered by the Rust tests; to be ported to the question flow.
-  it.skip('sends a factor of 1,2 and goes from the kernel\'s refusal to the field', async () => {
+  it('sends a factor of 1,2 and goes from the kernel\'s refusal to the field', async () => {
     const user = userEvent.setup();
     const path = 'ntaCalculation.lighting[0].lightingZones[0].daylight.sectors[0].daylightDependencyFactor';
     projectAnswer = (block) => (sector(block) && Number(sector(block)!.daylightDependencyFactor) > 1 ? {
@@ -271,12 +295,12 @@ describe('declared daylight factor (14.36, NEN-EN 15193-1 annex F)', () => {
       sectors: [{ kind: 'declared', areaM2: 120, daylightDependencyFactor: 0.78, sourceReference: 'daglichtrapport' }] };
     await openProject(user, project);
 
-    await openStep(user, /^Installations/, 'Lighting');
+    await openStep(user, 'Installations', 'Lighting');
     await typeNumber(user, main().getByLabelText(/Daylight dependency factor F_D;dayl/), '1,2');
     await applyDraft(user);
     expect(sector(lastNta())!.daylightDependencyFactor).toBe(1.2);
 
-    await openStep(user, /^Check/, 'Check overview');
+    await openStep(user, 'Check');
     expect(await main().findByText(/a declared F_D;dayl lies outside 0–1/)).toBeInTheDocument();
     await user.click(await main().findByRole('button', { name: /Go to/ }));
     expect(within(nav()).getByRole('button', { name: /^Installations/ })).toHaveAttribute('aria-current', 'page');
@@ -285,9 +309,7 @@ describe('declared daylight factor (14.36, NEN-EN 15193-1 annex F)', () => {
 });
 
 describe('PV peak power per m² (16.4a)', () => {
-  // Kernel-branch e2e (12 Oct 2026 merge): it applies the input through the NTA draft bar and the old menu names;
-  // main applies it per question. The kernel side is covered by the Rust tests; to be ported to the question flow.
-  it.skip('declares K_pk 350 W/m², shows the plausibility warning on the registration page and goes to the field', async () => {
+  it('declares K_pk 350 W/m², shows the plausibility warning on the registration page and goes to the field', async () => {
     const user = userEvent.setup();
     // Above 300 W/m² the kernel calculates and warns on the field (test: declared_pv_peak_power_warns_on_the_project_route).
     const declared = (block: NtaBlock | undefined) =>
@@ -302,14 +324,14 @@ describe('PV peak power per m² (16.4a)', () => {
     } : officeOutput);
     await openProject(user, officeProject);
 
-    await openStep(user, /^Installations/, 'Generation (PV)');
+    await openStep(user, 'Installations', 'Generation (PV)');
     await user.selectOptions(main().getByLabelText(/peak power P_pk/), 'declared_specific');
     await typeNumber(user, main().getByLabelText(/^K_pk W\/m²/), '350');
     await typeNumber(user, main().getByLabelText('panel area m²'), '45');
     await applyDraft(user);
     expect(lastNta()!.pvSystems[0].peakPower).toEqual({ method: 'declared_specific', peakPowerWPerM2: 350, panelAreaM2: 45 });
 
-    await openStep(user, /^Registration/);
+    await openStep(user, 'Registration');
     await main().findByText('Plausibility');
     const warning = await main().findByText(/PV peak power per m² above 300 W\/m²; check the data sheet/);
     const row = warning.closest('li, tr') as HTMLElement;
@@ -320,9 +342,7 @@ describe('PV peak power per m² (16.4a)', () => {
 });
 
 describe('basic survey: façade part against the ground (ISSO 82.1 §8.4)', () => {
-  // Kernel-branch e2e (12 Oct 2026 merge): it applies the input through the NTA draft bar and the old menu names;
-  // main applies it per question. The kernel side is covered by the Rust tests; to be ported to the question flow.
-  it.skip('enters H1 and the floor, calculates the survey and takes it over without its geometry', async () => {
+  it('enters H1 and the floor, calculates the survey and takes it over without its geometry', async () => {
     const user = userEvent.setup();
     const survey = structuredClone(survey1930) as Record<string, any>;
     survey.envelope.surfaces.push({ id: 'kelderwand', element: 'facade', boundary: { kind: 'outdoor' }, orientation: 'north',
@@ -341,8 +361,10 @@ describe('basic survey: façade part against the ground (ISSO 82.1 §8.4)', () =
     projectAnswer = () => terracedOutput;
     await openProject(user, { ...terracedProject, basisopname: { kind: 'residential', survey } });
 
-    await openStep(user, /^Basic survey/, 'Thermal envelope');
-    const wall = within(main().getByRole('group', { name: 'kelderwand' }));
+    // The survey's façades are a step of its question flow; the wizard names the cards by element and number
+    // (kelderwand is the fourth façade).
+    await openStep(user, 'Survey', 'Facades and windows');
+    const wall = within(main().getByRole('group', { name: 'Facade 4' }));
     await user.selectOptions(wall.getByLabelText('Boundary'), 'ground');
     // A façade part against the ground has no orientation of its own; it goes with its floor (H1).
     await typeNumber(user, wall.getByLabelText(/^Height H1/), '1,2');
@@ -350,20 +372,22 @@ describe('basic survey: façade part against the ground (ISSO 82.1 §8.4)', () =
     expect([...floor.options].map((option) => option.value).filter(Boolean)).toEqual(['vloer']);
     await user.selectOptions(floor, 'vloer');
 
-    await openStep(user, /^Basic survey/);
+    // The survey's check page holds the full form with the calculation, its outcome and the takeover.
+    await openStep(user, 'Check');
+    await user.click(main().getByText('All data as a form (for experts)'));
     await user.click(main().getByRole('button', { name: 'Calculate survey' }));
     await waitFor(() => expect(requests.some((request) => request.url.endsWith('/opname/residential'))).toBe(true));
     const sent = requests.filter((request) => request.url.endsWith('/opname/residential')).slice(-1)[0].body as Record<string, any>;
     expect(sent.survey.envelope.surfaces.find((surface: { id: string }) => surface.id === 'kelderwand')).toMatchObject({
       element: 'facade', boundary: { kind: 'ground' }, depthBelowGroundM: 1.2, groundFloorId: 'vloer' });
 
-    await user.click(main().getByRole('button', { name: 'Outcome & defaults' }));
-    expect(await main().findByText('envelope.surfaces[6]')).toBeInTheDocument();
-    expect(main().getByText(/ISSO 82\.1 7e druk §8\.4; NTA 8800 8\.3\.3\.2/)).toBeInTheDocument();
+    const outcome = within(main().getByLabelText('Survey result'));
+    expect(await outcome.findByText('envelope.surfaces[6]')).toBeInTheDocument();
+    expect(outcome.getByText(/ISSO 82\.1 7e druk §8\.4; NTA 8800 8\.3\.3\.2/)).toBeInTheDocument();
 
     // The takeover keeps the project's own geometry; floor data to the ground goes only per ticked value
     // (survey-takeover-ground.test.tsx). Untick every floor value: the project's ground floors stay as they are.
-    await user.click(await main().findByRole('button', { name: 'Take over into project model' }));
+    await user.click(await outcome.findByRole('button', { name: 'Take over into project model' }));
     const dialog = within(await screen.findByRole('dialog'));
     expect(dialog.getByText(/^geometry and areas stay those of the project model \(zones, surfaces, windows\)/)).toBeInTheDocument();
     for (const box of dialog.queryAllByRole('checkbox', { name: /^Take over: / })) {
@@ -371,15 +395,14 @@ describe('basic survey: façade part against the ground (ISSO 82.1 §8.4)', () =
     }
     await user.click(dialog.getByRole('button', { name: 'Take over into draft' }));
     const before = structuredClone(lastNta()!.groundFloors);
-    await applyDraft(user);
+    // A survey project has no NTA question flow: the takeover goes into the draft that the bar applies.
+    await applyDraftWithBar(user);
     expect(lastNta()!.groundFloors).toEqual(before);
   }, SLOW_UI_TEST_MS);
 });
 
 describe('a wall to the ground in the project (8.3)', () => {
-  // Kernel-branch e2e (12 Oct 2026 merge): it applies the input through the NTA draft bar and the old menu names;
-  // main applies it per question. The kernel side is covered by the Rust tests; to be ported to the question flow.
-  it.skip('sets a wall\'s boundary to the ground, shows ground_surface_not_floor and goes to the envelope', async () => {
+  it('sets a wall\'s boundary to the ground, shows ground_surface_not_floor and goes to the envelope', async () => {
     const user = userEvent.setup();
     // The kernel refuses a wall or roof to the ground on its boundary (test: a_wall_or_roof_to_the_ground_is_refused).
     projectAnswer = (block) => {
@@ -394,7 +417,7 @@ describe('a wall to the ground in the project (8.3)', () => {
     await openProject(user, terracedProject);
     window.localStorage.setItem('oes.inspector.open', '1');
 
-    await openStep(user, /^Building/, 'Envelope & windows');
+    await openStep(user, 'Building', 'Envelope & windows');
     const runs = projectBodies().length;
     await user.click(within(main().getByRole('table', { name: 'Envelope & windows' })).getAllByText(/Gevel N/)[0]);
     const inspector = within(screen.getByRole('complementary', { name: 'Context' }));
@@ -404,10 +427,11 @@ describe('a wall to the ground in the project (8.3)', () => {
     expect((projectBodies().slice(-1)[0] as { zones: Array<{ surfaces: Array<{ id: string; thermalBoundary?: string }> }> })
       .zones[0].surfaces[0]).toMatchObject({ id: 'wall-N', thermalBoundary: 'ground' });
 
-    await openStep(user, /^Check/, 'Check overview');
+    await openStep(user, 'Check');
     expect(await main().findByText(/Only a floor can border the ground/)).toBeInTheDocument();
     await user.click(await main().findByRole('button', { name: /Go to/ }));
     expect(within(nav()).getByRole('button', { name: /^Building/ })).toHaveAttribute('aria-current', 'page');
-    expect(within(nav()).getByRole('button', { name: 'Envelope & windows' })).toHaveAttribute('aria-current', 'page');
+    // The question flow marks the page of the step as its current question.
+    expect(within(nav()).getByRole('button', { name: 'Envelope & windows' })).toHaveAttribute('aria-current', 'step');
   }, SLOW_UI_TEST_MS);
 });

@@ -16,13 +16,13 @@ const photo = (id: string, linkedPaths?: string[]): NtaEvidenceItem => ({
   id, kind: 'photo_detail', fileName: `${id}.jpg`, sha256: 'c'.repeat(64), ...(linkedPaths ? { linkedPaths } : {}),
 });
 
-function Editor({ section }: { section?: 'envelope' | 'zones' | 'result' }) {
+function Editor({ section, photos }: { section?: 'envelope' | 'zones' | 'result'; photos?: NtaEvidenceItem[] }) {
   const { state, dispatch } = useEnergy();
   return <>
     <BasisopnamePanel section={section} />
     <button type="button" onClick={() => dispatch({ type: 'UPDATE_PROJECT_INFO', payload: { registration: {
       ...state.project.registration,
-      evidence: [photo('ev-1', ['/basisopname/survey/envelope/surfaces/@voorgevel']), photo('ev-2', ['/zones/0'])],
+      evidence: photos ?? [photo('ev-1', ['/basisopname/survey/envelope/surfaces/@voorgevel']), photo('ev-2', ['/zones/0'])],
     } } })}>seed photos</button>
     <output data-testid="survey">{JSON.stringify(state.project.basisopname ?? null)}</output>
     <output data-testid="evidence">{JSON.stringify(state.project.registration?.evidence ?? [])}</output>
@@ -33,56 +33,112 @@ const survey = () => (JSON.parse(screen.getByTestId('survey').textContent ?? 'nu
 const evidence = () => JSON.parse(screen.getByTestId('evidence').textContent ?? '[]') as NtaEvidenceItem[];
 
 describe('survey review 36', () => {
-  // Kernel-branch UI test (12 Oct 2026 merge): main has surface cards (Add facade/roof/floor, no rename of the
-  // surface id) and empty survey templates (no default lighting zone); to be ported to the cards.
-  it.skip('adds, renames and removes envelope surfaces; references and photo links follow the name', async () => {
+  // Ported to the surface cards (12 Oct 2026 merge). The cards add a facade, roof or floor with a fresh id
+  // and name it by position ("Facade 1"); the surface id itself can no longer be renamed. What changes a
+  // surface's place now is removing one (with its parts and openings) and adding one, which reuses the first
+  // free id: the photo links must stay on their own surface and never pass to the new one.
+  it('adds and removes envelope surfaces; openings and photo links stay with their own surface', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<Editor section="envelope" />);
+    const surfaces = '/basisopname/survey/envelope/surfaces';
+    renderWithProviders(<Editor section="envelope" photos={[
+      photo('ev-1', [`${surfaces}/@gevel-1`]), photo('ev-2', [`${surfaces}/@gevel-2`]),
+      photo('ev-3', ['/basisopname/survey/envelope/windows/@raam1']), photo('ev-4', ['/zones/0']),
+    ]} />);
     await user.click(screen.getByRole('button', { name: 'Start dwelling survey' }));
+    // A new dwelling survey starts without surfaces.
+    expect(survey()!.envelope.surfaces).toEqual([]);
+
+    // Two new façades, each to outside air until the adviser answers otherwise.
+    await user.click(screen.getByRole('button', { name: 'Add facade' }));
+    await user.click(screen.getByRole('button', { name: 'Add facade' }));
+    expect(survey()!.envelope.surfaces).toHaveLength(2);
+    expect(survey()!.envelope.surfaces[0]).toMatchObject({ id: 'gevel-1', element: 'facade', boundary: { kind: 'outdoor' } });
+    expect(survey()!.envelope.surfaces[1]).toMatchObject({ id: 'gevel-2', element: 'facade', boundary: { kind: 'outdoor' } });
+
+    // A window in the first façade, then photos of both façades and of the window.
+    await user.click(screen.getAllByRole('button', { name: 'Window in this facade' })[0]);
+    expect(survey()!.envelope.windows).toEqual([expect.objectContaining({ id: 'raam1', surfaceId: 'gevel-1' })]);
     await user.click(screen.getByRole('button', { name: 'seed photos' }));
-    const before = survey()!.envelope.surfaces.length;
 
-    // A new surface (the template house has six; a detached house needs others).
-    await user.click(screen.getByRole('button', { name: 'Add surface' }));
-    expect(survey()!.envelope.surfaces).toHaveLength(before + 1);
-    expect(survey()!.envelope.surfaces[before]).toMatchObject({ id: `vlak-${before + 1}`, element: 'facade', boundary: { kind: 'outdoor' } });
+    // Removing the first façade takes its window along (the kernel refuses an opening without its surface);
+    // its photos and the window's stay in the register, unlinked. The other façade keeps its photo.
+    await user.click(screen.getAllByRole('button', { name: 'Remove surface' })[0]);
+    expect(survey()!.envelope.surfaces.map((surface: { id: string }) => surface.id)).toEqual(['gevel-2']);
+    expect(survey()!.envelope.windows).toEqual([]);
+    expect(evidence()[0]).not.toHaveProperty('linkedPaths');
+    expect(evidence()[1].linkedPaths).toEqual([`${surfaces}/@gevel-2`]);
+    expect(evidence()[2]).not.toHaveProperty('linkedPaths');
+    expect(evidence()[3].linkedPaths).toEqual(['/zones/0']);
 
-    // Renaming the front façade by clearing and retyping: its window and photo follow.
-    await user.click(screen.getByRole('button', { name: 'Add window' }));
-    const windowSurface = survey()!.envelope.windows.at(-1).surfaceId;
-    expect(windowSurface).toBe('voorgevel');
-    const name = screen.getAllByLabelText('Surface name')[0];
-    await user.clear(name);
-    expect(screen.getAllByText(/Empty or duplicate name/).length).toBeGreaterThan(0);
-    await user.type(name, 'gevel-zuid');
-    expect(survey()!.envelope.surfaces[0].id).toBe('gevel-zuid');
-    expect(survey()!.envelope.windows.at(-1).surfaceId).toBe('gevel-zuid');
-    expect(evidence()[0].linkedPaths).toEqual(['/basisopname/survey/envelope/surfaces/@gevel-zuid']);
+    // A façade added now takes the free id "gevel-1" and a window in it "raam1" again: the photos of the
+    // removed ones do not reappear on them.
+    await user.click(screen.getByRole('button', { name: 'Add facade' }));
+    await user.click(screen.getAllByRole('button', { name: 'Window in this facade' })[1]);
+    expect(survey()!.envelope.surfaces.map((surface: { id: string }) => surface.id)).toEqual(['gevel-2', 'gevel-1']);
+    expect(survey()!.envelope.windows).toEqual([expect.objectContaining({ id: 'raam1', surfaceId: 'gevel-1' })]);
+    expect(evidence()[0]).not.toHaveProperty('linkedPaths');
+    expect(evidence()[2]).not.toHaveProperty('linkedPaths');
 
-    // A surface with a window in it cannot go; an empty one can.
-    const removes = screen.getAllByRole('button', { name: 'Remove surface' });
-    expect(removes[0]).toBeDisabled();
-    expect(screen.getByText(/still lies in this surface/)).toBeInTheDocument();
-    await user.click(removes[before]);
-    expect(survey()!.envelope.surfaces).toHaveLength(before);
+    // An opaque part of the remaining façade with a window moved into it: removing the façade removes the
+    // part and that window too, so no opening is left pointing at a surface that is gone.
+    await user.click(screen.getAllByRole('button', { name: 'Add opaque part' })[0]);
+    expect(survey()!.envelope.surfaces.map((surface: { id: string }) => surface.id)).toEqual(['gevel-2', 'gevel-1', 'gevel-2-deel-2']);
+    await user.click(screen.getAllByRole('button', { name: 'Window in this facade' })[0]);
+    expect(survey()!.envelope.windows[1]).toMatchObject({ id: 'raam2', surfaceId: 'gevel-2' });
+    await user.selectOptions(screen.getAllByLabelText('In surface')[0], 'gevel-2-deel-2');
+    expect(survey()!.envelope.windows[1].surfaceId).toBe('gevel-2-deel-2');
+    await user.click(screen.getAllByRole('button', { name: 'Remove surface' })[0]);
+    expect(survey()!.envelope.surfaces.map((surface: { id: string }) => surface.id)).toEqual(['gevel-1']);
+    expect(survey()!.envelope.windows).toEqual([expect.objectContaining({ id: 'raam1', surfaceId: 'gevel-1' })]);
+    expect(evidence()[1]).not.toHaveProperty('linkedPaths');
+    expect(evidence()[3].linkedPaths).toEqual(['/zones/0']);
   }, SLOW_UI_TEST_MS);
 
-  // Kernel-branch UI test (12 Oct 2026 merge): main has surface cards (Add facade/roof/floor, no rename of the
-  // surface id) and empty survey templates (no default lighting zone); to be ported to the cards.
-  it.skip('keeps zone references when a zone name is cleared and retyped past another zone name', async () => {
+  it('removes an opaque part: its window moves to the surface and its photo link goes', async () => {
+    const user = userEvent.setup();
+    const part = '/basisopname/survey/envelope/surfaces/@gevel-1-deel-2';
+    renderWithProviders(<Editor section="envelope" photos={[photo('ev-1', [part]), photo('ev-2', ['/basisopname/survey/envelope/windows/@raam1'])]} />);
+    await user.click(screen.getByRole('button', { name: 'Start dwelling survey' }));
+    await user.click(screen.getByRole('button', { name: 'Add facade' }));
+    await user.click(screen.getByRole('button', { name: 'Add opaque part' }));
+    await user.click(screen.getByRole('button', { name: 'Window in this facade' }));
+    await user.selectOptions(screen.getByLabelText('In surface'), 'gevel-1-deel-2');
+    await user.click(screen.getByRole('button', { name: 'seed photos' }));
+
+    await user.click(screen.getByRole('button', { name: 'Remove opaque part' }));
+    expect(survey()!.envelope.surfaces.map((surface: { id: string }) => surface.id)).toEqual(['gevel-1']);
+    // The window stays in the façade (an opening needs a surface the kernel knows) with its photo.
+    expect(survey()!.envelope.windows).toEqual([expect.objectContaining({ id: 'raam1', surfaceId: 'gevel-1' })]);
+    expect(evidence()[0]).not.toHaveProperty('linkedPaths');
+    expect(evidence()[1].linkedPaths).toEqual(['/basisopname/survey/envelope/windows/@raam1']);
+    // A new part takes the same id; the removed part's photo does not come back on it.
+    await user.click(screen.getByRole('button', { name: 'Add opaque part' }));
+    expect(survey()!.envelope.surfaces.map((surface: { id: string }) => surface.id)).toEqual(['gevel-1', 'gevel-1-deel-2']);
+    expect(evidence()[0]).not.toHaveProperty('linkedPaths');
+  }, SLOW_UI_TEST_MS);
+
+  // Ported (12 Oct 2026 merge): the utility survey starts without zones and lighting zones, so the adviser
+  // adds the lighting zone first ("verlichting-1") before giving it a calculation zone.
+  it('keeps zone references when a zone name is cleared and retyped past another zone name', async () => {
     const user = userEvent.setup();
     renderWithProviders(<Editor section="zones" />);
     await user.click(screen.getByRole('button', { name: 'Start utility survey' }));
+    expect(survey()!.lighting).toEqual([]);
+    await user.click(screen.getByRole('button', { name: 'Add lighting zone' }));
     await user.click(screen.getByRole('button', { name: 'Add calculation zone' }));
     await user.click(screen.getByRole('button', { name: 'Add calculation zone' }));
-    await user.selectOptions(screen.getByLabelText('Calculation zone of lighting zone kantoren'), 'zone2');
+    expect(survey()!.zones.map((zone: { id: string }) => zone.id)).toEqual(['zone1', 'zone2']);
+    await user.selectOptions(screen.getByLabelText('Calculation zone of lighting zone verlichting-1'), 'zone2');
+    expect(survey()!.lighting[0].zoneId).toBe('zone2');
     const name = screen.getAllByLabelText('Zone name')[1];
     // Cleared, then typed through "zone1" (the other zone's name) to "zone12".
     await user.clear(name);
+    expect(screen.getAllByText(/Empty or duplicate name/).length).toBeGreaterThan(0);
     await user.type(name, 'zone12');
     expect(survey()!.zones[1].id).toBe('zone12');
     // Before review 36 the reference stayed on "zone" or "" and pointed at no zone.
     expect(survey()!.lighting[0].zoneId).toBe('zone12');
+    expect(screen.queryByText(/Empty or duplicate name/)).toBeNull();
   }, SLOW_UI_TEST_MS);
 
   it('asks before discarding the survey and unlinks its photos', async () => {
@@ -105,9 +161,9 @@ describe('survey review 36', () => {
     expect(evidence()[1].linkedPaths).toEqual(['/zones/0']);
   }, SLOW_UI_TEST_MS);
 
-  // Kernel-branch UI test (12 Oct 2026 merge): main has surface cards (Add facade/roof/floor, no rename of the
-  // surface id) and empty survey templates (no default lighting zone); to be ported to the cards.
-  it.skip('refuses JSON that is not an object and warns when the survey changed since the JSON edit', async () => {
+  // Ported (12 Oct 2026 merge): the field change elsewhere is "Add facade" on the surface cards; the new
+  // dwelling survey has no surfaces, so the façade is "gevel-1".
+  it('refuses JSON that is not an object and warns when the survey changed since the JSON edit', async () => {
     const user = userEvent.setup();
     const { rerender } = renderWithProviders(<Editor section="result" />);
     await user.click(screen.getByRole('button', { name: 'Start dwelling survey' }));
@@ -121,11 +177,15 @@ describe('survey review 36', () => {
     fireEvent.change(box, { target: { value: JSON.stringify({ ...survey(), constructionYear: 1950 }) } });
     expect(screen.queryByText(/changed since you started editing/)).toBeNull();
     rerender(<Editor section="envelope" />);
-    await user.click(screen.getByRole('button', { name: 'Add surface' }));
+    await user.click(screen.getByRole('button', { name: 'Add facade' }));
     rerender(<Editor section="result" />);
     expect(screen.getByText(/changed since you started editing/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Reload JSON' }));
-    expect((screen.getByLabelText('Full survey (JSON)') as HTMLTextAreaElement).value).toContain('vlak-7');
+    expect(screen.queryByText(/changed since you started editing/)).toBeNull();
+    const reloaded = (screen.getByLabelText('Full survey (JSON)') as HTMLTextAreaElement).value;
+    expect(reloaded).toContain('gevel-1');
+    // The reload drops the unapplied JSON edit.
+    expect(JSON.parse(reloaded).constructionYear).not.toBe(1950);
   }, SLOW_UI_TEST_MS);
 });
 
