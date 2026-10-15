@@ -19,7 +19,7 @@ Geachte leden van de normcommissie,
 
 [organisatie] ontwikkelt Open Energy Studio, rekensoftware voor de energieprestatie van woningen en utiliteitsgebouwen volgens NTA 8800. Wij bereiden de aanvraag van een attest volgens BRL 9501 voor. De versie waar deze vragen over gaan is programmaversie 0.2.0 met rekenkern 0.4.0 (nog niet uitgebracht); de standaarduitgave is NTA 8800:2025+C1:2026.
 
-Bij het narekenen van openbare BENG-berekeningen van geattesteerde software (vragen 1–7), bij een systematische controle en onafhankelijke herberekening van de rekenkern tegen de normtekst (vragen 8–14 en 19–24) en bij de BRL 9501-toetsset ISSO 54 (vragen 15–18) zijn wij vierentwintig punten tegengekomen waar de tekst van de norm (of, bij vraag 4, de Omgevingsregeling) meer dan één lezing toelaat. Bij vijf daarvan verklaart het verschil in lezing een meetbaar verschil in BENG 2 tussen onze uitkomst en het gepubliceerde rapport; vragen 8–14 en 19–24 veranderen geen vergeleken uitkomst van de openbare gevallen. Wij volgen de letterlijke tekst, waar twee bepalingen elkaar tegenspreken (vragen 9 en 10) de lezing die aansluit op de rest van de berekening, en waar de toetsset ISSO 54 een andere lezing gebruikt dan de letterlijke tekst (vragen 15–18) de lezing van de toetsset, maar willen voor de attestering zeker weten welke lezing bedoeld is. Per vraag noemen wij de plaats in de norm, de twee lezingen, het gevolg in een openbaar geval en de concrete vraag. De openbare gevallen en de verschilanalyse per post staan in onze vergelijking van openbare rapporten; die sturen wij desgewenst mee.
+Bij het narekenen van openbare BENG-berekeningen van geattesteerde software (vragen 1–7), bij een systematische controle en onafhankelijke herberekening van de rekenkern tegen de normtekst (vragen 8–14 en 19–27) en bij de BRL 9501-toetsset ISSO 54 (vragen 15–18) zijn wij zevenentwintig punten tegengekomen waar de tekst van de norm (of, bij vraag 4, de Omgevingsregeling) meer dan één lezing toelaat. Bij vijf daarvan verklaart het verschil in lezing een meetbaar verschil in BENG 2 tussen onze uitkomst en het gepubliceerde rapport; vragen 8–14 en 19–27 veranderen geen vergeleken uitkomst van de openbare gevallen. Wij volgen de letterlijke tekst, waar twee bepalingen elkaar tegenspreken (vragen 9 en 10) de lezing die aansluit op de rest van de berekening, en waar de toetsset ISSO 54 een andere lezing gebruikt dan de letterlijke tekst (vragen 15–18) de lezing van de toetsset, maar willen voor de attestering zeker weten welke lezing bedoeld is. Per vraag noemen wij de plaats in de norm, de twee lezingen, het gevolg in een openbaar geval en de concrete vraag. De openbare gevallen en de verschilanalyse per post staan in onze vergelijking van openbare rapporten; die sturen wij desgewenst mee.
 
 Wij stellen een antwoord per vraag zeer op prijs, ook als het een verwijzing is naar een bestaande toelichting of een geplande correctie.
 
@@ -231,3 +231,24 @@ Met vriendelijke groet,
 [organisatie]
 
 *Bijlage op verzoek: vergelijking met openbare rapporten (gevallen A–O), met de verschilanalyse per post.*
+
+### Vraag 25. Verliezen van een modulerende lokale verwarmer in N.69 (bijlage N, p. 907)
+
+- **Plaats.** N.69 interpoleert bij modulatie tussen vollast en minimale last en noemt daarin alleen de schoorsteenverliezen α_ch. Bij vollast en minimale last (N.49/N.50) bestaat het totale verlies α_ON ook uit ventilatie-, omhullings- en condensatietermen.
+- **Lezing A (onze keuze).** Het totale verlies α_ON. Volgens de gedrukte formule vallen de ventilatie-, omhullings- en condensatietermen bij modulatie weg; de toegevoerde energie daalt in onze gevallen 0,6 tot 12,5 %.
+- **Lezing B.** Alleen α_ch, zoals gedrukt.
+- **Vraag.** Wordt in N.69 alleen α_ch geïnterpoleerd, of het totale verlies α_ON?
+
+### Vraag 26. CO2-factor van warm tapwater uit een warmtenet in P.38 (bijlage P, p. 987)
+
+- **Plaats.** P.34 deelt de primaire-energiefactor van de tapwateropwekking door het opslagrendement η_WD;gen;sto. P.38 geeft K_CO2;WD;gen;tot als Σ F · K zonder η_WD;gen;sto.
+- **Lezing A (onze keuze).** Ja, zoals P.34. Volgens de gedrukte formule is K_gen een factor η_sto lager: 20 % bij η_sto 0,80.
+- **Lezing B.** Nee, zoals P.38 gedrukt staat.
+- **Vraag.** Wordt K_CO2;WD;gen;tot in P.38 door η_WD;gen;sto gedeeld, zoals f in P.34?
+
+### Vraag 27. Teken van het leidingverlies van een koudenet in P.14 (bijlage P, p. 960–965)
+
+- **Plaats.** P.14 bepaalt het leidingverlies uit het temperatuurverschil tussen het water en de omgeving. Voor een koudenet zegt de tekst niet of maanden waarin de omgeving kouder is dan het water negatief meetellen.
+- **Lezing A (onze keuze).** Per maand begrensd op 0. Een koudenet dat het hele jaar op 7 °C draait: 5 646 kWh verlies tegen 4 555 kWh met een sommatie met teken (24 %); het effect op η_dis is klein.
+- **Lezing B.** Met teken gesommeerd.
+- **Vraag.** Wordt het verlies van een koudenet per maand op 0 begrensd, of met teken over het jaar gesommeerd?

@@ -161,6 +161,8 @@ export function NtaConstructionSection({ layers, onApply }: {
       </label>
       <label>{t('nta.construction.insulation')}
         <select value={forfait.insulation} onChange={(event) => editForfait({ ...forfait, insulation: event.target.value as NtaForfaitDraft['insulation'] })}>
+          {/* Figure I.4: "nee" takes table I.4 whatever the year; "onbekend" goes by the year. */}
+          <option value="absent">{t('nta.construction.insulation.none')}</option>
           <option value="absent_or_unknown">{t('nta.construction.insulation.absent')}</option>
           <option value="present_unknown_thickness">{t('nta.construction.insulation.unknownThickness')}</option>
           <option value="known_thickness">{t('nta.construction.insulation.known')}</option>

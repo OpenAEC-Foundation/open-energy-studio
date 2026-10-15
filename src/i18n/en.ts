@@ -418,6 +418,7 @@ export const en: Record<string, string> = {
   'orientation.horizontal': 'Horizontal',
   'kernel.bridge.orientations': "Lies on construction parts facing (TOjuli, NTA 8800 §5.7.2)",
   'kernel.bridge.orientationsNote': "None ticked: distributed pro rata over the orientations. On parts of several orientations the bridge counts in equal shares.",
+  'kernel.bridge.sharedNote': "Enter the share of this zone: ψ·ℓ of a bridge between two zones, or between a zone and an unheated space or sunroom, is split equally; for a party-wall detail with one ψ for the whole detail, half counts (NTA 8800 figure 8.2, note 9).",
 
   // Results
   'results.title': 'BENG Results',
@@ -2347,7 +2348,8 @@ export const en: Record<string, string> = {
   'nta.construction.element.roof': "roof",
   'nta.construction.element.floor': "floor",
   'nta.construction.insulation': "Insulation",
-  'nta.construction.insulation.absent': "none or unknown",
+  'nta.construction.insulation.absent': "unknown whether insulated",
+  'nta.construction.insulation.none': "no insulation (established)",
   'nta.construction.insulation.unknownThickness': "present, thickness unknown",
   'nta.construction.insulation.known': "thickness known",
   'nta.construction.insulationMm': "Insulation thickness, mm",
@@ -2854,7 +2856,8 @@ export const en: Record<string, string> = {
   'opname.functionKind.cell': "Cell",
   'opname.surface.area': "Gross area, m²",
   'opname.surface.insulation': "Insulation",
-  'opname.surface.insulationKind.none_or_unknown': "None or unknown",
+  'opname.surface.insulationKind.none_or_unknown': "Unknown whether insulated",
+  'opname.surface.insulationKind.none': "No insulation (established)",
   'opname.surface.insulationKind.present_unknown_thickness': "Present, thickness unknown",
   'opname.surface.insulationKind.cavity_filled_unknown_width': "Cavity filled, width unknown",
   'opname.surface.insulationKind.thickness': "Known thickness",

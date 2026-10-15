@@ -418,6 +418,7 @@ export const nl: Record<string, string> = {
   'orientation.horizontal': 'Horizontaal',
   'kernel.bridge.orientations': "Ligt op bouwdelen met oriëntatie (TOjuli, NTA 8800 §5.7.2)",
   'kernel.bridge.orientationsNote': "Niets aangevinkt: naar rato verdeeld over de oriëntaties. Bij bouwdelen met verschillende oriëntaties telt de brug gelijk verdeeld.",
+  'kernel.bridge.sharedNote': "Voer het deel van deze rekenzone in: ψ·ℓ van een koudebrug tussen twee rekenzones of tussen een rekenzone en een onverwarmde ruimte of serre wordt gelijk verdeeld; bij een bouwmuurdetail met één ψ voor het hele detail telt de helft (NTA 8800 figuur 8.2, opmerking 9).",
 
   // Results
   'results.title': 'BENG Resultaten',
@@ -2347,7 +2348,8 @@ export const nl: Record<string, string> = {
   'nta.construction.element.roof': "dak",
   'nta.construction.element.floor': "vloer",
   'nta.construction.insulation': "Isolatie",
-  'nta.construction.insulation.absent': "geen of onbekend",
+  'nta.construction.insulation.absent': "onbekend of er isolatie is",
+  'nta.construction.insulation.none': "geen isolatie (vastgesteld)",
   'nta.construction.insulation.unknownThickness': "aanwezig, dikte onbekend",
   'nta.construction.insulation.known': "dikte bekend",
   'nta.construction.insulationMm': "Isolatiedikte, mm",
@@ -2854,7 +2856,8 @@ export const nl: Record<string, string> = {
   'opname.functionKind.cell': "Cel",
   'opname.surface.area': "Bruto oppervlakte, m²",
   'opname.surface.insulation': "Isolatie",
-  'opname.surface.insulationKind.none_or_unknown': "Geen of onbekend",
+  'opname.surface.insulationKind.none_or_unknown': "Onbekend of er isolatie is",
+  'opname.surface.insulationKind.none': "Geen isolatie (vastgesteld)",
   'opname.surface.insulationKind.present_unknown_thickness': "Aanwezig, dikte onbekend",
   'opname.surface.insulationKind.cavity_filled_unknown_width': "Spouw gevuld, breedte onbekend",
   'opname.surface.insulationKind.thickness': "Bekende dikte",

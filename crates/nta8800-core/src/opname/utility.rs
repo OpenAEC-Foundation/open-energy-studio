@@ -4452,10 +4452,10 @@ fn derive_utility_input_cited(survey: &UtilitySurvey, recorder: &mut Recorder) -
                 "vertical_pipes_unknown_one_per_toilet_group",
                 "verticalPipes",
                 format!(
-                    "{stacks} uninsulated pipe(s) through {} storey(s)",
-                    survey.storeys.max(1)
+                    "{stacks} uninsulated pipe(s) through floor(H/3) = {} storey(s), over the zones by area",
+                    ((survey.building_height_m / 3.0 + 1e-9).floor() as u32).max(1)
                 ),
-                "ISSO 75.1 p. 68 (table 7.8); NTA 8800 7.3.3",
+                "NTA 8800 7.3.3 (7.17a, p. 173); ISSO 75.1 p. 68 (table 7.8)",
             );
             stacks
         }
@@ -4472,11 +4472,27 @@ fn derive_utility_input_cited(survey: &UtilitySurvey, recorder: &mut Recorder) -
     if !recorder.issues.is_empty() {
         return None;
     }
+    let total_area: f64 = plans.iter().map(|plan| plan.area).sum();
     let mut demands = Vec::new();
     for (plan, part) in plans.iter().zip(parts) {
-        // Table 7.8 / NTA 7.3.3: the building's vertical pipes are booked
-        // in the first calculation zone.
-        let pipes = if plan.pipes {
+        // 7.3.3 (7.17a, p. 173): unknown pipes are one fictitious pipe per
+        // toilet group through floor(H/3) storeys (at least 1), its H_p
+        // spread over all zones by usable area. Surveyed pipes are booked in
+        // the first calculation zone (table 7.8).
+        let pipes = if survey.vertical_pipes.is_none() {
+            (0..stacks)
+                .map(|index| {
+                    json!({
+                        "id": format!("leiding-{}", index + 1),
+                        "buildingHeightM": survey.building_height_m,
+                        "areaShare": if total_area > 0.0 { plan.area / total_area } else { 1.0 },
+                        "insulated": false,
+                        "sharedZones": 1,
+                        "sourceReference": format!("{}; basisopname §7.2.4", survey.source_reference),
+                    })
+                })
+                .collect()
+        } else if plan.pipes {
             super::vertical_pipes(
                 survey.vertical_pipes.as_deref(),
                 survey.storeys,
@@ -6205,11 +6221,23 @@ mod tests {
         assert_eq!(input["lighting"][1]["zoneId"], "sporthal");
         assert_eq!(hall["ventilation"]["zoneId"], "sporthal");
         assert_eq!(hall["ventilation"]["functions"][0]["function"], "sport");
-        // The vertical pipes are booked once, in the first zone.
-        assert!(hall["transmission"]["verticalPipes"]
+        // 7.17a (p. 173): unknown pipes are spread over all zones by usable
+        // area, so the shares of each pipe add up to 1 over the two zones.
+        let shares = |zone: &Value| -> f64 {
+            zone["transmission"]["verticalPipes"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|pipe| pipe["areaShare"].as_f64().unwrap())
+                .sum()
+        };
+        let pipes = school["transmission"]["verticalPipes"]
             .as_array()
             .unwrap()
-            .is_empty());
+            .len() as f64;
+        assert!(pipes > 0.0);
+        assert!((shares(school) + shares(hall) - pipes).abs() < 1e-9);
+        assert!(shares(hall) > 0.0);
         let performance = result.performance.unwrap();
         assert!(performance.status == "calculated_unverified");
     }

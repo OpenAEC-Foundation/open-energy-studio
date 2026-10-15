@@ -1,8 +1,8 @@
 # Vragen aan NEN / NTA 8800-commissie
 
-Concepten voor vragen over de interpretatie van NTA 8800:2025+C1:2026. Ze zijn in eigen woorden opgesteld en verwijzen alleen naar paginanummers. Aanleiding voor vragen 1–7 is de vergelijking met openbare BENG-rapporten van geattesteerde software ([nta8800-vergelijking-openbare-rapporten.md](nta8800-vergelijking-openbare-rapporten.md)); vragen 8–12 kwamen uit de controle van de rekenkern tegen de normtekst per hoofdstuk (reviews 40–48 in [nta8800-releasenotes.md](nta8800-releasenotes.md)), vragen 13 en 14 uit de onafhankelijke herberekening van bijlage Q (reviews 69 en 70), vragen 15–18 uit de BRL 9501-toetsset ISSO 54, waar de kern de lezing van de toetsset volgt, en vragen 19–24 uit de onafhankelijke herberekening van review 75.
+Concepten voor vragen over de interpretatie van NTA 8800:2025+C1:2026. Ze zijn in eigen woorden opgesteld en verwijzen alleen naar paginanummers. Aanleiding voor vragen 1–7 is de vergelijking met openbare BENG-rapporten van geattesteerde software ([nta8800-vergelijking-openbare-rapporten.md](nta8800-vergelijking-openbare-rapporten.md)); vragen 8–12 kwamen uit de controle van de rekenkern tegen de normtekst per hoofdstuk (reviews 40–48 in [nta8800-releasenotes.md](nta8800-releasenotes.md)), vragen 13 en 14 uit de onafhankelijke herberekening van bijlage Q (reviews 69 en 70), vragen 15–18 uit de BRL 9501-toetsset ISSO 54, waar de kern de lezing van de toetsset volgt, en vragen 19–27 uit de onafhankelijke herberekeningen van reviews 75 en 76.
 
-Alle vierentwintig vragen staan ook in een verzendklare brief aan NEN en RVO, met per vraag de twee lezingen en het gevolg in de openbare gevallen: [nta8800-vragen-nen-brief.md](nta8800-vragen-nen-brief.md). Werk die brief bij als een vraag hier verandert.
+Alle zevenentwintig vragen staan ook in een verzendklare brief aan NEN en RVO, met per vraag de twee lezingen en het gevolg in de openbare gevallen: [nta8800-vragen-nen-brief.md](nta8800-vragen-nen-brief.md). Werk die brief bij als een vraag hier verandert.
 
 ## 1. Afgifteverlies koeling, formule 10.15 (p. 376)
 
@@ -272,3 +272,36 @@ Deze punten gaan over de Omgevingsregeling (BWBR0045528, versie 2026-10-01), nie
 
 **Vraag.**
 - Tellen kelderwanden en een vloer boven een onverwarmde kelder mee in A_T;ntr voor ΔU_for?
+
+## 25. Verliezen van een modulerende lokale verwarmer in N.69 (bijlage N, p. 907)
+
+**Situatie.** N.69 interpoleert bij modulatie tussen vollast en minimale last en noemt daarin alleen de schoorsteenverliezen α_ch. Bij vollast en minimale last (N.49/N.50) bestaat het totale verlies α_ON ook uit ventilatie-, omhullings- en condensatietermen.
+
+**Gekozen lezing.** De kern interpoleert het totale verlies α_ON.
+
+**Gevolg.** Volgens de gedrukte formule vallen de ventilatie-, omhullings- en condensatietermen bij modulatie weg; de toegevoerde energie daalt in onze gevallen 0,6 tot 12,5 %.
+
+**Vraag.**
+- Wordt in N.69 alleen α_ch geïnterpoleerd, of het totale verlies α_ON?
+
+## 26. CO2-factor van warm tapwater uit een warmtenet in P.38 (bijlage P, p. 987)
+
+**Situatie.** P.34 deelt de primaire-energiefactor van de tapwateropwekking door het opslagrendement η_WD;gen;sto. P.38 geeft K_CO2;WD;gen;tot als Σ F · K zonder η_WD;gen;sto.
+
+**Gekozen lezing.** De kern deelt K ook door η_WD;gen;sto, zoals P.34 voor f.
+
+**Gevolg.** Volgens de gedrukte formule is K_gen een factor η_sto lager: 20 % bij η_sto 0,80.
+
+**Vraag.**
+- Wordt K_CO2;WD;gen;tot in P.38 door η_WD;gen;sto gedeeld, zoals f in P.34?
+
+## 27. Teken van het leidingverlies van een koudenet in P.14 (bijlage P, p. 960–965)
+
+**Situatie.** P.14 bepaalt het leidingverlies uit het temperatuurverschil tussen het water en de omgeving. Voor een koudenet zegt de tekst niet of maanden waarin de omgeving kouder is dan het water negatief meetellen.
+
+**Gekozen lezing.** De kern telt per maand alleen warmtewinst (≥ 0).
+
+**Gevolg.** Een koudenet dat het hele jaar op 7 °C draait: 5 646 kWh verlies tegen 4 555 kWh met een sommatie met teken (24 %); het effect op η_dis is klein.
+
+**Vraag.**
+- Wordt het verlies van een koudenet per maand op 0 begrensd, of met teken over het jaar gesommeerd?

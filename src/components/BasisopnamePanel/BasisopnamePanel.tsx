@@ -1007,7 +1007,7 @@ function RemoveButton({ label, onRemove, disabled = false }: { label: string; on
   return <button type="button" className="btn opname-remove" disabled={disabled} onClick={onRemove}>{label}</button>;
 }
 
-const INSULATION_KINDS = ['none_or_unknown', 'present_unknown_thickness', 'cavity_filled_unknown_width', 'thickness'];
+const INSULATION_KINDS = ['none', 'none_or_unknown', 'present_unknown_thickness', 'cavity_filled_unknown_width', 'thickness'];
 
 /**
  * One insulation answer for all surfaces of an element (feedback 8 Oct 2026:
@@ -1545,7 +1545,7 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
             <label>{t('opname.surface.insulation')}
               <select value={typeof kindOf === 'string' ? kindOf : ''}
                 onChange={(event) => change(b, withInsulation(read(draft, b) as Draft, event.target.value))}>
-                {['none_or_unknown', 'present_unknown_thickness', 'cavity_filled_unknown_width', 'thickness'].map((key) =>
+                {['none', 'none_or_unknown', 'present_unknown_thickness', 'cavity_filled_unknown_width', 'thickness'].map((key) =>
                   <option key={key} value={key}>{t(`opname.surface.insulationKind.${key}`)}</option>)}
               </select>
             </label>
@@ -1568,7 +1568,7 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
             return <>
               <td><label>{t('opname.surface.insulation')}
                 <select value={typeof value === 'string' ? value : ''} onChange={(event) => change(b, withInsulation(read(draft, b) as Draft, event.target.value))}>
-                  {['none_or_unknown', 'present_unknown_thickness', 'cavity_filled_unknown_width', 'thickness'].map((key) =>
+                  {['none', 'none_or_unknown', 'present_unknown_thickness', 'cavity_filled_unknown_width', 'thickness'].map((key) =>
                     <option key={key} value={key}>{t(`opname.surface.insulationKind.${key}`)}</option>)}
                 </select></label></td>
               <td>{value === 'thickness' ? <NumberField {...field} path={[...b, 'insulation', 'thicknessMm']} label={t('opname.surface.thicknessMm')} />

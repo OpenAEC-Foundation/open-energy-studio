@@ -184,8 +184,12 @@ pub enum BuildingKind {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum InsulationState {
-    /// No insulation or unknown whether present.
+    /// Unknown whether insulation is present (figure I.4 "onbekend": by
+    /// construction year I.2.1.2 or I.2.1.3).
     AbsentOrUnknown,
+    /// Known to have no insulation: figure I.4 "nee" leads to I.2.1.2
+    /// (table I.4, column without insulation) whatever the construction year.
+    Absent,
     /// (Post-)insulated with an undeterminable thickness.
     PresentUnknownThickness,
     /// I.2.1.4.
@@ -564,7 +568,8 @@ impl ForfaitOpaque {
         if let (true, Some(renovation)) = (insulated, &self.renovation) {
             return self.renovated_rc(renovation);
         }
-        if self.construction_year < 1965 {
+        let absent = matches!(self.insulation, InsulationState::Absent);
+        if self.construction_year < 1965 || absent {
             // Table I.4 has no hull row: a houseboat hull before 1965 takes
             // the first class of table I.7 (interpretation).
             table_i4(self.element, self.cavity, insulated).or_else(|| {
@@ -653,7 +658,9 @@ impl ForfaitOpaque {
             }
             _ => (
                 self.forfait_rc_from_tables().unwrap_or(f64::NAN),
-                if self.construction_year < 1965 {
+                if self.construction_year < 1965
+                    || matches!(self.insulation, InsulationState::Absent)
+                {
                     "I.2.1.2"
                 } else {
                     "I.2.1.3"

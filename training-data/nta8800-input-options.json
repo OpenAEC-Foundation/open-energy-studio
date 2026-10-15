@@ -3000,6 +3000,7 @@
     "kind": "variant",
     "options": [
       "none_or_unknown",
+      "none",
       "present_unknown_thickness",
       "cavity_filled_unknown_width",
       "thickness"
@@ -3653,6 +3654,7 @@
     "kind": "variant",
     "options": [
       "none_or_unknown",
+      "none",
       "present_unknown_thickness",
       "cavity_filled_unknown_width",
       "thickness"

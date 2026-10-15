@@ -1398,11 +1398,13 @@
             "unheated": null,
             "verticalPipes": [
               {
+                "areaShare": 1.0,
+                "buildingHeightM": 6.0,
                 "id": "leiding-1",
                 "insulated": false,
                 "sharedZones": 1,
                 "sourceReference": "synthetic fixture, not a real building; basisopname §7.2.4",
-                "storeys": 1
+                "storeys": 0
               }
             ]
           },
@@ -1891,11 +1893,13 @@
             "unheated": null,
             "verticalPipes": [
               {
+                "areaShare": 1.0,
+                "buildingHeightM": 7.5,
                 "id": "leiding-1",
                 "insulated": false,
                 "sharedZones": 1,
                 "sourceReference": "synthetic fixture, not a real building; basisopname §7.2.4",
-                "storeys": 2
+                "storeys": 0
               }
             ]
           },
@@ -2429,11 +2433,13 @@
             "unheated": null,
             "verticalPipes": [
               {
+                "areaShare": 1.0,
+                "buildingHeightM": 4.5,
                 "id": "leiding-1",
                 "insulated": false,
                 "sharedZones": 1,
                 "sourceReference": "synthetic fixture, not a real building; basisopname §7.2.4",
-                "storeys": 1
+                "storeys": 0
               }
             ]
           },

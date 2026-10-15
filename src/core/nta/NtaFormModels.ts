@@ -273,7 +273,7 @@ export interface NtaConstructionDraft {
 export interface NtaForfaitDraft {
   element: 'facade' | 'floor' | 'roof';
   constructionYear: number;
-  insulation: 'absent_or_unknown' | 'present_unknown_thickness' | 'known_thickness';
+  insulation: 'absent' | 'absent_or_unknown' | 'present_unknown_thickness' | 'known_thickness';
   thicknessMm: number;
   cavity: boolean;
 }

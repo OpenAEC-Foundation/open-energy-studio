@@ -2355,6 +2355,8 @@ export async function calculateVentilationWithRust(input: VentilationInput, norm
 
 /** ISSO 82.1 basic survey of an existing dwelling; see docs/nta8800-basisopname.md. */
 export type OpnameInsulation =
+  /** Known to have no insulation (NTA 8800 figure I.4 "nee": table I.4 whatever the year). */
+  | { kind: 'none' }
   | { kind: 'none_or_unknown' }
   | { kind: 'present_unknown_thickness' }
   | { kind: 'cavity_filled_unknown_width' }

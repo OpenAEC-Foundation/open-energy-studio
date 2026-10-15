@@ -753,7 +753,9 @@ pub fn heater_month(heater: &LocalHeater, r: &ResolvedHeater, month: HeaterMonth
         + (l.vent_on + l.envelope) / r.k_mod
         - r.condensation_min;
     let mut average = q / t_gen;
-    let mut beta_mod = 0.0;
+    // Step 10 (p. 907) repeats steps 6–9 until β_mod changes less than
+    // 0,001; the first β_mod has no previous value to compare with.
+    let mut beta_mod = f64::NAN;
     for _ in 0..200 {
         let next = ((average - r.input_min) / (r.input_full - r.input_min)).clamp(0.0, 1.0);
         let q_br = (w_br_min + (w_br - w_br_min) * next) * k_rh;

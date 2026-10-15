@@ -127,6 +127,9 @@ export function ThermalBridgeDialog({ editId, onClose }: ThermalBridgeDialogProp
             </option>)}
           </select>
           <small>{t('kernel.boundary.scope')}</small>
+          {/* NTA 8800 figure 8.2, note 9: ψ·ℓ between two zones, or a zone and an AOR/AOS, is split equally. */}
+          {(thermalBoundary === 'unheated_space' || thermalBoundary === 'adjacent_conditioned') &&
+            <small role="note">{t('kernel.bridge.sharedNote')}</small>}
         </div>
 
         <div className="dialog-field">

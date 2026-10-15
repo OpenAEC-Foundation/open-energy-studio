@@ -78,8 +78,10 @@ pub enum SurfaceBoundary {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum InsulationAnswer {
-    /// No insulation, or not determinable whether present.
+    /// Not determinable whether insulation is present (figure I.4 "onbekend").
     NoneOrUnknown,
+    /// Known to have no insulation (figure I.4 "nee": table I.4).
+    None,
     /// (Post-)insulated, thickness not determinable.
     PresentUnknownThickness,
     /// Cavity filled afterwards, cavity width unknown (table 8.26).
@@ -563,7 +565,7 @@ fn thatch_rc(
         return None;
     }
     let insulation_mm = match &surface.insulation {
-        InsulationAnswer::NoneOrUnknown => None,
+        InsulationAnswer::NoneOrUnknown | InsulationAnswer::None => None,
         InsulationAnswer::PresentUnknownThickness | InsulationAnswer::CavityFilledUnknownWidth => {
             recorder.record(
                 "thatch_insulation_thickness_unknown_40_mm",
@@ -1023,6 +1025,7 @@ pub fn derive_envelope_zone(
         // Opaque part.
         let insulation = match &surface.insulation {
             InsulationAnswer::NoneOrUnknown => InsulationState::AbsentOrUnknown,
+            InsulationAnswer::None => InsulationState::Absent,
             InsulationAnswer::PresentUnknownThickness => InsulationState::PresentUnknownThickness,
             InsulationAnswer::CavityFilledUnknownWidth => {
                 let width = cavity_width_mm(construction_year);
