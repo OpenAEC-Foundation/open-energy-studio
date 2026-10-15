@@ -2715,7 +2715,7 @@ fn ventilation_value(
     let infiltration = match &survey.measured_infiltration {
         Some(item) => json!({
             "method": "measured", "qv10DmPerSM2": item.qv10_dm3_per_s_m2,
-            "sourceReference": item.source_reference,
+            "sourceReference": item.derived_reference(),
         }),
         None => {
             let mut value = json!({"method": "reference", "buildingType": airtightness});

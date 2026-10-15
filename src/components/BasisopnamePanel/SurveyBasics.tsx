@@ -71,7 +71,10 @@ export function BuildingTypeFields({ draft, change, t }: Props) {
   </>;
 }
 
-/** Table 7.4/7.5: lighter ceiling, and (utility only) a closed or suspended ceiling; a measured qv10 (NEN 2686). */
+/**
+ * Table 7.4/7.5: lighter ceiling, and (utility only) a closed or suspended ceiling; a known qv10:
+ * measured (NEN 2686) or laid down in a quality-assurance procedure (§11.2.5).
+ */
 export function ConstructionExtrasFields({ draft, change, t, utility }: Props & { utility: boolean }) {
   const field = { draft, onChange: change };
   const measured = read(draft, ['measuredInfiltration']);
@@ -85,10 +88,12 @@ export function ConstructionExtrasFields({ draft, change, t, utility }: Props & 
       label={t('opname.construction.closedCeiling')} />}
     <label className="nta-form-check">
       <input type="checkbox" checked={measured != null} onChange={(event) => change(['measuredInfiltration'],
-        event.target.checked ? { qv10Dm3PerSM2: null, sourceReference: '' } : null)} />
+        event.target.checked ? { qv10Dm3PerSM2: null, sourceReference: '', basis: 'measurement' } : null)} />
       {t('opname.measuredInfiltration')}
     </label>
     {measured != null && <>
+      <SelectField {...field} path={['measuredInfiltration', 'basis']} label={t('opname.measuredInfiltration.basis')}
+        options={opts(t, 'opname.measuredInfiltration.basis', ['measurement', 'quality_assurance'])} />
       <NumberField {...field} path={['measuredInfiltration', 'qv10Dm3PerSM2']} label={t('opname.measuredInfiltration.qv10')}
         unit="dm³/(s·m²)" />
       <TextField {...field} path={['measuredInfiltration', 'sourceReference']} label={t('opname.measuredInfiltration.source')} />

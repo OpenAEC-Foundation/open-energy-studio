@@ -13,6 +13,10 @@ Dit bestand is de wijzigingsregistratie van de rekenkern (BRL 9501 §5.2, §6.2 
 
 ## Onuitgebracht
 
+### 15 oktober 2026 — Opname: q_v10 uit kwaliteitsborging (geen rekenwijziging)
+- **Herkomst q_v10 (§11.2.5):** naast een meting (NEN 2686) legt de opname nu ook een q_v10 vast die binnen een kwaliteitsborgingsprocedure is vastgelegd; §11.2.5 schrijft voor dat die waarde wordt gebruikt. ISSO 54 EPWReal D05 geeft "qv,10-waarde gemeten: nee" met 0,62 dm³/(s·m²); met die waarde komen alle zes uitkomsten binnen de tolerantie. Zonder `basis` blijft het een meting, dus opgeslagen opnamen rekenen gelijk.
+- **Bron van de afgeleide infiltratie:** de afgeleide invoer neemt de bron van de q_v10 zelf over (het meetrapport of de kwaliteitsborging, met de route), niet meer de bron van het ventilatiesysteem.
+
 ### 13 oktober 2026 — Utiliteitsopname: koeling per zone, 290 kW-antwoord, TOjuli 0
 - **Koeling per zone (§10.2):** de utiliteitsopname kent `zoneIds` per koelsysteem en `additionalCoolingSystems`; de kern rekent dan met `coolingSystems`. ISSO 54 EPUReal B01: koudelevering in zone 1 en multi-split op elektriciteit in zone 2 (18 942 kWh, referentie circa 19 483).
 - **f_BACS (tabel 7.3):** `bacs.above290Kw` legt het antwoord van het formulier vast ("geen installatie met vermogen > 290 kW") en gaat voor het vermogen.

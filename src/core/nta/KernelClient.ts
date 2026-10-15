@@ -2418,7 +2418,8 @@ export interface ResidentialSurvey {
     closedOrSuspendedCeiling?: boolean;
     sourceReference: string;
   };
-  measuredInfiltration?: { qv10Dm3PerSM2: number; sourceReference: string } | null;
+  /** §11.2.5: a measured q_v10 (NEN 2686) or one laid down in a quality-assurance procedure. */
+  measuredInfiltration?: { qv10Dm3PerSM2: number; sourceReference: string; basis?: 'measurement' | 'quality_assurance' } | null;
   /** Storeys of the dwelling; absent: the storeys served by the heating. */
   storeys?: number | null;
   /** §7.2.4 vertical pipes; absent: one uninsulated pipe per storey, empty: none. */

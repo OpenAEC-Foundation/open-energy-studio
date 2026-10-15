@@ -190,6 +190,40 @@ pub struct MeasuredInfiltration {
     /// registered (p. 55–56).
     pub qv10_dm3_per_s_m2: f64,
     pub source_reference: String,
+    /// Where the value comes from (§11.2.5): a measurement, or the value laid
+    /// down in a quality-assurance procedure, which "moet worden gebruikt".
+    #[serde(default, skip_serializing_if = "InfiltrationBasis::is_measurement")]
+    pub basis: InfiltrationBasis,
+}
+
+/// The two sources of q_v10;lea;ref that §11.2.5 accepts besides 11.86.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum InfiltrationBasis {
+    /// Measured on the realised building (NEN 2686).
+    #[default]
+    Measurement,
+    /// Laid down or checked within a quality-assurance procedure (ISSO 54
+    /// EPWReal D05: "qv,10-waarde gemeten: nee" with a value of 0,62).
+    QualityAssurance,
+}
+
+impl InfiltrationBasis {
+    fn is_measurement(&self) -> bool {
+        *self == Self::Measurement
+    }
+}
+
+impl MeasuredInfiltration {
+    /// The source reference of the derived `measured` infiltration, naming
+    /// the §11.2.5 route.
+    pub fn derived_reference(&self) -> String {
+        let route = match self.basis {
+            InfiltrationBasis::Measurement => "meting NEN 2686 (§11.2.5)",
+            InfiltrationBasis::QualityAssurance => "kwaliteitsborging (§11.2.5)",
+        };
+        format!("{route}: {}", self.source_reference)
+    }
 }
 
 /// Vertical pipe through the thermal envelope (§7.2.4, table 7.7).
@@ -783,10 +817,7 @@ pub fn derive_residential_input(
             .ok()?
             .as_str()
             .unwrap_or_default(),
-        survey
-            .measured_infiltration
-            .as_ref()
-            .map(|item| item.qv10_dm3_per_s_m2),
+        survey.measured_infiltration.as_ref(),
         recorder,
     );
     let mut heating = heating::derive_heating(&survey.heating, year, recorder);
@@ -1801,6 +1832,45 @@ mod tests {
             .iter()
             .any(|item| item.code == "opening_surface_unknown"
                 && item.path == "envelope.windows[0].surfaceId"));
+    }
+
+    /// §11.2.5: a q_v10 from a quality-assurance procedure is used like a
+    /// measured one, with its own source and the route in the reference.
+    #[test]
+    fn quality_assured_qv10_is_used_with_its_own_source() {
+        fn infiltration(value: &Value) -> Option<&Value> {
+            match value {
+                Value::Object(map) => map
+                    .get("infiltration")
+                    .or_else(|| map.values().find_map(infiltration)),
+                Value::Array(items) => items.iter().find_map(infiltration),
+                _ => None,
+            }
+        }
+        let mut survey = fixture("2015");
+        survey.measured_infiltration = serde_json::from_value(json!({
+            "qv10Dm3PerSM2": 0.62, "sourceReference": "opleverdossier kwaliteitsborging",
+            "basis": "quality_assurance",
+        }))
+        .unwrap();
+        let (_, input) = calculated(&survey);
+        let derived = infiltration(&input).unwrap();
+        assert_eq!(derived["method"], "measured");
+        assert_eq!(derived["qv10DmPerSM2"], 0.62);
+        assert_eq!(
+            derived["sourceReference"],
+            "kwaliteitsborging (§11.2.5): opleverdossier kwaliteitsborging"
+        );
+        // Without a basis the value is a measurement.
+        survey.measured_infiltration = serde_json::from_value(json!({
+            "qv10Dm3PerSM2": 0.62, "sourceReference": "meetrapport",
+        }))
+        .unwrap();
+        let (_, input) = calculated(&survey);
+        assert_eq!(
+            infiltration(&input).unwrap()["sourceReference"],
+            "meting NEN 2686 (§11.2.5): meetrapport"
+        );
     }
 
     /// 8.3: the forfait ΔU_for is in H_D only; the solar elements keep U_c and

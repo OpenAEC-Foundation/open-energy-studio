@@ -546,7 +546,7 @@ pub fn derive_ventilation(
     building_height_m: f64,
     floor_above_crawlspace: bool,
     airtightness_type: &str,
-    measured_qv10: Option<f64>,
+    measured_infiltration: Option<&super::MeasuredInfiltration>,
     recorder: &mut Recorder,
 ) -> DerivedVentilation {
     let reference = survey.source_reference.as_str();
@@ -686,10 +686,11 @@ pub fn derive_ventilation(
             current
         }
     };
-    let infiltration = match measured_qv10 {
-        Some(qv10) => {
-            json!({"method": "measured", "qv10DmPerSM2": qv10, "sourceReference": reference})
-        }
+    let infiltration = match measured_infiltration {
+        Some(item) => json!({
+            "method": "measured", "qv10DmPerSM2": item.qv10_dm3_per_s_m2,
+            "sourceReference": item.derived_reference(),
+        }),
         None => {
             let mut value = json!({"method": "reference", "buildingType": airtightness_type});
             if let Some(year) = infiltration_year {

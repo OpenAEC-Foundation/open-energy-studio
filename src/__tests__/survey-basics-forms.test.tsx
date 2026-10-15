@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { fireEvent, screen } from '@testing-library/react';
 import { write, type Draft, type Path } from '../components/NtaPerformancePanel/NtaFormFields';
 import {
-  emptyRequiredSurveyFields, SolarControlWindowsFields, SurveyDoorsFields, SurveyUnheatedSpacesFields,
+  ConstructionExtrasFields, emptyRequiredSurveyFields, SolarControlWindowsFields, SurveyDoorsFields, SurveyUnheatedSpacesFields,
   SYSTEM_VARIANTS, UtilityInstallationExtrasFields, UtilityLightingFields, VentilationBasicsFields,
 } from '../components/BasisopnamePanel/SurveyBasics';
 import { en } from '../i18n/en';
@@ -28,6 +28,16 @@ const draft = () => JSON.parse(screen.getByTestId('draft').textContent ?? '{}');
 const t = (key: string) => (en as Record<string, string>)[key] ?? key;
 
 describe('survey basics write what the kernel reads', () => {
+  it('records whether a known qv10 was measured or laid down in quality assurance (§11.2.5)', () => {
+    renderWithProviders(<Harness initial={{}}>
+      {(d, change) => <ConstructionExtrasFields draft={d} change={change} t={t} utility={false} />}</Harness>);
+    fireEvent.click(screen.getByLabelText('Air permeability q_v10 known (§11.2.5)'));
+    expect(draft().measuredInfiltration.basis).toBe('measurement');
+    fireEvent.change(screen.getByLabelText('Origin of q_v10'), { target: { value: 'quality_assurance' } });
+    fireEvent.change(screen.getByLabelText(/^q_v10/), { target: { value: '0.62' } });
+    expect(draft().measuredInfiltration).toMatchObject({ basis: 'quality_assurance', qv10Dm3PerSM2: 0.62 });
+  });
+
   it('unchecking the last solar-control window leaves an empty list, not null', () => {
     renderWithProviders(<Harness initial={{ envelope: { windows: [{ id: 'raam1' }] }, solarControlWindowIds: ['raam1'] }}>
       {(d, change) => <SolarControlWindowsFields draft={d} change={change} t={t} />}</Harness>);
