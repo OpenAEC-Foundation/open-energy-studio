@@ -129,7 +129,7 @@ scripts/verify-nta.sh
 The gate runs:
 
 - **Version checks:** the kernel-version and release-notes check, and the manual-stamp check.
-- **Kernel tests:** the unit tests, the edition tests and the public-comparison tests.
+- **Kernel tests:** the unit tests, the edition tests, the public-comparison tests, and tests holding values computed independently from the norm pages (`ventilation_independent`, `installations_independent`, `edition_switches_independent`; see [docs/nta8800-verificatiestatus.md](docs/nta8800-verificatiestatus.md)).
 - **Option-coverage sweep:** every enum variant and optional field of the kernel input, under every edition.
 - **Numeric fuzz test:** boundary and random values, plus monotonicity checks.
 - **Large-project tests.**

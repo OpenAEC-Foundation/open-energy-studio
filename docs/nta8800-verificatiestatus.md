@@ -1,4 +1,31 @@
-# NTA 8800 verificatiestatus — 12 oktober 2026
+# NTA 8800 verificatiestatus — 15 oktober 2026
+
+**Bouwcontrole 13 oktober 2026.** De [Linux-devbuild van broncommit `4c871f1`](nta8800-build-verificatie-2026-10-13-4c871f1.md) slaagde na een verse `npm ci`; de manifestlezer bevestigde de bewaarde bytes en bronmetadata. Daarna slaagde de releaseproef van review 74 met de volledige technische gate en Rust 1.77.2 (`e9987e1`, exit 0). Een tweede onafhankelijke bouw, actuele officiële referentiegevallen, visuele desktopacceptatie en externe attestering blijven open.
+
+De bewaarde HTTP- en MCP-binaries leverden voor dezelfde voorbeeldtussenwoning beide BENG 2 = 80,56 kWh/m²·jaar en indicatieve klasse A+ met status `calculated_unverified` en `unattested`. De HTTP-gezondheidsroute en MCP-initialisatie slaagden. Dit controleert alleen de gebouwde transportadapters.
+
+De [wijzigingsimpact voor de doeluitgave](nta8800-2026-wijzigingen.md) is op 14 oktober met het dekkingsregister in overeenstemming gebracht. Dit corrigeert een verouderde documentatiestatus, zonder nieuwe berekening of bewijs voor een attest.
+
+## Overzicht: onafhankelijke herberekening (reviews 63–73, stand 14 oktober 2026)
+
+Sinds 12 oktober is de kern opnieuw nagerekend met een eigen implementatie vanaf de normpagina's, steeds vanaf de afgeleide invoer van de kern en zonder eerst de kerncode van de route te lezen. Tolerantie 10⁻⁶ relatief. De herberekeningen zelf blijven buiten de repository; varianten met de onafhankelijk berekende waarden staan als vaste test in `tests/ventilation_independent.rs` (12), `tests/installations_independent.rs` (37) en `tests/edition_switches_independent.rs` (12). De laatste volledige gate na deze reviews is die van review 74, als onderdeel van de sequentiële releaseproef (exit 0).
+
+| Onderdeel | Uitgave | Review | Vergeleken grootheden | Uitkomst |
+|---|---|---|---|---|
+| Voorbeeldwoning en -kantoor, hoofdstukken 5, 7, 8, 9, 13, 14, 16 en TOjuli | 2025+C1 | 63 | 782 | gelijk |
+| Hoofdstuk 11 en de vaste C1-run (5.4.3) van beide voorbeelden | 2025+C1 | 64 | 1 041 | gelijk |
+| Hoofdstuk 11, routes buiten de voorbeelden (ventilatieve koeling, open verbranding, ≥ 15 m, kruipruimte, roosters, vorst, LBK-batterijen) | 2025+C1 | 65 | 12 008 | gelijk |
+| Installaties buiten de voorbeelden (stadswarmte, biomassa, forfaitaire warmtepompen, WKK methode 2, hybride, tapwater, douche-wtw, booster, koelmethode 3, PV en batterij) | 2025+C1 | 66 | 2 417 | gelijk |
+| Zonneboilers, koelmethode 2, gemeten booster, WKK methode 1 | 2025+C1 | 67 | 304 | gelijk |
+| Koelmethode 1, aan/uit-warmtepompen volgens bijlage Q | 2025+C1 | 68 | 492 | gelijk |
+| Overige bijlage Q-varianten (brine/water, water/water, afvoerlucht, lucht/lucht, hybride, modulerend) | 2025+C1 | 69 | 2 214 | gelijk |
+| Laatste bijlage Q-onderdelen (interval 5, Q.4.4, carnotbegrenzing, overventilatie Q.5.3) | 2025+C1 | 70 | 1 034 | gelijk na één herstel (11.23 met 13.148/13.148a) |
+| Voorbeelden en 31 ventilatievarianten in de oudere uitgaven | 2024, 2023, 2022, 2020+A1 | 71 | 14 639 per uitgave | gelijk |
+| Schakelpunten tussen de uitgaven | alle vijf | 72–73 | per schakelpunt tegen de tekst; 12 kerntests | twee herstellen (tabel E.11, NEN-EN 13053 in 2022) |
+
+**Vragen aan NEN** uit deze reeks: 13 (bronpomp dubbel geteld, review 69) en 14 (tapwatertijdfractie Q.86 tegenover 13.149, review 70); samen nu veertien ([vragen aan NEN](nta8800-vragen-nen.md)).
+
+**Niet onafhankelijk nagerekend:** Q.86–Q.88 zelf en Q.92 (de kern gebruikt ze niet), de luchtdebietinterpolatie van tabel Q.9 (niet uitgevoerd), het uurklimaat van 17.3.8 (geen NEN 5060-uurwaarden), en in de oudere uitgaven de hoofdstukken 10 en 13 en de bijlagen buiten wat de voorbeelden en de schakelpunten raken. Officiële referentie-uitkomsten (ISSO 54 v5.0) en externe toetsing ontbreken nog; deze herberekeningen vergroten het interne bewijs, niet de status *Referentie* of *Attest*.
 
 ## Stand 12 oktober 2026: onafhankelijke herberekening van de voorbeeldprojecten (review 63)
 
@@ -40,8 +67,160 @@ Samen 782 vergeleken grootheden. Alle komen overeen, op BENG 1 van het kantoor n
 
 Samen 1 041 vergeleken grootheden (per maand verwarming en koeling), alle gelijk tegen 1·10⁻⁶ relatief. BENG 1 van het kantoor (74,55) volgt nu ook uit de eigen herberekening van de C1-run: let daarbij op §5.4.2, dat voor utiliteit de interne warmte vastzet (Φ_int;W = 0, q_L;kantoor = 1,25 W/m², geen terugwinbare systeemverliezen). Een eerste versie van de herberekening liet dat weg en kwam op 74,35; de kern rekent het goed. c_a van 11.115/11.119 is als gedrukt gelaten (vraag 7 aan NEN); de luchtbehandelingskast-batterijen zelf spelen in deze projecten niet. Geen kernfout, geen gewijzigde uitkomst.
 
-- **Niet in deze projecten aanwezig en dus niet met deze herberekening gedekt:** ventilatieve koeling (11.2.3.3), open verbrandingstoestellen (11.2.4), luchtbehandelingskast met batterijen (11.110–11.121), gebouwen vanaf 15 m (meerdere luchtstroomzones), de kruipruimterijen van tabel 11.1, roosterverwarming en vorstbeveiliging bij woningen met balansventilatie. De sectorgrens van 11.77 is door review 52 al apart nagerekend.
+- **Niet in deze projecten aanwezig en dus niet met deze herberekening gedekt:** ventilatieve koeling (11.2.3.3), open verbrandingstoestellen (11.2.4), luchtbehandelingskast met batterijen (11.110–11.121), gebouwen vanaf 15 m (meerdere luchtstroomzones), de kruipruimterijen van tabel 11.1, roosterverwarming en vorstbeveiliging bij woningen met balansventilatie. De sectorgrens van 11.77 is door review 52 al apart nagerekend; de overige routes door review 65 (hieronder).
 - **Grenswaarden voor de lucht (`heatingLimitAirKwh`, `coolingLimitAirKwh`)** horen bij 9.29 en 10.15 en niet bij hoofdstuk 11; ze zijn hier niet opnieuw afgeleid.
+
+**De overige routes van hoofdstuk 11 onafhankelijk nagerekend (review 65).** De routes die de voorbeeldprojecten niet bereiken, zijn met 29 synthetische ventilatie-invoeren door `/v1/nta8800/ventilation/calculate` gehaald en vergeleken met een eigen implementatie vanaf de normpagina's (zonder eerst de kerncode van die routes te lezen). Elke variant gaat uit van de invoer van de voorbeeldwoning (C1) of het voorbeeldkantoor (D2) en zet één route aan.
+
+| Route | Normplaats | Varianten | Uitkomst |
+|---|---|---|---|
+| Ventilatieve koeling: nettodoorlaat (opgegeven, 11.71a, 11.71b met factor 0,3), h_w;st, enkelzijdig en dwarsventilatie, A_w;cros met halfopen sectoren | 11.70–11.79, tabel 11.7 (p. 475–481) | enkelzijdig handmatig en automatisch; dwars N–Z, gevel + dak 45°, ZO/O/N op de sectorgrenzen; met kruipruimte | gelijk |
+| Open verbrandingstoestellen: afvoerloos (in), met rookgasafvoer (uit), gesloten (f_as = 0), P_h;fi;min | 11.80–11.83, tabellen 11.11 en 11.12 (p. 481–484) | afvoerloos, met afvoer, gemengd; ook bij 20 m, 60 m en kruipruimte | gelijk |
+| Luchtstroomzones vanaf 15 m: H_path, C-verdeling, mechanische stromen naar 11.6–11.10, C_p per padhoogte, massabalans per zone | tabel 11.1 (p. 430–437), 11.6–11.10, tabel 11.3 (p. 440–443) | 20, 49, 50 en 60 m; kantoor 20 m; kantoor 60 m met toestellen | gelijk |
+| Kruipruimterijen (H < 15 m, vóór 1992): 0,35/0,35/0,15/0,15 × C_lea, vloer op 0 m met C_p −0,20; vanaf 1992 de gewone rijen | tabel 11.1 (p. 430), tabel 11.3 | bouwjaar 1980 en 2000, ook met D2 en met toestellen | gelijk |
+| Roosterverwarming: 11.123 (begrensd), 11.124 (terugval), f_pre;nat;elvv | 11.123–11.128 (p. 509–511) | opgegeven, opgegeven met maximale sprong en voorverwarmd ontwerpdebiet, terugval | gelijk |
+| Vorstbeveiliging bij een woning met balansventilatie | tabel 11.16, 11.105/11.106, 11.108 (p. 497–502) | woning D2, ook met kruipruimte | gelijk |
+| Luchtbehandelingskast met batterijen: tabel 11.15, kanaalverlies tabel 11.19, f_lea;ahu 1,02, f_ins;ahu 0,02, Q_H/C;ahu;in;req (c_a als gedrukt, vraag 7) | 11.87, 11.102–11.104, 11.107, 11.114–11.121, 11.129/11.130 (p. 474, 489–508) | in de zone met beide batterijen en alleen koeling; buiten de zone situatie 2 (beide) en situatie 3 (alleen verwarming) | gelijk |
+
+Samen 12 008 vergeleken grootheden (referentiedruk per luchtstroomzone, alle effectieve stromen, toevoertemperaturen, H_ve met b, ventilator-, vorst- en roostergebruik, en Q_ahu;in;req per maand), alle gelijk tegen 1·10⁻⁶ relatief. Geen kernfout, geen gewijzigde uitkomst. Twaalf varianten staan als vaste test in `crates/nta8800-core/tests/ventilation_independent.rs`, met de onafhankelijk berekende waarden. Daarbij vastgesteld:
+
+- **H = 50 m:** tabel 11.1 geeft vanaf 50 m drie luchtstroomzones, 11.6–11.10 pas boven 50 m. Bij precies 50 m is de derde zone leeg ((H − 50)/H = 0) en vallen beide lezingen samen; de kern rekent met twee zones.
+- **u10;site:** tabel 17.1 geeft alleen u_site; de kern en de herberekening gebruiken die voor u10;site in 11.73–11.76.
+- **11.76:** de uitgaande stroom bij dwarsventilatie gebruikt in de thermiekterm T_e;mi, de ingaande (11.75) T_e;argII;mi. De kern volgt de druk; bij de variant met dakraam overheerst in juli de thermiekterm, zodat dit verschil meetelt en overeenkomt.
+- **Q_ahu:** de kern geeft Q_H;ahu;in;req en Q_C;ahu;in;req (lucht gedeeld door 0,98, 11.116/11.120), de grootheden die hoofdstuk 9 en 10 gebruiken.
+
+**Installatieroutes buiten de voorbeeldprojecten onafhankelijk nagerekend (review 66).** De opwekkings-, tapwater-, koel- en PV-routes die de voorbeeldprojecten niet bereiken, zijn in 2025+C1 nagerekend met 37 ISSO 54 v2.0-deeltesten (`training-data/reference-suites/isso54-v2.json`, zonder `normVersion` en zonder het 2022/2023-blok van de emissie) en 15 synthetische varianten daarvan met één route aangezet. Uitgangspunt is de afgeleide invoer van de kern; de eigen implementatie is vanaf de normpagina's geschreven zonder eerst de kerncode van die route te lezen.
+
+| Route | Normplaats | Gevallen | Vergeleken | Uitkomst |
+|---|---|---|---|---|
+| Externe warmte zonder en met kwaliteitsverklaring (berekend, f_prac 0,95), EMGforf-run | 9.84, 9.91, §5.3.1.3, 5.39g, tabellen 5.2 en 5.3 | EPW204a/b/i | 174 | gelijk |
+| Biomassa (kachel, ketel binnen/buiten), hulpenergie met automatische toevoer en t_on ≤ t_mi | 9.64, tabel 9.30, 9.91/9.92 | EPW204c, 2 varianten | 173 | gelijk |
+| Warmtepomp forfaitair (buitenlucht, bodem met c_source, ventilatieretourlucht) en met gedeclareerde COP (afgerond op 0,05, f_prac 0,95, vraag 3) | 9.62, tabel 9.27, 9.85, 5.31, §9.1 | EPW203d, 4 varianten | 281 | gelijk |
+| WKK methode 2 met eigen gebruik en export | tabel 9.31, 16.12, 5.10–5.13, 5.22–5.26 | EPW204f/g | 176 | gelijk |
+| Meerdere opwekkers met prioriteit, collectieve ketels, waakvlammen | 9.56–9.60, tabellen 9.23 en 9.25, 9.91 met f_gebouw | EPW205a/c | 62 | gelijk |
+| Hybride warmtepomp (één en twee systemen) | 9.56, tabel 9.23, tabel 9.25 (bijverwarming), 9.85 per toestel | EPW203m, 1 variant | 134 | gelijk |
+| Elektrische weerstandsverwarming | tabel 9.27, 9.62, 9.91 | 1 variant | 48 | gelijk |
+| Tapwater: combitoestellen, collectief met afleverset, elektrische boiler en doorstromer, indirect gestookt voorraadvat, voorraadverlies met label (13.59) en gemeten (13.60, afronding bijlage X, kokendwaterkraan 90 °C) | 13.24, 13.46, 13.59, 13.60, 13.179, 13.181, tabellen 13.9, 13.25–13.28 | EPW404a/c, EPW405a, EPW406a/c/d/f/g/k/o/q/t/u/v, 1 variant | 553 | gelijk |
+| Douche-wtw (horizontaal, verticaal, twee units) | 13.9, 13.51/13.53, tabel 13.8 | EPW403a–d | 168 | gelijk |
+| Boosterwarmtepomp forfaitair | 13.162/13.163, tabel 13.27 | EPW406i | 54 | gelijk |
+| Koelopwekking methode 3: tabel-EER, gedeclareerde EER (0,05, f_prpr 0,9, vraag 12), gasabsorptie, absorptie op externe warmte, externe koude, onbekend collectief, gesloten koeltoren | 10.76–10.78, 10.83, 10.87, tabellen 10.29, 10.30 en 10.33 | EPW301a, EPW303a/b, 4 varianten | 224 | gelijk |
+| PV (twee systemen, volledige belemmering) en batterij | 16.2–16.4a, tabellen 16.1–16.3 en 17.15, 5.13, 5.14a/5.14b | EPW501a/b/c, 2 varianten | 370 | gelijk |
+
+Samen 2 417 vergeleken grootheden (per maand opwekkerinvoer per energiedrager, hulpenergie, terugwinbaar verlies, hernieuwbaar, voorraadverlies, teruggewonnen douchewarmte, PV-opbrengst en export, en per geval de rijen per dienst, primair fossiel, CO₂, hernieuwbaar en de totalen), alle gelijk tegen 1·10⁻⁶ relatief. Geen kernfout, geen gewijzigde uitkomst. Vijftien gevallen staan als vaste test in `crates/nta8800-core/tests/installations_independent.rs`, met de onafhankelijk berekende waarden. Daarbij vastgesteld:
+
+- **Regelenergie 10.87:** de kern telt die niet bij externe koude, vrije koeling en een onbekende collectieve opwekker. Dat is aangehouden en bij vraag 2 aan NEN genoteerd.
+- **Externe warmte met verklaring op berekende waarden:** `spaceHeating.monthly.districtHeatKwh` is de waarde met f_prac 1; de 0,95 werkt in hoofdstuk 5 op de geleverde energie en dus ook in E_P en 5.39g.
+- **Elektrische boiler:** rendement 1,0 zonder c_W;gen, geen hulpenergie en geen terugwinbaar verlies (13.8.4.5.3).
+- **Booster:** c_W;gen uit tabel 13.27, omdat een booster een individuele tapwaterwarmtepomp is (13.8.4.7.3).
+- **PV, c_sh:** onder F 0,80 houdt de kern c_sh op 0,75 (gedocumenteerde lezing van tabel 16.3); de herberekening volgt dat.
+- **Niet nagerekend in deze review:** zonneboilers (13.7), warmtepompen met productwaarden volgens bijlage Q, WKK methode 1, de gemeten booster van bijlage W en koelmethoden 1 en 2 (10.5.4/10.5.5). Review 67 (hieronder) rekent zonneboilers, WKK methode 1, de gemeten booster en koelmethode 2 alsnog na.
+
+**Restende installatieroutes onafhankelijk nagerekend (review 67).** Op dezelfde manier als review 66: ISSO 54 v2.0-deeltesten in 2025+C1 en synthetische varianten daarvan met één route aangezet, nagerekend met een eigen implementatie vanaf de normpagina's zonder eerst de kerncode van die route te lezen. Tolerantie 10⁻⁶ relatief.
+
+| Route | Gevallen | Vergeleken | Uitkomst |
+|---|---|---|---|
+| Zonneboiler, alleen tapwater (13.7.2.2: 13.66, 13.72–13.84, 13.92–13.109, tabellen 13.10–13.15; p. 574–594) | EP-W405a (voorverwarmer, beglaasd, label A), EP-W405b (onbeglaasd, west 30°, label C), EP-W405e (geïntegreerde naverwarming, 100 l back-up van 220 l) | 180 | gelijk |
+| Koelmethode 2 (10.5.5: 10.65, 10.67–10.69, 10.73–10.75, tabellen 10.19, 10.21, 10.22, 10.24, 10.26; p. 409–416) | EP-W301a met een split-inverter airco en met een watergekoelde koelmachine op een droge koeler | 28 | gelijk |
+| Gemeten boosterwarmtepomp (bijlage W: W.1, W.2, W.8–W.15; p. 1119–1126) | EP-W406i met metingen bij klasse 3 (24/40 °C) en bij klasse 1 (16/40 °C) | 48 | gelijk |
+| Micro-WKK methode 1 (9.6.6.2: 9.66–9.83; p. 346–352) | EP-W204g met een Stirling-WKK, CHP_100+Sup_0 5,5 kW en CHP_100+Sup_100 24 kW | 48 | gelijk |
+| **Totaal** | | **304** | **gelijk** |
+
+- **Als invoer van de kern overgenomen:** Q_W;dis per maand (13.1.2), de genivelleerde setpointtemperatuur van 7.76 voor ϑ_sto;amb (13.69; hoofdstuk 7 is in review 63 nagerekend), de koelgrens (10.3.5), t_C uit tabel 10.6, Δϑ_int;inc (10.11) en t_H;op van 9.32a.
+- **Afronding:** de pomp van de zonneboiler (13.76: 10 + 1·A = 15 W) wordt volgens bijlage X naar het *volgende hogere* getal uit tabel X.1 afgerond, dus 16 W. W.1 en W.2 van de booster worden ook naar boven afgerond; Q_W;ren van de zonneboiler naar beneden.
+- **H_sto;ls van de zonneboiler (13.82):** de waarde uit het energielabel wordt niet afgerond; de afrondingsregel van 13.81 geldt voor de opgave van de leverancier (UA). De herberekening volgt dat en komt dan overeen.
+- **Koelgrens onder 15 °C:** tabel 10.24 begint bij ≥ 15; bij een koelgrens van 14 °C gebruikt de kern de kolom ≥ 15. De herberekening volgt dat.
+- **Tabel 10.8 letterlijk:** bij een watergevoerd systeem is de gevraagde uittredetemperatuur ϑ_in − Δϑ_int;inc. Met een negatieve Δϑ_int;inc (−4,8 K bij vloerkoeling) wordt dat 17 + 4,8 = 21,8 °C. Kern en herberekening lezen de formule letterlijk.
+- **Booster, correctie voor de taphoeveelheid:** W.3.3 staat drie methoden toe; de kern gebruikt methode 3 (W.14/W.15, interpolatie met het stilstandsverlies). Met tabel 13.27 (methode 2) komen 24 van de 24 maandwaarden anders uit; de herberekening volgt de keuze van de kern.
+- **WKK methode 1, lezingen van de kern aangehouden** (lijst `micro_chp::INTERPRETATIONS`): P_th;sb = 0, de NEN-EN 50465-rendementen op onderwaarde met omrekening f_Hs/Hi 1,11 voor aardgas, en warmte boven P_th;chp_100+sup_100 × t als bijstook tegen f_prac × η_th;100 (9.66 wijst die warmte aan geen opwekker toe).
+- **Opgemerkt bij WKK methode 1:** tabel 9.35 geeft t = t_H;op volgens 9.32a. Voor een woning met een individuele installatie bevat 9.32a de pompfactor f_H;red;pmp;op = 0,10 (tabel 9.X). De WKK krijgt daardoor een tiende van de stookuren (januari 42,9 h) en draait in de koudste maanden op vollast met bijstook. De kern volgt de letterlijke tekst; of dit zo bedoeld is, is een mogelijke vraag aan NEN.
+- **Niet nagerekend:** koelmethode 1 (NEN-EN 14825, 10.5.4) en warmtepompen met productwaarden volgens bijlage Q. Die routes zijn niet opnieuw afgeleid. Zes gevallen staan als test in `crates/nta8800-core/tests/installations_independent.rs`. Review 68 (hieronder) rekent beide alsnog na.
+
+**Koelmethode 1 en bijlage Q onafhankelijk nagerekend (review 68).** Op dezelfde manier als reviews 66 en 67: synthetische varianten van ISSO 54 v2.0-deeltesten in 2025+C1 met één route aangezet, nagerekend met een eigen implementatie vanaf de normpagina's zonder eerst de kerncode van die route te lezen. Tolerantie 10⁻⁶ relatief.
+
+| Route | Gevallen | Vergeleken | Uitkomst |
+|---|---|---|---|
+| Koelmethode 1 (10.5.4: 10.53–10.64, tabellen 10.17 en 10.18; p. 401–409) | EP-W301a met een modulerende airco: met gemeten vijfde punt, en zonder vijfde punt (10.64, Δϑ_corr = 0) met een grens voor de condensorintrede van 25 °C en een minimale deellast van 71 % | 58 | gelijk |
+| Bijlage Q, aan/uit-lucht/waterwarmtepomp (Q.1–Q.9, Q.29–Q.53, Q.60–Q.62, Q.69/Q.70, Q.81–Q.83, tabellen Q.3 en Q.5–Q.7; p. 1027–1055) met 9.63 (p. 340) | EP-W001 met een warmtepomp die elke bin dekt (35 °C, conditie 4 gemeten) en met een te kleine warmtepomp met afschakeling onder −5 °C en bij COP < 2 en elektrische bijverwarming (45 °C, zonder conditie 4) | 434 | gelijk |
+| **Totaal** | | **492** | **gelijk** |
+
+- **Vergeleken:** bij koelmethode 1 de coëfficiënten C1–C4 en Δϑ_corr van 10.63, de EER per maand (10.54/10.55) en het elektriciteitsgebruik per maand. Bij bijlage Q per bin van tabel Q.6 de uren, het gevraagde en geleverde vermogen, P_max, de COP, de afschakelfactor en de aantijd, daarnaast F_H;gen, η_H;gen;hp, Q_H;hp;pr;an en Q_H;hp;us;an;el, en per maand de warmtepompwarmte en het elektriciteitsgebruik.
+- **Als invoer van de kern overgenomen:** de koelgrens en Q_C;gen;in per maand (hoofdstuk 10, eerder nagerekend), ϑ_C;int;inc (10.10) en de thermische node-input Q_H;node,in per maand (9.2.3.5).
+- **Tabel 10.18:** f_t;tot is de afgedrukte totaalrij van de tabel ("volgens tabel 10.18"). De som van de afgedrukte waarden wijkt per maand tot 2·10⁻⁴ af van die rij; met de som in plaats van de rij komen zes maanden op 10⁻⁴ tot 2·10⁻³ relatief uit. Kern en herberekening gebruiken de afgedrukte rij.
+- **Q.49/Q.50 (N meetcondities):** de gemiddelde temperatuurverhoging over de condensor en -verlaging over de verdamper gaan over alle volgens Q.4.2 gemeten condities, dus ook conditie 4 als die is gemeten. Met alleen de condities 1–3 wijkt P_max per bin 4·10⁻⁴ relatief af. De kern neemt alle gemeten condities; de herberekening volgt die lezing.
+- **Lezingen van de kern aangehouden** (lijst `annex_q::INTERPRETATIONS`): ϑ_evap;nom = −10 °C voor lucht/water in Q.48 (de tekst noemt alleen W/W, B/W en L/L), en F_H;gen = 1 als elke bin van tabel Q.6 wordt gedekt. In de eerste variant rapporteert de kern daardoor F_H;gen = 0,999 737 (de letterlijke Q.1, die de herberekening ook geeft), maar rekent per maand met 1.
+- **Niet nagerekend:** modulerende warmtepompen (Q.2.6, Q.3.6/Q.3.7, tabellen Q.15/Q.16), brine/water- en water/waterwarmtepompen (tabel Q.4, bronpomp Q.5–Q.8), afvoer- en gecombineerde lucht (Q.41/Q.43), lucht/luchtwarmtepompen, de maandverdeling Q.90–Q.97 en de hybride route met bijlage Q. Vier gevallen staan als test in `crates/nta8800-core/tests/installations_independent.rs`. Review 69 (hieronder) rekent die varianten alsnog na.
+
+**Overige bijlage Q-varianten onafhankelijk nagerekend (review 69).** Op dezelfde manier als review 68: synthetische varianten van ISSO 54-deeltest EP-W001 in 2025+C1 met één warmtepomp volgens bijlage Q, nagerekend met een eigen implementatie vanaf de normpagina's (p. 1027–1069) zonder eerst de kerncode van die route te lezen. Tolerantie 10⁻⁶ relatief.
+
+| Route | Variant | Vergeleken | Uitkomst |
+|---|---|---|---|
+| Brine/water, aan/uit, met bronpomp (tabel Q.4, Q.5/Q.7/Q.8, ϑ_evap;nom −1,5 °C) | 35 °C, bronpomp 120 W, nadraaitijd 60 s | 254 | gelijk |
+| Water/water, aan/uit, met bronpomp (Q.44, ϑ_evap;nom 8,5 °C) | 45 °C, bronpomp 90 W, afschakeling boven 60 °C uittrede | 254 | gelijk |
+| Alleen afvoerlucht (Q.41, Q.54–Q.56, Q.63–Q.65) | te klein, elektrische bijverwarming | 242 | gelijk |
+| Gecombineerde buiten- en afvoerlucht (Q.43, f_buitenlucht 0,6) | conditie 4 gemeten | 242 | gelijk |
+| Lucht/lucht met luchtverwarming (Q.57–Q.59, Q.66–Q.68) | zonder conditie 4 | 242 | gelijk |
+| Lucht/water met gasketel als bijverwarming | te klein, afschakeling onder −5 °C en bij COP < 2, HR107 | 242 | gelijk |
+| Modulerend lucht/water (Q.2.6: Q.10–Q.28, Q.71–Q.78, tabellen Q.1, Q.2, Q.13, Q.16) | modulerende condensorpomp en bronventilator, 35 °C; en aan/uit-pompen, 45 °C | 484 | gelijk |
+| Modulerend brine/water met modulerende bronpomp (Q.6) | tabel Q.12-deellastrijen | 254 | gelijk |
+| **Totaal** | 9 varianten | **2 214** | **gelijk** |
+
+- **Vergeleken:** per bin van tabel Q.6 de uren, het gevraagde en geleverde vermogen, P_max, de COP, de afschakelfactor en de aantijd (Q.9 of Q.10); daarnaast F_H;gen, η_H;gen;hp, Q_H;hp;pr;an, Q_H;hp;us;an;el en W_H;aux;hp;an; per maand de warmtepompwarmte, het elektriciteitsgebruik, het gasgebruik van de bijverwarming en de hulpenergie (9.6.3, p. 340); en de tijdfractie in bedrijf per maand (Q.90 met Q.91 of Q.93 en tabel Q.17).
+- **Bronpomp twee keer geteld (letterlijke tekst, vraag 13 aan NEN):** Q.4 telt W_H;aux;hp;an mee in het elektriciteitsgebruik waaruit η_H;gen;hp (Q.2) volgt, en 9.6.3 (p. 340) telt dezelfde W_H;aux;hp;an / (12 × 3,6) per maand nog eens als hulpenergie. De kern volgt beide bepalingen letterlijk. Bij de brine/watervariant (bronpomp 66 kWh per jaar) telt de bronpomp zo twee keer: 69 kWh via de COP (met f_prac) en 66 kWh als hulpenergie, op ongeveer 980 kWh warmtepompelektriciteit.
+- **Lezingen van de kern aangehouden** (lijst `annex_q::INTERPRETATIONS`): ϑ_evap;nom −10 °C voor lucht/water en gecombineerde lucht (Q.48), een condensorintrede van 20 °C bij lucht/lucht, F_H;gen = 1 als elke bin wordt gedekt, en het gemeten 15 %-punt (plj = 4) bij interval 5, waar Q.16 naar het niet gemeten plj = 5 verwijst.
+- **Afgeleide invoer van de kern overgenomen:** de thermische node-input per maand (9.2.3.5) en de vraagklasse van tabel Q.6.
+- **Niet nagerekend:** interval 5 (B < 0,15; de varianten blijven met P_H;hp;min erboven), het forfaitaire bronpompvermogen als de fabrikant het niet opgeeft (Q.4.4), modulerende lucht/luchtwarmtepompen met de carnotbegrenzing (Q.12A/Q.12B, Q.73A/Q.73B), de herberekening van de warmtevraag bij overventilatie door een afvoerluchtwarmtepomp (Q.5.3, Q.94–Q.97) en de tijdfractie voor tapwater (Q.86–Q.88). Zeven varianten staan als test in `crates/nta8800-core/tests/installations_independent.rs`.
+
+
+**Laatste bijlage Q-onderdelen onafhankelijk nagerekend (review 70).** Dezelfde werkwijze als reviews 68 en 69: synthetische varianten van ISSO 54-deeltest EP-W001 in 2025+C1, nagerekend met een eigen implementatie vanaf de normpagina's (p. 1027–1072, 449–450, 614–615) zonder eerst de kerncode van die route te lezen. Tolerantie 10⁻⁶ relatief.
+
+| Route | Variant | Vergeleken | Uitkomst |
+|---|---|---|---|
+| Interval 5, B < 0,15 (tabel Q.2, Q.16, Q.10, Q.27/Q.28) | modulerend lucht/water met P_H;hp;min 0,5 kW (35 °C, modulerende pompen) en 0,4 kW (45 °C, aan/uit-pompen); 11 en 12 klassen in interval 5 | 388 | gelijk |
+| Forfaitair bronpompvermogen W/W (Q.4.4, 50 W/kW verdampervermogen) | aan/uit water/water zonder opgegeven bronpompvermogen | 194 | gelijk |
+| Modulerend lucht/lucht met carnotbegrenzing (Q.12A/Q.12B, Q.20–Q.24A, Q.73A/Q.73B, Q.74–Q.78) | aan/uit-ventilator, deellastrijen bij conditie 1; begrenzing actief in 16 van de 27 klassen | 194 | gelijk |
+| Herberekening bij overventilatie (Q.5.3: Q.84, Q.90/Q.91 met tabel Q.17, Q.96/Q.97) en buitenluchtdebiet (11.23/11.23a, 13.148a) | afvoerluchtwarmtepomp met q_V;hp;H 200 en 230 m³/h; zonder tapwaterfractie, met f_W 0,4 bij 150 m³/h en met een fractie per maand bij 250 m³/h | 258 | gelijk na herstel |
+| **Totaal** | 7 varianten | **1 034** | **gelijk** |
+
+- **Werkwijze bij Q.5.3:** stap 1 is een kernrun met f_H = 0; f(2) volgt uit de eigen Q.90/Q.91 op Q_H;node,in(1); een kernrun met f(2) geeft Q_H;node,in(2); f(3) volgt uit Q.96/Q.97 met de grens van Q.84. Een kernrun met dat f(3) geeft dezelfde uitkomst als de automatische herberekening van de kern (f(3) per maand, Q_H;node,in(3), warmtepompelektriciteit, tijdfractie in bedrijf, BENG 1 en 2). Het buitenluchtdebiet volgt per maand 11.23 met 11.23a en 13.148a, op het debiet uit de run zonder overventilatie (hoofdstuk 11 zelf is in reviews 64 en 65 nagerekend).
+- **Kernfout hersteld:** een opgegeven tapwaterdebiet `overventilation.hotWaterFlowM3PerH` onder q_V;ODA;req verlaagde het buitenluchtdebiet van 11.23. Volgens 13.148/13.148a is q_V;hp;W;zi,mi nooit lager dan q_V;ODA;req van de warmtebehoefte (11.22). De kern verhoogt een lager opgegeven waarde nu tot dat debiet, in de verwarmings- en de koelbalans; bij de door de kern afgeleide waarden verandert niets. Voorbeeld: 100 m³/h bij f_W 0,3 gaf 137,0 in plaats van 152,8 m³/h. De referentierapporten van alle suites zijn voor en na byte-identiek.
+- **Lezingen van de kern aangehouden** (lijst `annex_q::INTERPRETATIONS`): interval 5 rekent met het 15 %-punt (plj = 4); het forfaitaire W/W-bronpompvermogen neemt het verdampervermogen bij conditie 1, P·(1 − 1/COP); bij Q_H;node,in(2) = 0 blijft f(3) = f(2) (Q.96 onbepaald); f_W;t;hp-on komt uit 13.149, niet uit Q.86–Q.88 (vraag 14 aan NEN).
+- **Vraag 14 aan NEN:** 13.8.2.4 en 11.23 schrijven 13.149 voor de tapwatertijdfractie voor, bijlage Q.5.2.2 geeft met Q.86–Q.88 een andere formule voor dezelfde grootheid in Q.84.
+- **Niet nagerekend:** Q.86–Q.88 zelf (de kern gebruikt ze niet), Q.92 (forfaitair maximaal vermogen zonder productgegevens; de kern vraagt productgegevens) en de luchtdebietinterpolatie van tabel Q.9 (niet uitgevoerd). Vijf gevallen staan als test in `crates/nta8800-core/tests/installations_independent.rs`, waaronder de regressietest van het herstel.
+
+**Oudere uitgaven onafhankelijk nagerekend (review 71).** Reviews 63–70 rekenden alleen in 2025+C1. Review 71 rekent dezelfde invoer in 2024, 2023, 2022 en 2020+A1 na, met de herberekeningen van reviews 63–65 aangevuld met de regels van die uitgave (gelicentieerde PDF's: 2024, 2023, 2022 en de geconsolideerde 2020+A1). Werkwijze:
+- **Invoer.** De twee voorbeeldprojecten, in alle vijf uitgaven met dezelfde invoer: `ledFrom2017` uit (2023 en ouder kennen die kolom niet) en het PV-piekvermogen als opgegeven K_pk 182,5 W/m² (16.4a) in plaats van per paneel (16.4b bestaat niet in 2020+A1). Daarnaast de 31 ventilatievarianten van review 65 via `ventilation/calculate`; in 2023 en ouder wordt een spuiopening volgens (11.71a) een opgegeven netto-oppervlakte van dezelfde grootte, omdat (11.71a) daar niet bestaat.
+- **Wat de uitgaven hier veranderen.** Eerst is per stap (2025+C1 → 2024 → 2023 → 2022 → 2020+A1) bepaald welke kernuitkomsten verschuiven; die zijn daarna met de eigen implementatie in die uitgave nagerekend:
+  - 2024: de CO2-coëfficiënten van tabel 5.3 (p. 94–95: el 0,34, gas 0,183, olie 0,260, externe warmte 0,17, externe koude K_el/3);
+  - 2023: θ_e;argII van tabel 17.1 (p. 676), ΔT_C;fan 1,5 K in de utiliteitsbouw (11.3.2.7, p. 496; via de toevoertemperatuur verschuiven de koudebehoefte en TOjuli van het kantoor: 5,37 → 5,73 K) en Δθ_int;inc van de afgiftetabellen 9.2/9.3 (p. 276–278);
+  - 2022: niets in deze invoer (de schakelpunten 49–67 worden niet geraakt);
+  - 2020+A1: K_pk naar beneden afgerond op 5 W/m² (16.4, p. 651: 182,5 → 180) en A = 13,0 kWh in (9.85) voor een toestel vanaf 2015 (p. 336).
+- **Gelijk in alle uitgaven, tekstueel nagelopen:** tabellen 17.1, 17.2 en 17.4, de kantoorrijen van 7.2, 7.3, 7.13, 11.8 en 14.3, de woningformules (7.21)–(7.24), de vaste C1-run van 5.4.2/5.4.3, de constanten van (9.85), tabel 5.2, de tabellen 11.1, 11.3, 11.7, 11.11/11.12, 11.15/11.16, 11.18, 11.19 en de zomernachtventilatie 11.2.3.3 (in 2022 en 2020+A1 gelijk aan 2023, met f_argII 0,5/0,9/1,0, de NEN 1087-factor 0,5 en (11.77) zonder dakregel, α_min ≤ α < α_max).
+
+| Onderdeel | 2025+C1 | 2024 | 2023 | 2022 | 2020+A1 |
+|---|---|---|---|---|---|
+| Hoofdstuk 11, beide voorbeelden | 988 | 988 | 988 | 988 | 988 |
+| Hoofdstuk 7, beide voorbeelden | 546 | 546 | 546 | 546 | 546 |
+| Vaste C1-run en BENG 1 (5.4.3) | 53 | 53 | 53 | 53 | 53 |
+| Installaties, PV, hoofdstuk 5 (BENG 2/3) | 211 | 210 | 210 | 210 | 210 |
+| TOjuli | 26 | 26 | 26 | 26 | 26 |
+| CO2 en forfaitaire CO2-factoren externe levering | 8 | 8 | 8 | 8 | 8 |
+| 31 ventilatievarianten van review 65 | 12 808 | 12 808 | 12 808 | 12 808 | 12 808 |
+| **Totaal, alle gelijk (10⁻⁶ relatief)** | **14 640** | **14 639** | **14 639** | **14 639** | **14 639** |
+
+- **Lezingen van de kern aangehouden.** Afgifte in 2023 en ouder zonder `emission.edition2023`: onbekend leidingsysteem telt als eenpijps (Δθ_hydr 0,7), onbekende eigenschappen nemen de hoogste waarde van de hoofdcategorie (Δθ_str = (1,6 + 1,7)/2), Δθ_ctr,1 2,5 en Δθ_im;emt −0,3, samen 4,55 K (2025+C1: 3,55 K). In beide voorbeelden ligt het afgifteverlies van (9.16) in elke stookmaand op de grens 0,15, dus de verwarmingsenergie verandert niet. Tabel 7.10 naar massa per m² in 2022 en 2020+A1 (punt 58) leest de kern zonder massa-invoer uit de vloer- en wandklassen.
+- **Geen kernfout gevonden, geen gewijzigde uitkomst, geen nieuwe vraag aan NEN.**
+- **Niet nagerekend (niet geraakt door deze invoer):** de meeste schakelpunten van [nta8800-normversies.md](nta8800-normversies.md): 1–2, 6–18a, 19, 26–38, 41–48 behalve 47, 49–67, 69–73 en 75–79. Hoofdstuk 13, hoofdstuk 10 en de bijlagen zijn in de oudere uitgaven alleen nagerekend voor zover de voorbeelden ze gebruiken.
+
+**Schakelpunten van oudere uitgaven onafhankelijk nagelopen (review 72).** Review 71 raakte met de voorbeeldinvoer de meeste schakelpunten niet. Review 72 loopt die schakelpunten na tegen de tekst van elke uitgave (gelicentieerde PDF's van 2020+A1, 2022, 2023, 2024 en 2025+C1; tekstuittreksels alleen in de scratchpad) en legt een deel vast als kerntest met met de hand berekende waarden (`crates/nta8800-core/tests/edition_switches_independent.rs`).
+- **Getal nagerekend in een kerntest (waarde uit de tekst, kern in beide uitgaven gedraaid):** 6 (tabel 9.16, 2024 p. 292 / 2025+C1 p. 310), 12 (tabel 13.18 met en zonder interpolatie, 2024 p. 614–615 / 2025+C1 p. 630–631; profiel L bij 3 000 kWh 0,74 tegen 0,74 + 870/2 120 × 0,26), 15 en 60 (tabel E.5, 2020+A1 p. 768, 2022 p. 775, 2023 p. 785, 2024 p. 783, 2025+C1 p. 803), 16 en 27 (tabellen E.10–E.12, elke uitgave), 19 (tabel 13.2, 2023 p. 533: alle drie keukenrijen), 26 en 76 (tabellen I.1/I.2, 2020+A1 p. 786–787 met een steekproef van de ene kolom, 2022 p. 793, 2023 p. 803, 2024 p. 802), 38 (tabellen I.13/I.14, 2023 p. 819–820) en 74 ((9.85), 2020+A1 p. 335–336 en 2022 p. 337–338: 1 200 kWh geeft in 2020+A1 13,0/12 + 16,5 kWh en in 2022 voor de warmtepomp 3,65 + 0,132 × 1 200/(0,7 × 3)).
+- **Waarde of route alleen tekstueel nagelopen (de bestaande kerntests dekken het getal):** 1, 2, 9, 17 (I.3: d/0,2 in 2020+A1 t/m 2024, d/0,105 in 2025+C1), 22, 28 en 70 ((P.25): 4 000 / 8 800 / 8 800 / 5 400 / 5 400), 32, 33, 34, 36 en 71 (restwarmte, 2020+A1 tabellen 5.5/5.6: 0,1 en 0,034), 40, 45, 52, 55, 57, 61 en 69 ((I.2): 0,045 / 0,06 / 0,045 met de route voor een bekende hogere λ vanaf 2023), 64 (2022 p. 549), 65, 66, 67 (tabel 14.4 van 2022: 1,00 / 0,8 / 0,7), 72, 78 en 79: aanwezig of afwezig in de uitgave zoals de tabel in [nta8800-normversies.md](nta8800-normversies.md) zegt.
+- **Twee kernfouten gevonden en hersteld (geen gewijzigde uitkomst voor invoer die al rekende):**
+  - **Miscanthus en graswol vóór 2025+C1.** Tabel E.11 van 2020+A1 (p. 775), 2022 (p. 782), 2023 (p. 792) en 2024 (p. 791) heeft voor deze materialen geen rij; de kern gaf ze stil de 2025+C1-waarde (0,060 en 0,045). Nu `route_not_in_edition` op `material` in die uitgaven (schakelpunt 16).
+  - **η_hr volgens NEN-EN 13053 in 2022 en 2020+A1.** De kern weigerde `standard: en13053` in 2022, maar 2022 laat η_hr volgens NEN-EN 13053 uitdrukkelijk toe (p. 479 en 482). Alleen de rij van tabel 11.17 ontbreekt (2022 p. 481; nieuw in 2023 p. 489 met f_rend;cond = 0,00), zodat zo'n rendement in 2022 onder "onbekend/overig" valt: 0,10. De kern rekent nu zo. Controle: bij η_hr 0,90 verschilt de toevoertemperatuur tussen 2022 en 2023 precies 0,90 × 0,10 × (θ_x − θ_e), met dezelfde θ_x (19,80 °C) in januari, februari en december (schakelpunt 63).
+- **Review 73: de overige schakelpunten tegen de tekst gelegd.** Alle schakelpunten die review 72 open liet, zijn nu naast de tekst van beide uitgaven gelegd; geen afwijking met de kern.
+  - **Getal of constante in een kerntest:** 44 (tabel 13.4 van 2023, p. 542: de rijen "klein" en "overig" voor elke isolatiekolom), 58 (tabel 7.10 van 2022, p. 181–182: de vier massaklassen met de grenzen 250, 500 en 750 kg/m²) en de waarde per uitgave van 7 ((9.62) zonder f_cor.bron.col in 2024 p. 314, 0,022/0,009 in 2025+C1 p. 331–332), 13 (11.136, 2024 p. 499 / 2025+C1 p. 515), 29 (P.6.5.4.8, 2023 p. 960 forfait 20 / 2024 p. 958), 30 en 53 (bmA: geen kW-grens in 2022 p. 96, 100 kW in 2023 p. 90 en 92, 500 kW vanaf 2024 p. 99 en 103), 37 (U_rc van lichtkoepels vanaf 2024 p. 210), 54 ((9.58), 2022 p. 305 / 2023 p. 309), 59 (h = 0,125 m vanaf 2023 p. 240), 62 (zwembad in (11.57) vanaf 2023 p. 459), 73 (β onbekend 0,5 in 2022 p. 936, opmerking 2; geen regel in 2020+A1 p. 921–926), 75 ((11.139) van 2020+A1 p. 495 tegen (11.140)–(11.142) van 2022 p. 499) en 77 (werkelijke leidinglengte alleen utiliteit in 2020+A1 p. 292 en 363, ook woningen in 2022 p. 294 en 367).
+  - **Alleen tekstueel (de bestaande kerntests van de bouwer dekken het getal):** 10 (zonwerend glas en lamellen als eigen route pas in 2025+C1 p. 190–196; de TOjuli-uitzondering met g_gl ≤ 0,4 staat in 2024 p. 106 al wel en de kern telt die in beide uitgaven mee), 11 ((13.157) /365 in 2024 p. 611, /(365·f_gebouw) in 2025+C1 p. 627), 14 (bijlage AA met SWM en tabel AA.2 in 2024 p. 1116–1117, uurinstraling tabel AA.3 in 2025+C1 p. 1140), 18 (ondergrens ≥ E_ls in de noemer van (W.9) alleen in 2025+C1 p. 1123), 18a (P.3: 2024 p. 916 bodem en grondwater, 2025+C1 p. 936 ook oppervlaktewater), 31 (geen bijlage AA in 2023), 35 (de woningregel voor f_sh;with ontbreekt in 2023, staat in 2024 p. 181–182), 41 en 42 (65 °C-regel en gecombineerde rijen van tabel 9.16 in 2024 p. 286 en 292, niet in 2023), 43 (f_H;dis;rbl 0,5 in 2023 p. 299, niet in 2024 p. 295), 46 (bron ≥ 20 °C in 2023 p. 326 en 343), 48 (tabel 10.35 vanaf 2024 p. 359), 49 en 51 (tabel 9.27 en P.5 tot 55 °C in 2022 p. 313 en 941, tot 75 °C in 2023 p. 955), 50 (geen Q_HD;hp;in;bron in 5.20 van 2022) en 56 (getest ventilatorvermogen volgens NEN-EN 16430 pas in 2023 p. 286).
+  - **Opgemerkt bij schakelpunt 8 (2024, geen wijziging):** de definitie bij (5.20) van 2024 (p. 88) zegt dat Q_HD;hp;in;bron 0 is bij een brontemperatuur onder 20 °C, terwijl 9.6.3.1.3 (p. 323, met het interpretatiedocument V1 p. 5) de bronwarmte vanaf 15 °C laat boeken en 9.6.8.1.1.2.3 (p. 346) voor 15–20 °C de hulpenergie Q/EER geeft. De kern volgt 9.6.3.1.3 en het interpretatiedocument; 2024 is een oudere, niet registreerbare uitgave, dus geen nieuwe vraag aan NEN.
 
 ## Stand 11 oktober 2026
 
@@ -71,7 +250,7 @@ Samen 1 041 vergeleken grootheden (per maand verwarming en koeling), alle gelijk
 - het contract van API en MCP is per operatie getoetst;
 - de UNIEC3/VABI-uitwisseling is als heen-en-terug over alle trainingsprojecten getoetst.
 
-**Openstaand** blijft wat hieronder onder "Stand 5 oktober" staat: de verwachte uitkomsten van ISSO 54 versie 5.0, het EP-Online-aanleverschema, het uurklimaat van 17.3.8 en het attestnummer. Daarbij komen de antwoorden van NEN op vragen 1–12 en echte Uniec 3- en VABI-bestanden om de veldnamen van de uitwisseling tegen te toetsen.
+**Openstaand** blijft wat hieronder onder "Stand 5 oktober" staat: de verwachte uitkomsten van ISSO 54 versie 5.0, het EP-Online-aanleverschema, het uurklimaat van 17.3.8 en het attestnummer. Daarbij komen de antwoorden van NEN op vragen 1–13 en echte Uniec 3- en VABI-bestanden om de veldnamen van de uitwisseling tegen te toetsen.
 
 ## Stand 5 oktober 2026
 

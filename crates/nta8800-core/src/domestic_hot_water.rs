@@ -3018,7 +3018,7 @@ fn generation_values(
             // rows print no c_W;gen factor, so this is an interpretation; it
             // is the reading of the BRL 9501 test set (ISSO 54 EPWReal B01:
             // E_W 2 806 kWh on Q_W;dis;nren 1 874 kWh), which the kernel
-            // follows where test set and literal text differ (vragen-nen 13).
+            // follows where test set and literal text differ (vragen-nen 15).
             // The public reports of the older editions (cases J and M, Uniec
             // under 2020+A1 and 2022) book 1,4 uncorrected, so the correction
             // is a switch point of the edition (normversies 80).
@@ -3493,7 +3493,7 @@ fn book_generator(
         // energy for the tapping demand, not the heat pump's own efficiency.
         // The BRL 9501 test set books Q_W;ren = E_W;gen;in · (1,4·c_source − 1)
         // (ISSO 54 EPWReal B01 and D01), i.e. 5.36 with the uncorrected
-        // efficiency on the heat that efficiency gives (vragen-nen 15).
+        // efficiency on the heat that efficiency gives (vragen-nen 17).
         let (ambient_output, ambient_efficiency) = match generator {
             HotWaterGenerator::HeatPump {
                 declared: None,
@@ -5922,7 +5922,7 @@ mod tests {
 
     /// The forfait heat pump of table 13.25 takes c_W;gen of table 13.27,
     /// class 4 when the class is unknown, as the BRL 9501 test set reads it
-    /// (ISSO 54 EPWReal B01; vragen-nen 13).
+    /// (ISSO 54 EPWReal B01; vragen-nen 15).
     #[test]
     fn forfait_heat_pump_takes_the_class_4_correction() {
         for (exhaust_air_source, source_correction, expected) in

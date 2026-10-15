@@ -74,6 +74,7 @@ CARGO_NET_OFFLINE=true NTA_SKIP_MSRV=1 scripts/verify-nta.sh   # zonder, voor tu
 - de frontendbundel (`npm run build`), vóór de Tauri-stappen; CI roept alleen `scripts/verify-nta.sh` aan en bouwt de frontend niet apart (`ci-parity.test.ts`);
 - **bestand tegen belasting:** UI-tests wachten via gedeelde limieten in `src/__tests__/timeouts.ts` (findBy/waitFor 5 s, per test 60 s, werkstroomtests 180 s); tijdsbudgetten schalen met een basislijn uit dezelfde run (`large-project-ui.test.tsx`). Een test die alleen onder belasting faalt, is een fout in de test of de app en wordt niet opgelost door hem los opnieuw te draaien;
 - de stap "project-form states through the kernel": de documenten die de formulierbewaking schreef, gaan door `tests/project_form_guard.rs`.
+- **onafhankelijk berekende waarden** (onderdeel van a/h): `tests/ventilation_independent.rs` (12 tests, review 65), `tests/installations_independent.rs` (37 tests, reviews 66–70) en `tests/edition_switches_independent.rs` (12 tests, reviews 72–73) leggen varianten vast met waarden die buiten de kern vanaf de normpagina's zijn berekend; de herberekeningen zelf staan in de [verificatiestatus](nta8800-verificatiestatus.md).
 
 **Belangrijkste frontendtests (k):**
 

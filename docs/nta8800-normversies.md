@@ -58,6 +58,8 @@ De invoer draagt de uitgave (`NtaCalculationInput.normVersion`, `BuildingPerform
 
 Dat wijkt bewust af van "alle parameters doorgeven". De kern rekent synchroon op één thread, en de bewaker herstelt de vorige uitgave ook bij een paniek. Zo hoeven niet tientallen functiesignaturen en struct-initialisaties te veranderen voor een getal dat in één uitgave anders is. Andere threads (de service, parallelle tests) rekenen ongestoord in hun eigen uitgave. Een rekenfunctie die zonder `with_version` wordt aangeroepen (een eenheidstest), rekent in 2025+C1. De service draait elk verzoek in een eigen blokkerende taak; een test met parallelle verzoeken in 2024 en 2025+C1 laat zien dat de uitgave niet tussen verzoeken lekt.
 
+Elk schakelpunt in de tabellen hieronder is in reviews 72 en 73 naast de tekst van beide uitgaven gelegd; een deel staat als kerntest met de waarden uit de tekst in `crates/nta8800-core/tests/edition_switches_independent.rs`. Per schakelpunt staat in de [verificatiestatus](nta8800-verificatiestatus.md) (stand 12 oktober) of het getal of alleen de route is nagelopen.
+
 ## Verschillen 2024 → 2025+C1 die de kern omschakelt
 
 | # | Onderwerp | 2024 (pagina) | 2025+C1 (pagina) | Kern |
@@ -78,10 +80,10 @@ Dat wijkt bewust af van "alle parameters doorgeven". De kern rekent synchroon op
 | 13 | (11.136) gemeten motorrendement | alleen als hoger dan tabel 11.20 (p. 499) | vrije keuze (p. 515) | `nominal_fan_power` |
 | 14 | Bijlage AA | SWM, tabel AA.2, juli-maandinstraling 17.2, geen ondergrens (p. 1115–1127) | uurinstraling tabel AA.3, ondergrens 0 kW (p. 1136–1147) | `assess_annex_aa`, `effectiveMassKgPerM2`, `roofAreaM2` |
 | 15 | Tabel E.5 F_A;iso cellulose, gespoten vlas | overig 1,30 (p. 783) | 1,00 (p. 803) | `ForfaitMaterial::in_situ_product` |
-| 16 | Tabel E.11/E.12 biobased λ, riet | vlas/schapenwol/katoen 0,050, kokos 0,055, stro 0,060, hennep 0,100; riet 0,200 geen isolatie (p. 791) | p. 810 | `ForfaitMaterial::lambda` |
+| 16 | Tabel E.11/E.12 biobased λ, riet, miscanthus, graswol | vlas/schapenwol/katoen 0,050, kokos 0,055, stro 0,060, hennep 0,100; riet 0,200 geen isolatie; geen rij voor miscanthus en graswol (p. 791) | p. 810 | `ForfaitMaterial::lambda`; miscanthus en graswol → `route_not_in_edition` vóór 2025+C1 |
 | 17 | (I.3) rieten dak | d/0,2 (p. 814) | d/0,105 (p. 833) | `ForfaitOpaque::calculate` |
 | 18 | (W.9) ondergrens noemer boosterwarmtepomp | geen (p. 1103) | ≥ E_ls (p. 1123) | `calculate_booster` |
-| 80 | Tabel 13.25/13.27 c_W;gen op de forfaitaire tapwaterwarmtepomp (1,4 en 1,4·c_source) | geen klassecorrectie, zoals de openbare rapporten J (2020+A1) en M (2022) rekenen | klasse 4 bij een onbekende klasse, anders de opgegeven klasse (p. 641–643), zoals ISSO 54 EPWReal B01 rekent; de hernieuwbare warmte (5.36) blijft E_W;gen;in · (1,4·c_source − 1) (vraag 15) | `forfait_heat_pump_class_correction` |
+| 80 | Tabel 13.25/13.27 c_W;gen op de forfaitaire tapwaterwarmtepomp (1,4 en 1,4·c_source) | geen klassecorrectie, zoals de openbare rapporten J (2020+A1) en M (2022) rekenen | klasse 4 bij een onbekende klasse, anders de opgegeven klasse (p. 641–643), zoals ISSO 54 EPWReal B01 rekent; de hernieuwbare warmte (5.36) blijft E_W;gen;in · (1,4·c_source − 1) (vraag 17) | `forfait_heat_pump_class_correction` |
 | 18a | P.3 item 6 oppervlaktewater en andere LT-bronnen als collectieve bron | alleen bodem en grondwater (p. 916) | ruimere lijst (p. 936) | `wide_collective_low_temperature_sources`; geen eigen invoer (zie "Niet omgeschakeld") |
 
 ## Verschillen 2023 → 2024 die de kern omschakelt
@@ -143,7 +145,7 @@ Bovenop de punten 1–48. Pagina's links uit NTA 8800:2022, rechts uit NTA 8800:
 | 60 | Tabel E.5 minerale-wolvlokken F_A;iso | 1,05 (p. 775) | 1,00 (p. 785) | `mineral_wool_flakes_ageing` |
 | 61 | (I.2) λ_equi;ntr | 0,06 (p. 805) | 0,045 of een bekende hogere λ (p. 814) | `knownLambdaEquivalent` → `route_not_in_edition` |
 | 62 | Zwembad in (11.57) | bestaat niet (p. 451) | q_usi;spec sport × 2 (p. 459) | `swimmingPool` → `route_not_in_edition` |
-| 63 | η_hr volgens NEN-EN 13053 | geen rij (p. 482) | p. 490–491 | `standard: en13053` → `route_not_in_edition` |
+| 63 | Tabel 11.17 rij "toestelrendement volgens NEN-EN 13053" | geen rij: η_hr volgens NEN-EN 13053 mag (p. 479, 482) en valt onder "onbekend/overig", f_rend;cond 0,10 (p. 481) | f_rend;cond 0,00 (p. 489–491) | `en_13053_route` in de condensatieaftrek |
 | 64 | f_sto;dis;ls = 1,5 elektroboiler met geïsoleerde leiding | p. 550 | vervallen (p. 557–558) | `electricBoilerInsulatedPipe` (alleen 2022) |
 | 65 | ϑ_sto;amb met ventilatieretourluchtwarmtepomp (13.69a/13.137a) | bestaat niet (p. 557, 584) | p. 565, 592 | `storage_ambient_exhaust_air` |
 | 66 | C_W;mixed air (13.153b) | bestaat niet (p. 600–602) | p. 609–611 | `mixedAir` → `route_not_in_edition` |
@@ -220,7 +222,7 @@ Het interpretatiedocument bij NTA 8800:2024 (INT-V1:2024) brengt deze punten al 
 
 ## Interpretaties
 
-- **c_W;gen op de forfaitaire tapwaterwarmtepomp (punt 80):** de warmtepomprijen van tabel 13.25 tonen geen factor c_W;gen, maar de toelichting onder de tabel vraagt c_W;gen bij de forfaitaire waarden, met klasse 4 als de klasse onbekend is. De BRL 9501-toetsset voor 2025+C1 past de correctie toe (ISSO 54 EPWReal B01: E_W 2 806 kWh bij Q_W;dis;nren 1 874 kWh). De openbare rapporten in 2020+A1 en 2022 (gevallen J en M) rekenen 1,4 zonder correctie. De kern volgt per uitgave de toets of het openbare rapport; vraag 13 aan NEN.
+- **c_W;gen op de forfaitaire tapwaterwarmtepomp (punt 80):** de warmtepomprijen van tabel 13.25 tonen geen factor c_W;gen, maar de toelichting onder de tabel vraagt c_W;gen bij de forfaitaire waarden, met klasse 4 als de klasse onbekend is. De BRL 9501-toetsset voor 2025+C1 past de correctie toe (ISSO 54 EPWReal B01: E_W 2 806 kWh bij Q_W;dis;nren 1 874 kWh). De openbare rapporten in 2020+A1 en 2022 (gevallen J en M) rekenen 1,4 zonder correctie. De kern volgt per uitgave de toets of het openbare rapport; vraag 15 aan NEN.
 
 - **Tabel 13.4 in 2023 (p. 542):** de rij "klein" heeft geen definitie. De kern leest "klein" als een systeem met ten hoogste 500 m² aangesloten gebruiksoppervlakte, de grens die 2024 (p. 538) voor utiliteitsgebouwen gebruikt.
 - **Tabel 13.18 in 2024 (p. 614):** de tabel geeft geen interpolatieregel. De kern neemt de kolom van de grootste tabelwaarde die niet groter is dan de jaarlijkse tapwarmtevraag. 2025+C1 (p. 630–631) interpoleert lineair.

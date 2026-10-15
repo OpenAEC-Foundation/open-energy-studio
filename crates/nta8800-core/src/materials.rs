@@ -716,6 +716,17 @@ impl Conductivity {
             Self::ForfaitInsulation {
                 material, ageing, ..
             } => {
+                // Miscanthus and grass wool are rows of table E.11 from
+                // 2025+C1 only (p. 810); tables E.11 of 2020+A1 (p. 775),
+                // 2022 (p. 782), 2023 (p. 792) and 2024 (p. 791) have no
+                // value for them.
+                if matches!(
+                    material,
+                    ForfaitMaterial::Miscanthus | ForfaitMaterial::GrassWool
+                ) && !crate::norm_versions::profile().bio_based_lambda_2025
+                {
+                    push("route_not_in_edition", "material");
+                }
                 // E.2.1.4.1, table E.5: in-situ products age per E.10; the
                 // group must match, or "other" (1,30) as the conservative
                 // fallback of footnote c.

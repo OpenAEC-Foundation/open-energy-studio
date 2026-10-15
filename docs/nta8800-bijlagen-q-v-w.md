@@ -24,8 +24,13 @@ Interpretatiekeuzes (ook in de uitvoer `interpretations`):
 3. Bij `B < 0,15` (interval 5) verwijst de formule naar `plj = 5`, dat niet gemeten wordt. De kern gebruikt het 15 %-punt (`plj = 4`).
 4. De jaarlijkse `F_H;gen` geldt voor elke maand.
 5. Afschakelcriteria die niet zijn opgegeven, worden niet toegepast (opmerking 1 bij tabel Q.1/Q.3).
+6. Het forfaitaire bronpompvermogen van een W/W-warmtepomp (Q.4.4, p. 1065) neemt het verdampervermogen bij conditie 1, P·(1 − 1/COP); de norm noemt de conditie niet.
+7. Wordt elke klasse van tabel Q.6 gedekt, dan is `F_H;gen` = 1, met of zonder bijverwarming.
+8. De bronpomp telt in `η_H;gen;hp` (Q.4) en daarnaast als hulpenergie volgens 9.6.3 (vraag 13 aan NEN).
+9. Is in stap 2 van Q.5.3 de warmtevraag `Q_H;node,in(2)` nul, dan is de verhouding van Q.96 onbepaald en blijft f(3) = f(2) (Q.97, p. 1072).
+10. Q.84 neemt de tapwatertijdfractie `f_W;t;hp-on` uit 13.149, zoals 13.8.2.4 en 11.23 voorschrijven, niet uit Q.86–Q.88 (vraag 14 aan NEN).
 
-Niet uitgevoerd: de herberekening van de warmtevraag bij overventilatie (Q.5.3, drie stappen) en luchtdebietinterpolatie bij variabel debiet (tabel Q.9). Bijlage Q geldt alleen voor ruimteverwarming; tapwaterwarmtepompen volgen hoofdstuk 13.
+De herberekening van de warmtevraag bij overventilatie (Q.5.3, drie stappen) zit in de verwarmingsketen ([ventilatie](nta8800-ventilatie.md)). Niet uitgevoerd: luchtdebietinterpolatie bij variabel debiet (tabel Q.9). Bijlage Q geldt alleen voor ruimteverwarming; tapwaterwarmtepompen volgen hoofdstuk 13.
 
 ## Bijlage V: regeneratie
 

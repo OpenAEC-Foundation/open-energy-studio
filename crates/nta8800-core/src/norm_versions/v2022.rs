@@ -38,7 +38,8 @@ pub(super) const PROFILE: NormProfile = NormProfile {
     lambda_equi_known_route: false,
     // No swimming pool in (11.57) (2022 p. 451; 2023 p. 459).
     swimming_pool_route: false,
-    // No NEN-EN 13053 row (2022 p. 482; 2023 p. 490–491).
+    // Table 11.17 without the NEN-EN 13053 row (2022 p. 481; 2023 p. 489);
+    // η_hr per NEN-EN 13053 itself is allowed (2022 p. 479, 482).
     en_13053_route: false,
     // f_sto;dis;ls 1,5 (2022 p. 550; 2023 p. 557–558).
     electric_boiler_insulated_pipe_factor: true,

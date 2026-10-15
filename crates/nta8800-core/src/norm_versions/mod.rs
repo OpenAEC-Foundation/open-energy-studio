@@ -363,7 +363,9 @@ pub struct NormProfile {
     /// 11.2.2.x (11.57): rooms with a swimming pool take twice the sport
     /// function's q_usi;spec.
     pub swimming_pool_route: bool,
-    /// Table 11.x: heat-recovery efficiency declared per NEN-EN 13053.
+    /// Table 11.17: the row for a heat-recovery efficiency declared per
+    /// NEN-EN 13053 (f_rend;cond = 0); without it such an efficiency takes
+    /// "onbekend/overig" (0,10).
     pub en_13053_route: bool,
     /// 13.6.3: f_sto;dis;ls = 1,5 for an electric boiler with insulated
     /// hot-water pipes (2022 only).

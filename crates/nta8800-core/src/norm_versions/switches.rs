@@ -169,10 +169,11 @@ pub const SWITCH_POINTS: &[SwitchPoint] = &[
         "F_A;iso biobased (tabel E.5)",
         &["bio_based_ageing_one"],
     ),
-    values(
+    inputs(
         &["16"],
-        "biobased λ, riet (tabel E.11/E.12)",
+        "biobased λ, riet, miscanthus en graswol (tabel E.11/E.12)",
         &["bio_based_lambda_2025"],
+        &["material"],
     ),
     values(&["17"], "rieten dak (I.3)", &["reed_thatch_divisor"]),
     values(&["18"], "boosterwarmtepomp (W.9)", &["booster_bounds"]),
@@ -411,11 +412,10 @@ pub const SWITCH_POINTS: &[SwitchPoint] = &[
         &["swimming_pool_route"],
         &["swimmingPool"],
     ),
-    inputs(
+    values(
         &["63"],
-        "η_hr volgens NEN-EN 13053",
+        "tabel 11.17 rij NEN-EN 13053 (f_rend;cond)",
         &["en_13053_route"],
-        &["efficiency.standard"],
     ),
     routed(
         &["64"],

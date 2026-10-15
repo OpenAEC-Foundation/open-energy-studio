@@ -861,7 +861,7 @@ pub fn derive_residential_input(
         // that storey: N storey crossings in total, which is one pipe through
         // all N storeys (formula 7.17, 1,8 W/K per crossing). Counting N pipes
         // through N storeys each gave N² crossings; ISSO 54 EDR test
-        // EPWReal B03 (three storeys, "onbekend") confirms N (vragen-nen 14).
+        // EPWReal B03 (three storeys, "onbekend") confirms N (vragen-nen 16).
         recorder.record(
             "vertical_pipes_unknown_one_per_storey",
             "verticalPipes",

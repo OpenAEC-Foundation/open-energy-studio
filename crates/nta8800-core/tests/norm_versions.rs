@@ -246,7 +246,7 @@ fn changed_keys(a: &ProjectPerformanceAssessment, b: &ProjectPerformanceAssessme
 /// column in both). The dwelling has no input on a route that differs. The
 /// office changes only TOjuli, through ΔT_C;fan of utility buildings: 1,5 K
 /// in 2023 (p. 496) against 0,7 K in 2024 (p. 491). A utility building
-/// registers TOjuli 0 (vragen-nen 16), so the difference shows in the values
+/// registers TOjuli 0 (vragen-nen 18), so the difference shows in the values
 /// per orientation, not in the scalar outputs.
 #[test]
 fn example_projects_2023_differ_from_2024_only_where_the_editions_differ() {

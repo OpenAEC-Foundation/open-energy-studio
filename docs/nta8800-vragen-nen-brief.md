@@ -1,6 +1,6 @@
 # Brief aan NEN en RVO: interpretatievragen NTA 8800
 
-*Verzendklaar concept, opgesteld 10 oktober 2026 en bijgewerkt 11 oktober 2026 uit [nta8800-vragen-nen.md](nta8800-vragen-nen.md). Vul de velden tussen rechte haken in voor verzending. De brief citeert geen normtekst; hij verwijst alleen naar formule-, paragraaf- en paginanummers van NTA 8800:2025+C1:2026, tenzij een andere uitgave is genoemd.*
+*Verzendklaar concept, opgesteld 10 oktober 2026 en bijgewerkt 15 oktober 2026 uit [nta8800-vragen-nen.md](nta8800-vragen-nen.md). Vul de velden tussen rechte haken in voor verzending. De brief citeert geen normtekst; hij verwijst alleen naar formule-, paragraaf- en paginanummers van NTA 8800:2025+C1:2026, tenzij een andere uitgave is genoemd.*
 
 ---
 
@@ -19,7 +19,7 @@ Geachte leden van de normcommissie,
 
 [organisatie] ontwikkelt Open Energy Studio, rekensoftware voor de energieprestatie van woningen en utiliteitsgebouwen volgens NTA 8800. Wij bereiden de aanvraag van een attest volgens BRL 9501 voor. De versie waar deze vragen over gaan is programmaversie 0.2.0 met rekenkern 0.4.0 (nog niet uitgebracht); de standaarduitgave is NTA 8800:2025+C1:2026.
 
-Bij het narekenen van openbare BENG-berekeningen van geattesteerde software (vragen 1–7) bij een systematische controle van de rekenkern tegen de normtekst (vragen 8–12) en bij de BRL 9501-toetsset ISSO 54 (vragen 13–16) zijn wij zestien punten tegengekomen waar de tekst van de norm (of, bij vraag 4, de Omgevingsregeling) meer dan één lezing toelaat. Bij vijf daarvan verklaart het verschil in lezing een meetbaar verschil in BENG 2 tussen onze uitkomst en het gepubliceerde rapport; vragen 8–12 veranderen geen vergeleken uitkomst van de openbare gevallen. Wij volgen de letterlijke tekst, waar twee bepalingen elkaar tegenspreken (vragen 9 en 10) de lezing die aansluit op de rest van de berekening, en waar de toetsset ISSO 54 een andere lezing gebruikt dan de letterlijke tekst (vragen 13–16) de lezing van de toetsset, maar willen voor de attestering zeker weten welke lezing bedoeld is. Per vraag noemen wij de plaats in de norm, de twee lezingen, het gevolg in een openbaar geval en de concrete vraag. De openbare gevallen en de verschilanalyse per post staan in onze vergelijking van openbare rapporten; die sturen wij desgewenst mee.
+Bij het narekenen van openbare BENG-berekeningen van geattesteerde software (vragen 1–7), bij een systematische controle en onafhankelijke herberekening van de rekenkern tegen de normtekst (vragen 8–14) en bij de BRL 9501-toetsset ISSO 54 (vragen 15–18) zijn wij achttien punten tegengekomen waar de tekst van de norm (of, bij vraag 4, de Omgevingsregeling) meer dan één lezing toelaat. Bij vijf daarvan verklaart het verschil in lezing een meetbaar verschil in BENG 2 tussen onze uitkomst en het gepubliceerde rapport; vragen 8–14 veranderen geen vergeleken uitkomst van de openbare gevallen. Wij volgen de letterlijke tekst, waar twee bepalingen elkaar tegenspreken (vragen 9 en 10) de lezing die aansluit op de rest van de berekening, en waar de toetsset ISSO 54 een andere lezing gebruikt dan de letterlijke tekst (vragen 15–18) de lezing van de toetsset, maar willen voor de attestering zeker weten welke lezing bedoeld is. Per vraag noemen wij de plaats in de norm, de twee lezingen, het gevolg in een openbaar geval en de concrete vraag. De openbare gevallen en de verschilanalyse per post staan in onze vergelijking van openbare rapporten; die sturen wij desgewenst mee.
 
 Wij stellen een antwoord per vraag zeer op prijs, ook als het een verwijzing is naar een bestaande toelichting of een geplande correctie.
 
@@ -43,6 +43,7 @@ Wij stellen een antwoord per vraag zeer op prijs, ook als het een verwijzing is 
   - geval A +1,66, geval B +0,94 en geval C +0,50;
   - geval I +0,29;
   - geval M +2,92.
+- **Toepassingsgebied in de kern.** Alleen bij een koelmachine (compressie of absorptie); niet bij externe koude, vrije koeling of een onbekende collectieve opwekker.
 - **Vraag.** Geldt de regelenergie van 10.87 in alle maanden? Geldt ze ook wanneer de koeling wordt geleverd door een omkeerbare warmtepomp waarvan de regeling al in de verwarmingsberekening is meegenomen?
 
 ### Vraag 3. Praktijkfactor f_prac bij een kwaliteitsverklaring van een warmtepomp (p. 337, 340, 615–617)
@@ -131,7 +132,22 @@ Deze vraag gaat over de Omgevingsregeling (BWBR0045528, versie 2026-10-01), niet
 - **Gevolg.** Geen openbaar geval of ISSO 54-deeltest heeft een gedeclareerde koudeopwekker. Lezing B verlaagt het aandrijfenergiegebruik van zo'n opwekker met 10 %; een kamerairco met een verklaarde EER zou dan gunstiger uitkomen dan dezelfde airco met volledige NEN-EN 14511-gegevens in methode 2 (f_prpr 0,60).
 - **Vraag.** Welke f_prpr hoort bij een gedeclareerde EER of ζ die een waarde van tabel 10.29 of 10.30 vervangt?
 
-### Vraag 13. Klassecorrectie c_W;gen op de forfaitaire tapwaterwarmtepomp (tabellen 13.25 en 13.27, 13.8.4.7.3, p. 641–643)
+### Vraag 13. Bronpomp van een warmtepomp volgens bijlage Q in de COP én als hulpenergie (9.6.3, p. 340; Q.2.4–Q.2.5, p. 1029–1031)
+
+- **Plaats.** Q.4 (p. 1029) telt het hulpenergiegebruik van de bronpomp van een brine/water- of water/waterwarmtepomp (Q.5–Q.8, p. 1030–1031) mee in het elektriciteitsgebruik waaruit η_H;gen;hp (Q.2) volgt. 9.6.3 (p. 340) gebruikt η_H;gen;hp als COP per maand en telt daarnaast W_H;aux;hp;an / (12 × 3,6) per maand als hulpenergie. Bij de hulpenergie van centrale opwekkers staat dat de bronpomp deels in de COP zit (9.6.8.1.1.1.1, p. 357).
+- **Lezing A (letterlijk, onze keuze).** De bronpomp telt in η_H;gen;hp en daarnaast als hulpenergie.
+- **Lezing B.** De bronpomp telt maar één keer: alleen in η_H;gen;hp, of alleen als hulpenergie.
+- **Gevolg.** Geen openbaar geval heeft een warmtepomp volgens bijlage Q. In een synthetische brine/watervariant (bronpomp 120 W, 66 kWh per jaar) telt de bronpomp bij lezing A 69 kWh via de COP en 66 kWh als hulpenergie, op ongeveer 980 kWh warmtepompelektriciteit.
+- **Vraag.** Telt het hulpenergiegebruik van de bronpomp bij een warmtepomp volgens bijlage Q alleen in η_H;gen;hp, alleen als hulpenergie volgens 9.6.3, of in beide?
+
+### Vraag 14. Tijdfractie voor warm tapwater van een warmtepomp op ventilatielucht (13.8.2.4, p. 614–615; 11.2.2.1.2, p. 449–450; Q.5.2.2, p. 1066–1067)
+
+- **Plaats.** 13.8.2.4 schrijft voor dat de tijdfractie voor warm tapwater, f_W;t;hp-on;mi, "in alle gevallen" met 13.149 wordt bepaald (geleverde tapwaterwarmte gedeeld door de maximaal leverbare volgens 13.141), en 11.23 verwijst daarnaar. Bijlage Q.5.2.2 geeft met Q.86–Q.88 een andere formule voor dezelfde grootheid, die Q.84 gebruikt in de herberekening bij overventilatie: tapwaterwarmte maal F_W;gen, gedeeld door het bronvermogen van Q.87 (q_ve;hp = 0,44·A_g;tot, minimaal 44 dm³/s, afkoeling 20 naar 3 °C), maal (η_W;gen − 1)/η_W;gen en 1,2.
+- **Lezing A (onze keuze).** 13.149 geldt overal, ook in Q.84.
+- **Lezing B.** In de herberekening van bijlage Q (Q.84) geldt Q.86–Q.88.
+- **Gevolg.** Geen openbaar geval of ISSO 54-deeltest heeft een warmtepomp op ventilatielucht voor tapwater. De twee formules geven een andere f_W en daarmee een ander buitenluchtdebiet (11.23) en een andere grens f_H ≤ 1 − f_W in Q.84.
+- **Vraag.** Welke formule bepaalt f_W;t;hp-on;mi in Q.84 en 11.23, en voor welk geval is Q.86 bedoeld?
+### Vraag 15. Klassecorrectie c_W;gen op de forfaitaire tapwaterwarmtepomp (tabellen 13.25 en 13.27, 13.8.4.7.3, p. 641–643)
 
 - **Plaats.** Tabel 13.25 geeft een individuele warmtepomp 1,4 of 1,4·c_source, zonder c_W;gen in de cel; de toelichting onder de tabel vraagt c_W;gen bij de forfaitaire rendementen, klasse 4 als de klasse onbekend is. Tabel 13.27 begint bij 1 805 kWh.
 - **Lezing A (onze keuze voor 2025+C1, zoals ISSO 54).** De forfaitaire warmtepomp krijgt c_W;gen van tabel 13.27, klasse 4 bij een onbekende klasse.
@@ -139,7 +155,7 @@ Deze vraag gaat over de Omgevingsregeling (BWBR0045528, versie 2026-10-01), niet
 - **Gevolg.** ISSO 54 EPWReal B01: lezing A geeft 2 790 kWh voor tapwater (referentie 2 806 kWh) en BENG 2 73,65 (referentie 73,89); lezing B 1 339 kWh en BENG 2 49,33.
 - **Vraag.** Geldt c_W;gen voor de forfaitaire warmtepomp, en welke waarde geldt onder 1 805 kWh?
 
-### Vraag 14. Aantal fictieve verticale leidingen bij een onbekende situatie (7.3.3, formule 7.17)
+### Vraag 16. Aantal fictieve verticale leidingen bij een onbekende situatie (7.3.3, formule 7.17)
 
 - **Plaats.** Bij een onbekende situatie neemt 7.3.3 voor een woonfunctie buiten een woongebouw één ongeïsoleerde fictieve leiding per rekenzone per bouwlaag aan; opmerking 2 bij 7.17 telt per leiding het werkelijke aantal bouwlagen van de rekenzone.
 - **Lezing A (onze keuze, zoals ISSO 54).** Eén leiding door alle N bouwlagen: N·1,8 W/K.
@@ -147,15 +163,15 @@ Deze vraag gaat over de Omgevingsregeling (BWBR0045528, versie 2026-10-01), niet
 - **Gevolg.** Drie bouwlagen: 5,4 tegen 16,2 W/K. ISSO 54 EPWReal B03 (drie bouwlagen, "onbekend") sluit aan bij lezing A.
 - **Vraag.** Welke van beide is bedoeld?
 
-### Vraag 15. Hernieuwbare warmte van de forfaitaire tapwaterwarmtepomp met c_W;gen (5.36–5.38; tabellen 13.25 en 13.27)
+### Vraag 17. Hernieuwbare warmte van de forfaitaire tapwaterwarmtepomp met c_W;gen (5.36–5.38; tabellen 13.25 en 13.27)
 
-- **Plaats.** Met c_W;gen (vraag 13) is het rendement van de forfaitaire tapwaterwarmtepomp bij een kleine tapvraag lager dan 1; formule 5.38 zet de hernieuwbare warmte dan op 0.
+- **Plaats.** Met c_W;gen (vraag 15) is het rendement van de forfaitaire tapwaterwarmtepomp bij een kleine tapvraag lager dan 1; formule 5.38 zet de hernieuwbare warmte dan op 0.
 - **Lezing A (onze keuze voor 2025+C1, zoals ISSO 54).** 5.36 rekent met het ongecorrigeerde 1,4·c_source: hernieuwbaar is E_W;gen;in · (1,4·c_source − 1).
 - **Lezing B (letterlijk).** Het gecorrigeerde rendement geldt ook in 5.36–5.38, dus geen hernieuwbare warmte onder rendement 1.
 - **Gevolg.** ISSO 54 EPWReal B01: lezing A geeft RER 58,0 % (referentie 57,8 %), lezing B 54,7 %.
 - **Vraag.** Welk rendement en welke warmte gelden in 5.36–5.38 voor een forfaitaire warmtepomp met c_W;gen?
 
-### Vraag 16. TOjuli bij utiliteitsbouw (§5.7, p. 114–120)
+### Vraag 18. TOjuli bij utiliteitsbouw (§5.7, p. 114–120)
 
 - **Plaats.** §5.7.2 bepaalt TOjuli per rekenzone zonder onderscheid naar gebruiksfunctie; §5.7.1 noemt bij actieve koeling woningbouw en de grenswaarde geldt alleen voor woonfuncties.
 - **Lezing A (onze keuze, zoals ISSO 54).** Utiliteitsbouw registreert TOjuli 0; de toetsset geeft 0 voor alle 59 EPU-deeltests en EPUReal B01.

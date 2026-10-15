@@ -1,8 +1,8 @@
 # Vragen aan NEN / NTA 8800-commissie
 
-Concepten voor vragen over de interpretatie van NTA 8800:2025+C1:2026. Ze zijn in eigen woorden opgesteld en verwijzen alleen naar paginanummers. Aanleiding voor vragen 1–7 is de vergelijking met openbare BENG-rapporten van geattesteerde software ([nta8800-vergelijking-openbare-rapporten.md](nta8800-vergelijking-openbare-rapporten.md)); vragen 8–12 kwamen uit de controle van de rekenkern tegen de normtekst per hoofdstuk (reviews 40–48 in [nta8800-releasenotes.md](nta8800-releasenotes.md)).
+Concepten voor vragen over de interpretatie van NTA 8800:2025+C1:2026. Ze zijn in eigen woorden opgesteld en verwijzen alleen naar paginanummers. Aanleiding voor vragen 1–7 is de vergelijking met openbare BENG-rapporten van geattesteerde software ([nta8800-vergelijking-openbare-rapporten.md](nta8800-vergelijking-openbare-rapporten.md)); vragen 8–12 kwamen uit de controle van de rekenkern tegen de normtekst per hoofdstuk (reviews 40–48 in [nta8800-releasenotes.md](nta8800-releasenotes.md)), vragen 13 en 14 uit de onafhankelijke herberekening van bijlage Q (reviews 69 en 70), en vragen 15–18 uit de BRL 9501-toetsset ISSO 54, waar de kern de lezing van de toetsset volgt.
 
-Alle zestien vragen staan ook in een verzendklare brief aan NEN en RVO, met per vraag de twee lezingen en het gevolg in de openbare gevallen: [nta8800-vragen-nen-brief.md](nta8800-vragen-nen-brief.md). Werk die brief bij als een vraag hier verandert.
+Alle achttien vragen staan ook in een verzendklare brief aan NEN en RVO, met per vraag de twee lezingen en het gevolg in de openbare gevallen: [nta8800-vragen-nen-brief.md](nta8800-vragen-nen-brief.md). Werk die brief bij als een vraag hier verandert.
 
 ## 1. Afgifteverlies koeling, formule 10.15 (p. 376)
 
@@ -24,6 +24,8 @@ Alle zestien vragen staan ook in een verzendklare brief aan NEN en RVO, met per 
 **Vraag.**
 - Geldt de regelenergie van 10.87 in alle twaalf maanden, ook buiten het koelseizoen?
 - Geldt ze ook wanneer de koeling wordt geleverd door een omkeerbare warmtepomp waarvan de regeling al in de verwarmingsberekening (hulpenergie van de warmtepomp) is meegenomen?
+
+**Huidige lezing van de kern.** De kern telt 10.87 in alle maanden bij een koelmachine (compressie of absorptie), niet bij externe koude, vrije koeling en een onbekende collectieve opwekker (review 66).
 
 ## 3. f_prac bij een kwaliteitsverklaring van een warmtepomp (p. 337, 340, 615–617)
 
@@ -146,7 +148,26 @@ Deze punten gaan over de Omgevingsregeling (BWBR0045528, versie 2026-10-01), nie
 
 **Vraag.** Welke f_prpr hoort bij een gedeclareerde EER of ζ die volgens §10.1 een waarde van tabel 10.29 of 10.30 vervangt: 1, zoals bij de tabelwaarden, of die van methode 1/2 (0,9, of 0,60 bij directe condensatie tegen de buitenlucht)?
 
-## 13. Klassecorrectie c_W;gen op de forfaitaire tapwaterwarmtepomp (tabellen 13.25 en 13.27, 13.8.4.7.3, p. 641–643)
+## 13. Bronpomp van een warmtepomp volgens bijlage Q in de COP én als hulpenergie (9.6.3, p. 340; Q.2.4–Q.2.5, p. 1029–1031)
+
+**Situatie.** Bij een brine/water- of water/waterwarmtepomp met productgegevens volgens bijlage Q telt Q.4 het hulpenergiegebruik van de bronpomp, W_H;aux;hp;an (Q.5–Q.8), mee in het elektriciteitsgebruik waaruit het opwekkingsrendement η_H;gen;hp (Q.2) volgt. 9.6.3 (p. 340) gebruikt die η_H;gen;hp als COP van de maand en telt daarnaast W_H;aux;hp;an / (12 × 3,6) per maand als hulpenergie van de opwekker. Bij de hulpenergie van centrale opwekkers zegt de norm dat de bronpomp geen onderdeel is van die bepaling en deels in de COP zit (9.6.8.1.1.1.1, p. 357).
+
+**Gekozen lezing.** De kern volgt beide bepalingen letterlijk: de bronpomp zit in η_H;gen;hp en komt er per maand als hulpenergie nog eens bij.
+
+**Gevolg.** Geen openbaar geval heeft een warmtepomp volgens bijlage Q. In een synthetische brine/watervariant van ISSO 54-deeltest EP-W001 (bronpomp 120 W, 66 kWh per jaar) telt de bronpomp 69 kWh via de COP (met f_prac 0,95) en 66 kWh als hulpenergie, op ongeveer 980 kWh warmtepompelektriciteit. Bij de andere lezing valt een van beide weg.
+
+**Vraag.** Telt het hulpenergiegebruik van de bronpomp volgens Q.5 bij een warmtepomp volgens bijlage Q alleen in η_H;gen;hp (Q.2/Q.4), alleen als hulpenergie volgens 9.6.3, of bedoelt de norm beide?
+
+## 14. Tijdfractie voor warm tapwater van een warmtepomp op ventilatielucht (13.8.2.4, p. 614–615; 11.2.2.1.2, p. 449–450; Q.5.2.2, p. 1066–1067)
+
+**Situatie.** Voor een warmtepomp die ventilatieretourlucht als bron gebruikt, telt de norm de tijdfractie in bedrijf voor warm tapwater, f_W;t;hp-on;mi, mee in het buitenluchtdebiet (11.23) en, via Q.84, in de herberekening van de warmtevraag bij overventilatie (Q.5.3). 13.8.2.4 schrijft voor dat die fractie "in alle gevallen" met 13.149 wordt bepaald: de geleverde tapwaterwarmte gedeeld door de maximaal leverbare (13.141, met P_nom). 11.23 verwijst daarvoor naar 13.8.2.4. Bijlage Q.5.2.2 geeft met Q.86–Q.88 een andere formule: de tapwaterwarmte maal F_W;gen, gedeeld door het bronvermogen P_W;hp;max van Q.87 (met q_ve;hp = 0,44·A_g;tot volgens Q.88, minimaal 44 dm³/s, en een afkoeling van 20 naar 3 °C), maal (η_W;gen − 1)/η_W;gen en maal 1,2.
+
+**Gekozen lezing.** De kern bepaalt f_W;t;hp-on met 13.149, ook in Q.84, omdat 13.8.2.4 en 11.23 dat voorschrijven. Q.86–Q.88 worden niet gebruikt.
+
+**Gevolg.** Geen openbaar geval en geen ISSO 54-deeltest heeft een warmtepomp op ventilatielucht voor tapwater. De twee formules geven een andere fractie: 13.149 rekent met het afgiftevermogen van het toestel, Q.86 met het bronvermogen bij het forfaitaire luchtdebiet, de verhouding (η_W;gen − 1)/η_W;gen en een toeslag van 20 %. Een andere f_W verandert het buitenluchtdebiet van 11.23 en de grens f_H ≤ 1 − f_W in Q.84.
+
+**Vraag.** Welke formule bepaalt f_W;t;hp-on;mi in Q.84 en 11.23: 13.149, zoals 13.8.2.4 zegt, of Q.86–Q.88 van bijlage Q? Is Q.86 bedoeld voor een ander geval, bijvoorbeeld alleen een combiwarmtepomp met een kwaliteitsverklaring volgens bijlage Q?
+## 15. Klassecorrectie c_W;gen op de forfaitaire tapwaterwarmtepomp (tabellen 13.25 en 13.27, 13.8.4.7.3, p. 641–643)
 
 **Situatie.** Tabel 13.25 geeft een individuele warmtepomp de forfaitaire waarde 1,4 of 1,4·c_source. Bij de gasrijen staat c_W;gen in de cel, bij de warmtepomprijen niet. De toelichting onder de tabel vraagt c_W;gen bij de forfaitaire rendementen, met klasse 4 als de klasse onbekend is. 13.8.4.7.3 c) neemt c_W;gen van tabel 13.27 uit de klasse waarbij het rendement van de warmtepomp is gemeten. Tabel 13.27 begint bij 1 805 kWh.
 
@@ -156,7 +177,7 @@ Deze punten gaan over de Omgevingsregeling (BWBR0045528, versie 2026-10-01), nie
 
 **Vraag.** Geldt c_W;gen van tabel 13.27 ook voor de forfaitaire waarde 1,4 (·c_source) van een individuele warmtepomp, met klasse 4 als de klasse onbekend is? En zo ja, welke waarde geldt onder 1 805 kWh, waar tabel 13.27 geen kolom heeft?
 
-## 14. Aantal fictieve verticale leidingen bij een onbekende situatie (7.3.3, formule 7.17)
+## 16. Aantal fictieve verticale leidingen bij een onbekende situatie (7.3.3, formule 7.17)
 
 **Situatie.** Is niet bekend of er een verticale leiding door de thermische schil is, dan neemt 7.3.3 voor een woonfunctie buiten een woongebouw één ongeïsoleerde fictieve leiding per rekenzone per bouwlaag aan. Formule 7.17 telt per leiding het aantal bouwlagen van de rekenzone; opmerking 2 zegt dat dit het werkelijke aantal bouwlagen is, ook als de leiding maar door een deel ervan loopt. Letterlijk geeft dat bij N bouwlagen N leidingen van elk N bouwlagen: N²·1,8 W/K.
 
@@ -166,9 +187,9 @@ Deze punten gaan over de Omgevingsregeling (BWBR0045528, versie 2026-10-01), nie
 
 **Vraag.** Is bij een onbekende situatie de bedoeling één leiding per bouwlaag die elk alleen die bouwlaag telt (samen N·1,8 W/K), of N leidingen die elk alle N bouwlagen tellen (N²·1,8 W/K)?
 
-## 15. Hernieuwbare warmte van de forfaitaire tapwaterwarmtepomp met c_W;gen (5.36–5.38; tabellen 13.25 en 13.27)
+## 17. Hernieuwbare warmte van de forfaitaire tapwaterwarmtepomp met c_W;gen (5.36–5.38; tabellen 13.25 en 13.27)
 
-**Situatie.** Met de klassecorrectie van vraag 13 wordt het opwekkingsrendement van de forfaitaire tapwaterwarmtepomp 1,4·c_W;gen, bij een kleine tapvraag onder 1. Formule 5.38 zet de hernieuwbare warmte dan op 0. De BRL 9501-toetsset telt wel hernieuwbare warmte: in ISSO 54 EPWReal B01 en D01 boeken alle referentieprogramma's E_W;gen;in · (1,4 − 1), circa 1 120 kWh.
+**Situatie.** Met de klassecorrectie van vraag 15 wordt het opwekkingsrendement van de forfaitaire tapwaterwarmtepomp 1,4·c_W;gen, bij een kleine tapvraag onder 1. Formule 5.38 zet de hernieuwbare warmte dan op 0. De BRL 9501-toetsset telt wel hernieuwbare warmte: in ISSO 54 EPWReal B01 en D01 boeken alle referentieprogramma's E_W;gen;in · (1,4 − 1), circa 1 120 kWh.
 
 **Gekozen lezing.** De kern volgt de toetsset (besluit 13 oktober 2026): c_W;gen corrigeert de energie voor de tapvraag, niet het rendement van de warmtepomp zelf. Formule 5.36 rekent met het ongecorrigeerde 1,4·c_source op de warmte die dat rendement uit de elektriciteit levert. Alleen onder 2025+C1 (normversies, punt 80).
 
@@ -176,7 +197,7 @@ Deze punten gaan over de Omgevingsregeling (BWBR0045528, versie 2026-10-01), nie
 
 **Vraag.** Geldt in 5.36–5.38 voor een forfaitaire warmtepomp met c_W;gen het rendement met of zonder c_W;gen, en op welke warmte?
 
-## 16. TOjuli bij utiliteitsbouw (§5.7, p. 114–120)
+## 18. TOjuli bij utiliteitsbouw (§5.7, p. 114–120)
 
 **Situatie.** §5.7.2 bepaalt TOjuli per rekenzone en oriëntatie zonder onderscheid naar gebruiksfunctie. De lijst van actieve koelsystemen in §5.7.1 noemt woningbouw, en de grenswaarde (Bbl art. 4.149b) geldt alleen voor woonfuncties. De BRL 9501-toetsset geeft voor alle 59 utiliteits-deeltests (EPU) en voor EPUReal B01 TOjuli 0, met en zonder koeling; bij de woningen is TOjuli in 259 van de 264 deeltests groter dan 0.
 
