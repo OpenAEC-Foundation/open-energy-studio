@@ -471,9 +471,19 @@ pub fn assess_tojuli(input: &MonthlyDemandInput, options: TojuliOptions<'_>) -> 
     // §5.7.1 (p. 114–115): a system without sufficient capacity falls under
     // "alle andere systemen en situaties", so TOjuli is calculated (5.40).
     let mut insufficient_annex_aa = None;
+    // Method 3 with a criterion the zone does not meet: as with an
+    // insufficient annex AA capacity, TOjuli is calculated (p. 115).
+    let mut solar_limitation_failed = None;
     if let Some(evidence) = options.active_cooling {
         let mut issues =
             validate_active_cooling(evidence, input, options.residential, "activeCooling");
+        if let Some(at) = issues
+            .iter()
+            .position(|item| item.code == "solar_limitation_not_met")
+        {
+            solar_limitation_failed = Some(issues.remove(at));
+            issues.retain(|item| item.code != "solar_limitation_not_met");
+        }
         let mut annex_aa = None;
         if let CoolingCapacityEvidence::AnnexAa {
             calculation,
@@ -525,7 +535,7 @@ pub fn assess_tojuli(input: &MonthlyDemandInput, options: TojuliOptions<'_>) -> 
             result.annex_aa = annex_aa.or(insufficient_annex_aa);
             return result;
         }
-        if insufficient_annex_aa.is_none() {
+        if insufficient_annex_aa.is_none() && solar_limitation_failed.is_none() {
             // §5.7.2: an active cooling system allows TOjuli = 0 for all orientations.
             return TojuliAssessment {
                 zone_id: input.zone_id.clone(),
@@ -748,6 +758,7 @@ pub fn assess_tojuli(input: &MonthlyDemandInput, options: TojuliOptions<'_>) -> 
                 )
             })
             .into_iter()
+            .chain(solar_limitation_failed)
             // Step A (p. 115) counts the facade to an adjacent unheated
             // sunroom in A_T;or, but steps 1–2 give it no H_C;D (8.2 has no
             // sunroom term). Until NEN answers, the facade, its transmission

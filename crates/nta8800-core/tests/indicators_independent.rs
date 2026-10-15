@@ -1018,12 +1018,11 @@ mod assess {
     }
 
     pub fn outcome(project: &Value) -> Outcome {
+        // §5.7.1 (p. 115): a criterion that is not met is reported, and TOjuli
+        // is then calculated ("alle andere systemen en situaties").
         let result = assess_project_performance(project);
-        let not_met = result
-            .gaps
-            .iter()
-            .any(|gap| gap.code == "solar_limitation_not_met");
         let p = serde_json::to_value(result).expect("serializable");
+        let not_met = p.to_string().contains("solar_limitation_not_met");
         Outcome {
             not_met,
             tojuli: p["performance"]["tojuliMaxK"].as_f64(),
@@ -1037,14 +1036,26 @@ fn tojuli_small_window_area() {
     let small = small_window_area(4.79);
     assert!(!small.not_met);
     assert_eq!(small.tojuli, Some(0.0));
-    assert!(small_window_area(4.81).not_met);
+    let large = small_window_area(4.81);
+    assert!(large.not_met);
+    assert!(
+        large.tojuli.is_some_and(|value| value > 0.0),
+        "{:?}",
+        large.tojuli
+    );
 }
 
 /// "kleiner is dan 0,2 × A_g;tot": A_w = 19,20 m² at A_g = 96 m² is not smaller, so the exemption does not
 /// apply. The kernel compares 19,2 with 0,2 × 96 = 19,200000000000003 in floating point and accepts it.
 #[test]
 fn tojuli_small_window_area_at_the_boundary() {
-    assert!(small_window_area(4.8).not_met);
+    let boundary = small_window_area(4.8);
+    assert!(boundary.not_met);
+    assert!(
+        boundary.tojuli.is_some_and(|value| value > 0.0),
+        "{:?}",
+        boundary.tojuli
+    );
 }
 
 // ---------------------------------------------------------------------------------------------------

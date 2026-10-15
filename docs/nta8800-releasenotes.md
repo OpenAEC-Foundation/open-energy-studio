@@ -13,6 +13,10 @@ Dit bestand is de wijzigingsregistratie van de rekenkern (BRL 9501 §5.2, §6.2 
 
 ## Onuitgebracht
 
+### 15 oktober 2026 — TOjuli bij een niet gehaald criterium van methode 3; vragen 20–24 aan NEN
+- **Rekenwijziging (§5.7.1, p. 115):** voldoet de rekenzone niet aan het opgegeven criterium voor beperking van de zoninstraling (methode 3), dan blokkeerde de kern TOjuli met `solar_limitation_not_met`. De tekst zegt dat voor "alle andere systemen en situaties" TOjuli wordt bepaald; de kern berekent TOjuli nu, met `solar_limitation_not_met` als waarschuwing, zoals al bij een te kleine capaciteit volgens bijlage AA.
+- **Vragen aan NEN 20–24:** uit review 75 de punten die een uitkomst meetbaar veranderen: M.25 met of zonder f_ctr;ls, η van geothermie in 5.48, afronding van de U naar een onverwarmde ruimte, U_x;T in D.15/D.16 en ΔU_for over kelderwanden. De overige lezingen staan in de verificatiestatus.
+
 ### 15 oktober 2026 — Review 75: grondverlies, schil, hoofdstuk 7, indicatoren en bijlagen M, O en P onafhankelijk nagerekend
 - **Herberekening:** kruipruimte, onverwarmde en verwarmde kelder (8.38/8.39, 8.45), deels verdiepte vloeren, randisolatie (D.7–D.9), forfaitaire en gedetailleerde randkoudebruggen, H_g;an per maand, H_H/C;g;adj en de julibehandeling voor TOjuli (5.40) nagerekend vanaf de normpagina's; circa 1 980 grootheden in 22 gevallen (`crates/nta8800-core/tests/ground_independent.rs`), alle gelijk na één herstel.
 - **Rekenwijziging (8.49, p. 263):** de ventilatie van een onverwarmde kelder rekent met ρ_a·c_a = 1211 J/(m³·K) zoals gedrukt, niet 1,205·1005 = 1211,025; H_g verandert 1–3·10⁻⁶ relatief.

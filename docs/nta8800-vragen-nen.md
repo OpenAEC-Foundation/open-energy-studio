@@ -1,8 +1,8 @@
 # Vragen aan NEN / NTA 8800-commissie
 
-Concepten voor vragen over de interpretatie van NTA 8800:2025+C1:2026. Ze zijn in eigen woorden opgesteld en verwijzen alleen naar paginanummers. Aanleiding voor vragen 1–7 is de vergelijking met openbare BENG-rapporten van geattesteerde software ([nta8800-vergelijking-openbare-rapporten.md](nta8800-vergelijking-openbare-rapporten.md)); vragen 8–12 kwamen uit de controle van de rekenkern tegen de normtekst per hoofdstuk (reviews 40–48 in [nta8800-releasenotes.md](nta8800-releasenotes.md)), vragen 13 en 14 uit de onafhankelijke herberekening van bijlage Q (reviews 69 en 70), vragen 15–18 uit de BRL 9501-toetsset ISSO 54, waar de kern de lezing van de toetsset volgt, en vraag 19 uit de onafhankelijke herberekening van hoofdstuk 7 (review 75).
+Concepten voor vragen over de interpretatie van NTA 8800:2025+C1:2026. Ze zijn in eigen woorden opgesteld en verwijzen alleen naar paginanummers. Aanleiding voor vragen 1–7 is de vergelijking met openbare BENG-rapporten van geattesteerde software ([nta8800-vergelijking-openbare-rapporten.md](nta8800-vergelijking-openbare-rapporten.md)); vragen 8–12 kwamen uit de controle van de rekenkern tegen de normtekst per hoofdstuk (reviews 40–48 in [nta8800-releasenotes.md](nta8800-releasenotes.md)), vragen 13 en 14 uit de onafhankelijke herberekening van bijlage Q (reviews 69 en 70), vragen 15–18 uit de BRL 9501-toetsset ISSO 54, waar de kern de lezing van de toetsset volgt, en vragen 19–24 uit de onafhankelijke herberekening van review 75.
 
-Alle negentien vragen staan ook in een verzendklare brief aan NEN en RVO, met per vraag de twee lezingen en het gevolg in de openbare gevallen: [nta8800-vragen-nen-brief.md](nta8800-vragen-nen-brief.md). Werk die brief bij als een vraag hier verandert.
+Alle vierentwintig vragen staan ook in een verzendklare brief aan NEN en RVO, met per vraag de twee lezingen en het gevolg in de openbare gevallen: [nta8800-vragen-nen-brief.md](nta8800-vragen-nen-brief.md). Werk die brief bij als een vraag hier verandert.
 
 ## 1. Afgifteverlies koeling, formule 10.15 (p. 376)
 
@@ -217,3 +217,58 @@ Deze punten gaan over de Omgevingsregeling (BWBR0045528, versie 2026-10-01), nie
 
 **Vraag.**
 - Wordt in een rekenzone met meer gebruiksfuncties het product q_Oc · f_τ per gebruiksfunctie gewogen, of worden q_Oc en f_τ elk apart gewogen en daarna vermenigvuldigd?
+
+## 20. Opwekkingsrendement van een ketel volgens bijlage M: Q_H;gen;out met of zonder f_ctr;ls (M.24–M.25, p. 878)
+
+**Situatie.** M.24 definieert de nuttige warmte Q_gen;out als f_ctr;ls · Q_H;gen,j;out. M.25 deelt Q_H;gen;out door de toegevoerde energie, zonder te zeggen of dat de waarde vóór of na f_ctr;ls is.
+
+**Gekozen lezing.** De kern neemt de waarde met f_ctr;ls, zoals M.24 hem definieert.
+
+**Gevolg.** Een gesloten wandketel met een kamerthermostaat: de jaarlijks toegevoerde energie verschilt circa 0,9 % tussen beide lezingen.
+
+**Vraag.**
+- Is Q_H;gen;out in M.25 de waarde na f_ctr;ls (M.24) of de waarde ervoor?
+
+## 21. Rendement van geothermie bij externe warmtelevering (5.48, p. 128; P.6.5.4.8)
+
+**Situatie.** Formule 5.48 drukt het aandeel hernieuwbaar af als 1 − 1/20 = 0,95 met "η = 20 conform P.6.5.4.8". P.6.5.4.8 geeft η echter als 20 · (ϑ_geo − ϑ_ret − 3)/40, afhankelijk van de temperaturen.
+
+**Gekozen lezing.** De kern rekent 1 − 1/η met η volgens P.6.5.4.8.
+
+**Gevolg.** Een net met alleen geothermie: f_Pren 0,88 met de formule van P.6.5.4.8 tegen 0,89 met de gedrukte waarde 20.
+
+**Vraag.**
+- Geldt in 5.48 η = 20 vast, of η volgens de formule van P.6.5.4.8?
+
+## 22. Afronding van de U-waarde naar een onverwarmde ruimte (8.2.2.1, p. 227; 8.4.2.1, p. 265)
+
+**Situatie.** 8.4.2.1 vervangt voor een scheidingsconstructie naar een onverwarmde ruimte R_se door R_si. 8.2.2.1 rondt een U-waarde die in 8.1 wordt gebruikt af op twee decimalen, maar zegt niet of dat ook geldt voor de U-waarde na deze vervanging.
+
+**Gekozen lezing.** De kern rondt de U-waarde na de vervanging niet opnieuw af.
+
+**Gevolg.** Een garage als onverwarmde ruimte: H_U 7,4625 W/K onafgerond tegen 7,4035 W/K met afgeronde U-waarden.
+
+**Vraag.**
+- Wordt de U-waarde na de vervanging van R_se door R_si (8.4.2.1) opnieuw afgerond volgens 8.2.2.1?
+
+## 23. U_x;T bij een onverwarmde kelder in D.15 en D.16 (p. 795–796; 8.47, p. 262)
+
+**Situatie.** D.15 en D.16 noemen U_x;T de U-waarde van de kelderwand boven het maaiveld "volgens 8.3.2.1". 8.47 definieert een U_x;T voor de kruipruimte en kelder anders. De noemer van D.15 is bovendien zo gezet dat het formulenummer erin lijkt te staan.
+
+**Gekozen lezing.** De kern neemt de U-waarde van de kelderwand (U_xw), zoals NEN-EN-ISO 13370 bijlage H.8, en leest de noemer als (A_f + z · P) · λ/δ, zoals D.16.
+
+**Gevolg.** Bepaalt H_g van elke vloer boven een onverwarmde kelder.
+
+**Vraag.**
+- Is U_x;T in D.15/D.16 de U-waarde van de kelderwand boven het maaiveld, of de U_x;T van 8.47?
+
+## 24. ΔU_for over kelderwanden en vloeren boven een onverwarmde kelder (8.3, p. 225)
+
+**Situatie.** A_T;ntr in de formule voor ΔU_for sluit alleen "vloer boven kruipruimte of direct op ondergrond of paneel" uit. Kelderwanden van 8.38 en een vloer boven een onverwarmde kelder worden niet genoemd.
+
+**Gekozen lezing.** De kern laat alle elementen van de grondroute buiten A_T;ntr.
+
+**Gevolg.** Een verwarmde kelder met 24 m² kelderwand (forfaitaire route): ΔU_for 0,1549 zonder en 0,1494 W/(m²·K) met de kelderwanden.
+
+**Vraag.**
+- Tellen kelderwanden en een vloer boven een onverwarmde kelder mee in A_T;ntr voor ΔU_for?

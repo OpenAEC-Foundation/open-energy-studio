@@ -19,7 +19,7 @@ Geachte leden van de normcommissie,
 
 [organisatie] ontwikkelt Open Energy Studio, rekensoftware voor de energieprestatie van woningen en utiliteitsgebouwen volgens NTA 8800. Wij bereiden de aanvraag van een attest volgens BRL 9501 voor. De versie waar deze vragen over gaan is programmaversie 0.2.0 met rekenkern 0.4.0 (nog niet uitgebracht); de standaarduitgave is NTA 8800:2025+C1:2026.
 
-Bij het narekenen van openbare BENG-berekeningen van geattesteerde software (vragen 1–7), bij een systematische controle en onafhankelijke herberekening van de rekenkern tegen de normtekst (vragen 8–14 en 19) en bij de BRL 9501-toetsset ISSO 54 (vragen 15–18) zijn wij negentien punten tegengekomen waar de tekst van de norm (of, bij vraag 4, de Omgevingsregeling) meer dan één lezing toelaat. Bij vijf daarvan verklaart het verschil in lezing een meetbaar verschil in BENG 2 tussen onze uitkomst en het gepubliceerde rapport; vragen 8–14 en 19 veranderen geen vergeleken uitkomst van de openbare gevallen. Wij volgen de letterlijke tekst, waar twee bepalingen elkaar tegenspreken (vragen 9 en 10) de lezing die aansluit op de rest van de berekening, en waar de toetsset ISSO 54 een andere lezing gebruikt dan de letterlijke tekst (vragen 15–18) de lezing van de toetsset, maar willen voor de attestering zeker weten welke lezing bedoeld is. Per vraag noemen wij de plaats in de norm, de twee lezingen, het gevolg in een openbaar geval en de concrete vraag. De openbare gevallen en de verschilanalyse per post staan in onze vergelijking van openbare rapporten; die sturen wij desgewenst mee.
+Bij het narekenen van openbare BENG-berekeningen van geattesteerde software (vragen 1–7), bij een systematische controle en onafhankelijke herberekening van de rekenkern tegen de normtekst (vragen 8–14 en 19–24) en bij de BRL 9501-toetsset ISSO 54 (vragen 15–18) zijn wij vierentwintig punten tegengekomen waar de tekst van de norm (of, bij vraag 4, de Omgevingsregeling) meer dan één lezing toelaat. Bij vijf daarvan verklaart het verschil in lezing een meetbaar verschil in BENG 2 tussen onze uitkomst en het gepubliceerde rapport; vragen 8–14 en 19–24 veranderen geen vergeleken uitkomst van de openbare gevallen. Wij volgen de letterlijke tekst, waar twee bepalingen elkaar tegenspreken (vragen 9 en 10) de lezing die aansluit op de rest van de berekening, en waar de toetsset ISSO 54 een andere lezing gebruikt dan de letterlijke tekst (vragen 15–18) de lezing van de toetsset, maar willen voor de attestering zeker weten welke lezing bedoeld is. Per vraag noemen wij de plaats in de norm, de twee lezingen, het gevolg in een openbaar geval en de concrete vraag. De openbare gevallen en de verschilanalyse per post staan in onze vergelijking van openbare rapporten; die sturen wij desgewenst mee.
 
 Wij stellen een antwoord per vraag zeer op prijs, ook als het een verwijzing is naar een bestaande toelichting of een geplande correctie.
 
@@ -184,6 +184,41 @@ Deze vraag gaat over de Omgevingsregeling (BWBR0045528, versie 2026-10-01), niet
 - **Lezing A (onze keuze).** Het product q_Oc · f_τ wordt per gebruiksfunctie gewogen, zoals de gepubliceerde rapporten van openbare gevallen H (2023) en K (2022).
 - **Lezing B.** q_Oc en f_τ worden elk apart gewogen en daarna vermenigvuldigd (kantoor 150 m² met andere bijeenkomstfunctie 100 m²: Q_int januari 909,7 in plaats van 876,2 kWh).
 - **Vraag.** Welke weging is bedoeld?
+
+### Vraag 20. Opwekkingsrendement van een ketel volgens bijlage M: Q_H;gen;out met of zonder f_ctr;ls (M.24–M.25, p. 878)
+
+- **Plaats.** M.24 definieert de nuttige warmte Q_gen;out als f_ctr;ls · Q_H;gen,j;out. M.25 deelt Q_H;gen;out door de toegevoerde energie, zonder te zeggen of dat de waarde vóór of na f_ctr;ls is.
+- **Lezing A (onze keuze).** Q_H;gen;out met f_ctr;ls, zoals M.24. Een gesloten wandketel met een kamerthermostaat: de jaarlijks toegevoerde energie verschilt circa 0,9 % tussen beide lezingen.
+- **Lezing B.** Q_H;gen;out zonder f_ctr;ls.
+- **Vraag.** Is Q_H;gen;out in M.25 de waarde na f_ctr;ls (M.24) of de waarde ervoor?
+
+### Vraag 21. Rendement van geothermie bij externe warmtelevering (5.48, p. 128; P.6.5.4.8)
+
+- **Plaats.** Formule 5.48 drukt het aandeel hernieuwbaar af als 1 − 1/20 = 0,95 met "η = 20 conform P.6.5.4.8". P.6.5.4.8 geeft η echter als 20 · (ϑ_geo − ϑ_ret − 3)/40, afhankelijk van de temperaturen.
+- **Lezing A (onze keuze).** η volgens P.6.5.4.8. Een net met alleen geothermie: f_Pren 0,88 met de formule van P.6.5.4.8 tegen 0,89 met de gedrukte waarde 20.
+- **Lezing B.** η = 20, zoals in 5.48 gedrukt.
+- **Vraag.** Geldt in 5.48 η = 20 vast, of η volgens de formule van P.6.5.4.8?
+
+### Vraag 22. Afronding van de U-waarde naar een onverwarmde ruimte (8.2.2.1, p. 227; 8.4.2.1, p. 265)
+
+- **Plaats.** 8.4.2.1 vervangt voor een scheidingsconstructie naar een onverwarmde ruimte R_se door R_si. 8.2.2.1 rondt een U-waarde die in 8.1 wordt gebruikt af op twee decimalen, maar zegt niet of dat ook geldt voor de U-waarde na deze vervanging.
+- **Lezing A (onze keuze).** Niet opnieuw afronden. Een garage als onverwarmde ruimte: H_U 7,4625 W/K onafgerond tegen 7,4035 W/K met afgeronde U-waarden.
+- **Lezing B.** Opnieuw afronden op twee decimalen.
+- **Vraag.** Wordt de U-waarde na de vervanging van R_se door R_si (8.4.2.1) opnieuw afgerond volgens 8.2.2.1?
+
+### Vraag 23. U_x;T bij een onverwarmde kelder in D.15 en D.16 (p. 795–796; 8.47, p. 262)
+
+- **Plaats.** D.15 en D.16 noemen U_x;T de U-waarde van de kelderwand boven het maaiveld "volgens 8.3.2.1". 8.47 definieert een U_x;T voor de kruipruimte en kelder anders. De noemer van D.15 is bovendien zo gezet dat het formulenummer erin lijkt te staan.
+- **Lezing A (onze keuze).** De U-waarde van de kelderwand (U_xw). Bepaalt H_g van elke vloer boven een onverwarmde kelder.
+- **Lezing B.** U_x;T volgens 8.47.
+- **Vraag.** Is U_x;T in D.15/D.16 de U-waarde van de kelderwand boven het maaiveld, of de U_x;T van 8.47?
+
+### Vraag 24. ΔU_for over kelderwanden en vloeren boven een onverwarmde kelder (8.3, p. 225)
+
+- **Plaats.** A_T;ntr in de formule voor ΔU_for sluit alleen "vloer boven kruipruimte of direct op ondergrond of paneel" uit. Kelderwanden van 8.38 en een vloer boven een onverwarmde kelder worden niet genoemd.
+- **Lezing A (onze keuze).** Alle elementen van de grondroute blijven buiten A_T;ntr. Een verwarmde kelder met 24 m² kelderwand (forfaitaire route): ΔU_for 0,1549 zonder en 0,1494 W/(m²·K) met de kelderwanden.
+- **Lezing B.** Alleen de genoemde vloeren blijven erbuiten.
+- **Vraag.** Tellen kelderwanden en een vloer boven een onverwarmde kelder mee in A_T;ntr voor ΔU_for?
 
 ---
 
