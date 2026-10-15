@@ -17,7 +17,8 @@ import { readIdentity, renderLeveringsdocument } from '../../scripts/nta-leverin
 import { setVersion } from '../../scripts/bump-version.js';
 
 const root = resolve(__dirname, '../..');
-const read = (path: string) => readFileSync(resolve(root, path), 'utf8');
+// A Windows checkout has CRLF line endings (core.autocrlf); the checks read the content.
+const read = (path: string) => readFileSync(resolve(root, path), 'utf8').replace(/\r\n/g, '\n');
 const load = (name: string) => ({
   project: JSON.parse(read(`training-data/nta8800-example-${name}.json`)) as IProject,
   assessment: JSON.parse(read(`training-data/nta8800-example-${name}.kernel-output.json`)) as ProjectPerformanceAssessment,

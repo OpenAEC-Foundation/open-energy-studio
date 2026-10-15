@@ -6,7 +6,8 @@ import { join } from 'node:path';
 // hide a gate bug (the frontend bundle used to be built by CI before the gate,
 // which hid that the gate needed dist/ before its Tauri check).
 const root = join(__dirname, '../..');
-const read = (path: string) => readFileSync(join(root, path), 'utf8');
+// A Windows checkout has CRLF line endings (core.autocrlf); the checks read the content.
+const read = (path: string) => readFileSync(join(root, path), 'utf8').replace(/\r\n/g, '\n');
 
 /** The step lines of one job, from `  <job>:` to the next job. */
 function job(workflow: string, name: string): string {
