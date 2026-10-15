@@ -6,6 +6,9 @@
  * the project result in the status bar, an edit that marks it outdated, the
  * basic survey and its takeover, the tailored advice table, the edition
  * switch review, the report and EP-Online overview, and a gap with "Ga naar".
+ * Ported to the shell of the 12 Oct 2026 merge: a project without a survey is
+ * entered as a question flow whose "Next" applies the shared NTA draft; a
+ * survey project keeps the draft bar (workflow-e2e-040.test.tsx).
  *
  * Opt-in: runs only when OES_KERNEL_ONCE names the built example binary.
  * scripts/verify-nta.sh builds it and sets the variable; a plain `vitest run`
@@ -58,7 +61,8 @@ beforeEach(() => {
     const path = String(url).replace(/^\/api/, '');
     const body = init?.body ? JSON.parse(String(init.body)) as unknown : undefined;
     calls.push({ path, body });
-    const outcome = kernel(init?.method ?? (body === undefined ? 'GET' : 'POST'), path, body);    return {
+    const outcome = kernel(init?.method ?? (body === undefined ? 'GET' : 'POST'), path, body);
+    return {
       ok: outcome.status < 400,
       status: outcome.status,
       json: async () => outcome.body,
@@ -76,12 +80,26 @@ type User = ReturnType<typeof userEvent.setup>;
 const statusBar = () => document.querySelector('footer.status-bar') as HTMLElement;
 const nav = () => screen.getByRole('navigation', { name: 'Workflow steps' });
 const main = () => within(screen.getByRole('main'));
-const bar = () => within(screen.getByRole('region', { name: 'NTA input draft' }));
 const en = (value: number | null | undefined, digits = 0) => formatNumber(value, 'en', digits);
+const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-async function openStep(user: User, step: RegExp, sub?: string) {
-  await user.click(within(nav()).getByRole('button', { name: step }));
-  if (sub) await user.click(within(nav()).getByRole('button', { name: sub }));
+/**
+ * A workflow step by its label ("2 Building, to do") and optionally one of its pages ("· Calculation zones").
+ * Results and report are one step with two pages; Tailored advice is under "More" in a project without a survey.
+ */
+async function openStep(user: User, step: string, sub?: string) {
+  if (step === 'Results' || step === 'Report & dossier') {
+    await user.click(within(nav()).getByRole('button', { name: /^Results and report, / }));
+    await user.click(within(nav()).getByRole('button', { name: step }));
+  } else if (step === 'Tailored advice') {
+    await user.click(within(nav()).getByRole('button', { name: step }));
+  } else {
+    await user.click(within(nav()).getByRole('button', { name: new RegExp(`${escape(step)}, `) }));
+  }
+  if (!sub) return;
+  // Flow steps list their questions in the navigation; the other steps have their pages as tabs on the page.
+  const name = new RegExp(`${escape(sub)}$`);
+  await user.click(within(nav()).queryByRole('button', { name }) ?? main().getByRole('button', { name }));
 }
 
 async function openProjectFile(user: User, project: unknown) {
@@ -102,10 +120,26 @@ async function openExample(user: User, project: Record<string, unknown>) {
   await openProjectFile(user, project);
 }
 
-/** Applies the draft and waits for the kernel run of the applied input to be asked. */
+/** The primary button of the question flow ("Next question", "Next: …"), which applies the shared NTA draft. */
+const nextButton = () => {
+  const button = screen.getByRole('main').querySelector<HTMLButtonElement>('.survey-actions .btn-primary');
+  if (!button) throw new Error('no question-flow next button on this page');
+  return button;
+};
+
+/** Applies the draft the way the question flow does (by moving on) and waits for the kernel run of the applied input. */
 async function applyDraft(user: User) {
   const runs = projectBodies().length;
-  await user.click(bar().getByRole('button', { name: /^Apply/ }));
+  await user.click(nextButton());
+  await waitFor(() => expect(projectBodies().length).toBeGreaterThan(runs), { timeout: 10_000 });
+}
+
+/** Applies the draft with the bar, where a page is not a question of the flow (a survey project). */
+async function applyDraftWithBar(user: User) {
+  const runs = projectBodies().length;
+  const bar = within(screen.getByRole('region', { name: 'NTA input draft' }));
+  await user.click(bar.getByRole('button', { name: /^Apply/ }));
+  expect(screen.queryByRole('region', { name: 'NTA input draft' })).toBeNull();
   await waitFor(() => expect(projectBodies().length).toBeGreaterThan(runs), { timeout: 10_000 });
 }
 
@@ -129,14 +163,14 @@ describe.skipIf(!binary)('full app against the real kernel (kernel_once)', () =>
     await openExample(user, example('nta8800-example-terraced-dwelling.json'));
     const before = await expectKernelFigures();
 
-    // An overhang on the south window: the draft is applied, the result is outdated until the new answer.
-    await openStep(user, /^Building/);
+    // An overhang on the south window: "Next" applies the draft, the result is outdated until the new answer.
+    await openStep(user, 'Building');
     await user.selectOptions(main().getByLabelText('Obstruction Raam S'), 'overhang');
     const group = within(main().getByRole('group', { name: 'Raam S' }));
     await user.type(group.getByLabelText('Relative height (h/a)'), '0,9');
     await user.type(group.getByLabelText('Source'), 'gevelaanzicht');
     const runs = projectBodies().length;
-    await user.click(bar().getByRole('button', { name: /^Apply/ }));
+    await user.click(nextButton());
     await waitFor(() => expect(statusBar()).toHaveTextContent('Result outdated'), { timeout: 10_000 });
     await waitFor(() => expect(projectBodies().length).toBeGreaterThan(runs), { timeout: 10_000 });
     const after = await expectKernelFigures();
@@ -155,11 +189,12 @@ describe.skipIf(!binary)('full app against the real kernel (kernel_once)', () =>
     await openExample(user, { ...example('nta8800-example-terraced-dwelling.json'), basisopname: { kind: 'residential', survey } });
     await expectKernelFigures();
 
-    await openStep(user, /^Basic survey/);
+    // The survey's check page holds the full form with the calculation, its outcome and the takeover.
+    await openStep(user, 'Check');
+    await user.click(main().getByText('All data as a form (for experts)'));
     await user.click(main().getByRole('button', { name: 'Calculate survey' }));
     await waitFor(() => expect(sent('/opname/residential').length).toBeGreaterThan(0));
-    await user.click(main().getByRole('button', { name: 'Outcome & defaults' }));
-    const result = await screen.findByLabelText('Survey result');
+    const result = await main().findByLabelText('Survey result');
     const answer = answerToLast<{ performance: ProjectPerformanceAssessment['performance']; derivedInput: { spaceHeating: { generator: unknown } } }>('/opname/residential');
     const performance = answer.performance!;
     expect(result).toHaveTextContent(`Indicative label class: ${performance.indicativeLabelClass}`);
@@ -170,7 +205,8 @@ describe.skipIf(!binary)('full app against the real kernel (kernel_once)', () =>
     await user.click(within(result).getByRole('button', { name: 'Take over into project model' }));
     const dialog = within(await screen.findByRole('dialog'));
     await user.click(dialog.getByRole('button', { name: 'Take over into draft' }));
-    await applyDraft(user);
+    // A survey project has no NTA question flow: the takeover goes into the draft that the bar applies.
+    await applyDraftWithBar(user);
     const project = await expectKernelFigures();
     // The project the kernel calculated has the generator the survey derived.
     const request = projectBodies().slice(-1)[0] as { project: { ntaCalculation: { generator: unknown } } };
@@ -195,7 +231,7 @@ describe.skipIf(!binary)('full app against the real kernel (kernel_once)', () =>
     await openExample(user, { ...dwelling, maatwerkadvies });
     await expectKernelFigures();
 
-    await openStep(user, /^Tailored advice/, 'Advice & report');
+    await openStep(user, 'Tailored advice', 'Advice & report');
     await user.click(main().getAllByRole('button', { name: 'Calculate' })[0]);
     await waitFor(() => expect(sent('/maatwerkadvies').length).toBeGreaterThan(0));
     const table = (await main().findByRole('rowheader', { name: /^Pakket zon/ }, { timeout: 30_000 })).closest('table')!;
@@ -226,7 +262,7 @@ describe.skipIf(!binary)('full app against the real kernel (kernel_once)', () =>
     await expectKernelFigures();
 
     const reviewSwitch = async (edition: string) => {
-      await openStep(user, /^Project/);
+      await openStep(user, 'Project');
       await user.selectOptions(await main().findByLabelText('NTA 8800 edition'), edition);
       const dialog = within(await screen.findByRole('dialog', { name: 'Change the NTA 8800 edition' }));
       await waitFor(() => expect(dialog.queryByText('Calculating the project in both editions…')).toBeNull(), { timeout: 30_000 });
@@ -255,7 +291,7 @@ describe.skipIf(!binary)('full app against the real kernel (kernel_once)', () =>
     const { assessment } = await expectKernelFigures();
     const performance = assessment.performance!;
 
-    await openStep(user, /^Report/);
+    await openStep(user, 'Report & dossier');
     const preview = () => (main().getByTestId('report-builder-preview') as HTMLIFrameElement).getAttribute('srcdoc') ?? '';
     await waitFor(() => expect(preview()).toContain(`kern ${assessment.kernelVersion}`), { timeout: 10_000 });
     expect(preview()).toContain(assessment.targetNormVersion!);
@@ -263,7 +299,7 @@ describe.skipIf(!binary)('full app against the real kernel (kernel_once)', () =>
     const labelEp2 = performance.labelPrimaryFossilIndicatorKwhPerM2Year ?? performance.primaryFossilIndicatorKwhPerM2Year;
     expect(preview()).toContain(`${dutchNumber(labelEp2, 2)} kWh/m²·jr`);
 
-    await openStep(user, /^Report/, 'BRL 9500 checklist');
+    await openStep(user, 'Report & dossier', 'BRL 9500 checklist');
     const overview = within(main().getByTestId('ep-online-overview'));
     const value = (field: string) => overview.getByText(field).closest('tr')!.querySelectorAll('td')[1].textContent;
     const round = (number: number | null | undefined, digits = 2) => String(Math.round(number! * 10 ** digits) / 10 ** digits);
@@ -294,7 +330,7 @@ describe.skipIf(!binary)('full app against the real kernel (kernel_once)', () =>
     await openExample(user, example('nta8800-example-terraced-dwelling.json'));
     await expectKernelFigures();
 
-    await openStep(user, /^Building/, 'Calculation zones');
+    await openStep(user, 'Building', 'Calculation zones');
     await user.clear(main().getByLabelText('Heating setpoint °C'));
     await applyDraft(user);
     const answer = answerToLast<ProjectPerformanceAssessment>('/project/performance');
@@ -305,7 +341,8 @@ describe.skipIf(!binary)('full app against the real kernel (kernel_once)', () =>
     expect(answer.gaps.filter((item) => item.code === 'nta_value_missing').map((item) => item.path))
       .toEqual(['ntaCalculation.setpoints.heatingC']);
 
-    await openStep(user, /^Check/, 'Check overview');
+    // The check page of the question flow lists the kernel's open points.
+    await openStep(user, 'Check');
     const buttons = await main().findAllByRole('button', { name: /Go to/ }, { timeout: 30_000 });
     const itemOf = (button: HTMLElement) => (button.closest('li, tr') ?? button.parentElement!) as HTMLElement;
     // One open point per kernel gap, each with the kernel's code and detail.
