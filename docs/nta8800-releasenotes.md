@@ -13,6 +13,19 @@ Dit bestand is de wijzigingsregistratie van de rekenkern (BRL 9501 §5.2, §6.2 
 
 ## Onuitgebracht
 
+### 15 oktober 2026 — Review 77: laatste routes en dekking per normdeel
+- **Herberekening laatste routes:** berekende collectieve zonne-energie op een warmte- of tapwaternet (P.32/P.33 met 13.7.2.2), de gemeten route van bijlage P (P.6) en vliesgevels; `crates/nta8800-core/tests/remaining_independent.rs`.
+- **Rekenwijziging (13.114, p. 595):** bij collectieve zonne-energie voor verwarming telt het opslagverlies van het back-updeel Q_H;bu;sto;ls mee in het energiegebruik van het zonnedeel (was weggelaten); klein effect.
+- **Rekenwijziging (P.6.6.5.10, tabel 13.12, p. 579):** collectieve zonne-energie voor warm tapwater rekende met de instellingen voor verwarming (retour- en aanvoertemperatuur van het net). Nu de tapwaterinstellingen van tabel 13.12: ϑ_low 10 °C (koud water), ϑ_high en de back-upinstelling 65 °C (circulatie); alleen ϑ_ref wordt 70 °C. Voorbeeld: 14 990 in plaats van 17 540 kWh zonnewarmte.
+- **Dekking hoofdstukken 5–8 en bijlagen A–I en AA:** 329 formules en 79 tabellen per stuk nagelopen (`docs/nta8800-dekking-ch5-8.md`, `crates/nta8800-core/tests/coverage_ch5_8_independent.rs`); geen afwijking. Niet uitgevoerd: 7.44 (kozijnfractie methode A; methode B 0,25 werkt), 8.50/8.51 (ψ_gr uit een numeriek model; opgeven mag) en D.17/D.18 (gewogen h en z over kelderwanddelen; één gemiddelde invoeren).
+- **Dekking hoofdstukken 9–10 en bijlagen J–R** (`docs/nta8800-dekking-ch9-10.md`) en **11–17 en bijlagen S–Z** (`docs/nta8800-dekking-ch11-17.md`): per formule en tabel nagelopen, met tests in `coverage_ch9_10_independent.rs` en `coverage_ch11_17_independent.rs`.
+- **Rekenwijziging (13.168, p. 634):** het stilstandsverlies van een gasboiler rekent met (ϑ_Wc;mn + 5 − ϑ_W;amb)/45; de +5 ontbrak. Daarnaast telt Q_W;S;ls nu als terugwinbaar verlies volgens 13.6.5 (p. 636); dat ontbrak in een verwarmde zone.
+- **Rekenwijziging (p. 644):** een tapwatertoestel in serie met andere neemt c_W;gen van tabel 13.26/13.27 bij zijn eigen deel van de warmtebehoefte, niet bij de totale Q_W;dis;nren;an.
+- **Rekenwijziging (12.1, p. 520):** bevochtiging rekent met q_V;SUP;dis;out van 11.87, niet met q_V;SUP;eff; verschil bij toevoersystemen (B).
+- **Rekenwijziging (9.2.3.5, p. 292):** een buffervat in een verwarmde ruimte rekent met de genivelleerde setpointtemperatuur θ_int;set;H (7.9.4), niet met de rekentemperatuur.
+- **Boeking (10.79, p. 420):** de pompenergie van vrije koeling en de regeneratietoeslag van 10.85 staan nu als hulpenergie, niet als E_C;el; de totale elektriciteit en de primaire energie blijven gelijk.
+- **Vraag 28 aan NEN:** de kern rondt een opgegeven U-waarde niet opnieuw af vóór 8.1 (p. 228); met die afronding wijken dertien openbare gevallen af van hun gepubliceerde rapport.
+
 ### 15 oktober 2026 — Review 76: bijlagen C, E, I, N en P, numerieke route en opnamestandaarden onafhankelijk nagerekend
 - **Herberekening:** hellende lagen (C.4.4), reflecterende spouwen en folies (C.3.5, tabellen C.3/C.4, E.13), de λ-omrekening van bijlage E (E.3–E.10, tabellen E.1–E.17, H.1), bijlage I (tabellen I.1–I.16, I.2/I.3, figuur I.4) en de numerieke route (8.5, 8.25–8.29, tabel 8.5); circa 1 210 grootheden (`crates/nta8800-core/tests/constructions_independent.rs`). Daarnaast circa 45 standaardwaarden van de basisopname tegen NTA 8800 gelegd (`crates/nta8800-core/tests/opname_defaults_independent.rs`).
 - **Rekenwijziging (figuur I.4, p. 827):** "is er isolatie aanwezig? nee" leidt naar I.2.1.2 (tabel I.4, kolom zonder isolatie), ongeacht het bouwjaar. De kern kende alleen "geen of onbekend" en nam vanaf 1965 tabel I.5. Nieuw: `absent` in de forfaitaire constructie en `none` in de opname ("geen isolatie, vastgesteld"); "onbekend" blijft per bouwjaar I.2.1.2 of I.2.1.3. Voorbeeld: spouwgevel 1970 zonder isolatie R_c 0,35 (was 0,43). Opgeslagen invoer houdt de oude betekenis "onbekend".

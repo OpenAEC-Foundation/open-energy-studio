@@ -1102,7 +1102,8 @@ fn zone_humidity(
         supply_flow_m3_per_h: ventilation
             .months
             .iter()
-            .map(|month| month.heating.mechanical_supply_m3_per_h)
+            // 12.1 (p. 520): q_V;SUP;dis;out of 11.87, not q_V;SUP;eff.
+            .map(|month| month.heating.supply_distribution_out_m3_per_h)
             .collect(),
         cooling_design: None,
         cooling_need_kwh: Vec::new(),
@@ -1518,6 +1519,8 @@ struct ZoneTerms {
     fan_power_w: f64,
     /// θ_int;op;H = θ_int;calc;H (7.9.6) per month, °C.
     operative_c: [f64; 12],
+    /// θ_int;set;H;zi,mi (7.9.4, levelled by 7.76) per month, °C.
+    set_c: [f64; 12],
     /// Σ H_zi,j;ztu to the unheated spaces (unreduced), W/K: the weight
     /// F_j;ztu (7.6.4) of this zone in ϑ_ztu (7.82).
     unheated_conductance_w_per_k: f64,
@@ -1732,6 +1735,12 @@ fn zone_terms(
                 .monthly
                 .get(month)
                 .map_or(setpoint, |row| row.heating.calculation_temperature_c)
+        }),
+        set_c: std::array::from_fn(|month| {
+            demand
+                .monthly
+                .get(month)
+                .map_or(setpoint, |row| row.heating.setpoint_c)
         }),
         unheated_conductance_w_per_k: match &demand_input.transmission {
             crate::monthly_demand::Transmission::Components(components) => components
@@ -2234,8 +2243,10 @@ fn calculate_distribution(
                     .map(|zone| zone[month].0)
                     .fold(f64::NEG_INFINITY, f64::max)
             };
+            // 9.2.3.5 (p. 292): in a heated space θ_sto;amb is
+            // θ_int;set;H;zi,mi of 7.9.4, the levelled setpoint.
             let ambient = if buffer.in_heated_space {
-                zones[0].operative_c[month]
+                zones[0].set_c[month]
             } else {
                 unheated_ambient(month)
             };

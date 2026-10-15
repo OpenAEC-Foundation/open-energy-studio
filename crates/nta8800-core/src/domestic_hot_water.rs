@@ -3354,7 +3354,17 @@ fn book_generator(
                 (1.0, 1.0)
             }
         }
-        _ => generation(generator, annual_total)?,
+        // p. 644: an appliance in series with others takes c_W;gen at its own
+        // share of the demand, the sum of its Q_W;gen;gi;out, not the system's
+        // Q_W;dis;nren;an.
+        _ => generation(
+            generator,
+            if system.series.is_some() {
+                outputs.iter().sum()
+            } else {
+                annual_total
+            },
+        )?,
     };
     for index in 0..12 {
         let output = outputs[index];
@@ -3390,7 +3400,13 @@ fn book_generator(
                 unheated_ambient(system, None, context.heated_ambient_c, index)
             };
             let standing =
-                f_building * (mean - ambient) / 45.0 * MONTH_HOURS[index] / 24.0 * standby;
+                // 13.168 (p. 634): (θ_Wc;mn + 5 − θ_W;amb)/45.
+                f_building * (mean + 5.0 - ambient) / 45.0 * MONTH_HOURS[index] / 24.0 * standby;
+            // p. 636: the recoverable losses of 13.6.5 take Q_W;S;ls of 13.168
+            // as the vessel loss (f_sto;rm = 1, 13.63).
+            if recoverable_counts && *in_heated_zone {
+                booking.recoverable[index] += standing;
+            }
             let generation_loss = (1.11 - 0.84) / 0.84 * output;
             efficiency = if output > 0.0 {
                 round_down(output / (output + generation_loss + standing), 0.025)
@@ -6091,7 +6107,8 @@ mod tests {
         let result = assess_hot_water(&input, context()).unwrap();
         let jan = &result.months[0];
         let standby = 2.0 + 0.033 * 100.0_f64.powf(1.1);
-        let standing = (55.0 - 20.0) / 45.0 * 744.0 / 24.0 * standby;
+        // 13.168 (p. 634): (ϑ_Wc;mn + 5 − ϑ_W;amb)/45.
+        let standing = (55.0 + 5.0 - 20.0) / 45.0 * 744.0 / 24.0 * standby;
         let output = jan.generator_output_kwh;
         let loss = 0.27 / 0.84 * output;
         let eta = round_down(output / (output + loss + standing), 0.025);
@@ -6104,7 +6121,7 @@ mod tests {
         let result = assess_hot_water(&input, levelled).unwrap();
         let jan = &result.months[0];
         let output = jan.generator_output_kwh;
-        let standing = (55.0 - 17.0) / 45.0 * 744.0 / 24.0 * standby;
+        let standing = (55.0 + 5.0 - 17.0) / 45.0 * 744.0 / 24.0 * standby;
         let loss = 0.27 / 0.84 * output;
         let eta = round_down(output / (output + loss + standing), 0.025);
         assert!((jan.generation_efficiency - eta).abs() < 1e-12);

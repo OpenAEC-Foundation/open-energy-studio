@@ -3559,6 +3559,12 @@ fn solar_contribution(
                 return None;
             }
             let ambient = [field.storage_ambient_c; 12];
+            let hot_water = function == SystemFunction::HotWater;
+            // P.6.6.5.10 -> P.6.5.4.10: Q_W;ren follows 13.7.2.2 with the
+            // hot-water settings of table 13.12 (p. 579): theta_low the cold
+            // water (10 C), theta_high and the back-up set point theta_W;hw
+            // 65 C (a network circulates); only theta_ref is replaced by 70 C.
+            // Heating keeps the network's return and supply (reading 13).
             let months = calculated_service(
                 field.solar_type,
                 collectors,
@@ -3567,16 +3573,29 @@ fn solar_contribution(
                     use_kwh: *monthly_input,
                     share: [1.0; 12],
                     reference_c: [COLLECTIVE_SOLAR_REFERENCE_C; 12],
-                    low_c: ambient,
-                    high_c: field.network_return_c,
-                    backup_set_c: field.network_supply_c,
+                    low_c: if hot_water {
+                        [COLD_WATER_C; 12]
+                    } else {
+                        ambient
+                    },
+                    high_c: if hot_water {
+                        CIRCULATION_HOT_WATER_C
+                    } else {
+                        field.network_return_c
+                    },
+                    backup_set_c: if hot_water {
+                        CIRCULATION_HOT_WATER_C
+                    } else {
+                        field.network_supply_c
+                    },
                     ambient_c: ambient,
                     pump_hours: if function == SystemFunction::HotWater {
                         PUMP_HOURS_WATER
                     } else {
                         PUMP_HOURS_COMBI
                     },
-                    add_backup_loss_to_use: false,
+                    // 13.114 (p. 595): space heating adds Q_H;bu;sto;ls.
+                    add_backup_loss_to_use: !hot_water,
                 },
             );
             Some((
@@ -3586,6 +3605,11 @@ fn solar_contribution(
         }
     }
 }
+
+/// Table 13.12 (p. 579): monthly cold-water temperature, °C.
+const COLD_WATER_C: f64 = 10.0;
+/// Table 13.12: ϑ_W;hw of a system with circulation pipes, °C.
+const CIRCULATION_HOT_WATER_C: f64 = 65.0;
 
 /// `P_XD;gen;gi` for β and P.23/P.42/P.51; cold: P.53/P.55.
 fn generator_power(

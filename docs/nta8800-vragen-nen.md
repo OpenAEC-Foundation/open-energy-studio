@@ -1,8 +1,8 @@
 # Vragen aan NEN / NTA 8800-commissie
 
-Concepten voor vragen over de interpretatie van NTA 8800:2025+C1:2026. Ze zijn in eigen woorden opgesteld en verwijzen alleen naar paginanummers. Aanleiding voor vragen 1–7 is de vergelijking met openbare BENG-rapporten van geattesteerde software ([nta8800-vergelijking-openbare-rapporten.md](nta8800-vergelijking-openbare-rapporten.md)); vragen 8–12 kwamen uit de controle van de rekenkern tegen de normtekst per hoofdstuk (reviews 40–48 in [nta8800-releasenotes.md](nta8800-releasenotes.md)), vragen 13 en 14 uit de onafhankelijke herberekening van bijlage Q (reviews 69 en 70), vragen 15–18 uit de BRL 9501-toetsset ISSO 54, waar de kern de lezing van de toetsset volgt, en vragen 19–27 uit de onafhankelijke herberekeningen van reviews 75 en 76.
+Concepten voor vragen over de interpretatie van NTA 8800:2025+C1:2026. Ze zijn in eigen woorden opgesteld en verwijzen alleen naar paginanummers. Aanleiding voor vragen 1–7 is de vergelijking met openbare BENG-rapporten van geattesteerde software ([nta8800-vergelijking-openbare-rapporten.md](nta8800-vergelijking-openbare-rapporten.md)); vragen 8–12 kwamen uit de controle van de rekenkern tegen de normtekst per hoofdstuk (reviews 40–48 in [nta8800-releasenotes.md](nta8800-releasenotes.md)), vragen 13 en 14 uit de onafhankelijke herberekening van bijlage Q (reviews 69 en 70), vragen 15–18 uit de BRL 9501-toetsset ISSO 54, waar de kern de lezing van de toetsset volgt, en vragen 19–28 uit de onafhankelijke herberekeningen van reviews 75–77.
 
-Alle zevenentwintig vragen staan ook in een verzendklare brief aan NEN en RVO, met per vraag de twee lezingen en het gevolg in de openbare gevallen: [nta8800-vragen-nen-brief.md](nta8800-vragen-nen-brief.md). Werk die brief bij als een vraag hier verandert.
+Alle achtentwintig vragen staan ook in een verzendklare brief aan NEN en RVO, met per vraag de twee lezingen en het gevolg in de openbare gevallen: [nta8800-vragen-nen-brief.md](nta8800-vragen-nen-brief.md). Werk die brief bij als een vraag hier verandert.
 
 ## 1. Afgifteverlies koeling, formule 10.15 (p. 376)
 
@@ -305,3 +305,14 @@ Deze punten gaan over de Omgevingsregeling (BWBR0045528, versie 2026-10-01), nie
 
 **Vraag.**
 - Wordt het verlies van een koudenet per maand op 0 begrensd, of met teken over het jaar gesommeerd?
+
+## 28. Afronding van een opgegeven U-waarde vóór formule 8.1 (8.2.2, p. 228)
+
+**Situatie.** Op p. 228 staat dat een berekende U-waarde die in formule 8.1 wordt gebruikt, wordt afgerond: ondoorschijnende delen op twee decimalen, doorschijnende delen en vliesgevels boven 1,0 op één decimaal en daaronder op twee. Een rekenprogramma krijgt de U-waarde vaak als invoer, bijvoorbeeld uit een productopgave of een R_c-berekening met meer decimalen.
+
+**Gekozen lezing.** De kern rondt af waar hij de U-waarde zelf berekent (bijlage C, I en de forfaitaire route) en neemt een opgegeven U-waarde over zoals die is.
+
+**Gevolg.** Met afronding van de opgegeven U-waarden wijken dertien openbare gevallen (A tot en met J en L tot en met O) af van hun gepubliceerde rapport (geval A: BENG 1 93,86 tegen gepubliceerd 92,99); zonder afronding vallen ze binnen de tolerantie.
+
+**Vraag.**
+- Geldt de afronding van p. 228 ook voor een U-waarde die als invoer wordt opgegeven, en moet een rekenprogramma die vóór formule 8.1 alsnog afronden?

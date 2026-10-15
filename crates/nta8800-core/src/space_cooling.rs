@@ -2658,8 +2658,9 @@ pub fn assess_cooling(system: &CoolingSystem, context: CoolingContext<'_>) -> Co
                     row.district_cold_kwh += cold;
                 }
                 Drive::FreeCooling(eer) => {
-                    // 10.86: pump energy only.
-                    row.electricity_kwh += cold / eer;
+                    // 10.86: pump energy only, W_fc;el;in, part of the
+                    // generation auxiliary energy of 10.79 (p. 420).
+                    row.auxiliary_electricity_kwh += cold / eer;
                     free_cold_by_generator[generator_index][index] = cold;
                     if eer >= RENCOLD_MIN_EER {
                         row.ambient_cold_kwh += cold;
@@ -2671,7 +2672,8 @@ pub fn assess_cooling(system: &CoolingSystem, context: CoolingContext<'_>) -> Co
             // 10.87: control is always on.
             auxiliary += CONTROL_POWER_KW * MONTH_HOURS[index];
         }
-        row.auxiliary_electricity_kwh = auxiliary;
+        // += keeps W_fc;el;in of free cooling, booked above (10.79).
+        row.auxiliary_electricity_kwh += auxiliary;
         // 10.72.
         row.part_load_coverage = coverage.map(|(delivered, required)| {
             if required > 0.0 {
@@ -2708,7 +2710,8 @@ pub fn assess_cooling(system: &CoolingSystem, context: CoolingContext<'_>) -> Co
     if !qualifying.is_empty() {
         let surcharge = regeneration_surcharge_kwh(extracted, returned);
         for row in months.iter_mut().skip(3).take(6) {
-            row.electricity_kwh += surcharge;
+            // 10.85 adds to W_fc;el;in, auxiliary energy of 10.79.
+            row.auxiliary_electricity_kwh += surcharge;
         }
     }
     let zone_booster = context
@@ -3135,8 +3138,10 @@ mod tests {
         assert!((shares[1].share_july_to_september - 0.32).abs() < 1e-12);
         let july = &result.months[6];
         let cold = july.generator_cold_kwh;
-        let expected = 0.68 * cold / 10.0 + 0.32 * cold / 3.0;
-        assert!((july.electricity_kwh - expected).abs() < 1e-9);
+        // 10.79: the free-cooling pump energy is auxiliary energy, the
+        // chiller's input E_C;el.
+        assert!((july.electricity_kwh - 0.32 * cold / 3.0).abs() < 1e-9);
+        assert!(july.auxiliary_electricity_kwh >= 0.68 * cold / 10.0 - 1e-9);
         assert!((july.ambient_cold_kwh - 0.68 * cold).abs() < 1e-9);
         // Missing capacities with two priorities are rejected.
         let missing = system(vec![
@@ -3175,11 +3180,15 @@ mod tests {
         let returned: f64 = result.months.iter().map(|row| row.generator_cold_kwh).sum();
         let surcharge = (0.7 * 6000.0 - returned) / 60.0;
         let july = &result.months[6];
-        assert!((july.electricity_kwh - (july.generator_cold_kwh / 23.0 + surcharge)).abs() < 1e-9);
+        // 10.79/10.85: pump energy and surcharge are auxiliary energy; pure
+        // free cooling has no control energy and no E_C;el.
+        assert!(
+            (july.auxiliary_electricity_kwh - (july.generator_cold_kwh / 23.0 + surcharge)).abs()
+                < 1e-9
+        );
         let january = &result.months[0];
-        assert_eq!(january.electricity_kwh, 0.0);
-        // No control energy for pure free cooling.
-        assert_eq!(july.auxiliary_electricity_kwh, 0.0);
+        assert_eq!(january.auxiliary_electricity_kwh, 0.0);
+        assert_eq!(july.electricity_kwh, 0.0);
     }
 
     #[test]

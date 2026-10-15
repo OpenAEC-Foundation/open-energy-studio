@@ -1092,6 +1092,10 @@ pub struct BalanceFlows {
     pub ventilative_cooling_m3_per_h: f64,
     pub combustion_m3_per_h: f64,
     pub mechanical_supply_m3_per_h: f64,
+    /// q_V;SUP;dis;out (11.87): the supply at the outlet of the distribution,
+    /// q_V;ODA;eff/(f_lea;du·f_lea;ahu), m³/h; feeds 9.29, 10.20 and 12.1.
+    #[serde(default)]
+    pub supply_distribution_out_m3_per_h: f64,
     pub mechanical_extract_m3_per_h: f64,
     /// Temperature of the natural supply (11.99), °C.
     pub natural_supply_temperature_c: f64,
@@ -2935,6 +2939,7 @@ fn balance_month(
     let mut cooling_limit_air_kwh = 0.0;
     let mut ahu_heating_kwh = 0.0;
     let mut ahu_cooling_kwh = 0.0;
+    let mut supply_distribution_out = 0.0;
     for (index, q_supply, unit) in &supply_parts {
         let oda_eff = required * parts(&input.system)[*index].fraction;
         let supply = mechanical_supply_temperature(unit, &context, oda_eff, flea_du);
@@ -2960,6 +2965,7 @@ fn balance_month(
         supply_flows.push((*index, *q_supply, temperature, limit_temperature));
         // 9.29 with q_V;SUP;dis;out of 11.87.
         let dis_out = oda_eff / (flea_du * flea_ahu);
+        supply_distribution_out += dis_out;
         heating_limit_air_kwh +=
             dis_out * 1.205 * 1005.0 / 3600.0 * (limit_temperature - outdoor) * hours / 1000.0;
         // 10.20 with q_V;SUP;dis;out.
@@ -3085,6 +3091,7 @@ fn balance_month(
             ventilative_cooling_m3_per_h: argii_in,
             combustion_m3_per_h: effective.combustion_in,
             mechanical_supply_m3_per_h: supply_total,
+            supply_distribution_out_m3_per_h: supply_distribution_out,
             mechanical_extract_m3_per_h: -extract,
             natural_supply_temperature_c: natural_temperature,
             mechanical_supply_temperature_c: if supply_total > 0.0 {
