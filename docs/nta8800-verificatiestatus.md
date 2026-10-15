@@ -23,7 +23,7 @@ Sinds 12 oktober is de kern opnieuw nagerekend met een eigen implementatie vanaf
 | Voorbeelden en 31 ventilatievarianten in de oudere uitgaven | 2024, 2023, 2022, 2020+A1 | 71 | 14 639 per uitgave | gelijk |
 | Schakelpunten tussen de uitgaven | alle vijf | 72–73 | per schakelpunt tegen de tekst; 12 kerntests | twee herstellen (tabel E.11, NEN-EN 13053 in 2022) |
 
-**Vragen aan NEN** uit deze reeks: 13 (bronpomp dubbel geteld, review 69) en 14 (tapwatertijdfractie Q.86 tegenover 13.149, review 70); samen nu veertien ([vragen aan NEN](nta8800-vragen-nen.md)).
+**Vragen aan NEN** uit deze reeks: 13 (bronpomp dubbel geteld, review 69) en 14 (tapwatertijdfractie Q.86 tegenover 13.149, review 70); vragen 15–18 komen uit de BRL 9501-toetsset ISSO 54 en vraag 19 uit review 75; samen nu negentien ([vragen aan NEN](nta8800-vragen-nen.md)).
 
 **Niet onafhankelijk nagerekend:** Q.86–Q.88 zelf en Q.92 (de kern gebruikt ze niet), de luchtdebietinterpolatie van tabel Q.9 (niet uitgevoerd), het uurklimaat van 17.3.8 (geen NEN 5060-uurwaarden), en in de oudere uitgaven de hoofdstukken 10 en 13 en de bijlagen buiten wat de voorbeelden en de schakelpunten raken. Officiële referentie-uitkomsten (ISSO 54 v5.0) en externe toetsing ontbreken nog; deze herberekeningen vergroten het interne bewijs, niet de status *Referentie* of *Attest*.
 

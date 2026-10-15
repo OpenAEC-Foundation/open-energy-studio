@@ -158,17 +158,24 @@ pub fn mean_on_time(curve: &[LoadCurvePoint]) -> Option<(f64, f64, Option<f64>)>
     for pair in curve.windows(2) {
         let (p0, p1) = (product(&pair[0]), product(&pair[1]));
         if p0 < FULL_LOAD_ON_TIME_S && p1 >= FULL_LOAD_ON_TIME_S {
-            let f = (FULL_LOAD_ON_TIME_S - p0) / (p1 - p0);
-            let lerp = |a: f64, b: f64| a + f * (b - a);
+            // O.1.5 (p. 924): the mean load times the mean on-time is 120 s.
+            // The curve of table O.2 is read as linear in time between its
+            // points, so t solves (m_0 + s·(t − t_0))·t = 120 and m_b = 120/t.
+            let (t0, t1) = (pair[0].time_s, pair[1].time_s);
+            let slope = (pair[1].mean_load - pair[0].mean_load) / (t1 - t0);
+            let intercept = pair[0].mean_load - slope * t0;
+            let t = if slope.abs() < 1e-12 {
+                FULL_LOAD_ON_TIME_S / intercept
+            } else {
+                (-intercept + (intercept * intercept + 4.0 * slope * FULL_LOAD_ON_TIME_S).sqrt())
+                    / (2.0 * slope)
+            };
+            let f = (t - t0) / (t1 - t0);
             let pump = match (pair[0].mean_pump_modulation, pair[1].mean_pump_modulation) {
-                (Some(a), Some(b)) => Some(lerp(a, b)),
+                (Some(a), Some(b)) => Some(a + f * (b - a)),
                 _ => None,
             };
-            return Some((
-                lerp(pair[0].time_s, pair[1].time_s),
-                lerp(pair[0].mean_load, pair[1].mean_load),
-                pump,
-            ));
+            return Some((t, FULL_LOAD_ON_TIME_S / t, pump));
         }
     }
     None
@@ -375,10 +382,14 @@ mod tests {
             mean_pump_modulation: Some(p),
         });
         let (t, load, pump) = mean_on_time(&curve).unwrap();
-        // 240·0,35 = 84 and 300·0,45 = 135; 120 lies at 36/51 of the step.
-        let f = 36.0 / 51.0;
-        assert!((t - (240.0 + 60.0 * f)).abs() < 1e-9);
-        assert!((load - (0.35 + 0.10 * f)).abs() < 1e-12);
+        // 240·0,35 = 84 < 120 < 135 = 300·0,45 (p. 931). With the load linear
+        // in time, (0,35 + (t − 240)/600)·t = 120 gives t² − 30·t − 72 000 = 0.
+        let expected = (30.0 + (900.0f64 + 288_000.0).sqrt()) / 2.0;
+        assert!((t - expected).abs() < 1e-9);
+        assert!((t - 283.747).abs() < 1e-3);
+        // O.1.5: the product is 120 s.
+        assert!((load * t - 120.0).abs() < 1e-9);
+        let f = (t - 240.0) / 60.0;
         assert!((pump.unwrap() - (0.92 + 0.02 * f)).abs() < 1e-12);
     }
 

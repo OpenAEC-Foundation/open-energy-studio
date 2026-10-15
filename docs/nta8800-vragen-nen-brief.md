@@ -19,7 +19,7 @@ Geachte leden van de normcommissie,
 
 [organisatie] ontwikkelt Open Energy Studio, rekensoftware voor de energieprestatie van woningen en utiliteitsgebouwen volgens NTA 8800. Wij bereiden de aanvraag van een attest volgens BRL 9501 voor. De versie waar deze vragen over gaan is programmaversie 0.2.0 met rekenkern 0.4.0 (nog niet uitgebracht); de standaarduitgave is NTA 8800:2025+C1:2026.
 
-Bij het narekenen van openbare BENG-berekeningen van geattesteerde software (vragen 1–7), bij een systematische controle en onafhankelijke herberekening van de rekenkern tegen de normtekst (vragen 8–14) en bij de BRL 9501-toetsset ISSO 54 (vragen 15–18) zijn wij achttien punten tegengekomen waar de tekst van de norm (of, bij vraag 4, de Omgevingsregeling) meer dan één lezing toelaat. Bij vijf daarvan verklaart het verschil in lezing een meetbaar verschil in BENG 2 tussen onze uitkomst en het gepubliceerde rapport; vragen 8–14 veranderen geen vergeleken uitkomst van de openbare gevallen. Wij volgen de letterlijke tekst, waar twee bepalingen elkaar tegenspreken (vragen 9 en 10) de lezing die aansluit op de rest van de berekening, en waar de toetsset ISSO 54 een andere lezing gebruikt dan de letterlijke tekst (vragen 15–18) de lezing van de toetsset, maar willen voor de attestering zeker weten welke lezing bedoeld is. Per vraag noemen wij de plaats in de norm, de twee lezingen, het gevolg in een openbaar geval en de concrete vraag. De openbare gevallen en de verschilanalyse per post staan in onze vergelijking van openbare rapporten; die sturen wij desgewenst mee.
+Bij het narekenen van openbare BENG-berekeningen van geattesteerde software (vragen 1–7), bij een systematische controle en onafhankelijke herberekening van de rekenkern tegen de normtekst (vragen 8–14 en 19) en bij de BRL 9501-toetsset ISSO 54 (vragen 15–18) zijn wij negentien punten tegengekomen waar de tekst van de norm (of, bij vraag 4, de Omgevingsregeling) meer dan één lezing toelaat. Bij vijf daarvan verklaart het verschil in lezing een meetbaar verschil in BENG 2 tussen onze uitkomst en het gepubliceerde rapport; vragen 8–14 en 19 veranderen geen vergeleken uitkomst van de openbare gevallen. Wij volgen de letterlijke tekst, waar twee bepalingen elkaar tegenspreken (vragen 9 en 10) de lezing die aansluit op de rest van de berekening, en waar de toetsset ISSO 54 een andere lezing gebruikt dan de letterlijke tekst (vragen 15–18) de lezing van de toetsset, maar willen voor de attestering zeker weten welke lezing bedoeld is. Per vraag noemen wij de plaats in de norm, de twee lezingen, het gevolg in een openbaar geval en de concrete vraag. De openbare gevallen en de verschilanalyse per post staan in onze vergelijking van openbare rapporten; die sturen wij desgewenst mee.
 
 Wij stellen een antwoord per vraag zeer op prijs, ook als het een verwijzing is naar een bestaande toelichting of een geplande correctie.
 
@@ -177,6 +177,13 @@ Deze vraag gaat over de Omgevingsregeling (BWBR0045528, versie 2026-10-01), niet
 - **Lezing A (onze keuze, zoals ISSO 54).** Utiliteitsbouw registreert TOjuli 0; de toetsset geeft 0 voor alle 59 EPU-deeltests en EPUReal B01.
 - **Lezing B (letterlijk).** TOjuli wordt ook voor utiliteitsrekenzones bepaald (EPUReal B01: 5,02 K).
 - **Vraag.** Wordt TOjuli voor utiliteitsbouw niet bepaald, of geldt §5.7.2 ook daar?
+
+### Vraag 19. Bezettingstijd en warmteproductie door personen in een rekenzone met meer gebruiksfuncties (6.5.3, p. 156–157; 7.26, p. 179)
+
+- **Plaats.** 6.5.3 weegt q_Oc (f) en f_τ (g) elk naar gebruiksoppervlakte; 7.26 noemt q_Oc;usi gewogen en f_τ;usi per gebruiksfunctie.
+- **Lezing A (onze keuze).** Het product q_Oc · f_τ wordt per gebruiksfunctie gewogen, zoals de gepubliceerde rapporten van openbare gevallen H (2023) en K (2022).
+- **Lezing B.** q_Oc en f_τ worden elk apart gewogen en daarna vermenigvuldigd (kantoor 150 m² met andere bijeenkomstfunctie 100 m²: Q_int januari 909,7 in plaats van 876,2 kWh).
+- **Vraag.** Welke weging is bedoeld?
 
 ---
 

@@ -1,8 +1,8 @@
 # Vragen aan NEN / NTA 8800-commissie
 
-Concepten voor vragen over de interpretatie van NTA 8800:2025+C1:2026. Ze zijn in eigen woorden opgesteld en verwijzen alleen naar paginanummers. Aanleiding voor vragen 1–7 is de vergelijking met openbare BENG-rapporten van geattesteerde software ([nta8800-vergelijking-openbare-rapporten.md](nta8800-vergelijking-openbare-rapporten.md)); vragen 8–12 kwamen uit de controle van de rekenkern tegen de normtekst per hoofdstuk (reviews 40–48 in [nta8800-releasenotes.md](nta8800-releasenotes.md)), vragen 13 en 14 uit de onafhankelijke herberekening van bijlage Q (reviews 69 en 70), en vragen 15–18 uit de BRL 9501-toetsset ISSO 54, waar de kern de lezing van de toetsset volgt.
+Concepten voor vragen over de interpretatie van NTA 8800:2025+C1:2026. Ze zijn in eigen woorden opgesteld en verwijzen alleen naar paginanummers. Aanleiding voor vragen 1–7 is de vergelijking met openbare BENG-rapporten van geattesteerde software ([nta8800-vergelijking-openbare-rapporten.md](nta8800-vergelijking-openbare-rapporten.md)); vragen 8–12 kwamen uit de controle van de rekenkern tegen de normtekst per hoofdstuk (reviews 40–48 in [nta8800-releasenotes.md](nta8800-releasenotes.md)), vragen 13 en 14 uit de onafhankelijke herberekening van bijlage Q (reviews 69 en 70), vragen 15–18 uit de BRL 9501-toetsset ISSO 54, waar de kern de lezing van de toetsset volgt, en vraag 19 uit de onafhankelijke herberekening van hoofdstuk 7 (review 75).
 
-Alle achttien vragen staan ook in een verzendklare brief aan NEN en RVO, met per vraag de twee lezingen en het gevolg in de openbare gevallen: [nta8800-vragen-nen-brief.md](nta8800-vragen-nen-brief.md). Werk die brief bij als een vraag hier verandert.
+Alle negentien vragen staan ook in een verzendklare brief aan NEN en RVO, met per vraag de twee lezingen en het gevolg in de openbare gevallen: [nta8800-vragen-nen-brief.md](nta8800-vragen-nen-brief.md). Werk die brief bij als een vraag hier verandert.
 
 ## 1. Afgifteverlies koeling, formule 10.15 (p. 376)
 
@@ -206,3 +206,14 @@ Deze punten gaan over de Omgevingsregeling (BWBR0045528, versie 2026-10-01), nie
 **Gevolg.** EPUReal B01: TOjuli 0 (was 5,02 K). Op de labelregistratie van utiliteit staat "Temperatuuroverschrijding" 0.
 
 **Vraag.** Wordt TOjuli voor utiliteitsbouw niet bepaald (en als 0 geregistreerd), of geldt §5.7.2 ook voor utiliteitsrekenzones?
+
+## 19. Bezettingstijd en warmteproductie door personen in een rekenzone met meer gebruiksfuncties (6.5.3, p. 156–157; 7.26, p. 179)
+
+**Situatie.** 6.5.3 noemt de interne warmteproductie door personen q_Oc (onderdeel f) en de correctiefactor voor de bezettingstijd f_τ (onderdeel g) als afzonderlijke variabelen die in een rekenzone met meer gebruiksfuncties naar gebruiksoppervlakte worden gewogen. Formule 7.26 vermenigvuldigt q_Oc;usi, "gewogen naar de gebruiksoppervlakte", met f_τ;usi "voor gebruiksfunctie usi" volgens tabel 7.2.
+
+**Gekozen lezing.** De kern weegt het product q_Oc · f_τ per gebruiksfunctie naar oppervlakte. Zo rekenen de gepubliceerde rapporten van openbaar geval H (utiliteit, 2023) en K (sporthal, 2022).
+
+**Gevolg.** Kantoor 150 m² met een andere bijeenkomstfunctie 100 m²: Q_int in januari 876,2 kWh met de gekozen lezing, 909,7 kWh als q_Oc en f_τ elk apart worden gewogen en daarna vermenigvuldigd.
+
+**Vraag.**
+- Wordt in een rekenzone met meer gebruiksfuncties het product q_Oc · f_τ per gebruiksfunctie gewogen, of worden q_Oc en f_τ elk apart gewogen en daarna vermenigvuldigd?

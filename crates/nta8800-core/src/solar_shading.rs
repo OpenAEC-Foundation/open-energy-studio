@@ -583,6 +583,10 @@ fn shading_lookup(table: &ShadingTable, orientation: Orientation, tilt_deg: f64,
     }
 }
 
+/// Relative width b_b from which a side obstruction no longer makes situation
+/// d: §17.3.2 a and d (p. 698, 701) take b_b < 3,73 m.
+const SIDE_OBSTRUCTION_MAX_WIDTH: f64 = 3.73;
+
 /// Side of the field of view with a side obstruction (situation d).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -746,6 +750,10 @@ pub fn collector_obstruction_factor(
         } => {
             if !(relative_width.is_finite() && *relative_width >= 0.0) {
                 return None;
+            }
+            // §17.3.2 a/d: from b_b 3,73 m the panel is in situation a (table 17.6).
+            if *relative_width >= SIDE_OBSTRUCTION_MAX_WIDTH {
+                return Some(1.0);
             }
             if *side == ObstructionSide::Both && *relative_width < 1.0 && !is_vertical(tilt_deg) {
                 return tilt_lookup(&tables::TABLE_17_15, orientation, tilt_deg, month);
@@ -1070,6 +1078,16 @@ pub fn obstruction_factor(
     let minimal_cooling = (0.0..=180.0).contains(&tilt_deg).then_some(1.0);
     let vertical = |value: f64| is_vertical(tilt_deg).then_some(value);
     match obstruction {
+        // §17.3.2 a (p. 698): side obstructions with b_b of 3,73 m or more
+        // leave the window in situation a; d (p. 701) needs b_b < 3,73 m.
+        Obstruction::SideObstruction { relative_width, .. }
+            if *relative_width >= SIDE_OBSTRUCTION_MAX_WIDTH =>
+        {
+            match balance {
+                Balance::Cooling => minimal_cooling,
+                Balance::Heating => obstruction_lookup(orientation, tilt_deg, month),
+            }
+        }
         Obstruction::Minimal => match balance {
             Balance::Cooling => minimal_cooling,
             Balance::Heating => obstruction_lookup(orientation, tilt_deg, month),

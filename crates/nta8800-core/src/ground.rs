@@ -403,7 +403,8 @@ fn below_terms(
             if !(positive(*volume_m3) && n.is_finite() && n >= 0.0) {
                 return None;
             }
-            1.205 * 1005.0 * n * volume_m3 / (3600.0 * area)
+            // 8.49 (p. 263) gives ρ_a·c_a as 1211 J/(m³·K), rounded from 1,205 · 1005.
+            1211.0 * n * volume_m3 / (3600.0 * area)
         }
     };
     Some(BelowTerms {

@@ -351,7 +351,9 @@ pub fn validate_active_cooling(
                 ));
             }
             let window_area: f64 = input.windows.iter().map(|window| window.area_m2).sum();
-            if window_area >= SMALL_WINDOW_AREA_RATIO * input.usable_floor_area_m2 {
+            // §5.7.1 (p. 114): A_w must be smaller than 0,2·A_g;tot; equal areas
+            // (0,2·96 m² = 19,20 m²) are not, despite the floating-point product.
+            if window_area >= SMALL_WINDOW_AREA_RATIO * input.usable_floor_area_m2 - 1e-9 {
                 issues.push(issue(
                     "solar_limitation_not_met",
                     &format!("{path}.capacity.criterion"),
@@ -561,7 +563,9 @@ pub fn assess_tojuli(input: &MonthlyDemandInput, options: TojuliOptions<'_>) -> 
     let mut listed_conductance = 0.0;
     let mut bucket = |orientation: Orientation, tilt: f64, a: f64, h: f64, gain: f64| {
         listed_conductance += h;
-        if tilt <= HORIZONTAL_TILT_MAX_DEG {
+        // Step A (p. 115): horizontal elements, a roof (0°) or a floor over
+        // outdoor air (180°), go pro rata over the orientations.
+        if tilt <= HORIZONTAL_TILT_MAX_DEG || tilt >= 180.0 - HORIZONTAL_TILT_MAX_DEG {
             horizontal_conductance += h;
             horizontal_solar += gain;
         } else {
