@@ -145,7 +145,6 @@ export const shellLabelsNl: Record<string, string> = {
 
   'report.page.exports': 'Exports',
   'report.page.ifc': 'IFC (BENG)',
-  'nav.stepNumber': 'stap {{number}}',
   'shell.closeTab': 'Tabblad sluiten',
   'palette.group.fields': 'Velden',
   'overview.meets': 'voldoet',
@@ -306,7 +305,6 @@ export const shellLabelsEn: Record<string, string> = {
 
   'report.page.exports': 'Exports',
   'report.page.ifc': 'IFC (BENG)',
-  'nav.stepNumber': 'step {{number}}',
   'shell.closeTab': 'Close tab',
   'palette.group.fields': 'Fields',
   'overview.meets': 'meets the limit',

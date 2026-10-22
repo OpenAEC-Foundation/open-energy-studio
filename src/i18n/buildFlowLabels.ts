@@ -4,7 +4,6 @@
  */
 export const buildFlowLabelsNl: Record<string, string> = {
   'build.navQuestion.info': 'Projectgegevens',
-  'build.more.systems': 'Overzicht installaties',
   'build.import': 'Of lees een bestaand bestand in:',
   'build.fact.noAddress': 'Nog geen adres',
 
@@ -56,7 +55,6 @@ export const buildFlowLabelsNl: Record<string, string> = {
 
 export const buildFlowLabelsEn: Record<string, string> = {
   'build.navQuestion.info': 'Project data',
-  'build.more.systems': 'Installations overview',
   'build.import': 'Or read an existing file:',
   'build.fact.noAddress': 'No address yet',
 

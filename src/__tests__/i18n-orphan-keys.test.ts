@@ -39,8 +39,12 @@ describe('i18n keys', () => {
     const keys = definedKeys();
     // Code outside the translation tables, plus the i18n helpers that build keys.
     const helpers = new Set(['format.ts', 'i18n.ts', 'kernelDetail.ts', 'I18nProvider.tsx']);
+    // Windows paths use backslashes; compare with forward slashes.
     const code = sourceFiles('src')
-      .filter((path) => !path.startsWith(`${I18N}/`) || helpers.has(path.slice(I18N.length + 1)))
+      .filter((path) => {
+        const rel = path.split('\\').join('/');
+        return !rel.startsWith(`${I18N}/`) || helpers.has(rel.slice(I18N.length + 1));
+      })
       .map((path) => readFileSync(path, 'utf8'))
       .join('\n');
     const literals = new Set([...code.matchAll(/['"`]([A-Za-z0-9_.-]+)['"`]/g)].map((match) => match[1]));

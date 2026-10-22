@@ -51,6 +51,11 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Setup Python for build evidence checks
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
       - name: Tag matches program and kernel version
         shell: bash
         run: |
