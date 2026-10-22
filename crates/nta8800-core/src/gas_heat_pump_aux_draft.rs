@@ -2,6 +2,7 @@
 //! §9.6.8.2 (p. 363–364).
 //! Equation 9.91/9.92 only; month hours and generator heat are supplied inputs.
 
+use crate::climate::MONTH_HOURS;
 use crate::gas_heat_pump_forfait_draft::GasPumpDrive;
 use crate::{input_fingerprint, KERNEL_VERSION};
 use serde::{Deserialize, Serialize};
@@ -152,9 +153,12 @@ pub fn assess_gas_heat_pump_aux_draft(
                 format!("months[{index}].month"),
             ));
         }
-        if !positive(month.hours) || month.hours > 744.0 {
+        if !(1..=12).contains(&month.month)
+            || !month.hours.is_finite()
+            || (month.hours - MONTH_HOURS[usize::from(month.month - 1)]).abs() > 1e-9
+        {
             issues.push(issue(
-                "month_hours_invalid",
+                "month_hours_not_normative",
                 format!("months[{index}].hours"),
             ));
         }
@@ -247,7 +251,7 @@ mod tests {
             months: (1..=12)
                 .map(|month| GasHeatPumpAuxMonthInput {
                     month,
-                    hours: 730.0,
+                    hours: MONTH_HOURS[usize::from(month - 1)],
                     generator_output_kwh: 1000.0,
                 })
                 .collect(),
@@ -260,13 +264,13 @@ mod tests {
         let result = assess_gas_heat_pump_aux_draft(&input);
         assert_eq!(result.status, "diagnostic_valid");
         assert_eq!(result.monthly[0].capped_on_hours, 55.0);
-        assert_eq!(result.monthly[0].auxiliary_electricity_kwh, 8.4);
+        assert_eq!(result.monthly[0].auxiliary_electricity_kwh, 8.54);
         assert!((result.annual_auxiliary_electricity_kwh.unwrap() - 100.8).abs() < 1e-10);
         assert!(!result.gas_input_energy_available && !result.beng_calculation_available);
         input.months[0].generator_output_kwh = 20000.0;
         let capped = assess_gas_heat_pump_aux_draft(&input);
-        assert_eq!(capped.monthly[0].capped_on_hours, 730.0);
-        assert_eq!(capped.monthly[0].auxiliary_electricity_kwh, 21.9);
+        assert_eq!(capped.monthly[0].capped_on_hours, 744.0);
+        assert_eq!(capped.monthly[0].auxiliary_electricity_kwh, 22.32);
     }
 
     #[test]
@@ -280,11 +284,27 @@ mod tests {
         );
         input.forfait_cop_used = false;
         let measured = assess_gas_heat_pump_aux_draft(&input);
-        assert_eq!(measured.monthly[0].auxiliary_electricity_kwh, 19.4);
+        assert_eq!(measured.monthly[0].auxiliary_electricity_kwh, 19.54);
         input.drive = GasPumpDrive::GasEngine;
         assert!(assess_gas_heat_pump_aux_draft(&input).monthly.is_empty());
         input.drive = GasPumpDrive::Absorption;
         input.months[1].month = 1;
         assert!(assess_gas_heat_pump_aux_draft(&input).monthly.is_empty());
+    }
+
+    #[test]
+    fn month_hours_must_match_table_17_1() {
+        let mut input = sample();
+        input.months[1].hours = 744.0;
+        let result = assess_gas_heat_pump_aux_draft(&input);
+        assert_eq!(result.status, "invalid");
+        assert!(
+            result
+                .issues
+                .iter()
+                .any(|item| item.code == "month_hours_not_normative"
+                    && item.path == "months[1].hours")
+        );
+        assert!(result.monthly.is_empty());
     }
 }

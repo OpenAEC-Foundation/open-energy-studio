@@ -1,5 +1,5 @@
 //! Gas-driven heat-pump month terms from NTA 8800:2025+C1:2026 formula 9.62
-//! (p. 331) and §9.6.8.1.1.2.3 (p. 362).
+//! (p. 331–332) and §9.6.8.1.1.2.3 (p. 362).
 //! Carrier allocation, gas input and auxiliaries require a separate audit.
 
 use crate::final_energy_draft::MonthlyEnergy;
@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 const DRAFT_SOURCE: &str =
-    "NTA 8800:2025+C1:2026, formule 9.62 (p. 331) en §9.6.8.1.1.2.3 (p. 362)";
+    "NTA 8800:2025+C1:2026, formule 9.62 (p. 331–332) en §9.6.8.1.1.2.3 (p. 362)";
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -22,6 +22,10 @@ pub struct GasHeatPumpMonthlyDraftInput {
     pub generator_output_reference: String,
     pub source_system: SourceSystem,
     pub source_system_reference: String,
+    #[serde(default)]
+    pub collective_source_temperature_c: Option<f64>,
+    #[serde(default)]
+    pub collective_source_temperature_reference: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -97,6 +101,37 @@ pub fn assess_gas_heat_pump_monthly_draft(
     if !compatible {
         issues.push(issue("source_system_mismatch", "sourceSystem"));
     }
+    let ground_collective = input.source_system == SourceSystem::CollectiveGround
+        && input.forfait.source == GasPumpSource::Ground;
+    if ground_collective && crate::norm_versions::profile().collective_source_correction {
+        if !input
+            .collective_source_temperature_c
+            .is_some_and(f64::is_finite)
+        {
+            issues.push(issue(
+                "collective_source_temperature_required",
+                "collectiveSourceTemperatureC",
+            ));
+        }
+        if input
+            .collective_source_temperature_reference
+            .as_deref()
+            .map_or(true, |value| value.trim().is_empty())
+        {
+            issues.push(issue(
+                "source_required",
+                "collectiveSourceTemperatureReference",
+            ));
+        }
+    } else if !ground_collective
+        && (input.collective_source_temperature_c.is_some()
+            || input.collective_source_temperature_reference.is_some())
+    {
+        issues.push(issue(
+            "collective_source_temperature_not_applicable",
+            "collectiveSourceTemperatureC",
+        ));
+    }
     let mut months = [None; 12];
     for (index, item) in input.generator_output_kwh.iter().enumerate() {
         if !(1..=12).contains(&item.month) {
@@ -126,10 +161,20 @@ pub fn assess_gas_heat_pump_monthly_draft(
     }
     let collective = input.source_system != SourceSystem::Individual;
     // (9.62) f_cor.bron.col: 2025+C1 only (2024 p. 314–315 has none).
+    // The ≥15 °C branch on p. 332 also applies to a collective ground source.
     let factor = match input.source_system {
         _ if !crate::norm_versions::profile().collective_source_correction => 0.0,
         SourceSystem::Individual => 0.0,
-        SourceSystem::CollectiveGround => 0.009,
+        SourceSystem::CollectiveGround => {
+            if input
+                .collective_source_temperature_c
+                .is_some_and(|value| value >= 15.0)
+            {
+                0.022
+            } else {
+                0.009
+            }
+        }
         SourceSystem::CollectiveGroundwaterSurfaceOrAtLeast15C => 0.022,
     };
     let mut monthly = Vec::new();
@@ -253,10 +298,36 @@ mod tests {
         );
         let mut ground_input = sample("ground", SourceSystem::CollectiveGround);
         ground_input.forfait.drive = crate::gas_heat_pump_forfait_draft::GasPumpDrive::GasEngine;
+        ground_input.collective_source_temperature_c = Some(14.9);
+        ground_input.collective_source_temperature_reference = Some("source design".into());
         let ground = assess_gas_heat_pump_monthly_draft(&ground_input);
         assert_eq!(ground.status, "diagnostic_valid");
         assert_eq!(ground.collective_source_correction_factor, Some(0.009));
         assert!((ground.monthly[0].equation_962_input_term_kwh - 621.625).abs() < 1e-10);
+        ground_input.collective_source_temperature_c = Some(15.0);
+        let warmer_ground = assess_gas_heat_pump_monthly_draft(&ground_input);
+        assert_eq!(warmer_ground.status, "diagnostic_valid");
+        assert_eq!(
+            warmer_ground.collective_source_correction_factor,
+            Some(0.022)
+        );
+        assert!(
+            warmer_ground.monthly[0].equation_962_input_term_kwh
+                < ground.monthly[0].equation_962_input_term_kwh
+        );
+        ground_input.collective_source_temperature_c = None;
+        let missing = assess_gas_heat_pump_monthly_draft(&ground_input);
+        assert_eq!(missing.status, "invalid");
+        assert!(missing.monthly.is_empty());
+        assert!(missing
+            .issues
+            .iter()
+            .any(|issue| issue.code == "collective_source_temperature_required"));
+        ground_input.collective_source_temperature_c = Some(15.0);
+        ground_input.collective_source_temperature_reference = None;
+        let unreferenced = assess_gas_heat_pump_monthly_draft(&ground_input);
+        assert_eq!(unreferenced.status, "invalid");
+        assert!(unreferenced.monthly.is_empty());
     }
 
     #[test]

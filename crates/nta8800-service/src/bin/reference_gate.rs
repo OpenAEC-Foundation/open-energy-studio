@@ -289,6 +289,18 @@ fn check_coverage(plan: CoveragePlan, report: &mut GateReport) -> bool {
                 passed = false;
             }
             Some(case) => {
+                if case.comparison.target_norm_version != plan.target_norm_version {
+                    report.errors.push(GateError {
+                        file: case.file.clone(),
+                        error: format!(
+                            "Case {} calculates in {}, not the coverage plan edition {}",
+                            required.case_id,
+                            case.comparison.target_norm_version,
+                            plan.target_norm_version
+                        ),
+                    });
+                    passed = false;
+                }
                 if case.comparison.manifest_fingerprint != required.manifest_fingerprint {
                     report.errors.push(GateError {
                         file: case.file.clone(),
@@ -549,20 +561,44 @@ fn write_testset(
         return Err(format!("{} is not empty", projects.display()));
     }
     let mut file_names = HashSet::new();
+    let mut project_files = Vec::new();
     let mut rows = Vec::new();
     for path in suites {
         let bytes = fs::read(path).map_err(|error| format!("{}: {error}", path.display()))?;
+        let file = path.display().to_string();
+        let recorded_suite = report
+            .suites
+            .iter()
+            .find(|suite| suite.file == file)
+            .ok_or_else(|| format!("{file}: suite is absent from the comparison report"))?;
+        if sha256(&bytes) != recorded_suite.sha256 {
+            return Err(format!("{file}: suite changed after comparison"));
+        }
         let suite: Suite = serde_json::from_slice(&bytes).map_err(|error| error.to_string())?;
         let suite_dir = path.parent().unwrap_or(Path::new("."));
-        for raw in suite.cases {
+        for (index, raw) in suite.cases.into_iter().enumerate() {
             let resolved = resolve_suite_case(raw, suite_dir)?;
             let case_id = resolved.case.case_id.clone();
-            let project = resolved.case.project;
-            let first = testset::calculate(&project);
             let file_name = testset::project_file_name(&case_id)?;
             if !file_names.insert(file_name.clone()) {
                 return Err(format!("Duplicate caseId: {case_id}"));
             }
+            let case_file = format!("{file}#cases[{index}]");
+            let recorded_case = report
+                .cases
+                .iter()
+                .find(|item| item.file == case_file)
+                .ok_or_else(|| format!("{case_file}: case is absent from the comparison report"))?;
+            let resolved_hash =
+                sha256(&serde_json::to_vec(&resolved.case).expect("reference case serializes"));
+            if recorded_case.input_sha256 != resolved_hash
+                || recorded_case.project_file_sha256.as_deref()
+                    != Some(resolved.project_file_sha256.as_str())
+            {
+                return Err(format!("{case_file}: project changed after comparison"));
+            }
+            let project = resolved.case.project;
+            let first = testset::calculate(&project);
             let text = testset::project_file(&project, &first);
             // What the app sends after opening the file; the overview is its answer.
             let opened = testset::open_project_file(&text)?;
@@ -572,21 +608,23 @@ fn write_testset(
                     "{case_id}: the opened project file calculates with another input fingerprint"
                 ));
             }
-            fs::write(projects.join(&file_name), &text).map_err(|error| error.to_string())?;
-            let comparison = report
-                .cases
-                .iter()
-                .find(|item| item.comparison.case_id == case_id)
-                .map(|item| serde_json::to_value(&item.comparison).expect("comparison serializes"));
+            // Resolve and validate every case before writing any project file.
+            // A stale later case must not leave a partial dossier behind.
+            project_files.push((file_name.clone(), text.clone()));
+            let comparison =
+                serde_json::to_value(&recorded_case.comparison).expect("comparison serializes");
             rows.push(testset::row(
                 &case_id,
                 testset::topic(&case_id, &topics),
                 &format!("projecten/{file_name}"),
                 &text,
                 &assessment,
-                comparison.as_ref(),
+                Some(&comparison),
             ));
         }
+    }
+    for (file_name, text) in project_files {
+        fs::write(projects.join(file_name), text).map_err(|error| error.to_string())?;
     }
     let header = [
         (
@@ -1067,6 +1105,38 @@ mod tests {
         fs::remove_file(plan_path).unwrap();
     }
 
+    #[test]
+    fn coverage_plan_cannot_count_a_legacy_case_for_the_target_edition() {
+        let mut legacy = case(8.17);
+        legacy.norm_version = "2022".into();
+        legacy.project["ntaCalculation"]["normVersion"] = json!("2022");
+        let calculated = compare_reference_case(legacy.clone());
+        assert!(calculated.calculation_available);
+        legacy.expected[0].value = calculated.metrics[0].actual;
+        let comparison = compare_reference_case(legacy.clone());
+        assert_eq!(comparison.status, "compared_pass");
+        let case_path = temporary_case_file(&legacy);
+        let plan_path = case_path.with_extension("plan.json");
+        fs::write(
+            &plan_path,
+            json!({"targetNormVersion":TARGET_NORM_VERSION,
+                "requiredCases":[{"caseId":legacy.case_id,
+                    "manifestFingerprint":comparison.manifest_fingerprint,
+                    "requiredPaths":["beng2"]}]})
+            .to_string(),
+        )
+        .unwrap();
+        let report = run(std::slice::from_ref(&case_path), Some(&plan_path));
+        assert!(report.numeric_comparison_passed);
+        assert_eq!(report.planned_coverage_passed, Some(false));
+        assert!(report
+            .errors
+            .iter()
+            .any(|error| error.error.contains("not the coverage plan edition")));
+        fs::remove_file(case_path).unwrap();
+        fs::remove_file(plan_path).unwrap();
+    }
+
     fn suite_dir() -> PathBuf {
         let nonce = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -1168,15 +1238,86 @@ mod tests {
         assert!(again.unwrap_err().contains("is not empty"));
 
         let suite = write_suite(vec![suite_case(8.2, json!([])), suite_case(8.2, json!([]))]);
-        let duplicate = write_testset(&dir.join("d2"), None, std::slice::from_ref(&suite), &report);
+        let duplicate_report = run_with(&[], std::slice::from_ref(&suite), None);
+        let duplicate = write_testset(
+            &dir.join("d2"),
+            None,
+            std::slice::from_ref(&suite),
+            &duplicate_report,
+        );
         assert!(duplicate.unwrap_err().contains("Duplicate caseId"));
 
         let mut escaping = suite_case(8.2, json!([]));
         escaping["caseId"] = json!("../escaped");
         let suite = write_suite(vec![escaping]);
-        let unsafe_id = write_testset(&dir.join("d3"), None, std::slice::from_ref(&suite), &report);
+        let unsafe_report = run_with(&[], std::slice::from_ref(&suite), None);
+        let unsafe_id = write_testset(
+            &dir.join("d3"),
+            None,
+            std::slice::from_ref(&suite),
+            &unsafe_report,
+        );
         assert!(unsafe_id.unwrap_err().contains("not a plain file name"));
         assert!(!dir.join("d3/escaped.oes.json").exists());
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn testset_dossier_refuses_suite_or_project_changed_after_comparison() {
+        let dir = suite_dir();
+        let suite = dir.join("suite.json");
+        let suite_value = json!({"suiteId":"s", "description":"d",
+            "cases":[suite_case(8.2, json!([]))]});
+        fs::write(&suite, suite_value.to_string()).unwrap();
+        let report = run_with(&[], std::slice::from_ref(&suite), None);
+
+        let mut changed_suite = suite_value.clone();
+        changed_suite["description"] = json!("different");
+        fs::write(&suite, changed_suite.to_string()).unwrap();
+        let changed = write_testset(&dir.join("d1"), None, std::slice::from_ref(&suite), &report);
+        assert!(changed
+            .unwrap_err()
+            .contains("suite changed after comparison"));
+
+        fs::write(&suite, suite_value.to_string()).unwrap();
+        let project_file = dir.join("project.json");
+        let mut project: Value = serde_json::from_slice(&fs::read(&project_file).unwrap()).unwrap();
+        project["name"] = json!("changed after comparison");
+        fs::write(&project_file, project.to_string()).unwrap();
+        let changed = write_testset(&dir.join("d2"), None, std::slice::from_ref(&suite), &report);
+        assert!(changed
+            .unwrap_err()
+            .contains("project changed after comparison"));
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn testset_dossier_can_retry_after_a_later_case_fails_validation() {
+        let dir = suite_dir();
+        let suite = dir.join("suite.json");
+        let mut second = suite_case(8.2, json!([]));
+        second["caseId"] = json!("second-case");
+        fs::write(
+            &suite,
+            json!({"suiteId":"s", "description":"d",
+                "cases":[suite_case(8.2, json!([])), second]})
+            .to_string(),
+        )
+        .unwrap();
+        let complete = run_with(&[], std::slice::from_ref(&suite), None);
+        let mut incomplete = run_with(&[], std::slice::from_ref(&suite), None);
+        incomplete.cases.pop();
+        let out = dir.join("dossier");
+        let failed = write_testset(&out, None, std::slice::from_ref(&suite), &incomplete);
+        assert!(failed
+            .unwrap_err()
+            .contains("absent from the comparison report"));
+        assert_eq!(fs::read_dir(out.join("projecten")).unwrap().count(), 0);
+        assert_eq!(
+            write_testset(&out, None, std::slice::from_ref(&suite), &complete),
+            Ok(2)
+        );
+        assert_eq!(fs::read_dir(out.join("projecten")).unwrap().count(), 2);
         fs::remove_dir_all(dir).unwrap();
     }
 

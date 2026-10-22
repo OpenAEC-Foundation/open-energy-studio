@@ -83,6 +83,18 @@ def verify_source(manifest: dict, repo: Path) -> None:
     ).strip()
     if object_type != "commit":
         raise ValueError("Claimed source object is not a Git commit")
+    toolchain = manifest.get("toolchain")
+    if not isinstance(toolchain, dict):
+        raise ValueError("Missing build toolchain metadata")
+    source_date_epoch = toolchain.get("sourceDateEpoch")
+    if type(source_date_epoch) is not int:
+        raise ValueError("Missing or invalid SOURCE_DATE_EPOCH")
+    actual_epoch = int(subprocess.check_output(
+        ["git", "-C", str(repo), "show", "-s", "--format=%ct", commit],
+        text=True,
+    ).strip())
+    if source_date_epoch != actual_epoch:
+        raise ValueError("SOURCE_DATE_EPOCH differs from source commit time")
 
     def source_bytes(path: str) -> bytes:
         return subprocess.check_output(
@@ -110,14 +122,46 @@ def verify_source(manifest: dict, repo: Path) -> None:
         raise ValueError("Source target norm version differs from manifest")
 
 
+def compare_builds(first: dict, second: dict) -> None:
+    """Require the same source and exact bytes for all four artifacts."""
+    if first["sourceCommit"] != second["sourceCommit"]:
+        raise ValueError("Builds use different source commits")
+    for field in ("targetNormVersion", "kernelVersion", "desktopPackage", "dependencyLocks"):
+        if first.get(field) != second.get(field):
+            raise ValueError(f"Build metadata differs: {field}")
+    first_toolchain = first.get("toolchain")
+    second_toolchain = second.get("toolchain")
+    if not isinstance(first_toolchain, dict) or not isinstance(second_toolchain, dict):
+        raise ValueError("Build metadata differs: sourceDateEpoch")
+    first_epoch = first_toolchain.get("sourceDateEpoch")
+    second_epoch = second_toolchain.get("sourceDateEpoch")
+    if type(first_epoch) is not int or first_epoch != second_epoch:
+        raise ValueError("Build metadata differs: sourceDateEpoch")
+    if first_toolchain.get("buildLayout") != second_toolchain.get("buildLayout"):
+        raise ValueError("Build metadata differs: buildLayout")
+    for key in sorted(ARTIFACTS):
+        a, b = first["artifacts"][key], second["artifacts"][key]
+        if (a["sha256"], a["bytes"]) != (b["sha256"], b["bytes"]):
+            raise ValueError(f"Build artifact differs: {key}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("manifest", type=Path)
     parser.add_argument("--source-repo", type=Path, help="Check the claimed commit and lockfiles against this Git repository")
+    parser.add_argument("--compare-with", type=Path, help="Verify a second manifest and require byte-identical artifacts from the same commit")
     args = parser.parse_args()
     manifest = verify(args.manifest)
     if args.source_repo is not None:
         verify_source(manifest, args.source_repo)
+    if args.compare_with is not None:
+        second = verify(args.compare_with)
+        if args.source_repo is not None:
+            verify_source(second, args.source_repo)
+        compare_builds(manifest, second)
+        print("Both manifests verify and all four artifacts are byte-identical for the same commit. Build-host independence, normative reference and attest remain unverified.")
+        return 0
+    if args.source_repo is not None:
         print(f"Build bytes and source metadata match commit {manifest['sourceCommit']} in the supplied repository. Build provenance, normative reference and attest remain unverified.")
     else:
         print(f"Build bytes verified; claimed source {manifest['sourceCommit']} was not checked against a repository. Normative reference and attest remain unverified.")

@@ -336,7 +336,7 @@ mod tests {
             .map(|month| json!({"month":month,"energyKwh":1000.0}))
             .collect::<Vec<_>>();
         let aux_months = (1..=12)
-            .map(|month| json!({"month":month,"hours":730.0,"generatorOutputKwh":1000.0}))
+            .map(|month| json!({"month":month,"hours":nta8800_core::climate::MONTH_HOURS[(month - 1) as usize],"generatorOutputKwh":1000.0}))
             .collect::<Vec<_>>();
         let evidence = json!({
             "chain": {
@@ -352,6 +352,7 @@ mod tests {
                     "modulationReference":"draft","buildingShare":1.0,"buildingShareReference":"whole building",
                     "forfaitCopUsed":true,"monthHoursReference":"schedule","generatorOutputReference":"heat meter","months":aux_months}
             },
+            "collectiveSourceEvidenceKind":"supplier_records",
             "sourceTemperatureClass":"below20_c","sourceTemperatureReference":"source design",
             "noQualityDeclarationConfirmed":true,"noQualityDeclarationReference":"register check"
         });
@@ -1459,7 +1460,7 @@ mod tests {
             "modulationReference":"draft 9.6.8.2.3", "buildingShare":1.0,
             "buildingShareReference":"whole building", "forfaitCopUsed":true,
             "monthHoursReference":"hour schedule", "generatorOutputReference":"generator ledger",
-            "months":(1..=12).map(|month| json!({"month":month,"hours":730.0,"generatorOutputKwh":1000.0})).collect::<Vec<_>>()
+            "months":(1..=12).map(|month| json!({"month":month,"hours":nta8800_core::climate::MONTH_HOURS[(month - 1) as usize],"generatorOutputKwh":1000.0})).collect::<Vec<_>>()
         });
         let endpoint = "/v1/nta8800/heat-pumps/gas-aux-draft/diagnose";
         let request = |input: &Value| {
@@ -1477,7 +1478,7 @@ mod tests {
             (value["monthly"][0]["auxiliaryElectricityKwh"]
                 .as_f64()
                 .unwrap()
-                - 8.4)
+                - 8.54)
                 .abs()
                 < 1e-12
         );
@@ -1537,6 +1538,18 @@ mod tests {
             serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap())
                 .unwrap();
         assert!(value["monthly"].as_array().unwrap().is_empty());
+        input["forfait"]["source"] = json!("ground");
+        input["forfait"]["drive"] = json!("gas_engine");
+        let response = app().oneshot(request(&input)).await.unwrap();
+        assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        input["collectiveSourceTemperatureC"] = json!(15.0);
+        input["collectiveSourceTemperatureReference"] = json!("measured source temperature");
+        let response = app().oneshot(request(&input)).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let value: Value =
+            serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
+        assert_eq!(value["collectiveSourceCorrectionFactor"], 0.022);
     }
 
     #[tokio::test]
@@ -1545,7 +1558,7 @@ mod tests {
             .map(|month| json!({"month":month,"energyKwh":1000.0}))
             .collect::<Vec<_>>();
         let aux_months = (1..=12)
-            .map(|month| json!({"month":month,"hours":730.0,"generatorOutputKwh":1000.0}))
+            .map(|month| json!({"month":month,"hours":nta8800_core::climate::MONTH_HOURS[(month - 1) as usize],"generatorOutputKwh":1000.0}))
             .collect::<Vec<_>>();
         let mut input = json!({
             "monthly":{
@@ -1585,7 +1598,10 @@ mod tests {
             value["monthly"][0]["equation962UnallocatedInputTermKwh"],
             625.0
         );
-        assert_eq!(value["monthly"][0]["equipmentAuxiliaryElectricityKwh"], 8.4);
+        assert_eq!(
+            value["monthly"][0]["equipmentAuxiliaryElectricityKwh"],
+            8.54
+        );
         assert_eq!(value["carrierAllocationAvailable"], false);
         input["auxiliary"]["months"][0]["generatorOutputKwh"] = json!(900.0);
         let response = app().oneshot(request(&input)).await.unwrap();
@@ -1604,7 +1620,7 @@ mod tests {
             .map(|month| json!({"month":month,"energyKwh":1000.0}))
             .collect::<Vec<_>>();
         let aux_months = (1..=12)
-            .map(|month| json!({"month":month,"hours":730.0,"generatorOutputKwh":1000.0}))
+            .map(|month| json!({"month":month,"hours":nta8800_core::climate::MONTH_HOURS[(month - 1) as usize],"generatorOutputKwh":1000.0}))
             .collect::<Vec<_>>();
         let mut input = json!({
             "chain": {
@@ -1620,6 +1636,7 @@ mod tests {
                     "modulationReference":"draft","buildingShare":1.0,"buildingShareReference":"whole building",
                     "forfaitCopUsed":true,"monthHoursReference":"schedule","generatorOutputReference":"heat meter","months":aux_months}
             },
+            "collectiveSourceEvidenceKind":"supplier_records",
             "sourceTemperatureClass":"below20_c","sourceTemperatureReference":"source design",
             "noQualityDeclarationConfirmed":true,"noQualityDeclarationReference":"register check"
         });
@@ -1640,6 +1657,18 @@ mod tests {
         assert_eq!(value["primaryRenewableFactor"], 0.95);
         assert_eq!(value["gasInputEnergyAvailable"], false);
         assert_eq!(value["bengCalculationAvailable"], false);
+        input["collectiveSourceEvidenceKind"] = Value::Null;
+        let response = app().oneshot(request(&input)).await.unwrap();
+        assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        let value: Value =
+            serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
+        assert!(value["monthly"].as_array().unwrap().is_empty());
+        assert_eq!(
+            value["issues"][0]["code"],
+            "collective_source_evidence_kind_required"
+        );
+        input["collectiveSourceEvidenceKind"] = json!("supplier_records");
         input["noQualityDeclarationReference"] = json!("");
         let response = app().oneshot(request(&input)).await.unwrap();
         assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
@@ -1648,6 +1677,20 @@ mod tests {
                 .unwrap();
         assert!(value["monthly"].as_array().unwrap().is_empty());
         assert!(value["annualDeliveredSourceHeatKwh"].is_null());
+        input["noQualityDeclarationReference"] = json!("register check");
+        input["chain"]["monthly"]["forfait"]["source"] = json!("ground");
+        input["chain"]["monthly"]["sourceSystem"] = json!("collective_ground");
+        input["chain"]["monthly"]["collectiveSourceTemperatureReference"] = json!("source design");
+        input["chain"]["monthly"]["collectiveSourceTemperatureC"] = json!(20.0);
+        let response = app().oneshot(request(&input)).await.unwrap();
+        assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        let value: Value =
+            serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
+        assert!(value["monthly"].as_array().unwrap().is_empty());
+        input["chain"]["monthly"]["collectiveSourceTemperatureC"] = json!(19.9);
+        let response = app().oneshot(request(&input)).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
     }
 
     #[tokio::test]
@@ -1656,14 +1699,14 @@ mod tests {
             .map(|month| json!({"month":month,"energyKwh":1000.0}))
             .collect::<Vec<_>>();
         let aux_monthly = (1..=12)
-            .map(|month| json!({"month":month,"hours":730.0,"generatorOutputKwh":1000.0}))
+            .map(|month| json!({"month":month,"hours":nta8800_core::climate::MONTH_HOURS[(month - 1) as usize],"generatorOutputKwh":1000.0}))
             .collect::<Vec<_>>();
         let mut expected = Vec::new();
         for month in 1..=12 {
             expected.push(json!({"metric":"equation962_unallocated_input_term","month":month,
                 "valueKwh":625.0,"absoluteToleranceKwh":1e-9,"calculationBasis":"synthetic arithmetic"}));
             expected.push(json!({"metric":"equipment_auxiliary_electricity","month":month,
-                "valueKwh":8.4,"absoluteToleranceKwh":1e-9,"calculationBasis":"synthetic arithmetic"}));
+                "valueKwh":nta8800_core::climate::MONTH_HOURS[(month - 1) as usize] * 0.01 + 1.1,"absoluteToleranceKwh":1e-9,"calculationBasis":"synthetic arithmetic"}));
         }
         expected.push(json!({"metric":"annual_equipment_auxiliary_electricity","month":null,
             "valueKwh":100.8,"absoluteToleranceKwh":1e-9,"calculationBasis":"synthetic arithmetic"}));
@@ -1699,6 +1742,11 @@ mod tests {
                 .unwrap();
         assert_eq!(result["status"], "compared_pass");
         assert_eq!(result["metrics"].as_array().unwrap().len(), 25);
+        assert_eq!(result["source"]["documentId"], "synthetic hand calculation");
+        assert_eq!(
+            result["metrics"][0]["calculationBasis"],
+            "synthetic arithmetic"
+        );
         assert_eq!(result["referenceVerified"], false);
         case["expected"][0]["valueKwh"] = json!(626.0);
         let response = app().oneshot(request(&case)).await.unwrap();
@@ -1707,6 +1755,47 @@ mod tests {
             serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap())
                 .unwrap();
         assert_eq!(result["status"], "compared_fail");
+        case["expected"].as_array_mut().unwrap().pop();
+        let response = app().oneshot(request(&case)).await.unwrap();
+        assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        let result: Value =
+            serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
+        assert_eq!(result["status"], "invalid_case");
+        assert!(result["metrics"].as_array().unwrap().is_empty());
+        case["input"]["monthly"]["forfait"]["source"] = json!("groundwater_aquifer");
+        case["input"]["monthly"]["sourceSystem"] =
+            json!("collective_groundwater_surface_or_at_least15_c");
+        let source_heat = 1000.0 * (1.0 - 1.0 / 2.1);
+        let input_term = 1000.0 / 2.1 - source_heat * 0.022;
+        for metric in case["expected"].as_array_mut().unwrap() {
+            if metric["metric"] == "equation962_unallocated_input_term" {
+                metric["valueKwh"] = json!(input_term);
+            }
+        }
+        case["expected"].as_array_mut().unwrap().push(json!({
+            "metric":"annual_equipment_auxiliary_electricity","month":null,
+            "valueKwh":100.8,"absoluteToleranceKwh":1e-9,"calculationBasis":"synthetic arithmetic"
+        }));
+        for month in 1..=12 {
+            case["expected"].as_array_mut().unwrap().push(json!({
+                "metric":"collective_source_heat","month":month,
+                "valueKwh":source_heat,"absoluteToleranceKwh":1e-9,
+                "calculationBasis":"synthetic source-heat arithmetic"
+            }));
+        }
+        let response = app().oneshot(request(&case)).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let result: Value =
+            serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
+        assert_eq!(result["status"], "compared_pass");
+        assert_eq!(result["metrics"].as_array().unwrap().len(), 37);
+        assert_eq!(
+            result["metrics"][36]["calculationBasis"],
+            "synthetic source-heat arithmetic"
+        );
+        assert_eq!(result["referenceVerified"], false);
         case["expected"].as_array_mut().unwrap().pop();
         let response = app().oneshot(request(&case)).await.unwrap();
         assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);

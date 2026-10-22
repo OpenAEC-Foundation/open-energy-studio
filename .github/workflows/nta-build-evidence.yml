@@ -1,0 +1,55 @@
+name: NTA 8800 build evidence
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux-dev-build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux desktop dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Check build evidence code
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+
+      - name: Build NTA dev evidence from this commit
+        run: python3 scripts/build-nta-dev.py --output-dir nta-evidence/remote-build
+
+      - name: Verify bytes and source metadata
+        run: |
+          manifest="$(find nta-evidence/remote-build -maxdepth 1 -type f -name 'oes-nta8800-build_*.json' -print -quit)"
+          test -n "$manifest"
+          python3 scripts/verify-nta-build.py "$manifest" --source-repo .
+          sha256sum "$manifest"
+
+      - name: Upload NTA build evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: nta-8800-linux-dev-build
+          path: nta-evidence/remote-build/
+          if-no-files-found: error
+          retention-days: 30

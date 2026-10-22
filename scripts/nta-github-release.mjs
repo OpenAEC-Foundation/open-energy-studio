@@ -88,7 +88,8 @@ export function renderGithubRelease(values) {
         ? 'The release gate `scripts/verify-nta.sh` passed, including the kernel on Rust 1.77.2: ' +
           `${renderGateSummaryEnglish(gateSummary)} `
         : 'The release gate `scripts/verify-nta.sh` passed, including the kernel on Rust 1.77.2. ') +
-      'The archive holds the gate log, the gate summary (`gate-samenvatting.json`), the reference-suite report and the test report. ' +
+      'The archive holds the gate log, the gate summary (`gate-samenvatting.json`), the reference-suite report, ' +
+      'any configured planned-reference report and the test report. ' +
       `See the [test protocol](${link('docs/nta8800-testprotocol.md')}).`,
     '',
     '### Downloads',

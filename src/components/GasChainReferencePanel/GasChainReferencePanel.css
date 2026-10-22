@@ -29,4 +29,5 @@
 .gas-chain-reference table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
 .gas-chain-reference th, .gas-chain-reference td { padding: 0.35rem 0.55rem; border-bottom: 1px solid var(--border); text-align: right; font-size: 11px; }
 .gas-chain-reference th:first-child { text-align: left; }
+.gas-chain-reference .gas-chain-reference-basis { min-width: 10rem; max-width: 24rem; text-align: left; overflow-wrap: anywhere; }
 .gas-chain-reference small { overflow-wrap: anywhere; }

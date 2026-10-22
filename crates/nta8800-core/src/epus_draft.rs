@@ -437,6 +437,7 @@ mod tests {
         chain["monthly"]["sourceSystem"] = json!("collective_groundwater_surface_or_at_least15_c");
         serde_json::from_value(json!({
             "chain": chain,
+            "collectiveSourceEvidenceKind": "design_documents",
             "sourceTemperatureClass": "below20_c",
             "sourceTemperatureReference": "source design",
             "noQualityDeclarationConfirmed": true,

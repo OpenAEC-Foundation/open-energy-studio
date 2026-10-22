@@ -8,6 +8,8 @@ import { DecimalInput } from '../ui';
 
 const monthNumbers = Array.from({ length: 12 }, (_, index) => index + 1);
 const blank = () => monthNumbers.map(() => '');
+// NTA 8800:2025+C1:2026 table 17.1, t_mi in hours (non-leap year).
+const normativeMonthHours = [744, 672, 744, 720, 744, 720, 744, 744, 720, 744, 720, 744];
 
 export function GasHeatPumpAuxPanel({ pump, onSave }: {
   pump: INtaHeatPumpInput;
@@ -19,9 +21,9 @@ export function GasHeatPumpAuxPanel({ pump, onSave }: {
   const [capacityReference, setCapacityReference] = useState(saved?.capacityReference ?? forfait?.capacityReference ?? '');
   const [share, setShare] = useState(saved ? String(saved.buildingShare) : '1');
   const [shareReference, setShareReference] = useState(saved?.buildingShareReference ?? '');
-  const [hoursReference, setHoursReference] = useState(saved?.monthHoursReference ?? '');
+  const [hoursReference, setHoursReference] = useState(saved?.monthHoursReference ?? 'NTA 8800:2025+C1:2026 tabel 17.1');
   const [outputReference, setOutputReference] = useState(saved?.generatorOutputReference ?? '');
-  const [hours, setHours] = useState(saved ? monthNumbers.map((month) => String(saved.months.find((item) => item.month === month)?.hours ?? '')) : blank);
+  const [hours, setHours] = useState(saved ? monthNumbers.map((month) => String(saved.months.find((item) => item.month === month)?.hours ?? '')) : normativeMonthHours.map(String));
   const [output, setOutput] = useState(saved ? monthNumbers.map((month) => String(saved.months.find((item) => item.month === month)?.generatorOutputKwh ?? '')) : blank);
   const [result, setResult] = useState<GasHeatPumpAuxDraftAssessment | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -36,8 +38,8 @@ export function GasHeatPumpAuxPanel({ pump, onSave }: {
   const diagnose = async (save: boolean) => {
     if (!forfait) return;
     const fraction = Number(share);
-    const validHours = hours.length === 12 && hours.every((value) => value.trim() !== ''
-      && Number.isFinite(Number(value)) && Number(value) > 0 && Number(value) <= 744);
+    const validHours = hours.length === 12 && hours.every((value, index) => value.trim() !== ''
+      && Number.isFinite(Number(value)) && Number(value) === normativeMonthHours[index]);
     const validOutput = output.length === 12 && output.every((value) => value.trim() !== ''
       && Number.isFinite(Number(value)) && Number(value) >= 0);
     if (!capacityReference.trim() || !shareReference.trim() || !hoursReference.trim()
@@ -63,7 +65,7 @@ export function GasHeatPumpAuxPanel({ pump, onSave }: {
       const assessment = await diagnoseGasHeatPumpAuxDraftWithRust(input, edition);
       if (current !== sequence.current) return;
       setLoading(false); setResult(assessment);
-      if (assessment.status === 'invalid') setError(assessment.issues.map((item) => item.code).join(', '));
+      if (assessment.status === 'invalid') setError(assessment.issues.map((item) => t(`kernel.issue.${item.code}`, { defaultValue: item.code })).join(' '));
       else if (save) onSave(input);
     } catch (reason) {
       if (current === sequence.current) { setLoading(false); setError(String(reason)); }
@@ -85,7 +87,7 @@ export function GasHeatPumpAuxPanel({ pump, onSave }: {
       <th>{t('kernel.gasAux.month')}</th><th>{t('kernel.gasAux.hours')}</th><th>{t('kernel.gasAux.output')}</th>
     </tr></thead><tbody>{monthNumbers.map((month, index) => <tr key={month}>
       <th scope="row">{month}</th>
-      <td><DecimalInput min="0" max="744" step="any" aria-label={`${t('kernel.gasAux.hours')} ${month}`}
+      <td><DecimalInput min="0" max={String(normativeMonthHours[index])} step="any" aria-label={`${t('kernel.gasAux.hours')} ${month}`}
         value={hours[index]} onChange={(event) => update(hours, setHours, index, event.target.value)} /></td>
       <td><DecimalInput min="0" step="any" aria-label={`${t('kernel.gasAux.output')} ${month}`}
         value={output[index]} onChange={(event) => update(output, setOutput, index, event.target.value)} /></td>

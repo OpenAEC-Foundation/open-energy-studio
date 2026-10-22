@@ -6,11 +6,26 @@ import { renderWithProviders, userEvent } from './test-utils';
 afterEach(() => vi.unstubAllGlobals());
 
 describe('gas chain reference comparison UI', () => {
+  it('loads a clearly synthetic collective case with all 37 required expectations', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<GasChainReferencePanel />);
+    await user.click(screen.getByText('Gas heat pump reference comparison'));
+    await user.click(screen.getByRole('button', { name: 'Load synthetic collective example' }));
+    const caseInput = JSON.parse((screen.getByLabelText('Case JSON') as HTMLTextAreaElement).value);
+    expect(caseInput.expected).toHaveLength(37);
+    expect(caseInput.input.monthly.sourceSystem).toBe('collective_groundwater_surface_or_at_least15_c');
+    expect(caseInput.source.documentId).toContain('not ISSO 54');
+    expect(caseInput.source.independentReviewer).toContain('external verification pending');
+  });
+
   it('loads the synthetic 25-value case, compares via Rust API, and keeps verification unavailable', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => JSON.stringify({
       status: 'compared_pass', caseId: 'synthetic-gas-chain-2026-draft',
+      source: { publisher: 'Source returned by Rust', documentId: 'synthetic gas heat-pump hand calculation; not ISSO 54',
+        edition: 'draft', usePermission: 'internal test', independentReviewer: 'none; external verification pending' },
       referenceVerified: false, carrierAllocationAvailable: false, bengCalculationAvailable: false,
-      metrics: [{ metric: 'equation962_unallocated_input_term', month: 1, expectedKwh: 625,
+      metrics: [{ metric: 'equation962_unallocated_input_term', month: 1,
+        calculationBasis: 'synthetic worksheet A, row 1', expectedKwh: 625,
         actualKwh: 625, absoluteDifferenceKwh: 0, absoluteToleranceKwh: 1e-9, withinTolerance: true }],
       inputFingerprint: 'sha256:input', caseFingerprint: 'sha256:case', issues: [],
     }) });
@@ -31,14 +46,18 @@ describe('gas chain reference comparison UI', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Reference not independently verified');
     expect(screen.getByRole('status')).toHaveTextContent('625.000');
     expect(screen.getByRole('columnheader', { name: 'Assessment' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Submitted calculation basis' })).toBeInTheDocument();
+    expect(screen.getByRole('row', { name: /9.62 input term, unallocated/ })).toHaveTextContent('synthetic worksheet A, row 1');
     expect(screen.getByRole('row', { name: /9.62 input term, unallocated/ })).toHaveTextContent('Within tolerance');
-    const provenance = screen.getByLabelText('Reference case provenance');
-    expect(provenance).toHaveTextContent('Open Energy Studio internal arithmetic');
+    const provenance = screen.getByLabelText('Submitted reference source details');
+    expect(provenance).toHaveTextContent('Source returned by Rust');
     expect(provenance).toHaveTextContent('synthetic gas heat-pump hand calculation; not ISSO 54');
+    expect(provenance).toHaveTextContent('Use permission');
+    expect(provenance).toHaveTextContent('internal test');
     expect(provenance).toHaveTextContent('none; external verification pending');
     fireEvent.change(screen.getByLabelText('Case JSON'), { target: { value: '{invalid' } });
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Reference case provenance')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Submitted reference source details')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Compare draft values' }));
     expect(screen.getByRole('alert')).toHaveTextContent('SyntaxError');
     expect(fetchMock).toHaveBeenCalledOnce();
@@ -65,7 +84,10 @@ describe('gas chain reference comparison UI', () => {
       status: 'invalid_case', caseId: 'incomplete', referenceVerified: false,
       carrierAllocationAvailable: false, bengCalculationAvailable: false,
       metrics: [], inputFingerprint: 'sha256:input', caseFingerprint: 'sha256:case',
-      issues: [{ path: 'expected.annualEquipmentAuxiliaryElectricity', code: 'metric_required' }],
+      issues: [
+        { path: 'expected.annualEquipmentAuxiliaryElectricity', code: 'metric_required' },
+        { path: 'input.unknown', code: 'future_kernel_issue' },
+      ],
     }) });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
@@ -74,8 +96,9 @@ describe('gas chain reference comparison UI', () => {
     fireEvent.change(screen.getByLabelText('Case JSON'), { target: { value: '{"caseId":"incomplete"}' } });
     await user.click(screen.getByRole('button', { name: 'Compare draft values' }));
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Case incomplete or invalid'));
-    expect(screen.getByRole('status')).toHaveTextContent('metric_required');
-    expect(screen.queryByLabelText('Reference case provenance')).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('expected.annualEquipmentAuxiliaryElectricity: This required metric is missing.');
+    expect(screen.getByRole('status')).toHaveTextContent('input.unknown: future_kernel_issue');
+    expect(screen.queryByLabelText('Submitted reference source details')).not.toBeInTheDocument();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 

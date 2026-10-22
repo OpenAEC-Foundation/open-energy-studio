@@ -23,10 +23,19 @@ pub enum SourceTemperatureClass {
     Unknown,
 }
 
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum CollectiveSourceEvidenceKind {
+    SupplierRecords,
+    DesignDocuments,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct GasCollectiveSourceDraftInput {
     pub chain: GasHeatPumpChainDraftInput,
+    #[serde(default)]
+    pub collective_source_evidence_kind: Option<CollectiveSourceEvidenceKind>,
     pub source_temperature_class: SourceTemperatureClass,
     pub source_temperature_reference: String,
     pub no_quality_declaration_confirmed: bool,
@@ -96,6 +105,12 @@ pub fn assess_gas_collective_source_draft(
             "chain.monthly.sourceSystem",
         ));
     }
+    if input.collective_source_evidence_kind.is_none() {
+        issues.push(issue(
+            "collective_source_evidence_kind_required",
+            "collectiveSourceEvidenceKind",
+        ));
+    }
     if input.source_temperature_reference.trim().is_empty() {
         issues.push(issue(
             "source_temperature_reference_required",
@@ -116,7 +131,12 @@ pub fn assess_gas_collective_source_draft(
     }
     let source = input.chain.monthly.forfait.source;
     match (source, input.source_temperature_class) {
-        (GasPumpSource::Ground, SourceTemperatureClass::Below20C) => {}
+        (GasPumpSource::Ground, SourceTemperatureClass::Below20C)
+            if input
+                .chain
+                .monthly
+                .collective_source_temperature_c
+                .is_some_and(|value| value < 20.0) => {}
         (GasPumpSource::Ground, _) => issues.push(issue(
             "ground_temperature_class_invalid",
             "sourceTemperatureClass",
@@ -253,8 +273,9 @@ mod tests {
                     "solutionPumpWPerKw":0.0,"coefficientsReference":"draft","meanModulation":1.0,
                     "modulationReference":"draft","buildingShare":1.0,"buildingShareReference":"whole building",
                     "forfaitCopUsed":true,"monthHoursReference":"schedule","generatorOutputReference":"heat meter",
-                    "months":(1..=12).map(|month|json!({"month":month,"hours":730.0,"generatorOutputKwh":1000.0})).collect::<Vec<_>>()}
+                    "months":(1..=12).map(|month|json!({"month":month,"hours":crate::climate::MONTH_HOURS[(month - 1) as usize],"generatorOutputKwh":1000.0})).collect::<Vec<_>>()}
             },
+            "collectiveSourceEvidenceKind":"supplier_records",
             "sourceTemperatureClass":"below20_c","sourceTemperatureReference":"source design",
             "noQualityDeclarationConfirmed":true,"noQualityDeclarationReference":"register check"
         })).unwrap()
@@ -276,6 +297,26 @@ mod tests {
         assert!((result.monthly[0].draft_primary_renewable_kwh - source_heat * 0.95).abs() < 1e-10);
         assert_eq!(result.source_energy_carrier, "dh");
         assert!(!result.gas_input_energy_available && !result.beng_calculation_available);
+    }
+
+    #[test]
+    fn collective_source_requires_a_declared_supplier_or_design_evidence_kind() {
+        let mut input = sample(
+            "groundwater_aquifer",
+            "collective_groundwater_surface_or_at_least15_c",
+        );
+        input.collective_source_evidence_kind = None;
+        let missing = assess_gas_collective_source_draft(&input);
+        assert_eq!(missing.status, "invalid");
+        assert!(missing.monthly.is_empty());
+        assert!(missing
+            .issues
+            .iter()
+            .any(|item| item.code == "collective_source_evidence_kind_required"));
+        input.collective_source_evidence_kind = Some(CollectiveSourceEvidenceKind::DesignDocuments);
+        let declared = assess_gas_collective_source_draft(&input);
+        assert_eq!(declared.status, "diagnostic_valid");
+        assert!(!declared.reference_verified);
     }
 
     #[test]
@@ -313,6 +354,25 @@ mod tests {
             .iter()
             .any(|item| item.code == "ground_temperature_class_invalid"));
         assert!(result.monthly.is_empty());
+    }
+
+    #[test]
+    fn ground_temperature_evidence_must_agree_with_below20_source_class() {
+        let mut input = sample("ground", "collective_ground");
+        input.chain.monthly.collective_source_temperature_c = Some(19.9);
+        input.chain.monthly.collective_source_temperature_reference =
+            Some("source measurement".into());
+        let valid = assess_gas_collective_source_draft(&input);
+        assert_eq!(valid.status, "diagnostic_valid");
+        assert_eq!(valid.monthly.len(), 12);
+        input.chain.monthly.collective_source_temperature_c = Some(20.0);
+        let invalid = assess_gas_collective_source_draft(&input);
+        assert_eq!(invalid.status, "invalid");
+        assert!(invalid.monthly.is_empty());
+        assert!(invalid
+            .issues
+            .iter()
+            .any(|issue| issue.code == "ground_temperature_class_invalid"));
     }
 
     #[test]

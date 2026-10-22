@@ -1094,7 +1094,7 @@ mod tests {
                 "modulationReference":"draft 9.6.8.2.3", "buildingShare":1.0,
                 "buildingShareReference":"whole building", "forfaitCopUsed":true,
                 "monthHoursReference":"hour schedule", "generatorOutputReference":"generator ledger",
-                "months":(1..=12).map(|month| serde_json::json!({"month":month,"hours":730.0,"generatorOutputKwh":1000.0})).collect::<Vec<_>>()
+                "months":(1..=12).map(|month| serde_json::json!({"month":month,"hours":crate::climate::MONTH_HOURS[(month - 1) as usize],"generatorOutputKwh":1000.0})).collect::<Vec<_>>()
             }
         })).unwrap();
         assert!(pump.validate_inputs().is_empty());

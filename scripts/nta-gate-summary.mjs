@@ -6,6 +6,7 @@
 // text from it, so no test count in a delivery document is typed by hand.
 //
 //   node scripts/nta-gate-summary.mjs --log <gate.log> [--reference <reference-report.json>]
+//        [--planned-reference <reference-report.json>]
 //        --out <gate-samenvatting.json> [--require-pass [--allow-missing-steps]]
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -176,7 +177,24 @@ export function summariseReferenceReport(report) {
     pendingExpectationCases: report.pendingExpectationCases ?? null,
     totalCases: (report.cases ?? []).length,
     kernelVersion: report.kernelVersion ?? null,
+    commit: report.commit ?? null,
     suites: [...suites.values()],
+  };
+}
+
+/** Keep the separately planned batch distinct from the bundled internal suites. */
+export function summarisePlannedReferenceReport(report) {
+  return {
+    verdict: report.comparisonVerdict ?? null,
+    comparedCases: report.comparedCases ?? null,
+    pendingExpectationCases: report.pendingExpectationCases ?? null,
+    totalCases: (report.cases ?? []).length,
+    numericComparisonPassed: report.numericComparisonPassed === true,
+    plannedCoveragePassed: report.plannedCoveragePassed === true,
+    coveragePlanFingerprint: report.coveragePlanFingerprint ?? null,
+    commit: report.commit ?? null,
+    referenceVerified: report.referenceVerified === true,
+    attestStatus: report.attestStatus ?? null,
   };
 }
 
@@ -201,7 +219,7 @@ function vitestText(vitest) {
 /** The summary as Markdown, for the test report (Dutch, like the template). */
 export function renderGateSummaryMarkdown(summary) {
   if (!summary) return 'Gate overgeslagen (proefvrijgave): geen uitvoer om samen te vatten.';
-  const { gate, reference } = summary;
+  const { gate, reference, plannedReference } = summary;
   const lines = [
     `Uit \`gate.log\` en \`evidence/reference/reference-report.json\` van deze vrijgave. ` +
       `Gate ${gate.passed ? 'geslaagd' : gate.status === 'incomplete' ? 'onvolledig (log afgebroken)' : 'niet geslaagd'}` +
@@ -235,13 +253,27 @@ export function renderGateSummaryMarkdown(summary) {
       );
     }
   }
+  if (plannedReference) {
+    lines.push(
+      '',
+      `Afzonderlijke geplande referentiebatch: ${plannedReference.comparedCases} van ${plannedReference.totalCases} ` +
+        `gevallen vergeleken; numerieke vergelijking ${plannedReference.numericComparisonPassed ? 'geslaagd' : 'niet geslaagd'}; ` +
+        `plandekking ${plannedReference.plannedCoveragePassed ? 'geslaagd' : 'niet geslaagd'}.`,
+      `Plan-SHA-256: \`${plannedReference.coveragePlanFingerprint ?? 'ontbreekt'}\`; ` +
+        `commit: \`${plannedReference.commit ?? 'ontbreekt'}\`. ` +
+        `Onafhankelijke referentieverificatie: ${plannedReference.referenceVerified ? 'ja' : 'nee'}; ` +
+        `atteststatus: \`${plannedReference.attestStatus ?? 'onbekend'}\`.`,
+    );
+  } else {
+    lines.push('', 'Afzonderlijke geplande referentiebatch: niet uitgevoerd of rapport ontbreekt.');
+  }
   return lines.join('\n');
 }
 
 /** One English sentence for the GitHub release body. */
 export function renderGateSummaryEnglish(summary) {
   if (!summary) return '';
-  const { gate, reference } = summary;
+  const { gate, reference, plannedReference } = summary;
   let rust = 0;
   let ui = null;
   for (const step of gate.steps) {
@@ -256,6 +288,12 @@ export function renderGateSummaryEnglish(summary) {
         `(verdict \`${reference.verdict}\`), ${reference.pendingExpectationCases} without expected values`,
     );
   }
+  parts.push(plannedReference
+    ? `separate planned reference batch: ${plannedReference.comparedCases} of ${plannedReference.totalCases} cases compared, ` +
+      `numeric comparison ${plannedReference.numericComparisonPassed ? 'passed' : 'failed'}, ` +
+      `plan coverage ${plannedReference.plannedCoveragePassed ? 'passed' : 'failed'} ` +
+      `(independent verification ${plannedReference.referenceVerified ? 'recorded' : 'not recorded'})`
+    : 'separate planned reference batch: not run or report missing');
   const time = gate.totalSeconds !== null ? ` Gate time ${Math.round(gate.totalSeconds / 60)} min.` : '';
   return `${parts.join('; ')}.${time}`;
 }
@@ -276,11 +314,36 @@ function main(argv) {
     options.reference && existsSync(options.reference)
       ? summariseReferenceReport(JSON.parse(readFileSync(options.reference, 'utf8')))
       : null;
-  writeFileSync(options.out, `${JSON.stringify({ gate, reference }, null, 2)}\n`);
+  const plannedReference =
+    options['planned-reference'] && existsSync(options['planned-reference'])
+      ? summarisePlannedReferenceReport(JSON.parse(readFileSync(options['planned-reference'], 'utf8')))
+      : null;
+  writeFileSync(options.out, `${JSON.stringify({ gate, reference, plannedReference }, null, 2)}\n`);
   // --require-pass: the release stops on a summary that is no evidence (BRL 9501 §6.3).
   // --allow-missing-steps: a dry run may use the skip switches.
   if (options['require-pass'] !== undefined) {
     const problems = gateSummaryProblems(gate, { requireAllSteps: options['allow-missing-steps'] === undefined });
+    if (gate.steps.some((step) => step.name.startsWith('reference suites')) && !reference) {
+      problems.push('rapport van de interne referentiesuites ontbreekt');
+    }
+    if (reference && reference.verdict !== 'passed') {
+      problems.push('interne referentiesuites zijn niet geslaagd');
+    }
+    if (gate.steps.some((step) => step.name === 'planned reference comparisons') && !plannedReference) {
+      problems.push('rapport van de uitgevoerde geplande referentiebatch ontbreekt');
+    }
+    if (plannedReference && (!plannedReference.numericComparisonPassed || !plannedReference.plannedCoveragePassed)) {
+      problems.push('geplande referentiebatch is niet numeriek en qua plandekking geslaagd');
+    }
+    if (plannedReference && plannedReference.verdict !== 'passed') {
+      problems.push('oordeel van de geplande referentiebatch is niet geslaagd');
+    }
+    if (plannedReference && (!reference?.commit || !plannedReference.commit || reference.commit !== plannedReference.commit)) {
+      problems.push('broncommit van de geplande referentiebatch komt niet overeen met de interne gate');
+    }
+    if (plannedReference && !/^sha256:[0-9a-f]{64}$/.test(plannedReference.coveragePlanFingerprint ?? '')) {
+      problems.push('geldige planvingerafdruk van de geplande referentiebatch ontbreekt');
+    }
     if (problems.length) {
       console.error(`Gate-samenvatting is geen bewijs voor een vrijgave: ${problems.join('; ')}.`);
       return 1;

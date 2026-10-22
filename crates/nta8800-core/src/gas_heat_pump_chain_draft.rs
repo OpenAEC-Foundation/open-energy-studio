@@ -183,7 +183,7 @@ mod tests {
                 "modulationReference":"draft 9.6.8.2.3", "buildingShare":1.0,
                 "buildingShareReference":"whole building", "forfaitCopUsed":true,
                 "monthHoursReference":"hour schedule", "generatorOutputReference":"heat ledger",
-                "months":(1..=12).map(|month| json!({"month":month,"hours":730.0,"generatorOutputKwh":1000.0})).collect::<Vec<_>>()
+                "months":(1..=12).map(|month| json!({"month":month,"hours":crate::climate::MONTH_HOURS[(month - 1) as usize],"generatorOutputKwh":1000.0})).collect::<Vec<_>>()
             }
         })).unwrap()
     }
@@ -196,7 +196,7 @@ mod tests {
             result.monthly[0].equation_962_unallocated_input_term_kwh,
             625.0
         );
-        assert_eq!(result.monthly[0].equipment_auxiliary_electricity_kwh, 8.4);
+        assert_eq!(result.monthly[0].equipment_auxiliary_electricity_kwh, 8.54);
         assert!((result.annual_equipment_auxiliary_electricity_kwh.unwrap() - 100.8).abs() < 1e-10);
         assert!(!result.carrier_allocation_available && !result.gas_input_energy_available);
         assert!(!result.beng_calculation_available);
@@ -231,5 +231,31 @@ mod tests {
             .iter()
             .any(|item| item.code == "generator_output_reference_mismatch"));
         assert!(mismatch.monthly.is_empty());
+    }
+
+    #[test]
+    fn collective_ground_temperature_boundary_flows_through_linked_terms() {
+        let mut input = sample();
+        input.monthly.forfait.source = crate::gas_heat_pump_forfait_draft::GasPumpSource::Ground;
+        input.monthly.source_system =
+            crate::forfait_heat_pump_monthly_draft::SourceSystem::CollectiveGround;
+        let missing = assess_gas_heat_pump_chain_draft(&input);
+        assert_eq!(missing.status, "invalid");
+        assert!(missing.monthly.is_empty());
+        input.monthly.collective_source_temperature_reference = Some("source design".into());
+        input.monthly.collective_source_temperature_c = Some(14.9);
+        let cold = assess_gas_heat_pump_chain_draft(&input);
+        assert_eq!(cold.status, "diagnostic_valid");
+        input.monthly.collective_source_temperature_c = Some(15.0);
+        let warm = assess_gas_heat_pump_chain_draft(&input);
+        assert_eq!(warm.status, "diagnostic_valid");
+        assert!(
+            warm.monthly[0].equation_962_unallocated_input_term_kwh
+                < cold.monthly[0].equation_962_unallocated_input_term_kwh
+        );
+        assert_eq!(
+            warm.monthly[0].equipment_auxiliary_electricity_kwh,
+            cold.monthly[0].equipment_auxiliary_electricity_kwh
+        );
     }
 }

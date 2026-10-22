@@ -1016,6 +1016,8 @@ export interface GasHeatPumpMonthlyDraftInput {
   generatorOutputReference: string;
   sourceSystem: 'individual' | 'collective_ground' | 'collective_groundwater_surface_or_at_least15_c';
   sourceSystemReference: string;
+  collectiveSourceTemperatureC?: number;
+  collectiveSourceTemperatureReference?: string;
 }
 
 export interface GasHeatPumpMonthlyDraftAssessment {
@@ -1085,9 +1087,11 @@ export async function diagnoseGasHeatPumpChainDraftWithRust(input: GasHeatPumpCh
 }
 
 export type GasCollectiveSourceTemperatureClass = 'below20_c' | 'at_least20_c' | 'unknown';
+export type GasCollectiveSourceEvidenceKind = 'supplier_records' | 'design_documents';
 
 export interface GasCollectiveSourceDraftInput {
   chain: GasHeatPumpChainDraftInput;
+  collectiveSourceEvidenceKind: GasCollectiveSourceEvidenceKind | null;
   sourceTemperatureClass: GasCollectiveSourceTemperatureClass;
   sourceTemperatureReference: string;
   noQualityDeclarationConfirmed: boolean;
@@ -1119,7 +1123,7 @@ export async function diagnoseGasCollectiveSourceDraftWithRust(input: GasCollect
 }
 
 export type GasChainDiagnosticMetric = 'equation962_unallocated_input_term'
-  | 'equipment_auxiliary_electricity' | 'annual_equipment_auxiliary_electricity';
+  | 'collective_source_heat' | 'equipment_auxiliary_electricity' | 'annual_equipment_auxiliary_electricity';
 
 export interface GasChainDiagnosticCase {
   caseId: string;
@@ -1137,6 +1141,7 @@ export interface GasChainDiagnosticCase {
 
 export interface GasChainDiagnosticComparison {
   caseId: string;
+  source: GasChainDiagnosticCase['source'];
   status: 'invalid_case' | 'compared_pass' | 'compared_fail';
   targetNormVersion: string;
   kernelVersion: string;
@@ -1149,6 +1154,7 @@ export interface GasChainDiagnosticComparison {
   metrics: Array<{
     metric: GasChainDiagnosticMetric;
     month: number | null;
+    calculationBasis: string;
     expectedKwh: number;
     actualKwh: number;
     absoluteDifferenceKwh: number;

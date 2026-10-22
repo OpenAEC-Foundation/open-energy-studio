@@ -158,7 +158,9 @@ else
   summary_args=(--require-pass)
   if [[ $dry_run -eq 1 ]]; then summary_args+=(--allow-missing-steps); fi
   node scripts/nta-gate-summary.mjs --log "$archive/gate.log" \
-    --reference "$archive/evidence/reference/reference-report.json" --out "$archive/gate-samenvatting.json" \
+    --reference "$archive/evidence/reference/reference-report.json" \
+    --planned-reference "$archive/evidence/planned-reference/reference-report.json" \
+    --out "$archive/gate-samenvatting.json" \
     "${summary_args[@]}"
 fi
 

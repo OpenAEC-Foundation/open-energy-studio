@@ -158,7 +158,7 @@ jobs:
           - platform: ubuntu-22.04
             args: '--bundles deb,rpm,appimage'
             bundles: 'deb rpm appimage'
-          - platform: macos-latest
+          - platform: macos-15-intel
             args: '--target universal-apple-darwin --bundles dmg'
             bundles: 'dmg'
           - platform: windows-latest
@@ -204,6 +204,16 @@ jobs:
         env:
           APPIMAGE_EXTRACT_AND_RUN: '1'
         run: npm run tauri:build -- ${{ matrix.args }}
+
+      - name: Verify both macOS architectures
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          binary=src-tauri/target/universal-apple-darwin/release/open-energy-studio
+          archs="$(lipo -archs "$binary")"
+          echo "Desktop binary architectures: $archs"
+          [[ " $archs " == *" x86_64 "* && " $archs " == *" arm64 "* ]]
 
       - name: Sign Windows installers (when signing secrets are configured)
         if: runner.os == 'Windows' && env.AZURE_CLIENT_ID != ''

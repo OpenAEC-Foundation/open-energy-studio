@@ -56,8 +56,9 @@ export function GasHeatPumpForfaitPanel({ pump, buildingFunction, onSave }: {
       || (application === 'over25_kw' && thermalCapacityKw <= 25)
       || (application === 'utility' && buildingFunction === 'residential')
       || (correctionRequired && (sourceCorrectionFactor === null || !Number.isFinite(sourceCorrectionFactor)
-        // Annex V table V.1 (2025+C1 p. 1114) gives only 1,00, 1,02 and 1,04.
-        || ![1, 1.02, 1.04].some((allowed) => Math.abs(sourceCorrectionFactor - allowed) < 1e-9)
+        // Annex V table V.1 only gives a regeneration bonus for ground heat exchangers.
+        || !(source === 'ground' ? [1, 1.02, 1.04] : [1])
+          .some((allowed) => Math.abs(sourceCorrectionFactor - allowed) < 1e-9)
         || !correctionReference.trim()))) {
       setError(t('kernel.gasForfait.invalid')); setResult(null); return;
     }
@@ -76,7 +77,7 @@ export function GasHeatPumpForfaitPanel({ pump, buildingFunction, onSave }: {
       const assessment = await diagnoseGasHeatPumpForfaitDraftWithRust(input, edition);
       if (current !== sequence.current) return;
       setResult(assessment);
-      if (assessment.status === 'invalid') setError(assessment.issues.map((issue) => issue.code).join(', '));
+      if (assessment.status === 'invalid') setError(assessment.issues.map((issue) => t(`kernel.issue.${issue.code}`, { defaultValue: issue.code })).join(' '));
       else if (saveInput) onSave(input);
     } catch (cause) {
       if (current === sequence.current) setError(String(cause));
@@ -105,6 +106,7 @@ export function GasHeatPumpForfaitPanel({ pump, buildingFunction, onSave }: {
     <label>{t('kernel.gasForfait.temperatureReference')}<input value={temperatureReference} onChange={(event) => { setTemperatureReference(event.target.value); invalidate(); }} /></label>
     {correctionRequired && <>
       <label>{t('kernel.gasForfait.correction')}<DecimalInput min="0" step="any" value={correction} onChange={(event) => { setCorrection(event.target.value); invalidate(); }} /></label>
+      {source === 'groundwater_aquifer' && <p>{t('kernel.gasForfait.groundwaterCorrection')}</p>}
       <label>{t('kernel.gasForfait.correctionReference')}<input value={correctionReference} onChange={(event) => { setCorrectionReference(event.target.value); invalidate(); }} /></label>
     </>}
     <button type="button" onClick={() => diagnose(false)} disabled={!source}>{t('kernel.gasForfait.lookup')}</button>

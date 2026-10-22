@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import syntheticCase from '../../../training-data/nta8800-gas-chain-diagnostic-synthetic.json';
+import collectiveSyntheticCase from '../../../training-data/nta8800-gas-chain-diagnostic-collective-synthetic.json';
 import { compareGasHeatPumpChainDiagnosticWithRust, type GasChainDiagnosticCase, type GasChainDiagnosticComparison } from '../../core/nta/KernelClient';
 import { useI18n } from '../../i18n/i18n';
 import { FileButton } from '../ui';
@@ -10,7 +11,6 @@ export function GasChainReferencePanel() {
   const hintId = useId();
   const [text, setText] = useState('');
   const [result, setResult] = useState<GasChainDiagnosticComparison | null>(null);
-  const [comparedSource, setComparedSource] = useState<GasChainDiagnosticCase['source'] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const sequence = useRef(0);
@@ -20,7 +20,6 @@ export function GasChainReferencePanel() {
     sequence.current += 1;
     setText(value);
     setResult(null);
-    setComparedSource(null);
     setError(null);
     setLoading(false);
   };
@@ -29,7 +28,6 @@ export function GasChainReferencePanel() {
     if (!file) return;
     const current = ++sequence.current;
     setResult(null);
-    setComparedSource(null);
     setError(null);
     setLoading(true);
     try {
@@ -55,23 +53,16 @@ export function GasChainReferencePanel() {
     } catch (reason) {
       setError(String(reason));
       setResult(null);
-      setComparedSource(null);
       return;
     }
     const current = ++sequence.current;
     setLoading(true);
     setError(null);
     setResult(null);
-    setComparedSource(null);
     try {
       const assessment = await compareGasHeatPumpChainDiagnosticWithRust(caseInput);
       if (sequence.current === current) {
         setResult(assessment);
-        const source = caseInput.source;
-        setComparedSource(assessment.status !== 'invalid_case' && source
-          && typeof source.publisher === 'string' && typeof source.documentId === 'string'
-          && typeof source.edition === 'string' && typeof source.independentReviewer === 'string'
-          ? source : null);
         setLoading(false);
       }
     } catch (reason) {
@@ -90,6 +81,9 @@ export function GasChainReferencePanel() {
         <button type="button" onClick={() => setCaseText(JSON.stringify(syntheticCase, null, 2))}>
           {t('kernel.gasReference.example')}
         </button>
+        <button type="button" onClick={() => setCaseText(JSON.stringify(collectiveSyntheticCase, null, 2))}>
+          {t('kernel.gasReference.collectiveExample')}
+        </button>
         <label htmlFor="gas-reference-file">{t('kernel.gasReference.file')}</label>
         <FileButton id="gas-reference-file" accept=".json,application/json"
           onChange={(event) => void loadFile(event.target.files?.[0])} />
@@ -107,16 +101,18 @@ export function GasChainReferencePanel() {
       {result && <div role="status" className="gas-chain-reference-result" data-status={result.status}>
         <p><strong>{t(`kernel.gasReference.status.${result.status}`)}</strong> · {result.caseId}</p>
         <p>{t('kernel.gasReference.unverified')}</p>
-        {comparedSource && <dl className="gas-chain-reference-source" aria-label={locale === 'nl' ? 'Herkomst referentiecase' : 'Reference case provenance'}>
-          <div><dt>{locale === 'nl' ? 'Uitgever' : 'Publisher'}</dt><dd>{comparedSource.publisher}</dd></div>
-          <div><dt>{locale === 'nl' ? 'Document' : 'Document'}</dt><dd>{comparedSource.documentId}</dd></div>
-          <div><dt>{locale === 'nl' ? 'Editie' : 'Edition'}</dt><dd>{comparedSource.edition}</dd></div>
-          <div><dt>{locale === 'nl' ? 'Onafhankelijke controleur' : 'Independent reviewer'}</dt><dd>{comparedSource.independentReviewer}</dd></div>
+        {result.status !== 'invalid_case' && result.source && <dl className="gas-chain-reference-source" aria-label={t('kernel.gasReference.submittedSource')}>
+          <div><dt>{locale === 'nl' ? 'Uitgever' : 'Publisher'}</dt><dd>{result.source.publisher}</dd></div>
+          <div><dt>{locale === 'nl' ? 'Document' : 'Document'}</dt><dd>{result.source.documentId}</dd></div>
+          <div><dt>{locale === 'nl' ? 'Editie' : 'Edition'}</dt><dd>{result.source.edition}</dd></div>
+          <div><dt>{locale === 'nl' ? 'Gebruiksrecht' : 'Use permission'}</dt><dd>{result.source.usePermission}</dd></div>
+          <div><dt>{locale === 'nl' ? 'Onafhankelijke controleur' : 'Independent reviewer'}</dt><dd>{result.source.independentReviewer}</dd></div>
         </dl>}
         {result.issues.length > 0 && <ul>{result.issues.map((item, index) =>
-          <li key={`${item.path}-${item.code}-${index}`}><code>{item.path}</code>: {item.code}</li>)}</ul>}
+          <li key={`${item.path}-${item.code}-${index}`}><code>{item.path}</code>: {t(`kernel.issue.${item.code}`, { defaultValue: item.code })}</li>)}</ul>}
         {result.metrics.length > 0 && <div className="gas-chain-reference-table-wrap"><table>
           <thead><tr><th>{t('kernel.gasReference.metric')}</th><th>{t('kernel.gasReference.month')}</th>
+            <th>{t('kernel.gasReference.calculationBasis')}</th>
             <th>{t('kernel.gasReference.expected')}</th><th>{t('kernel.gasReference.actual')}</th>
             <th>{t('kernel.gasReference.difference')}</th><th>{t('kernel.gasReference.tolerance')}</th>
             <th>{locale === 'nl' ? 'Beoordeling' : 'Assessment'}</th></tr></thead>
@@ -124,6 +120,7 @@ export function GasChainReferencePanel() {
             className={item.withinTolerance ? '' : 'outside-tolerance'}>
             <th scope="row">{t(`kernel.gasReference.metric.${item.metric}`)}</th>
             <td>{item.month ?? t('kernel.gasReference.year')}</td>
+            <td className="gas-chain-reference-basis">{item.calculationBasis}</td>
             <td>{item.expectedKwh.toFixed(3)}</td><td>{item.actualKwh.toFixed(3)}</td>
             <td>{item.absoluteDifferenceKwh.toFixed(3)}</td><td>{item.absoluteToleranceKwh.toExponential(1)}</td>
             <td>{item.withinTolerance ? (locale === 'nl' ? 'Binnen tolerantie' : 'Within tolerance')

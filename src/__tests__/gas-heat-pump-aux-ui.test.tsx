@@ -21,6 +21,8 @@ const pump: INtaHeatPumpInput = {
 
 afterEach(() => vi.unstubAllGlobals());
 
+const normativeMonthHours = [744, 672, 744, 720, 744, 720, 744, 744, 720, 744, 720, 744];
+
 describe('gas heat pump draft auxiliary UI', () => {
   it('requires twelve sourced months, shows a limited result and saves the input', async () => {
     const user = userEvent.setup();
@@ -28,19 +30,20 @@ describe('gas heat pump draft auxiliary UI', () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({
       status: 'diagnostic_valid', annualAuxiliaryElectricityKwh: 100.8,
       monthly: Array.from({ length: 12 }, (_, index) => ({ month: index + 1,
-        cappedOnHours: 55, auxiliaryElectricityKwh: 8.4 })),
+        cappedOnHours: 55, auxiliaryElectricityKwh: 0.01 * normativeMonthHours[index] + 1.1 })),
       inputFingerprint: 'sha256:gas-aux', bengCalculationAvailable: false, issues: [],
     }) });
     vi.stubGlobal('fetch', fetchMock);
     const view = renderWithProviders(<GasHeatPumpAuxPanel pump={pump} onSave={onSave} />);
     await user.click(screen.getByRole('button', { name: 'Calculate draft auxiliary electricity' }));
-    expect(screen.getByRole('alert')).toHaveTextContent('twelve valid months');
+    expect(screen.getByRole('alert')).toHaveTextContent('NTA 8800 table 17.1');
     expect(fetchMock).not.toHaveBeenCalled();
     fireEvent.change(screen.getByLabelText('Building-share evidence'), { target: { value: 'whole building' } });
     fireEvent.change(screen.getByLabelText('Month-hours evidence'), { target: { value: 'hour schedule' } });
     fireEvent.change(screen.getByLabelText('Generator heat evidence'), { target: { value: 'heat ledger' } });
+    expect(screen.getByLabelText('Month hours (h) 1')).toHaveValue('744');
+    expect(screen.getByLabelText('Month hours (h) 2')).toHaveValue('672');
     for (let month = 1; month <= 12; month += 1) {
-      fireEvent.change(screen.getByLabelText(`Month hours (h) ${month}`), { target: { value: '730' } });
       fireEvent.change(screen.getByLabelText(`Generator heat (kWh) ${month}`), { target: { value: '1000' } });
     }
     await user.click(screen.getByRole('button', { name: 'Calculate draft auxiliary electricity' }));
@@ -54,6 +57,11 @@ describe('gas heat pump draft auxiliary UI', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Source pump/fan, gas use, final norm, BENG and label remain unverified');
     await user.click(screen.getByRole('button', { name: 'Save gas auxiliary input' }));
     await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ generatorId: 'ga-1' })));
+    const requests = fetchMock.mock.calls.length;
+    fireEvent.change(screen.getByLabelText('Month hours (h) 2'), { target: { value: '744' } });
+    await user.click(screen.getByRole('button', { name: 'Calculate draft auxiliary electricity' }));
+    expect(fetchMock).toHaveBeenCalledTimes(requests);
+    expect(screen.getByRole('alert')).toHaveTextContent('NTA 8800 table 17.1');
     fireEvent.change(screen.getByLabelText('Generator heat (kWh) 1'), { target: { value: '900' } });
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
     view.unmount();
@@ -74,7 +82,7 @@ describe('gas heat pump draft auxiliary UI', () => {
     vi.stubGlobal('fetch', vi.fn().mockImplementation(async (url: string) => ({ ok: true, json: async () =>
       url.includes('gas-aux-draft') ? {
         status: 'diagnostic_valid', annualAuxiliaryElectricityKwh: 100.8,
-        monthly: Array.from({ length: 12 }, (_, index) => ({ month: index + 1, cappedOnHours: 55, auxiliaryElectricityKwh: 8.4 })),
+        monthly: Array.from({ length: 12 }, (_, index) => ({ month: index + 1, cappedOnHours: 55, auxiliaryElectricityKwh: 0.01 * normativeMonthHours[index] + 1.1 })),
         inputFingerprint: 'sha256:gas-aux', issues: [],
       } : { status: 'diagnostic_valid', table: '9.27', forfaitCop: 1.2, correctedCop: 1.2,
         temperatureBandUpperC: 35, issues: [] },
@@ -99,12 +107,11 @@ describe('gas heat pump draft auxiliary UI', () => {
     fireEvent.change(screen.getByLabelText('Month-hours evidence'), { target: { value: 'schedule' } });
     fireEvent.change(screen.getByLabelText('Generator heat evidence'), { target: { value: 'ledger' } });
     for (let month = 1; month <= 12; month += 1) {
-      fireEvent.change(screen.getByLabelText(`Month hours (h) ${month}`), { target: { value: '730' } });
       fireEvent.change(screen.getByLabelText(`Generator heat (kWh) ${month}`), { target: { value: '1000' } });
     }
     await user.click(screen.getByRole('button', { name: 'Save gas auxiliary input' }));
     await waitFor(() => expect(JSON.parse(screen.getByTestId('gas-aux-input').textContent ?? 'null')).toMatchObject({
-      generatorId: expect.any(String), nominalThermalCapacityKw: 20, months: expect.arrayContaining([{ month: 1, hours: 730, generatorOutputKwh: 1000 }]),
+      generatorId: expect.any(String), nominalThermalCapacityKw: 20, months: expect.arrayContaining([{ month: 1, hours: 744, generatorOutputKwh: 1000 }]),
     }));
     await user.click(screen.getByRole('button', { name: 'Remove gas auxiliary input' }));
     expect(screen.getByTestId('gas-aux-input')).toHaveTextContent('null');

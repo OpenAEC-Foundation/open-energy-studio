@@ -94,7 +94,7 @@ describe('gas heat pump draft COP UI', () => {
     }) });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
-    renderWithProviders(<GasHeatPumpForfaitPanel pump={pump} buildingFunction="residential" onSave={onSave} />);
+    const view = renderWithProviders(<GasHeatPumpForfaitPanel pump={pump} buildingFunction="residential" onSave={onSave} />);
     await user.click(screen.getByLabelText('Collective building installation'));
     fireEvent.change(screen.getByLabelText('Application evidence'), { target: { value: 'building schedule' } });
     fireEvent.change(screen.getByLabelText('Thermal capacity (kW)'), { target: { value: '25' } });
@@ -116,5 +116,21 @@ describe('gas heat pump draft COP UI', () => {
       application: 'residential_collective_at_most25_kw', sourceCorrectionFactor: 1.04,
     })));
     expect(await screen.findByText(/COP with supplied source correction: 1.35/)).toBeInTheDocument();
+
+    const saved = onSave.mock.calls[0][0];
+    view.unmount();
+    onSave.mockClear();
+    fetchMock.mockClear();
+    renderWithProviders(<GasHeatPumpForfaitPanel pump={{ ...pump, source: 'groundwater', gasHeatPumpForfaitDraft: saved }}
+      buildingFunction="residential" onSave={onSave} />);
+    expect(screen.getByText(/For groundwater, csource is 1.00/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Save gas table input' }));
+    expect(onSave).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('Supplied source correction csource'), { target: { value: '1' } });
+    await user.click(screen.getByRole('button', { name: 'Save gas table input' }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      source: 'groundwater_aquifer', sourceCorrectionFactor: 1,
+    })));
   });
 });

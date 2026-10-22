@@ -34,8 +34,17 @@ pub const SERVICES: [(&str, &str); 7] = [
 pub struct PatchStep {
     pub op: PatchOp,
     pub pointer: String,
-    #[serde(default)]
+    // Preserve an explicitly supplied JSON null. Plain Option<Value> treats
+    // null like an absent value, making a valid `set` to null impossible.
+    #[serde(default, deserialize_with = "present_patch_value")]
     pub value: Option<Value>,
+}
+
+fn present_patch_value<'de, D>(deserializer: D) -> Result<Option<Value>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Value::deserialize(deserializer).map(Some)
 }
 
 #[derive(Deserialize, PartialEq)]
@@ -45,30 +54,78 @@ pub enum PatchOp {
     Remove,
 }
 
-/// Applies `set`/`remove` steps at JSON pointers. A step whose target (or,
-/// for `set`, whose parent) is missing is an error, so a fixture change
-/// cannot silently turn a patch into a no-op.
+/// Applies `set`/`remove` steps at JSON pointers. An object `set` may add a
+/// member; an array `set` replaces an existing index. A missing parent or
+/// target is an error, so a fixture change cannot silently turn a patch into
+/// a no-op.
 pub fn apply_patch(project: &mut Value, steps: Vec<PatchStep>) -> Result<(), String> {
     for step in steps {
+        if !step.pointer.starts_with('/') {
+            return Err(format!(
+                "Patch pointer must start with '/': {}",
+                step.pointer
+            ));
+        }
         let (parent, key) = step
             .pointer
             .rsplit_once('/')
-            .ok_or_else(|| format!("Patch pointer must start with '/': {}", step.pointer))?;
-        let object = project
-            .pointer_mut(parent)
-            .and_then(Value::as_object_mut)
-            .ok_or_else(|| format!("Patch parent is not an object: {}", step.pointer))?;
-        match step.op {
-            PatchOp::Set => {
-                let value = step
-                    .value
-                    .ok_or_else(|| format!("Patch set needs a value: {}", step.pointer))?;
-                object.insert(key.to_string(), value);
+            .expect("a pointer starting with '/' has a final token");
+        // serde_json resolves escapes in the parent pointer; decode the final
+        // token too, otherwise /a~1b silently edits a literal "a~1b" key.
+        let mut decoded_key = String::new();
+        let mut chars = key.chars();
+        while let Some(ch) = chars.next() {
+            if ch == '~' {
+                match chars.next() {
+                    Some('0') => decoded_key.push('~'),
+                    Some('1') => decoded_key.push('/'),
+                    _ => return Err(format!("Invalid patch pointer escape: {}", step.pointer)),
+                }
+            } else {
+                decoded_key.push(ch);
             }
-            PatchOp::Remove => {
-                object
-                    .remove(key)
-                    .ok_or_else(|| format!("Patch remove target is missing: {}", step.pointer))?;
+        }
+        let parent_value = project
+            .pointer_mut(parent)
+            .ok_or_else(|| format!("Patch parent is missing: {}", step.pointer))?;
+        match parent_value {
+            Value::Object(object) => match step.op {
+                PatchOp::Set => {
+                    let value = step
+                        .value
+                        .ok_or_else(|| format!("Patch set needs a value: {}", step.pointer))?;
+                    object.insert(decoded_key, value);
+                }
+                PatchOp::Remove => {
+                    object.remove(&decoded_key).ok_or_else(|| {
+                        format!("Patch remove target is missing: {}", step.pointer)
+                    })?;
+                }
+            },
+            Value::Array(array) => {
+                let index = decoded_key
+                    .parse::<usize>()
+                    .ok()
+                    .filter(|index| decoded_key == index.to_string() && *index < array.len());
+                let index = index.ok_or_else(|| {
+                    format!("Patch array index is invalid or missing: {}", step.pointer)
+                })?;
+                match step.op {
+                    PatchOp::Set => {
+                        array[index] = step
+                            .value
+                            .ok_or_else(|| format!("Patch set needs a value: {}", step.pointer))?;
+                    }
+                    PatchOp::Remove => {
+                        array.remove(index);
+                    }
+                }
+            }
+            _ => {
+                return Err(format!(
+                    "Patch parent is not an object or array: {}",
+                    step.pointer
+                ));
             }
         }
     }
@@ -429,6 +486,64 @@ pub fn markdown(rows: &[TestsetRow], header: &[(&str, String)]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn patch_decodes_json_pointer_tokens_without_touching_similarly_named_keys() {
+        let mut project = json!({"a/b": {"c~d": 1}, "a~1b": {"c~0d": 2}});
+        let steps: Vec<PatchStep> = serde_json::from_value(json!([
+            {"op": "set", "pointer": "/a~1b/c~0d", "value": 3},
+            {"op": "remove", "pointer": "/a~1b/c~0d"}
+        ]))
+        .unwrap();
+        apply_patch(&mut project, steps).unwrap();
+        assert_eq!(project, json!({"a/b": {}, "a~1b": {"c~0d": 2}}));
+
+        let invalid: Vec<PatchStep> = serde_json::from_value(json!([
+            {"op": "set", "pointer": "/a~2b", "value": 4}
+        ]))
+        .unwrap();
+        assert!(apply_patch(&mut project, invalid).is_err());
+        assert!(project.get("a~2b").is_none());
+    }
+
+    #[test]
+    fn patch_replaces_or_removes_array_items_only_at_existing_indices() {
+        let mut project = json!({"items": ["a", "b", "c"]});
+        let steps: Vec<PatchStep> = serde_json::from_value(json!([
+            {"op": "set", "pointer": "/items/1", "value": "B"},
+            {"op": "remove", "pointer": "/items/0"}
+        ]))
+        .unwrap();
+        apply_patch(&mut project, steps).unwrap();
+        assert_eq!(project, json!({"items": ["B", "c"]}));
+
+        for token in ["02", "+1", "2", "-", "x"] {
+            let steps: Vec<PatchStep> = serde_json::from_value(json!([
+                {"op": "set", "pointer": format!("/items/{token}"), "value": "wrong"}
+            ]))
+            .unwrap();
+            assert!(apply_patch(&mut project, steps).is_err(), "{token}");
+            assert_eq!(project, json!({"items": ["B", "c"]}));
+        }
+    }
+
+    #[test]
+    fn patch_set_distinguishes_explicit_null_from_missing_value() {
+        let mut project = json!({"optional": 3});
+        let null_step: Vec<PatchStep> = serde_json::from_value(json!([
+            {"op": "set", "pointer": "/optional", "value": null}
+        ]))
+        .unwrap();
+        apply_patch(&mut project, null_step).unwrap();
+        assert_eq!(project, json!({"optional": null}));
+
+        let missing_step: Vec<PatchStep> = serde_json::from_value(json!([
+            {"op": "set", "pointer": "/optional"}
+        ]))
+        .unwrap();
+        assert!(apply_patch(&mut project, missing_step).is_err());
+        assert_eq!(project, json!({"optional": null}));
+    }
 
     #[test]
     fn test_ids_and_topics() {

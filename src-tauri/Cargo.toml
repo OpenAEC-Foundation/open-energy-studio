@@ -36,6 +36,10 @@ windows = { version = "0.61", features = [
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
 
+[patch.crates-io]
+# Keep Tauri's embedded asset and CSP hash order stable across clean builds.
+tauri-codegen = { path = "vendor/tauri-codegen" }
+
 [profile.release]
 # Unwind so a kernel panic in a command becomes an error (`off_main`)
 # instead of ending the app with every unsaved document.

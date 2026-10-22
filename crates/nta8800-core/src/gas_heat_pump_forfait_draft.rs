@@ -141,14 +141,19 @@ pub fn assess_gas_heat_pump_forfait_draft(
             GasPumpSource::Ground | GasPumpSource::GroundwaterAquifer
         );
     if correction_required {
-        // Bijlage V (table V.1, 2025+C1 p. 1114): c_source is 1,00, 1,02 or
-        // 1,04, as on the electric heat-pump routes.
+        // Annex V table V.1 (2025+C1 p. 1114) permits regeneration factors
+        // above 1 only for a ground heat exchanger. For groundwater the table
+        // 9.27 footnote therefore falls back to c_source = 1.
         match input.source_correction_factor {
             None => add("source_correction_required", "sourceCorrectionFactor"),
             Some(factor)
-                if ![1.00, 1.02, 1.04]
-                    .iter()
-                    .any(|allowed| (factor - allowed).abs() < 1e-9) =>
+                if !(if input.source == GasPumpSource::Ground {
+                    &[1.00, 1.02, 1.04][..]
+                } else {
+                    &[1.00][..]
+                })
+                .iter()
+                .any(|allowed| (factor - allowed).abs() < 1e-9) =>
             {
                 add("source_correction_invalid", "sourceCorrectionFactor")
             }
@@ -405,6 +410,28 @@ mod tests {
         assert!(assess_gas_heat_pump_forfait_draft(&input)
             .forfait_cop
             .is_none());
+    }
+
+    #[test]
+    fn groundwater_cannot_claim_ground_heat_exchanger_regeneration() {
+        let mut input = sample();
+        input.application = GasPumpApplication::ResidentialCollectiveAtMost25Kw;
+        input.thermal_capacity_kw = 25.0;
+        input.source = GasPumpSource::GroundwaterAquifer;
+        input.source_correction_reference = Some("aquifer design record".into());
+        input.source_correction_factor = Some(1.04);
+        let rejected = assess_gas_heat_pump_forfait_draft(&input);
+        assert_eq!(rejected.status, "invalid");
+        assert!(rejected.corrected_cop.is_none());
+        assert!(rejected
+            .issues
+            .iter()
+            .any(|issue| issue.code == "source_correction_invalid"));
+
+        input.source_correction_factor = Some(1.0);
+        let accepted = assess_gas_heat_pump_forfait_draft(&input);
+        assert_eq!(accepted.status, "diagnostic_valid");
+        assert_eq!(accepted.corrected_cop, accepted.forfait_cop);
     }
 
     #[test]
