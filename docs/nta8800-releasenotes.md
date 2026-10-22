@@ -13,6 +13,9 @@ Dit bestand is de wijzigingsregistratie van de rekenkern (BRL 9501 §5.2, §6.2 
 
 ## Onuitgebracht
 
+## Rekenkern 0.4.0 — 22 oktober 2026
+<!-- kernel-version: 0.4.0 -->
+
 ### 15 oktober 2026 — Review 77: laatste routes en dekking per normdeel
 - **Herberekening laatste routes:** berekende collectieve zonne-energie op een warmte- of tapwaternet (P.32/P.33 met 13.7.2.2), de gemeten route van bijlage P (P.6) en vliesgevels; `crates/nta8800-core/tests/remaining_independent.rs`.
 - **Rekenwijziging (13.114, p. 595):** bij collectieve zonne-energie voor verwarming telt het opslagverlies van het back-updeel Q_H;bu;sto;ls mee in het energiegebruik van het zonnedeel (was weggelaten); klein effect.

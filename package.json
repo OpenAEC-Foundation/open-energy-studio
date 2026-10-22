@@ -1,6 +1,6 @@
 {
   "name": "open-energy-studio",
-  "version": "0.2.0",
+  "version": "2026.43.0",
   "description": "Energy performance workspace with an experimental NTA 8800 input audit",
   "type": "module",
   "scripts": {

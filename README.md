@@ -13,11 +13,12 @@ The goal is a complete, verifiable NTA 8800 calculation tool that can be atteste
 
 | Program | Calculation kernel (`KERNEL_VERSION`) | Manual | Release tag |
 |---|---|---|---|
-| **0.2.0** | **0.3.0** | stamped for kernel 0.3.0 | `oes-v0.2.0-kernel-v0.3.0` |
+| **2026.43.0** | **0.4.0** | stamped for kernel 0.4.0 | `v2026.43.0` |
+| 0.2.0 | 0.3.0 | stamped for kernel 0.3.0 | `oes-v0.2.0-kernel-v0.3.0` |
 
-Program 0.2.0 · Kernel 0.3.0 · Manual stamped for kernel 0.3.0.
+Program 2026.43.0 · Kernel 0.4.0 · Manual stamped for kernel 0.4.0. The program version follows the OpenAEC scheme year.week.n (issue #10); the Windows MSI carries 26.43.0 because an MSI major version stops at 255.
 
-The branch `nta8800-kernel` is ahead of this release: it carries kernel **0.4.0** (unreleased, manual stamped for 0.4.0). Its changes are under "Onuitgebracht" in [docs/nta8800-releasenotes.md](docs/nta8800-releasenotes.md).
+Changes after this release are listed under "Onuitgebracht" in [docs/nta8800-releasenotes.md](docs/nta8800-releasenotes.md).
 
 **Supported norm editions** (`normVersion` in the input → label stamped on results):
 

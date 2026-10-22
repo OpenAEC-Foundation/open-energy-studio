@@ -17,12 +17,19 @@ describe('GitHub release body (scripts/nta-github-release.mjs)', () => {
   });
 
   it('takes the entries that a release moves under the new kernel version', () => {
-    const identity = readIdentity(root);
-    const released = releaseNotes(notes, identity.kernelVersion, '11 oktober 2026');
-    const unreleased = releasedItems(notes, identity.kernelVersion);
-    const moved = releasedItems(released, identity.kernelVersion);
+    // Independent of the repository's state: right after a release nothing is
+    // unreleased, so the test adds one item and releases the next MINOR.
+    const [major, minor] = readIdentity(root).kernelVersion.split('.').map(Number);
+    const next = `${major}.${minor + 1}.0`;
+    const withItem = notes
+      .replace(/\r\n/g, '\n')
+      .replace('## Onuitgebracht\n\n', '## Onuitgebracht\n\n### 1 januari 2030 — Testitem\n- Een wijziging.\n\n');
+    const released = releaseNotes(withItem, next, '1 januari 2030');
+    const unreleased = releasedItems(withItem, next);
+    const moved = releasedItems(released, next);
     expect(unreleased.section).toBe('Onuitgebracht');
-    expect(moved.section).toBe(`Rekenkern ${identity.kernelVersion}`);
+    expect(unreleased.items).toContain('Testitem');
+    expect(moved.section).toBe(`Rekenkern ${next}`);
     expect(moved.items).toEqual(unreleased.items);
   });
 
