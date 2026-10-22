@@ -33,9 +33,34 @@ const survey = () => (JSON.parse(screen.getByTestId('survey').textContent ?? 'nu
 const evidence = () => JSON.parse(screen.getByTestId('evidence').textContent ?? '[]') as NtaEvidenceItem[];
 
 describe('survey review 36', () => {
+  it('renames a surface in its card; openings, parts and photo links follow the new name', async () => {
+    const user = userEvent.setup();
+    const surfaces = '/basisopname/survey/envelope/surfaces';
+    renderWithProviders(<Editor section="envelope" photos={[photo('ev-1', [`${surfaces}/@gevel-1`])]} />);
+    await user.click(screen.getByRole('button', { name: 'Start dwelling survey' }));
+    await user.click(screen.getByRole('button', { name: 'Add facade' }));
+    await user.click(screen.getByRole('button', { name: 'Window in this facade' }));
+    await user.click(screen.getByRole('button', { name: 'Add opaque part' }));
+    await user.click(screen.getByRole('button', { name: 'seed photos' }));
+    const part = survey()!.envelope.surfaces[1].id as string;
+
+    const name = screen.getByLabelText('Surface name');
+    await user.clear(name);
+    // An empty name leaves every reference on the old one.
+    expect(survey()!.envelope.windows[0].surfaceId).toBe('gevel-1');
+    await user.type(name, 'Voorgevel');
+    const after = JSON.parse(screen.getByTestId('survey').textContent ?? 'null');
+    expect(after.survey.envelope.surfaces[0].id).toBe('Voorgevel');
+    expect(after.survey.envelope.windows[0].surfaceId).toBe('Voorgevel');
+    expect(after.surfaceParts[part]).toBe('Voorgevel');
+    expect(evidence()[0].linkedPaths).toEqual([`${surfaces}/@Voorgevel`]);
+    // The card shows the adviser's own name instead of "Facade 1".
+    expect(screen.getAllByText('Voorgevel').length).toBeGreaterThan(0);
+  }, SLOW_UI_TEST_MS);
+
   // Ported to the surface cards (12 Oct 2026 merge). The cards add a facade, roof or floor with a fresh id
-  // and name it by position ("Facade 1"); the surface id itself can no longer be renamed. What changes a
-  // surface's place now is removing one (with its parts and openings) and adding one, which reuses the first
+  // and name it by position ("Facade 1") until the adviser gives it a name of its own (test above). What changes a
+  // surface's place is removing one (with its parts and openings) and adding one, which reuses the first
   // free id: the photo links must stay on their own surface and never pass to the new one.
   it('adds and removes envelope surfaces; openings and photo links stay with their own surface', async () => {
     const user = userEvent.setup();

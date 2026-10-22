@@ -218,6 +218,11 @@ pub struct SurveyHotWater {
     #[serde(default = "one")]
     pub showers: u32,
     pub shower_heat_recovery: ShowerRecoveryAnswer,
+    /// Table 13.8: how the shower heat recovery is connected (to mixer and
+    /// heater, mixer only, heater inlet only, shared units); `None`:
+    /// not determinable, factor 0,75.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shower_heat_recovery_connection: Option<crate::domestic_hot_water::ShowerConnection>,
     /// Vessel of an electric boiler (residential survey).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub boiler_vessel: Option<SurveyBoilerVessel>,
@@ -775,9 +780,18 @@ pub fn derive_hot_water(survey: &SurveyHotWater, recorder: &mut Recorder) -> Val
         for _ in 1..survey.showers.max(1) {
             showers.push(json!({"unit": "none"}));
         }
+        let connection = survey.shower_heat_recovery_connection.unwrap_or_else(|| {
+            recorder.record(
+                "shower_heat_recovery_connection_unknown",
+                "hotWater.showerHeatRecoveryConnection",
+                "unknown (0,75)".into(),
+                "NTA 8800 table 13.8",
+            );
+            crate::domestic_hot_water::ShowerConnection::Unknown
+        });
         system["showerHeatRecovery"] = json!({
             "showers": showers,
-            "connection": "unknown",
+            "connection": connection,
             "sourceReference": reference,
         });
     }
@@ -797,6 +811,7 @@ mod tests {
             bathroom_length_m: Some(5.0),
             showers: 1,
             shower_heat_recovery: ShowerRecoveryAnswer::Unknown,
+            shower_heat_recovery_connection: None,
             boiler_vessel: None,
             nominal_power_kw: None,
             additional_generators: Vec::new(),
@@ -858,6 +873,40 @@ mod tests {
         assert!(rules.contains(&"gas_appliance_type_unknown_bath_geyser"));
         assert!(rules.contains(&"gaskeur_unknown_none"));
         assert!(rules.contains(&"shower_heat_recovery_unknown_not_connected"));
+    }
+
+    /// Table 13.8: the surveyed connection of the shower heat recovery goes to
+    /// the kernel; without one it stays "unknown" (factor 0,75) and is recorded.
+    #[test]
+    fn shower_heat_recovery_takes_the_surveyed_connection() {
+        use crate::domestic_hot_water::ShowerConnection;
+        let gas = || HotWaterGeneratorAnswer::GasAppliance {
+            appliance_type: GasApplianceType::Unknown,
+            gaskeur: GaskeurAnswer::Unknown,
+            burner_load_kw: None,
+            cw_class: None,
+        };
+        let mut connected = survey(gas());
+        connected.shower_heat_recovery = ShowerRecoveryAnswer::Vertical;
+        connected.shower_heat_recovery_connection = Some(ShowerConnection::MixerAndHeater);
+        let mut recorder = Recorder::default();
+        let system = derive_hot_water(&connected, &mut recorder);
+        assert_eq!(
+            system["showerHeatRecovery"]["connection"],
+            "mixer_and_heater"
+        );
+        assert!(recorder
+            .applied
+            .iter()
+            .all(|item| item.rule != "shower_heat_recovery_connection_unknown"));
+        connected.shower_heat_recovery_connection = None;
+        let mut recorder = Recorder::default();
+        let system = derive_hot_water(&connected, &mut recorder);
+        assert_eq!(system["showerHeatRecovery"]["connection"], "unknown");
+        assert!(recorder
+            .applied
+            .iter()
+            .any(|item| item.rule == "shower_heat_recovery_connection_unknown"));
     }
 
     #[test]

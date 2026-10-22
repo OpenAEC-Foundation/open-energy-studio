@@ -541,6 +541,25 @@ export function moveZoneReferences(draft: Draft, from: string, to: string | null
  * Renames zone `index`; its references follow when the old name was unique and the new one is free.
  * With `from`, the references move from that name instead (the name field tracks them, see `IdField`).
  */
+/**
+ * Renames survey surface `index` to `id`. As with a zone, the references (openings, the floor of a
+ * ground wall, the parts of this surface) move from `from`, or from the old name while it is
+ * unique; an empty or taken name leaves them where they are (review 36).
+ */
+export function renameSurface(stored: StoredSurvey, index: number, id: string, from?: string | null): StoredSurvey {
+  const draft = stored.survey as Draft;
+  const surfaces = list(draft, ['envelope', 'surfaces']);
+  const old = String(surfaces[index]?.id ?? '');
+  const others = surfaces.filter((_, item) => item !== index).map((surface) => String(surface.id ?? ''));
+  const source = from === undefined ? (old !== '' && !others.includes(old) ? old : null) : from;
+  const moves = source != null && id !== '' && !others.includes(id);
+  const moved = moves ? moveSurfaceReferences(draft, source, id) : draft;
+  const parts = moves && stored.surfaceParts
+    ? Object.fromEntries(Object.entries(stored.surfaceParts).map(([part, parent]) => [part, parent === source ? id : parent]))
+    : stored.surfaceParts;
+  return { ...stored, survey: write(moved, ['envelope', 'surfaces', index, 'id'], id), ...(parts ? { surfaceParts: parts } : {}) };
+}
+
 export function renameZone(draft: Draft, index: number, id: string, from?: string | null): Draft {
   const zones = list(draft, ['zones']);
   const old = String(zones[index]?.id ?? '');
@@ -1297,9 +1316,7 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
     }
   };
   /** Saves an edit that keeps every item in place (a renamed surface); photo links follow the item. */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- the surface rename (IdField) is not in the cards yet.
-  const replaceKeepingLinks = (survey: Draft) => {
-    const next: StoredSurvey = { kind, survey };
+  const replaceKeepingLinks = (next: StoredSurvey) => {
     const registration = state.project.registration;
     const evidence = registration?.evidence ?? [];
     save(next);
@@ -1312,7 +1329,6 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
   const field = { draft, onChange: change };
   const surfaces = list(draft, ['envelope', 'surfaces']);
   const unheatedSpaces = list(draft, ['envelope', 'unheatedSpaces']);
-  void replaceKeepingLinks;
   const windows = list(draft, ['envelope', 'windows']);
   const rooflights = list(draft, ['envelope', 'rooflights']);
   const doors = list(draft, ['envelope', 'doors']);
@@ -1527,7 +1543,9 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
           if (isPart(surface)) return;
           const element = String(surface.element ?? 'facade');
           counts[element] = (counts[element] ?? 0) + 1;
-          names.set(String(surface.id ?? ''), `${t(`survey.element.${element}`)} ${counts[element]}`);
+          const id = String(surface.id ?? '');
+          // Generated ids (gevel-1, dak-2) show as "Gevel 1"; a name of the adviser's own shows as given.
+          names.set(id, /^[a-z]+-\d+$/.test(id) ? `${t(`survey.element.${element}`)} ${counts[element]}` : id);
         });
         surfaces.filter(isPart).forEach((surface) => {
           const id = String(surface.id ?? '');
@@ -1803,6 +1821,9 @@ export function BasisopnamePanel({ section: requested, onSection, part }: Basiso
                 {t('survey.grossNet', { gross: formatNumber(gross, locale, 2), net: formatNumber(net, locale, 2) })}</span>
             </summary>
             <div className="nta-form-grid opname-card-body" role="group" aria-label={names.get(id) ?? id}>
+              <IdField label={t('opname.surface.name')} id={id} t={t}
+                others={surfaces.filter((_, item) => item !== index).map((other) => String(other.id ?? ''))}
+                rename={(next, from) => replaceKeepingLinks(renameSurface(stored ?? { kind, survey: draft }, index, next, from))} />
               {!embedded && <SelectField {...sharedField} path={[...base, 'element']} label={t('opname.surface.element')}
                 options={opts(t, 'opname.surface.elementKind', ['facade', 'roof', 'floor'])}
                 onChange={(_, value) => sharedField.onChange(base, withoutStaleGroundWall({ ...(read(draft, base) as Draft), element: value }))} />}

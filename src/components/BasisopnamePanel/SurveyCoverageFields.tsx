@@ -231,11 +231,22 @@ export function SurveyHotWaterServedFields({ draft, change, t }: Props) {
   </>;
 }
 
-/** ISSO 82.1/75.1 table 13.16: shower heat recovery (vertical, horizontal, or not determinable). */
+/**
+ * ISSO 82.1/75.1 table 13.16: shower heat recovery (vertical, horizontal, or not determinable),
+ * and with a unit its connection (NTA 8800 table 13.8; not determinable: factor 0,75).
+ */
 export function SurveyShowerHeatRecoveryField({ draft, change, t }: Props) {
-  return <SelectField draft={draft} onChange={change} path={['hotWater', 'showerHeatRecovery']}
-    label={t('opname.hotWater.showerHeatRecovery')} fallback="none"
-    options={opts(t, 'opname.hotWater.showerHeatRecoveryKind', ['none', 'vertical', 'horizontal', 'unknown'])} />;
+  const unit = read(draft, ['hotWater', 'showerHeatRecovery']);
+  return <>
+    <SelectField draft={draft} onChange={change} path={['hotWater', 'showerHeatRecovery']}
+      label={t('opname.hotWater.showerHeatRecovery')} fallback="none"
+      options={opts(t, 'opname.hotWater.showerHeatRecoveryKind', ['none', 'vertical', 'horizontal', 'unknown'])} />
+    {(unit === 'vertical' || unit === 'horizontal') &&
+      <SelectField draft={draft} onChange={change} path={['hotWater', 'showerHeatRecoveryConnection']}
+        label={t('opname.hotWater.showerConnection')} fallback="unknown"
+        options={opts(t, 'opname.hotWater.showerConnectionKind',
+          ['mixer_and_heater', 'mixer_only', 'heater_only', 'shared_units', 'unknown'])} />}
+  </>;
 }
 
 /**

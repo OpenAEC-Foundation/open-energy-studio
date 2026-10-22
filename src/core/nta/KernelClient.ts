@@ -2558,6 +2558,8 @@ export interface ResidentialSurvey {
     bathroomLengthM?: number;
     showers?: number;
     showerHeatRecovery: 'none' | 'vertical' | 'horizontal' | 'unknown';
+    /** Table 13.8: connection of the shower heat recovery; absent: not determinable (0,75). */
+    showerHeatRecoveryConnection?: 'mixer_and_heater' | 'mixer_only' | 'heater_only' | 'shared_units' | 'unknown';
     /** Vessel of an electric boiler (§13.4). */
     boilerVessel?: {
       volumeL?: number | null;
@@ -2790,6 +2792,8 @@ export interface UtilitySurvey {
     circulation?: boolean | null;
     showers?: number;
     showerHeatRecovery: 'none' | 'vertical' | 'horizontal' | 'unknown';
+    /** Table 13.8: connection of the shower heat recovery; absent: not determinable (0,75). */
+    showerHeatRecoveryConnection?: 'mixer_and_heater' | 'mixer_only' | 'heater_only' | 'shared_units' | 'unknown';
     storage?: Array<{
       id: string;
       volumeL: number;

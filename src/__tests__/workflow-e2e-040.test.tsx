@@ -361,10 +361,10 @@ describe('basic survey: façade part against the ground (ISSO 82.1 §8.4)', () =
     projectAnswer = () => terracedOutput;
     await openProject(user, { ...terracedProject, basisopname: { kind: 'residential', survey } });
 
-    // The survey's façades are a step of its question flow; the wizard names the cards by element and number
-    // (kelderwand is the fourth façade).
+    // The survey's façades are a step of its question flow. This wall is called 'kelderwand' in the survey,
+    // and a name of its own shows on the card instead of the generated 'Facade 4'.
     await openStep(user, 'Survey', 'Facades and windows');
-    const wall = within(main().getByRole('group', { name: 'Facade 4' }));
+    const wall = within(main().getByRole('group', { name: 'kelderwand' }));
     await user.selectOptions(wall.getByLabelText('Boundary'), 'ground');
     // A façade part against the ground has no orientation of its own; it goes with its floor (H1).
     await typeNumber(user, wall.getByLabelText(/^Height H1/), '1,2');

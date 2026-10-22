@@ -6,6 +6,7 @@ import {
   ConstructionExtrasFields, emptyRequiredSurveyFields, SolarControlWindowsFields, SurveyDoorsFields, SurveyUnheatedSpacesFields,
   SYSTEM_VARIANTS, UtilityInstallationExtrasFields, UtilityLightingFields, VentilationBasicsFields,
 } from '../components/BasisopnamePanel/SurveyBasics';
+import { SurveyShowerHeatRecoveryField } from '../components/BasisopnamePanel/SurveyCoverageFields';
 import { en } from '../i18n/en';
 import { renderWithProviders } from './test-utils';
 
@@ -36,6 +37,15 @@ describe('survey basics write what the kernel reads', () => {
     fireEvent.change(screen.getByLabelText('Origin of q_v10'), { target: { value: 'quality_assurance' } });
     fireEvent.change(screen.getByLabelText(/^q_v10/), { target: { value: '0.62' } });
     expect(draft().measuredInfiltration).toMatchObject({ basis: 'quality_assurance', qv10Dm3PerSM2: 0.62 });
+  });
+
+  it('asks the connection of a shower heat recovery unit only when there is one (table 13.8)', () => {
+    renderWithProviders(<Harness initial={{ hotWater: { showerHeatRecovery: 'none' } }}>
+      {(d, change) => <SurveyShowerHeatRecoveryField draft={d} change={change} t={t} />}</Harness>);
+    expect(screen.queryByLabelText('Shower heat recovery connection (table 13.8)')).toBeNull();
+    fireEvent.change(screen.getByLabelText('Shower heat recovery (table 13.16)'), { target: { value: 'vertical' } });
+    fireEvent.change(screen.getByLabelText('Shower heat recovery connection (table 13.8)'), { target: { value: 'heater_only' } });
+    expect(draft().hotWater).toMatchObject({ showerHeatRecovery: 'vertical', showerHeatRecoveryConnection: 'heater_only' });
   });
 
   it('unchecking the last solar-control window leaves an empty list, not null', () => {

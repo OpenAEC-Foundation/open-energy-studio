@@ -13,6 +13,10 @@ Dit bestand is de wijzigingsregistratie van de rekenkern (BRL 9501 §5.2, §6.2 
 
 ## Onuitgebracht
 
+### 22 oktober 2026 — Opname: aansluiting douche-wtw en vlakken hernoemen (geen rekenwijziging)
+- **Aansluiting douche-wtw (tabel 13.8):** de opname legt vast waarop de douchewarmteterugwinning is aangesloten (douchemengkraan én toestel 1,00, alleen mengkraan 0,85, alleen de inlaat van het toestel of gedeelde units 0,75). Zonder antwoord blijft het "niet vast te stellen" (0,75), zoals tot nu toe; opgeslagen opnamen rekenen gelijk.
+- **Vlakken hernoemen:** een vlak in de opname kan een eigen naam krijgen ("Voorgevel"); ramen, deuren, dakramen, panelen, de vloer van een grondwand, de dichte delen en de fotokoppelingen gaan mee.
+
 ## Rekenkern 0.4.0 — 22 oktober 2026
 <!-- kernel-version: 0.4.0 -->
 

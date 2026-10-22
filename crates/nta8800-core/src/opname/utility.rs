@@ -589,6 +589,10 @@ pub struct UtilityHotWater {
     #[serde(default = "one")]
     pub showers: u32,
     pub shower_heat_recovery: ShowerRecoveryAnswer,
+    /// Table 13.8: connection of the shower heat recovery; `None`: not
+    /// determinable (0,75).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shower_heat_recovery_connection: Option<crate::domestic_hot_water::ShowerConnection>,
     /// Vessels whose losses are not part of the generator efficiency
     /// (electric and indirectly heated boilers, p. 172).
     #[serde(default)]
@@ -2990,6 +2994,7 @@ fn hot_water_value(
                 } else {
                     ShowerRecoveryAnswer::None
                 },
+                shower_heat_recovery_connection: hot.shower_heat_recovery_connection,
                 boiler_vessel: None,
                 nominal_power_kw: None,
                 additional_generators: Vec::new(),
