@@ -16,11 +16,13 @@ Een berekening draagt twee versienummers.
 
 | Deel | Waar vastgelegd | Voorbeeld | Betekenis |
 | --- | --- | --- | --- |
-| Programmaversie | `package.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json` | `2026.43.0` | De versie van de desktop-app en de gebruikersinterface, volgens het OpenAEC-schema jaar.week.volgnummer (vanaf 22 oktober 2026; daarvoor `0.2.0`). De Windows-MSI krijgt `26.43.0` (`bundle.windows.wix.version`), omdat een MSI als hoofdversie hoogstens 255 accepteert. |
+| Programmaversie | `package.json`, `package-lock.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, `src-tauri/tauri.conf.json` | `2026.43.0` | De versie van de desktop-app en de gebruikersinterface, volgens het OpenAEC-schema jaar.week.volgnummer (vanaf 22 oktober 2026; daarvoor `0.2.0`). De Windows-MSI krijgt `26.43.0` (`bundle.windows.wix.version`), omdat een MSI als hoofdversie hoogstens 255 accepteert. |
 | Rekenkernversie (`KERNEL_VERSION`) | `crates/nta8800-core/Cargo.toml`, in de kern beschikbaar als `KERNEL_VERSION` | `0.4.0` (onuitgebracht; laatste uitgave 0.3.0) | De versie van de rekenkern: het deel van het versienummer dat BRL 9501 §5.2 aan de NTA 8800-versie koppelt. |
 | Normversie (`TARGET_NORM_VERSION`) | `crates/nta8800-core/src/lib.rs` | `NTA 8800:2025+C1:2026` | De normtekst waarop de rekenkern is gebaseerd. |
 
 De rekenkernversie volgt het schema `MAJOR.MINOR.PATCH`. De programmaversie volgt vanaf 2026.43.0 het OpenAEC-schema `JJJJ.W.N` (jaar, ISO-week, volgnummer); de tabel hieronder geldt voor de rekenkernversie, de programmaversie krijgt bij elke uitgave het nummer van die week.
+
+`npm run bump` (`node scripts/bump-version.js`) zet dat nummer automatisch: het neemt de ISO-week van vandaag, telt de bestaande tags `vJJJJ.W.N` en `oes-vJJJJ.W.N-kernel-v…` van die week en kiest het volgende volgnummer (de eerste uitgave van een week krijgt `.0`). Het zet de versie in `package.json`, `package-lock.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` en `src-tauri/Cargo.lock`, en de MSI-versie `JJ.W.N` in `bundle.windows.wix.version`. Een vaste versie kan ook: `node scripts/bump-version.js 2026.44.0`. Haal eerst de tags op (`git fetch --tags`), anders telt het script een tag van een collega niet mee. `src/__tests__/review31-output-identity.test.ts` bewaakt dat alle plekken gelijk lopen.
 
 | Soort wijziging | Rekenkernversie | Programmaversie |
 | --- | --- | --- |

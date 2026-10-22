@@ -13,6 +13,9 @@ Dit bestand is de wijzigingsregistratie van de rekenkern (BRL 9501 §5.2, §6.2 
 
 ## Onuitgebracht
 
+### 22 oktober 2026 — Automatisch programmaversienummer (geen rekenwijziging)
+- **Versie ophogen:** `npm run bump` zonder argument kiest zelf het volgende nummer jaar.week.volgnummer (ISO-week van vandaag, na de bestaande tags van die week) en zet het ook in `package-lock.json` en, als `26.W.N`, in de MSI-versie (`bundle.windows.wix.version`). Daarmee is het laatste punt van issue #10 afgerond.
+
 ### 22 oktober 2026 — Opname: aansluiting douche-wtw en vlakken hernoemen (geen rekenwijziging)
 - **Aansluiting douche-wtw (tabel 13.8):** de opname legt vast waarop de douchewarmteterugwinning is aangesloten (douchemengkraan én toestel 1,00, alleen mengkraan 0,85, alleen de inlaat van het toestel of gedeelde units 0,75). Zonder antwoord blijft het "niet vast te stellen" (0,75), zoals tot nu toe; opgeslagen opnamen rekenen gelijk.
 - **Vlakken hernoemen:** een vlak in de opname kan een eigen naam krijgen ("Voorgevel"); ramen, deuren, dakramen, panelen, de vloer van een grondwand, de dichte delen en de fotokoppelingen gaan mee.

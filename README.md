@@ -16,7 +16,7 @@ The goal is a complete, verifiable NTA 8800 calculation tool that can be atteste
 | **2026.43.0** | **0.4.0** | stamped for kernel 0.4.0 | `v2026.43.0` |
 | 0.2.0 | 0.3.0 | stamped for kernel 0.3.0 | `oes-v0.2.0-kernel-v0.3.0` |
 
-Program 2026.43.0 · Kernel 0.4.0 · Manual stamped for kernel 0.4.0. The program version follows the OpenAEC scheme year.week.n (issue #10); the Windows MSI carries 26.43.0 because an MSI major version stops at 255.
+Program 2026.43.0 · Kernel 0.4.0 · Manual stamped for kernel 0.4.0. The program version follows the OpenAEC scheme year.week.n (issue #10); the Windows MSI carries 26.43.0 because an MSI major version stops at 255. `npm run bump` sets the next number of the current week in every file that carries it.
 
 Changes after this release are listed under "Onuitgebracht" in [docs/nta8800-releasenotes.md](docs/nta8800-releasenotes.md).
 
