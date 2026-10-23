@@ -494,7 +494,8 @@ pub const DATA_IMPORT_SOURCE: &str = "BRL 9501 (29-05-2026) §4.3.1 opmerking, p
 
 /// Whether, and with which tools, data was read into the program by the
 /// adviser. Automatic reading is not allowed; every import in this program
-/// is started by the adviser.
+/// is started by the adviser, and the adviser confirms per import that the
+/// data read in was checked (`reviewedAt`) before the dossier is complete.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DataImportDeclaration {
@@ -502,15 +503,22 @@ pub struct DataImportDeclaration {
     pub data_imported: bool,
     /// Distinct tools in import order.
     pub tools: Vec<String>,
+    /// Every import was confirmed as checked by the adviser (`reviewedAt`);
+    /// `true` when nothing was imported.
+    pub all_reviewed: bool,
 }
 
-/// Reads `importLog` (entries `{tool, fileName?, importedAt?}`) of the
-/// project; malformed entries are reported.
+/// Reads `importLog` (entries `{tool, fileName?, importedAt?, reviewedAt?}`)
+/// of the project; malformed entries are reported, and so is every import the
+/// adviser has not yet confirmed as checked (`import_not_reviewed`): the
+/// registration must rest on data the adviser checked by hand, not on what an
+/// importer read in.
 pub fn data_import_declaration(
     project: &Value,
     issues: &mut Vec<RegistrationIssue>,
 ) -> DataImportDeclaration {
     let mut tools: Vec<String> = Vec::new();
+    let mut all_reviewed = true;
     match project.get("importLog") {
         None | Some(Value::Null) => {}
         Some(Value::Array(entries)) => {
@@ -519,6 +527,18 @@ pub fn data_import_declaration(
                     Some(tool) if !tool.is_empty() => {
                         if !tools.iter().any(|known| known == tool) {
                             tools.push(tool.to_string());
+                        }
+                        let reviewed = entry
+                            .get("reviewedAt")
+                            .and_then(Value::as_str)
+                            .is_some_and(|at| !at.trim().is_empty());
+                        if !reviewed {
+                            all_reviewed = false;
+                            issues.push(RegistrationIssue {
+                                code: "import_not_reviewed",
+                                path: format!("importLog[{index}].reviewedAt"),
+                                severity: "missing",
+                            });
                         }
                     }
                     _ => issues.push(RegistrationIssue {
@@ -539,6 +559,7 @@ pub fn data_import_declaration(
         source: DATA_IMPORT_SOURCE,
         data_imported: !tools.is_empty(),
         tools,
+        all_reviewed,
     }
 }
 
@@ -2703,9 +2724,9 @@ mod tests {
         assert!(!none.data_imported && none.tools.is_empty());
         assert!(issues.is_empty());
         let project = serde_json::json!({"importLog": [
-            {"tool": "UNIEC3", "fileName": "a.uniec3", "importedAt": "2026-10-05"},
-            {"tool": "VABI"},
-            {"tool": "UNIEC3"},
+            {"tool": "UNIEC3", "fileName": "a.uniec3", "importedAt": "2026-10-05", "reviewedAt": "2026-10-06"},
+            {"tool": "VABI", "reviewedAt": "2026-10-06"},
+            {"tool": "UNIEC3", "reviewedAt": "2026-10-06"},
             {"fileName": "b.xml"}
         ]});
         let declared = data_import_declaration(&project, &mut issues);
@@ -2718,9 +2739,38 @@ mod tests {
         assert_eq!(issues.len(), 1);
         assert_eq!(issues[0].code, "import_log_invalid");
         assert_eq!(issues[0].path, "importLog[3].tool");
+        assert!(declared.all_reviewed);
         let mut issues = Vec::new();
         data_import_declaration(&serde_json::json!({"importLog": "x"}), &mut issues);
         assert_eq!(issues[0].path, "importLog");
+    }
+
+    /// The registration rests on data the adviser checked: an import without
+    /// `reviewedAt` keeps the dossier incomplete (issue #8).
+    #[test]
+    fn an_import_the_adviser_has_not_confirmed_blocks_the_dossier() {
+        let mut issues = Vec::new();
+        let project = serde_json::json!({"importLog": [
+            {"tool": "UNIEC3", "reviewedAt": "2026-10-22T10:00:00Z"},
+            {"tool": "VABI"},
+            {"tool": "UNIEC3", "reviewedAt": "  "}
+        ]});
+        let declared = data_import_declaration(&project, &mut issues);
+        assert!(!declared.all_reviewed);
+        let paths: Vec<_> = issues
+            .iter()
+            .map(|issue| (issue.code, issue.path.as_str()))
+            .collect();
+        assert_eq!(
+            paths,
+            vec![
+                ("import_not_reviewed", "importLog[1].reviewedAt"),
+                ("import_not_reviewed", "importLog[2].reviewedAt"),
+            ]
+        );
+        let mut issues = Vec::new();
+        assert!(data_import_declaration(&serde_json::json!({}), &mut issues).all_reviewed);
+        assert!(issues.is_empty());
     }
 
     /// A relabel in the original's older edition may be registered (BRL

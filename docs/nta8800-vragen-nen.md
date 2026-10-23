@@ -4,6 +4,43 @@ Concepten voor vragen over de interpretatie van NTA 8800:2025+C1:2026. Ze zijn i
 
 Alle achtentwintig vragen staan ook in een verzendklare brief aan NEN en RVO, met per vraag de twee lezingen en het gevolg in de openbare gevallen: [nta8800-vragen-nen-brief.md](nta8800-vragen-nen-brief.md). Werk die brief bij als een vraag hier verandert.
 
+## Stand per uitgave
+
+Per vraag de status bij NEN en de lezing die de rekenkern volgt. Werk deze tabel bij elke uitgave bij: komt er een antwoord, zet dan de datum en het antwoord in de kolom *Status bij NEN* en noem de rekenkernversie die het antwoord volgt. De releasenotes van die versie vermelden de wijziging. `src/__tests__/nen-questions-status.test.ts` controleert dat elke vraag hier een regel heeft.
+
+Stand bij rekenkern 0.5.0 (22 oktober 2026). De vragen zijn gebundeld in de [brief](nta8800-vragen-nen-brief.md); die is nog niet verstuurd.
+
+| Nr | Onderwerp | Status bij NEN | Lezing in de rekenkern |
+| --- | --- | --- | --- |
+| 1 | Afgifteverlies koeling, formule 10.15 | nog niet verstuurd | De kern past 10.15 letterlijk toe en meldt `cooling_emission_loss_singular` als het afgifteverlies groter wordt dan drie keer de koudebehoefte. |
+| 2 | Regelenergie koeling, formule 10.87 | nog niet verstuurd | De kern telt 10.87 in alle maanden bij een koelmachine (compressie of absorptie), niet bij externe koude, vrije koeling en een onbekende collectieve opwekker (review 66). |
+| 3 | f_prac bij een kwaliteitsverklaring van een warmtepomp | nog niet verstuurd | Een gedeclareerde COP voor verwarming valt onder 9.63 met 0,95. |
+| 4 | A0 en labelelement h bij een woning | nog niet verstuurd | A0: lid 5 onder b toetst de labelwaarde met EMGforf; element h: alleen hernieuwbare elektriciteit op eigen terrein. |
+| 5 | Luchtvolumestroom van het forfaitaire ventilatorvermogen, formule 11.142 | nog niet verstuurd | De kern neemt q_V;ODA;req van de warmtebalans, in alle maanden. |
+| 6 | Oppervlakte per gebruiksfunctie voor tapwater en verlichting bij een gemeenschappelijke ruimte | nog niet verstuurd | De kern neemt de verdeling binnen de rekenzone als hij deze lijsten zelf vult. |
+| 7 | Warmtecapaciteit van lucht in 11.115 en 11.119 | nog niet verstuurd | De kern rekent met de gedrukte waarde. |
+| 8 | Gevel aan een aangrenzende onverwarmde serre bij TOjuli | nog niet verstuurd | Zolang dit niet vaststaat, laat de kern het serregeveldeel, zijn transmissie en de indirecte serrewinst buiten de verdeling per oriëntatie, net als bij een gewone aangrenzende onverwarmde ruimte. |
+| 9 | Scheidingsconstructie naar een aangrenzende onverwarmde ruimte bij TOjuli in de forfaitaire route | nog niet verstuurd | In de forfaitaire route telt de kern de scheidingsconstructie mee in A_T;or en in H_C;D;juli;or van haar eigen oriëntatie, zonder zonnewinst (de AOR schermt de zon af). |
+| 10 | RER_PrenTot;EMGforf bij een collectieve warmtepompbron onder 20 °C met kwaliteitsverklaring | nog niet verstuurd | De kern rekent de EMGforf-berekening voor zo'n bron met de waarden uit de kwaliteitsverklaring (f_P;del;dh, f_Pren;dh en K_CO2), dus met één EPTot in EwePTot;EMGforf en in de noemer van RERPrenTot;EMGforf. |
+| 11 | Zonnewinst door de scheidingsconstructie naar een aangrenzende onverwarmde serre | nog niet verstuurd | De kern geeft de scheidingsconstructie naar een serre in beide routes geen eigen zonnewinst, ook niet door haar ramen. |
+| 12 | Praktijkfactor f_prpr bij een kwaliteitsverklaring van een koudeopwekker | nog niet verstuurd | Een gedeclareerde EER of ζ is een productwaarde en krijgt f_prpr 0,9, zoals in methode 1 en de meeste gevallen van methode 2. |
+| 13 | Bronpomp van een warmtepomp volgens bijlage Q in de COP én als hulpenergie | nog niet verstuurd | De kern volgt beide bepalingen letterlijk: de bronpomp zit in η_H;gen;hp en komt er per maand als hulpenergie nog eens bij. |
+| 14 | Tijdfractie voor warm tapwater van een warmtepomp op ventilatielucht | nog niet verstuurd | De kern bepaalt f_W;t;hp-on met 13.149, ook in Q.84, omdat 13.8.2.4 en 11.23 dat voorschrijven. |
+| 15 | Klassecorrectie c_W;gen op de forfaitaire tapwaterwarmtepomp | nog niet verstuurd | Waar de toetsset en de letterlijke tekst uiteenlopen, volgt de kern de BRL 9501-toetsset (besluit 13 oktober 2026). |
+| 16 | Aantal fictieve verticale leidingen bij een onbekende situatie | nog niet verstuurd | De kern volgt de BRL 9501-toetsset: één leiding door alle N bouwlagen, N·1,8 W/K (ISSO 54 EPWReal B03, drie bouwlagen, "onbekend"). |
+| 17 | Hernieuwbare warmte van de forfaitaire tapwaterwarmtepomp met c_W;gen | nog niet verstuurd | De kern volgt de toetsset (besluit 13 oktober 2026): c_W;gen corrigeert de energie voor de tapvraag, niet het rendement van de warmtepomp zelf. |
+| 18 | TOjuli bij utiliteitsbouw | nog niet verstuurd | De kern volgt de toetsset (besluit 13 oktober 2026): een utiliteitsgebouw registreert TOjuli 0. |
+| 19 | Bezettingstijd en warmteproductie door personen in een rekenzone met meer gebruiksfuncties | nog niet verstuurd | De kern weegt het product q_Oc · f_τ per gebruiksfunctie naar oppervlakte. |
+| 20 | Opwekkingsrendement van een ketel volgens bijlage M: Q_H;gen;out met of zonder f_ctr;ls | nog niet verstuurd | De kern neemt de waarde met f_ctr;ls, zoals M.24 hem definieert. |
+| 21 | Rendement van geothermie bij externe warmtelevering | nog niet verstuurd | De kern rekent 1 − 1/η met η volgens P.6.5.4.8. |
+| 22 | Afronding van de U-waarde naar een onverwarmde ruimte | nog niet verstuurd | De kern rondt de U-waarde na de vervanging niet opnieuw af. |
+| 23 | U_x;T bij een onverwarmde kelder in D.15 en D.16 | nog niet verstuurd | De kern neemt de U-waarde van de kelderwand (U_xw), zoals NEN-EN-ISO 13370 bijlage H.8, en leest de noemer als (A_f + z · P) · λ/δ, zoals D.16. |
+| 24 | ΔU_for over kelderwanden en vloeren boven een onverwarmde kelder | nog niet verstuurd | De kern laat alle elementen van de grondroute buiten A_T;ntr. |
+| 25 | Verliezen van een modulerende lokale verwarmer in N.69 | nog niet verstuurd | De kern interpoleert het totale verlies α_ON. |
+| 26 | CO2-factor van warm tapwater uit een warmtenet in P.38 | nog niet verstuurd | De kern deelt K ook door η_WD;gen;sto, zoals P.34 voor f. |
+| 27 | Teken van het leidingverlies van een koudenet in P.14 | nog niet verstuurd | De kern telt per maand alleen warmtewinst (≥ 0). |
+| 28 | Afronding van een opgegeven U-waarde vóór formule 8.1 | nog niet verstuurd | De kern rondt af waar hij de U-waarde zelf berekent (bijlage C, I en de forfaitaire route) en neemt een opgegeven U-waarde over zoals die is. |
+
 ## 1. Afgifteverlies koeling, formule 10.15 (p. 376)
 
 **Situatie.** Formule 10.15 geldt als θ_int,inc − θ_e,comb kleiner is dan 0. Het verlies is dan de koudeafgifte maal het maximum van twee waarden: de verhouding Δθ_int,inc / (θ_int,inc − θ_e,comb) en 0,15. Bij vloerkoeling met forfaitaire waterzijdige inregeling en regeling volgt uit tabel 10.35 en tabel 10.5 een Δθ_int,inc van −3,05 tot −3,55 K. In de tussenmaanden (mei, september) ligt θ_e,comb maar net boven θ_int,inc, zodat de noemer klein is en de verhouding groot wordt.

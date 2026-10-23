@@ -123,6 +123,7 @@ export const GAP_ROUTES: GapRoute[] = [
   { prefix: 'city', step: 'project' },
   { prefix: 'registration', step: 'registration' },
   { prefix: 'evidence', step: 'registration' },
+  { prefix: 'importLog', step: 'registration' },
   { prefix: 'registration.relabelComparison', step: 'relabel' },
   { prefix: 'relabelComparison', step: 'relabel' },
   // Building (geometry, envelope, zone use).

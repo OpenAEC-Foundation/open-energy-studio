@@ -345,6 +345,12 @@ export interface ProjectImportRecord {
   sourceVersion?: string;
   /** Values the importer filled in, limited or left out; empty when it copied everything. */
   issues?: ProjectImportIssue[];
+  /**
+   * ISO timestamp at which the adviser confirmed having checked the data read
+   * in. Without it the kernel keeps the registration dossier incomplete
+   * (`import_not_reviewed`).
+   */
+  reviewedAt?: string;
 }
 
 export interface IProject {

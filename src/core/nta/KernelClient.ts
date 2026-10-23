@@ -3426,12 +3426,32 @@ export interface NtaTojuliAssessment {
     share: number;
     assessed: boolean;
     conductanceWPerK: number;
+    /** Step B: July heat transfer of the orientation (direct, ground and ventilation share), kWh. */
+    heatTransferJulyKwh?: number;
+    /** Step B: internal gains by A_T;or plus the solar gains of the orientation, kWh. */
+    gainsJulyKwh?: number;
+    /** Step B: recoverable July system losses by A_T;or, kWh. */
+    recoverableJulyKwh?: number;
     coolingNeedJulyKwh: number;
     boosterHeatPumpJulyKwh: number;
     tojuliK: number | null;
   }>;
   maxTojuliK: number | null;
   meetsBblLimit: boolean | null;
+  /** Fixed values and zone terms of 5.40 when TOjuli was calculated (issue #8). */
+  july?: {
+    hours: number;
+    outdoorTemperatureC: number;
+    coolingSetpointC: number;
+    coolingReductionFactor: number;
+    internalGainsKwh: number;
+    ventilationConductanceWPerK: number;
+    groundConductanceWPerK: number;
+    specificHeatCapacityKjPerM2k: number;
+    usableFloorAreaM2: number;
+    minOrientationAreaM2: number;
+    limitK: number;
+  };
   annexAa: NtaAnnexAaResult | null;
   issues: Array<{ code: string; path: string }>;
   /** Non-blocking findings, e.g. insufficient annex AA capacity (TOjuli then calculated). */
@@ -4818,9 +4838,10 @@ export interface RegistrationAssessment {
   /**
    * BRL 9501 (29-05-2026) §4.3.1 opmerking (p. 8): whether, and with which
    * tools, the adviser read data into the program (from the project's
-   * `importLog`). Null when the block is checked on its own.
+   * `importLog`), and whether the adviser confirmed every import as checked
+   * (`allReviewed`). Null when the block is checked on its own.
    */
-  dataImport?: { source: string; dataImported: boolean; tools: string[] } | null;
+  dataImport?: { source: string; dataImported: boolean; tools: string[]; allReviewed?: boolean } | null;
 }
 
 export interface NtaBacsEvidence {

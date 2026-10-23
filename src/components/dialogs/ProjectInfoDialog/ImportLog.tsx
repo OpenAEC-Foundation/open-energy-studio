@@ -24,6 +24,8 @@ export function ImportLog({ records }: ImportLogProps) {
           <dl className="dialog-grid">
             <dt>{record.tool}</dt>
             <dd>{t('import.log.date')}: {record.importedAt}</dd>
+            <dt>{t('import.review.title')}</dt>
+            <dd>{record.reviewedAt ? `${t('import.log.reviewed')}: ${record.reviewedAt}` : t('import.log.notReviewed')}</dd>
             {record.fileName && <><dt>{t('import.log.file')}</dt><dd>{record.fileName}</dd></>}
             {record.sha256 && <><dt>{t('import.log.sha256')}</dt><dd><code>{record.sha256}</code></dd></>}
             {record.sourceVersion && <><dt>{t('import.log.source')}</dt><dd>{record.sourceVersion}</dd></>}

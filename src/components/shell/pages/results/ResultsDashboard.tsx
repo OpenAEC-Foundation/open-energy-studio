@@ -276,19 +276,50 @@ function ZonesTab({ assessment }: { assessment: ProjectPerformanceAssessment }) 
     id: `${zone.zoneId}-${orientation.orientation}`, zone: zone.zoneId, ...orientation,
   })));
   type TRow = (typeof tojuli)[number];
+  const optional = (value: number | undefined) => (value == null ? '–' : formatNumber(value, locale, 1));
   const tColumns: Array<Column<TRow>> = [
     { key: 'zone', header: t('results.dash.col.zone'), render: (row) => row.zone },
     { key: 'orientation', header: t('results.dash.col.orientation'), render: (row) => row.orientation },
     { key: 'area', header: t('results.dash.col.area'), unit: 'm²', numeric: true, render: (row) => formatNumber(row.areaM2, locale, 1) },
+    { key: 'conductance', header: t('results.dash.col.tojuliConductance'), unit: 'W/K', numeric: true, render: (row) => formatNumber(row.conductanceWPerK, locale, 1) },
+    { key: 'heatTransfer', header: t('results.dash.col.tojuliHeatTransfer'), unit: 'kWh', numeric: true, render: (row) => optional(row.heatTransferJulyKwh) },
+    { key: 'gains', header: t('results.dash.col.tojuliGains'), unit: 'kWh', numeric: true, render: (row) => optional(row.gainsJulyKwh) },
+    { key: 'recoverable', header: t('results.dash.col.tojuliRecoverable'), unit: 'kWh', numeric: true, render: (row) => optional(row.recoverableJulyKwh) },
+    { key: 'need', header: t('results.dash.col.tojuliNeed'), unit: 'kWh', numeric: true, render: (row) => formatNumber(row.coolingNeedJulyKwh, locale, 1) },
+    { key: 'booster', header: t('results.dash.col.tojuliBooster'), unit: 'kWh', numeric: true, render: (row) => formatNumber(row.boosterHeatPumpJulyKwh, locale, 1) },
     { key: 'tojuli', header: 'TOjuli', unit: 'K', numeric: true, render: (row) => row.assessed ? formatNumber(row.tojuliK, locale, 2) : '–' },
   ];
+  // Fixed values and zone terms of 5.40, so TOjuli can be checked by hand (issue #8).
+  const fixed = performance.tojuli.filter((zone) => zone.july);
   return <>
     <Card title={t('results.dash.zonesTitle')} flush>
       <DataTable columns={columns} rows={rows} rowKey={(row) => row.id} caption={t('results.dash.zonesTitle')} />
     </Card>
     {isResidential(assessment) && tojuli.length > 0 && <Card title={t('results.dash.tojuliTitle')} flush>
       <DataTable columns={tColumns} rows={tojuli} rowKey={(row) => row.id} caption={t('results.dash.tojuliTitle')} />
+      <p className="dialog-hint">{t('results.dash.tojuli.formula')}</p>
     </Card>}
+    {isResidential(assessment) && fixed.map((zone) => {
+      const july = zone.july!;
+      const line = (key: string, value: number, digits: number, unit: string) => (
+        <tr key={key}><td>{t(`results.dash.tojuli.${key}`)}</td><td className="mono">{formatNumber(value, locale, digits)} {unit}</td></tr>
+      );
+      return <Card key={zone.zoneId} title={`${t('results.dash.tojuli.fixedTitle')} — ${zone.zoneId}`} level={2}>
+        <table className="kv-table"><tbody>
+          {line('hours', july.hours, 0, 'h')}
+          {line('outdoor', july.outdoorTemperatureC, 2, '°C')}
+          {line('setpoint', july.coolingSetpointC, 1, '°C')}
+          {line('reduction', july.coolingReductionFactor, 2, '')}
+          {line('internal', july.internalGainsKwh, 1, 'kWh')}
+          {line('ventilation', july.ventilationConductanceWPerK, 1, 'W/K')}
+          {line('ground', july.groundConductanceWPerK, 1, 'W/K')}
+          {line('capacity', july.specificHeatCapacityKjPerM2k, 0, 'kJ/(m²·K)')}
+          {line('floorArea', july.usableFloorAreaM2, 1, 'm²')}
+          {line('minArea', july.minOrientationAreaM2, 1, 'm²')}
+          {line('limit', july.limitK, 2, 'K')}
+        </tbody></table>
+      </Card>;
+    })}
   </>;
 }
 

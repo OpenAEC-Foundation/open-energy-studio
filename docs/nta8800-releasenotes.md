@@ -13,6 +13,15 @@ Dit bestand is de wijzigingsregistratie van de rekenkern (BRL 9501 §5.2, §6.2 
 
 ## Onuitgebracht
 
+### 22 oktober 2026 — TOjuli narekenbaar en NEN-vragen per uitgave (geen rekenwijziging)
+- **TOjuli (§5.7, issue #8):** de uitkomst geeft per oriëntatie ook Q_ht, Q_gn en Q_rbl van stap B (`heatTransferJulyKwh`, `gainsJulyKwh`, `recoverableJulyKwh`) en per rekenzone de vaste waarden en zonetermen van 5.40 (`july`: t_juli, θ_e;juli, setpoint, a_C;red, interne warmtelast, H_C;ve, H_gr;an, warmtecapaciteit, gebruiksoppervlakte, minimale oppervlakte, grenswaarde). De resultatenpagina toont ze, met de rekenregel; TOjuli zelf verandert niet.
+- **NEN-vragen:** [nta8800-vragen-nen.md](nta8800-vragen-nen.md) heeft een tabel *Stand per uitgave* met per vraag de status bij NEN en de lezing in de rekenkern; een test bewaakt dat elke vraag erin staat en dat de tabel bij de huidige rekenkernversie hoort.
+
+### 22 oktober 2026 — Registratie: ingelezen gegevens bevestigen (issue #8)
+- **Rekenkern.** `KERNEL_VERSION` 0.4.0 → 0.5.0; de handleiding is opnieuw gestempeld.
+- **Registratiecontrole (BRL 9501 §4.3.1, p. 8):** een import uit UNIEC3 of VABI telt pas mee als de adviseur heeft bevestigd dat de ingelezen gegevens zijn gecontroleerd (`importLog[i].reviewedAt`). Zonder die bevestiging meldt de kern `import_not_reviewed` en is het dossier onvolledig; `dataImport.allReviewed` geeft aan of alles is bevestigd. Een opgeslagen project met een import zonder bevestiging is daardoor niet meer gereed voor registratie tot de adviseur bevestigt; berekende waarden veranderen niet.
+- **App:** de registratiepagina heeft een blok *Ingelezen gegevens* met per import de knop **Ingelezen gegevens gecontroleerd** (en **Bevestiging intrekken**); het importverslag toont de bevestiging.
+
 ### 22 oktober 2026 — Automatisch programmaversienummer (geen rekenwijziging)
 - **Versie ophogen:** `npm run bump` zonder argument kiest zelf het volgende nummer jaar.week.volgnummer (ISO-week van vandaag, na de bestaande tags van die week) en zet het ook in `package-lock.json` en, als `26.W.N`, in de MSI-versie (`bundle.windows.wix.version`). Daarmee is het laatste punt van issue #10 afgerond.
 

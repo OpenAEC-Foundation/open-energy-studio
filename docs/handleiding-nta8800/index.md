@@ -1,7 +1,7 @@
 # Gebruikershandleiding NTA 8800 — Open Energy Studio
 
-<!-- handleiding: rekenkern 0.4.0 -->
-*Versie: bij rekenkern 0.4.0. De app en de handleiding van een release tonen daarnaast de programmaversie.*
+<!-- handleiding: rekenkern 0.5.0 -->
+*Versie: bij rekenkern 0.5.0. De app en de handleiding van een release tonen daarnaast de programmaversie.*
 
 Deze handleiding beschrijft het NTA 8800-deel van Open Energy Studio:
 - de rekenkern;

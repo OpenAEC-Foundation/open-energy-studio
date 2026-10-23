@@ -4,14 +4,15 @@
  * check (open points and plausibility, each with "Ga naar") and the
  * registration data itself (`RegistrationForm`).
  */
-import { CheckCircle2, CircleAlert } from 'lucide-react';
+import { CheckCircle2, CircleAlert, Undo2 } from 'lucide-react';
 import { useI18n } from '../../../i18n/i18n';
 import { useKernel } from '../../../context/KernelProvider';
+import { useEnergy } from '../../../context/EnergyContext';
 import { routeForPath } from '../../../core/nta/gapRoutes';
 import { softwareIdentity } from '../../../core/nta/Registration';
 import type { IProject } from '../../../core/energy/types';
 import type { RegistrationAssessment } from '../../../core/nta/KernelClient';
-import { Banner, Card, IssueList, Pill } from '../../ui';
+import { Banner, Button, Card, IssueList, Pill } from '../../ui';
 import type { ShellActions } from '../ShellActions';
 import './delivery.css';
 import { routeLabel } from '../PageHeader';
@@ -26,6 +27,52 @@ export function readinessReasons(assessment: RegistrationAssessment | null | und
   if (!(assessment.dossierComplete ?? assessment.issues.length === 0)) reasons.push('registration.page.reason.dossier');
   if (assessment.softwareAttested === false) reasons.push('registration.page.reason.attest');
   return reasons;
+}
+
+/**
+ * Per import, the adviser confirms having checked the data read in (BRL 9501
+ * §4.3.1: no registration on automatically read data). The kernel keeps the
+ * dossier incomplete (`import_not_reviewed`) until every import is confirmed.
+ */
+export function ImportReview() {
+  const { t } = useI18n();
+  const { state, dispatch } = useEnergy();
+  const records = state.project.importLog ?? [];
+  if (records.length === 0) return null;
+  const setReviewed = (index: number, reviewedAt: string | undefined) => dispatch({
+    type: 'UPDATE_PROJECT_INFO',
+    payload: {
+      importLog: records.map((record, at) => {
+        if (at !== index) return record;
+        const { reviewedAt: _previous, ...rest } = record;
+        return reviewedAt ? { ...rest, reviewedAt } : rest;
+      }),
+    },
+  });
+  return (
+    <Card title={t('import.review.title')} subtitle={t('import.review.intro')} level={2}>
+      <table className="kv-table"><tbody>
+        {records.map((record, index) => (
+          <tr key={`${record.importedAt}-${index}`}>
+            <td>
+              <strong>{record.tool}</strong>{record.fileName ? ` — ${record.fileName}` : ''}
+              {record.importedAt && <div className="mono">{t('import.log.date')}: {record.importedAt}</div>}
+            </td>
+            <td>
+              {record.reviewedAt
+                ? <>
+                  <Pill tone="ok">{t('import.log.reviewed')}: {record.reviewedAt.slice(0, 10)}</Pill>{' '}
+                  <Button type="button" variant="ghost" size="sm" icon={<Undo2 aria-hidden="true" />}
+                    onClick={() => setReviewed(index, undefined)}>{t('import.review.undo')}</Button>
+                </>
+                : <Button type="button" variant="secondary" size="sm" icon={<CheckCircle2 aria-hidden="true" />}
+                  onClick={() => setReviewed(index, new Date().toISOString())}>{t('import.review.confirm')}</Button>}
+            </td>
+          </tr>
+        ))}
+      </tbody></table>
+    </Card>
+  );
 }
 
 export function RegistrationPage({ project, actions }: { project: IProject; actions: Pick<ShellActions, 'navigate' | 'openDialog'> }) {
@@ -105,6 +152,7 @@ export function RegistrationPage({ project, actions }: { project: IProject; acti
           onGoTo={(issue) => goTo(issue.path ?? '')} />
       </Card>
     )}
+    <ImportReview />
     <RegistrationForm />
   </>;
 }

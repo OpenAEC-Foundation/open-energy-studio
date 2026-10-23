@@ -196,9 +196,50 @@ pub struct OrientationResult {
     pub share: f64,
     pub assessed: bool,
     pub conductance_w_per_k: f64,
+    /// Step B: heat transfer of the orientation in July, `Q_C;ht;juli;or`
+    /// (direct, ground and ventilation share), kWh.
+    pub heat_transfer_july_kwh: f64,
+    /// Step B: internal gains by `A_T;or` plus the solar gains of the
+    /// orientation (its windows, opaque parts and its share of the
+    /// horizontal ones), kWh.
+    pub gains_july_kwh: f64,
+    /// Step B: recoverable July system losses by `A_T;or`
+    /// (`Q_H;ls;rbl` − `Q_C;ls;rbl`), kWh.
+    pub recoverable_july_kwh: f64,
     pub cooling_need_july_kwh: f64,
     pub booster_heat_pump_july_kwh: f64,
     pub tojuli_k: Option<f64>,
+}
+
+/// The fixed values and zone terms behind 5.40, so TOjuli can be checked by
+/// hand (issue #8): with these and the terms per orientation,
+/// `TOjuli;or = (Q_C;nd;juli;or − Q_C;HP;juli;or) · 1000 / (H_C;juli;or · t_juli)`,
+/// rounded up to 0,01 K.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TojuliJulyTerms {
+    /// Length of July `t_mi`, h (table 17.1).
+    pub hours: f64,
+    /// Mean outdoor temperature in July `θ_e;avg;mi`, °C (table 17.1).
+    pub outdoor_temperature_c: f64,
+    /// Setpoint of the cooling balance `θ_int;set;C`, °C (table 7.13).
+    pub cooling_setpoint_c: f64,
+    /// `a_C;red` (7.7) of the use function.
+    pub cooling_reduction_factor: f64,
+    /// Internal gains of the zone in July, kWh (split by `A_T;or`).
+    pub internal_gains_kwh: f64,
+    /// `H_C;ve;juli` of the zone, W/K (split by `A_T;or`).
+    pub ventilation_conductance_w_per_k: f64,
+    /// `H_gr;an;juli` of the zone, W/K (split by `A_T;or`).
+    pub ground_conductance_w_per_k: f64,
+    /// Specific heat capacity of the zone, kJ/(m²·K) (time constant 7.58).
+    pub specific_heat_capacity_kj_per_m2k: f64,
+    /// Usable floor area of the zone, m².
+    pub usable_floor_area_m2: f64,
+    /// §5.7.2 step A: an orientation with at most this area is not assessed, m².
+    pub min_orientation_area_m2: f64,
+    /// Bbl art. 4.149b limit for woonfuncties, K.
+    pub limit_k: f64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -210,6 +251,9 @@ pub struct TojuliAssessment {
     pub orientations: Vec<OrientationResult>,
     pub max_tojuli_k: Option<f64>,
     pub meets_bbl_limit: Option<bool>,
+    /// The fixed values and zone terms of 5.40 when TOjuli was calculated.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub july: Option<TojuliJulyTerms>,
     /// Annex AA capacity check when that is the active-cooling evidence.
     pub annex_aa: Option<AnnexAaResult>,
     pub issues: Vec<TojuliIssue>,
@@ -244,6 +288,7 @@ fn invalid(zone_id: &str, active_cooling: bool, issues: Vec<TojuliIssue>) -> Toj
         orientations: Vec::new(),
         max_tojuli_k: None,
         meets_bbl_limit: None,
+        july: None,
         annex_aa: None,
         issues,
         warnings: Vec::new(),
@@ -544,6 +589,7 @@ pub fn assess_tojuli(input: &MonthlyDemandInput, options: TojuliOptions<'_>) -> 
                 orientations: Vec::new(),
                 max_tojuli_k: Some(0.0),
                 meets_bbl_limit: options.residential.then_some(true),
+                july: None,
                 annex_aa,
                 issues: Vec::new(),
                 warnings: Vec::new(),
@@ -665,11 +711,10 @@ pub fn assess_tojuli(input: &MonthlyDemandInput, options: TojuliOptions<'_>) -> 
         crate::monthly_demand::function_profile(input).cooling_reduction_factor();
     let floor_area = input.usable_floor_area_m2;
     let internal_july = internal_gains_kwh(input, index);
-    let capacity = demand
+    let specific_capacity = demand
         .specific_heat_capacity_kj_per_m2k
-        .expect("valid demand")
-        * 1000.0
-        * floor_area;
+        .expect("valid demand");
+    let capacity = specific_capacity * 1000.0 * floor_area;
 
     let mut results = Vec::with_capacity(8);
     for (index, orientation) in ORIENTATIONS.iter().enumerate() {
@@ -713,6 +758,9 @@ pub fn assess_tojuli(input: &MonthlyDemandInput, options: TojuliOptions<'_>) -> 
             share,
             assessed: area[index] > MIN_ORIENTATION_AREA_M2,
             conductance_w_per_k: total_or,
+            heat_transfer_july_kwh: heat_transfer,
+            gains_july_kwh: gains,
+            recoverable_july_kwh: recoverable,
             cooling_need_july_kwh: need,
             booster_heat_pump_july_kwh: 0.0,
             tojuli_k: None,
@@ -749,6 +797,19 @@ pub fn assess_tojuli(input: &MonthlyDemandInput, options: TojuliOptions<'_>) -> 
         meets_bbl_limit: max
             .filter(|_| options.residential)
             .map(|value| value <= TOJULI_LIMIT_K),
+        july: Some(TojuliJulyTerms {
+            hours,
+            outdoor_temperature_c: outdoor,
+            cooling_setpoint_c: setpoint,
+            cooling_reduction_factor: cooling_reduction,
+            internal_gains_kwh: internal_july,
+            ventilation_conductance_w_per_k: ventilation_conductance,
+            ground_conductance_w_per_k: ground_conductance,
+            specific_heat_capacity_kj_per_m2k: specific_capacity,
+            usable_floor_area_m2: floor_area,
+            min_orientation_area_m2: MIN_ORIENTATION_AREA_M2,
+            limit_k: TOJULI_LIMIT_K,
+        }),
         warnings: insufficient_annex_aa
             .is_some()
             .then(|| {
@@ -874,6 +935,35 @@ mod tests {
         let expected =
             round_up(south.cooling_need_july_kwh * 1000.0 / (south.conductance_w_per_k * 744.0));
         assert_eq!(south.tojuli_k, Some(expected));
+    }
+
+    /// Issue #8: TOjuli can be checked by hand from the output alone, with
+    /// the fixed values of table 17.1 and the terms per orientation.
+    #[test]
+    fn the_output_carries_every_term_of_5_40() {
+        let input = demand();
+        let result = assess_tojuli(&input, TojuliOptions::default());
+        let july = result.july.as_ref().expect("calculated");
+        assert_eq!(july.hours, 744.0);
+        assert_eq!(july.outdoor_temperature_c, 18.05);
+        assert_eq!(july.cooling_setpoint_c, input.setpoints.cooling_c);
+        assert_eq!(july.limit_k, TOJULI_LIMIT_K);
+        assert_eq!(july.min_orientation_area_m2, MIN_ORIENTATION_AREA_M2);
+        assert_eq!(july.usable_floor_area_m2, input.usable_floor_area_m2);
+        // The internal gains are split by A_T;or over the orientations.
+        let shares: f64 = result.orientations.iter().map(|item| item.share).sum();
+        assert!((shares - 1.0).abs() < 1e-9);
+        for item in result.orientations.iter().filter(|item| item.assessed) {
+            let by_hand = round_up(
+                (item.cooling_need_july_kwh - item.booster_heat_pump_july_kwh) * 1000.0
+                    / (item.conductance_w_per_k * july.hours),
+            );
+            assert_eq!(item.tojuli_k, Some(by_hand), "{:?}", item.orientation);
+            assert!(item.gains_july_kwh >= item.share * july.internal_gains_kwh - 1e-9);
+            assert!(item.heat_transfer_july_kwh > 0.0);
+        }
+        let cooled = invalid("z", true, Vec::new());
+        assert!(cooled.july.is_none());
     }
 
     #[test]

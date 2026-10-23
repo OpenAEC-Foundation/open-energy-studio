@@ -5314,6 +5314,7 @@ mod tests {
                 orientations: Vec::new(),
                 max_tojuli_k: None,
                 meets_bbl_limit: None,
+                july: None,
                 annex_aa: None,
                 issues: vec![crate::tojuli::TojuliIssue {
                     code,

@@ -55,7 +55,7 @@ export interface EnergyState {
 export type EnergyAction =
   // Project-level
   | { type: 'SET_PROJECT'; payload: IProject }
-  | { type: 'UPDATE_PROJECT_INFO'; payload: Partial<Pick<IProject, 'name' | 'description' | 'buildingFunction' | 'address' | 'city' | 'registration'>> }
+  | { type: 'UPDATE_PROJECT_INFO'; payload: Partial<Pick<IProject, 'name' | 'description' | 'buildingFunction' | 'address' | 'city' | 'registration' | 'importLog'>> }
   /**
    * Adds evidence to the register of the project as it is when the action
    * runs (not as it was when the files were chosen), so a slow file read

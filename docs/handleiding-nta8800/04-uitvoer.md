@@ -26,6 +26,8 @@ Alle getoonde BENG-waarden komen uit de kern. De oude, vereenvoudigde berekening
 - Als EPTot en de hernieuwbare energie samen nul zijn, blijft EP2 bestaan en is het aandeel hernieuwbaar leeg (`null`).
 - Een negatieve EPTot kan een aandeel boven 100 % geven. Dan volgt een waarschuwing.
 
+**TOjuli narekenen.** De resultatenpagina (tab Rekenzones) toont per oriëntatie alle termen van formule 5.40: de oppervlakte, H_C;juli, het warmtetransport Q_ht, de warmtewinst Q_gn, de terugwinbare systeemverliezen Q_rbl, de koudebehoefte Q_C;nd en de onttrekking van een boosterwarmtepomp Q_C;HP. Per rekenzone staan daaronder de vaste waarden en de zonetermen: t_juli en θ_e;juli uit tabel 17.1, de setpoint uit tabel 7.13, a_C;red, de interne warmtelast, H_C;ve en H_gr;an in juli, de warmtecapaciteit, de gebruiksoppervlakte, de minimale oppervlakte per oriëntatie en de grenswaarde. Daarmee is TOjuli = (Q_C;nd − Q_C;HP) · 1000 / (H_C;juli · t_juli) met de hand na te rekenen. De API geeft dezelfde termen (`tojuli[].orientations[]` en `tojuli[].july`).
+
 ## Label en labelgegevens
 
 - **Klasse:** de labelklasse volgt uit de afgeronde EP2 en de klassegrenzen van de Omgevingsregeling (bijlagen IX en X). Bij gemengde functies zijn de grenzen naar oppervlakte gewogen.
