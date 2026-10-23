@@ -16,6 +16,7 @@
 
 - **Uniec 3, echte export:** de import van een export van Uniec 3.4 is getest op één geanonimiseerde woning. Dakhellingen, de omtrek van de vloer op de grond en belemmering en zonwering per raam komen mee; bij meer gebouwen in één bestand leest de import het eerste en meldt de rest. De registratie vraagt per import een bevestiging dat de gegevens zijn gecontroleerd.
 - **Uniec 3, export:** een nagebouwd invoerconcept (`.input-draft.uniec3`); niet vastgesteld is dat Uniec het accepteert.
+- **Uniec 3, geometrie (Excel, concept):** de geometrie van een grondgebonden woning volgens de openbare Excel-import van Uniec (specificatie 18-09-2026). De app weigert met de reden als verplichte gegevens ontbreken; nog niet in Uniec getest. Zie [de vertaling](https://github.com/OpenAEC-Foundation/open-energy-studio/blob/main/docs/nta8800-uniec-geometrie-export.md).
 
 > Brede compatibiliteit met Uniec- en VABI-bestanden is niet aangetoond; de VABI-veldcodes zijn afgeleid. Zie [[Bekende beperkingen]].
 

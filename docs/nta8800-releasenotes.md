@@ -13,6 +13,9 @@ Dit bestand is de wijzigingsregistratie van de rekenkern (BRL 9501 §5.2, §6.2 
 
 ## Onuitgebracht
 
+### 23 oktober 2026 — Export naar de geometrie-import van Uniec, issue #14 (geen rekenwijziging)
+- **Uniec-geometrie (Excel, concept):** nieuwe export onder Exports › Uitwisseling. Hij schrijft een grondgebonden woning in het Excel-formaat van de geometrie-import van Uniec (specificatie 18-09-2026, SHA-256 `312f5028…0cd`): de algemene gegevens en per rekenzone de dichte delen, ramen en deuren, vloeren op de grond met perimeter, belemmering en zonwering, met de afrondingsregels van de specificatie. Ontbreken verplichte gegevens of vraagt het contract iets wat deze versie nog niet kan (kruipruimte, kelder, belemmering met maten, utiliteitsbouw, appartementen), dan maakt de app geen bestand en noemt hij elk punt. Vergeleken met het voorbeeldbestand van Uniec (28-05-2026); nog niet in Uniec zelf geïmporteerd. Vertaling en vergelijking: [nta8800-uniec-geometrie-export.md](nta8800-uniec-geometrie-export.md).
+
 ### 23 oktober 2026 — Uniec-import, herstelkopie en documentatie, issues #11, #12, #13 en #16 (geen rekenwijziging)
 - **Uniec-import, meer gebouwen (#11):** een echte Uniec-export met meer gebouwmappen leest het gebouw met het laagste nummer en meldt de andere als importpunt *meerdere* (was: het eerste gevonden gebouw, zonder melding).
 - **Uniec-import, importpunten (#12):** wat de import van een echte export aannam, niet las of liet liggen, is nu een importpunt met soort en Uniec-veld. De melding na het inlezen, het importverslag en de controlepagina tonen dezelfde punten. Een import schrijft één regel in het importlogboek (was: twee, waardoor de registratie twee bevestigingen vroeg).

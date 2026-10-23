@@ -48,6 +48,8 @@ In beide gevallen vul je de rest van de NTA-invoer, de opname en de registratie 
 
 Getallen worden met volle precisie geschreven (geen afronding op twee decimalen).
 
+**Uniec-geometrie (Excel, concept)** schrijft de geometrie van een grondgebonden woning in het Excel-formaat van de geometrie-import van Uniec (specificatie van 18-09-2026): de werkbladen *algemene gegevens* en *geometrische gegevens*, met de rekenzones, de dichte delen met R_c, de ramen en deuren met U en g, de vloer op de grond met perimeter en per raam de belemmering en zonwering. Waarden worden afgerond zoals de specificatie voorschrijft (bijvoorbeeld g naar beneden op 0,05). Vraagt het contract iets dat het project niet heeft of dat deze versie nog niet ondersteunt (plaats, bouwjaar, bouwwijze, perimeter, een kruipruimte, een belemmering met maten), dan maakt de app geen bestand en noemt hij elk punt; wat niet meegaat (koudebruggen, ventilatieve koeling) en wat is afgeleid, staat in dezelfde melding. Het bestand is nog niet in Uniec getest: controleer na de import in Uniec de aantallen, oppervlaktes, oriëntaties en constructies. De volledige vertaling staat in [nta8800-uniec-geometrie-export.md](../nta8800-uniec-geometrie-export.md).
+
 ## VABI-uitwisseling
 
 **VABI export** schrijft het projectmodel als een EPA-bestand (zip met `project.xml`). Per vlak staan de U-waarde en de R_c van de constructie (ook bij een vlak dat helemaal uit ramen bestaat, dan met oppervlakte 0), de hellingshoek (`Hellingshoek`: 0 voor een vloer of plat dak, 90 voor een wand, de hoek uit de NTA-invoer voor een hellend dak) en de ramen. De koudebruggen staan één keer per rekenzone.

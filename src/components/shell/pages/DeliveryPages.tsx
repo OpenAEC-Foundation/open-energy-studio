@@ -20,6 +20,7 @@ import {
   danglingEvidenceReferences, evidenceUsage, pointerToPath, resolvePointer, unresolvedEvidenceLinks,
 } from '../../../core/nta/EvidenceLinks';
 import { routeForPath } from '../../../core/nta/gapRoutes';
+import { downloadUniecGeometry, type UniecExportPoint, type UniecGeometryExport } from '../../../core/io/UniecGeometryExport';
 import './delivery.css';
 
 const GROUPS: DossierItem['group'][] = [
@@ -246,8 +247,23 @@ export function ExportsPage({ actions }: {
     downloadNtaCalculationReportHTML(project).catch((reason: unknown) =>
       setError(reason instanceof Error ? reason.message : String(reason)));
   };
+  // Uniec geometry import (issue #14): refused with the reasons, or downloaded with what was derived or left out.
+  const [uniec, setUniec] = useState<UniecGeometryExport | null>(null);
+  const uniecPoints = (kind: UniecExportPoint['kind']) => (uniec?.points ?? []).filter((point) => point.kind === kind);
   return <>
     {(error ?? dossier.error) && <Banner tone="err">{error ?? dossier.error}</Banner>}
+    {uniec && (
+      <Banner tone={uniec.ok ? 'warn' : 'err'} title={t(uniec.ok ? 'delivery.exports.uniecGeometry.done' : 'delivery.exports.uniecGeometry.refused')}>
+        {(['missing', 'lost', 'derived'] as const).filter((kind) => uniecPoints(kind).length > 0).map((kind) => (
+          <div key={kind}>
+            <p>{t(`delivery.exports.uniecGeometry.${kind}`)}</p>
+            <ul className="delivery-uniec-points">
+              {uniecPoints(kind).map((point, index) => <li key={index}><b>{point.where}</b>: {point.message}</li>)}
+            </ul>
+          </div>
+        ))}
+      </Banner>
+    )}
     <div className="delivery-exports">
       <ExportCard icon={<FileText aria-hidden="true" />} title={t('delivery.exports.report')} hint={t('delivery.exports.reportHint')}>
         {/* The report needs a kernel result (UX finding 3); the input dossier below does not. */}
@@ -270,6 +286,8 @@ export function ExportsPage({ actions }: {
       </ExportCard>
       <ExportCard icon={<Download aria-hidden="true" />} title={t('delivery.exports.exchange')} hint={t('delivery.exports.exchangeHint')}>
         <Button icon={<Download aria-hidden="true" />} onClick={actions.exportUNIEC3}>{t('ribbon.exportUNIEC3Draft')}</Button>
+        <Button icon={<Download aria-hidden="true" />} onClick={() => setUniec(downloadUniecGeometry(project))}>
+          {t('delivery.exports.uniecGeometry')}</Button>
         <Button icon={<Download aria-hidden="true" />} onClick={actions.exportVABI}>{t('ribbon.exportVABI')}</Button>
       </ExportCard>
       <ExportCard icon={<Box aria-hidden="true" />} title={t('delivery.exports.ifc')} hint={t('delivery.exports.ifcHint')}>
