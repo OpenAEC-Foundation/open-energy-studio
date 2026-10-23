@@ -10,4 +10,4 @@ Herlabelen vergelijkt een origineel en een gewijzigd project volgens **BRL 9500 
 - **Termijn:** de verbeteringen moeten binnen 24 maanden na de oorspronkelijke opnamedatum zijn aangebracht; er wordt gerekend met dezelfde opnamedatum en dezelfde rekenkern.
 - **Vergelijking:** de labelinvoer-hash van de kern is gelijk aan die van de app. Een wijziging na de vergelijking wordt gesignaleerd.
 
-Details: [hoofdstuk 7 van de handleiding](https://github.com/Erika98-be/open-energy-studio/blob/nta8800-kernel/docs/handleiding-nta8800/07-herlabelen-registratie-dossier.md).
+Details: [hoofdstuk 7 van de handleiding](https://github.com/OpenAEC-Foundation/open-energy-studio/blob/main/docs/handleiding-nta8800/07-herlabelen-registratie-dossier.md).

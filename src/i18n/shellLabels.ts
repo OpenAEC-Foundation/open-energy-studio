@@ -85,6 +85,8 @@ export const shellLabelsNl: Record<string, string> = {
   'status.unattested': 'Onverifieerd · geen attest',
   'status.saved': 'Opgeslagen',
   'status.unsaved': 'Niet opgeslagen',
+  'status.autosaveFailed': 'Herstelkopie mislukt',
+  'status.autosaveFailedTitle': 'De browser weigert de automatische herstelkopie (opslag vol of geblokkeerd). De app probeert het elke paar seconden opnieuw; sla het project intussen op als bestand.',
   'status.label': 'Label',
   'status.openResults': 'Open de resultaten',
 
@@ -245,6 +247,8 @@ export const shellLabelsEn: Record<string, string> = {
   'status.unattested': 'Unverified · no attest',
   'status.saved': 'Saved',
   'status.unsaved': 'Unsaved',
+  'status.autosaveFailed': 'Recovery copy failed',
+  'status.autosaveFailedTitle': 'The browser refuses the automatic recovery copy (storage full or blocked). The app retries every few seconds; save the project as a file meanwhile.',
   'status.label': 'Label',
   'status.openResults': 'Open the results',
 

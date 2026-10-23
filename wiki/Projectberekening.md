@@ -14,6 +14,6 @@ De projectberekening is de volledige NTA 8800-invoer:
 - **Lege velden:**
   - een leeg veld met een standaardwaarde in de kern krijgt die standaardwaarde;
   - een leeg verplicht veld krijgt een melding met **Ga naar**.
-- **Formulieren:** vrijwel elke invoeroptie van de kern heeft een formulier. Een klein aantal expertroutes staat alleen onder *Geavanceerd (JSON)*; zie [formulierdekking](https://github.com/Erika98-be/open-energy-studio/blob/nta8800-kernel/docs/ui-redesign/formulierdekking.md).
+- **Formulieren:** vrijwel elke invoeroptie van de kern heeft een formulier. Een klein aantal expertroutes staat alleen onder *Geavanceerd (JSON)*; zie [formulierdekking](https://github.com/OpenAEC-Foundation/open-energy-studio/blob/main/docs/ui-redesign/formulierdekking.md).
 
-Details: [hoofdstuk 3 van de handleiding](https://github.com/Erika98-be/open-energy-studio/blob/nta8800-kernel/docs/handleiding-nta8800/03-projectberekening.md).
+Details: [hoofdstuk 3 van de handleiding](https://github.com/OpenAEC-Foundation/open-energy-studio/blob/main/docs/handleiding-nta8800/03-projectberekening.md).

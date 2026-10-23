@@ -23,4 +23,4 @@ cargo build --release --manifest-path crates/nta8800-service/Cargo.toml --bin mc
 - **Uitgave:** `normVersion` per verzoek. Oudere uitgaven krijgen de status `calculated_legacy_edition`.
 - **Rekentijd:** een groot utiliteitsgebouw (50 zones, 2 250 ramen) rekent in minder dan een halve seconde (release); zie de API-documentatie.
 
-Details: [docs/nta8800-api.md](https://github.com/Erika98-be/open-energy-studio/blob/nta8800-kernel/docs/nta8800-api.md) en [docs/nta8800-mcp.md](https://github.com/Erika98-be/open-energy-studio/blob/nta8800-kernel/docs/nta8800-mcp.md).
+Details: [docs/nta8800-api.md](https://github.com/OpenAEC-Foundation/open-energy-studio/blob/main/docs/nta8800-api.md) en [docs/nta8800-mcp.md](https://github.com/OpenAEC-Foundation/open-energy-studio/blob/main/docs/nta8800-mcp.md).

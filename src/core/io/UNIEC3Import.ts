@@ -14,15 +14,16 @@
  * (INSTALL_TYPE) → VERW/TAPW/VENT/KOEL/PV with their chains.
  *
  * Nothing is defaulted in silence: what the file does not say, or what this
- * model cannot hold, is written to the import record's `notes` and, for
- * numbers, marked `assumed`. Results in the file (PRESTATIE, RESULT-*) are
+ * model cannot hold, is reported as an import issue (kind and Uniec3 field)
+ * and, for numbers, marked `assumed`. Results in the file (PRESTATIE, RESULT-*) are
  * not read: the kernel calculates.
  */
 import { strFromU8 } from 'fflate';
 import type {
   CoolingSystemType, HeatingSystemType, HotWaterSystemType, IConstruction, IHeatingSystem, IProject, ISurface, IWindow, IWindowType, IZone,
-  Orientation, ProjectImportRecord, SurfaceType, ThermalBoundary, VentilationType,
+  Orientation, SurfaceType, ThermalBoundary, VentilationType,
 } from '../energy/types';
+import { ImportIssues, type ImportIssueKind } from './importIssues';
 import type { NtaMovableShading, NtaObstruction, NtaShadeColour } from '../nta/KernelClient';
 import { insulationValues, type InsulationPart } from '../nta/MwaTemplates';
 import { buildNtaCalculationTemplate } from '../nta/NtaCalculationTemplate';
@@ -146,14 +147,36 @@ function coolingTypeOf(description: string | undefined): CoolingSystemType | und
   return undefined;
 }
 
-/** Reads a Uniec3 export into a project; `fileName` goes into the import record. */
-export function importUniec3Export(files: Record<string, Uint8Array>, fileName?: string): IProject {
-  const buildingDir = Object.keys(files).map((path) => /^(buildings\/[^/]+)\/entities\.json$/.exec(path)?.[1]).find(Boolean);
-  if (!buildingDir || !files[`${buildingDir}/relations.json`]) throw new Error('Geen gebouw gevonden in het Uniec3-bestand');
+/**
+ * Reads a Uniec3 export into a project. What the importer assumed, could not
+ * read or left out goes into `issues` (kind and Uniec3 field), so the import
+ * toast, the import record and the check page show the same points (issue
+ * #12); the caller writes the one import record. An archive with more than
+ * one building reads the first (lowest id) and reports the others as
+ * `multiple` (issue #11).
+ */
+export function importUniec3Export(files: Record<string, Uint8Array>, issues: ImportIssues = new ImportIssues()): IProject {
+  const buildingDirs = Object.keys(files)
+    .map((path) => /^(buildings\/([^/]+))\/entities\.json$/.exec(path))
+    .filter((match): match is RegExpExecArray => match !== null && files[`${match[1]}/relations.json`] !== undefined)
+    .sort((a, b) => a[2].localeCompare(b[2], undefined, { numeric: true }))
+    .map((match) => match[1]);
+  const buildingDir = buildingDirs[0];
+  if (!buildingDir) throw new Error('Geen gebouw gevonden in het Uniec3-bestand');
+  if (buildingDirs.length > 1) {
+    const ids = buildingDirs.map((dir) => dir.slice('buildings/'.length));
+    issues.add('multiple', 'buildings',
+      `Het bestand bevat ${ids.length} gebouwen (${ids.join(', ')}); alleen gebouw ${ids[0]} is ingelezen. Lees de andere gebouwen in vanuit een eigen export per gebouw.`,
+      ids.length);
+  }
   const entities = (JSON.parse(strFromU8(files[`${buildingDir}/entities.json`])) as Entity[]).filter((entity) => Array.isArray(entity.NTAPropertyDatas));
   const relations = JSON.parse(strFromU8(files[`${buildingDir}/relations.json`])) as Relation[];
-  const notes: string[] = [];
-  const note = (line: string) => { if (!notes.includes(line)) notes.push(line); };
+  const noted = new Set<string>();
+  const note = (kind: ImportIssueKind, path: string, line: string) => {
+    if (noted.has(line)) return;
+    noted.add(line);
+    issues.add(kind, path, line);
+  };
 
   const byId = new Map(entities.map((entity) => [entity.NTAEntityDataId, entity]));
   const childrenOf = new Map<string, Entity[]>();
@@ -172,7 +195,7 @@ export function importUniec3Export(files: Record<string, Uint8Array>, fileName?:
   const name = text(geb, 'GEB_OMSCHR') ?? 'Uniec3-project';
   const typeCode = text(geb, 'GEB_TYPEGEB') ?? '';
   const residential = typeCode.includes('WON') || typeCode.includes('APP');
-  if (!residential) note(`Gebouwtype ${typeCode || 'onbekend'} gelezen als "overig"; kies de gebruiksfunctie bij Project.`);
+  if (!residential) note('defaulted', 'GEB_TYPEGEB', `Gebouwtype ${typeCode || 'onbekend'} gelezen als "overig"; kies de gebruiksfunctie bij Project.`);
   const newBuild = text(geb, 'GEB_SRTBW') === 'NIEUWB';
   const constructionYear = number(geb, 'GEB_OPLVJR') ?? number(geb, 'GEB_BWJR');
 
@@ -183,8 +206,8 @@ export function importUniec3Export(files: Record<string, Uint8Array>, fileName?:
     const part = LIBRARY_PARTS[text(lib, 'LIBCONSTRD_TYPE') ?? ''];
     const rc = number(lib, 'LIBCONSTRD_RC');
     const libName = text(lib, 'LIBCONSTRD_OMSCHR') ?? `Constructie ${index + 1}`;
-    if (!part) note(`Constructietype "${libName}": vlaktype ${text(lib, 'LIBCONSTRD_TYPE') ?? 'onbekend'} niet herkend; R_si van een gevel gebruikt.`);
-    if (rc === undefined) note(`Constructietype "${libName}": geen R_c in het bestand (methode ${text(lib, 'LIBCONSTRD_METH') ?? 'onbekend'}); R_c 0 ingevuld, aanvullen.`);
+    if (!part) note('invalid', 'LIBCONSTRD_TYPE', `Constructietype "${libName}": vlaktype ${text(lib, 'LIBCONSTRD_TYPE') ?? 'onbekend'} niet herkend; R_si van een gevel gebruikt.`);
+    if (rc === undefined) note('defaulted', 'LIBCONSTRD_RC', `Constructietype "${libName}": geen R_c in het bestand (methode ${text(lib, 'LIBCONSTRD_METH') ?? 'onbekend'}); R_c 0 ingevuld, aanvullen.`);
     const values = insulationValues(part ?? 'facade', rc ?? 0, null);
     const construction: IConstruction = { id: `con-${index + 1}`, name: libName, layers: [], rcValue: rc ?? 0, uValue: round(values?.u ?? 0, 4) };
     constructions.push(construction);
@@ -196,7 +219,7 @@ export function importUniec3Export(files: Record<string, Uint8Array>, fileName?:
     const u = number(lib, 'LIBCONSTRT_U');
     const g = number(lib, 'LIBCONSTRT_G');
     const unitArea = number(lib, 'LIBCONSTRT_AC');
-    if (u === undefined || g === undefined) note(`Kozijntype "${typeName}": U of g ontbreekt in het bestand; 1,5 / 0,5 ingevuld, aanvullen.`);
+    if (u === undefined || g === undefined) note('defaulted', 'LIBCONSTRT', `Kozijntype "${typeName}": U of g ontbreekt in het bestand; 1,5 / 0,5 ingevuld, aanvullen.`);
     const type: IWindowType = {
       id: `wt-${index + 1}`, name: typeName, kind: text(lib, 'LIBCONSTRT_TYPE') === 'TRANSTYPE_DEUR' ? 'door' : 'window',
       uValue: u ?? 1.5, gValue: g ?? 0.5, ...(unitArea !== undefined ? { unitArea } : {}),
@@ -209,7 +232,7 @@ export function importUniec3Export(files: Record<string, Uint8Array>, fileName?:
   const infil = ofType('INFIL')[0];
   const buildingHeight = number(infil, 'INFIL_BGH');
   const qv10 = number(ofType('INFILUNIT')[0], 'INFILUNIT_QV_NON');
-  if (qv10 === undefined) note('Geen qv10 in het bestand; 0,4 dm³/(s·m²) aangenomen, controleer bij Luchtdichtheid.');
+  if (qv10 === undefined) note('defaulted', 'INFILUNIT_QV_NON', 'Geen qv10 in het bestand; 0,4 dm³/(s·m²) aangenomen, controleer bij Luchtdichtheid.');
 
   // ── Zones and surfaces ──
   const zones: IZone[] = [];
@@ -224,10 +247,10 @@ export function importUniec3Export(files: Record<string, Uint8Array>, fileName?:
     const zoneName = text(rz, 'RZ_OMSCHR') ?? `Rekenzone ${zoneIndex + 1}`;
     const unitZone = children(rz, 'UNIT-RZ')[0];
     const floorArea = number(unitZone, 'UNIT-RZAG');
-    if (floorArea === undefined) note(`Rekenzone "${zoneName}": geen gebruiksoppervlakte (UNIT-RZAG) gevonden; 0 ingevuld.`);
+    if (floorArea === undefined) note('defaulted', 'UNIT-RZAG', `Rekenzone "${zoneName}": geen gebruiksoppervlakte (UNIT-RZAG) gevonden; 0 ingevuld.`);
     const storeys = number(rz, 'RZ_BOUWLG') ?? 1;
     const height = buildingHeight !== undefined ? round(buildingHeight / Math.max(1, storeys), 2) : 2.6;
-    note(buildingHeight !== undefined
+    note('defaulted', 'INFIL_BGH', buildingHeight !== undefined
       ? `Rekenzone "${zoneName}": hoogte ${height} m afgeleid uit gebouwhoogte ${buildingHeight} m en ${storeys} bouwlaag/-lagen; inhoud = A_g × hoogte.`
       : `Rekenzone "${zoneName}": geen gebouwhoogte in het bestand; hoogte 2,6 m aangenomen.`);
 
@@ -238,22 +261,22 @@ export function importUniec3Export(files: Record<string, Uint8Array>, fileName?:
       const surfaceName = text(begr, 'BEGR_OMSCHR') ?? `Vlak ${surfaceCount}`;
       const vlak = text(begr, 'BEGR_VLAK') ?? '';
       const type = SURFACE_TYPES[vlak];
-      if (!type) note(`Vlak "${surfaceName}": vlaktype ${vlak || 'onbekend'} niet herkend; als gevel ingelezen.`);
+      if (!type) note('invalid', 'BEGR_VLAK', `Vlak "${surfaceName}": vlaktype ${vlak || 'onbekend'} niet herkend; als gevel ingelezen.`);
       const boundaryCode = text(begr, 'BEGR_GEVEL') ?? text(begr, 'BEGR_DAK') ?? text(begr, 'BEGR_VLOER');
       const thermalBoundary = boundaryOf(boundaryCode);
-      if (!thermalBoundary) note(`Vlak "${surfaceName}": grens ${boundaryCode ?? 'onbekend'} niet herkend; kies "grenst aan" bij het vlak.`);
-      else if (thermalBoundary !== 'outdoor') note(`Vlak "${surfaceName}": grens ${boundaryCode} gelezen als ${thermalBoundary}; controleer.`);
+      if (!thermalBoundary) note('invalid', 'BEGR_GEVEL', `Vlak "${surfaceName}": grens ${boundaryCode ?? 'onbekend'} niet herkend; kies "grenst aan" bij het vlak.`);
+      else if (thermalBoundary !== 'outdoor') note('defaulted', 'BEGR_GEVEL', `Vlak "${surfaceName}": grens ${boundaryCode} gelezen als ${thermalBoundary}; controleer.`);
       const orientation = orientationOf(boundaryCode) ?? ((type ?? 'wall') === 'floor' ? 'horizontal' : undefined);
-      if (!orientation) note(`Vlak "${surfaceName}": geen oriëntatie in ${boundaryCode ?? 'de grenscode'}; zuid ingevuld, controleer.`);
+      if (!orientation) note('defaulted', 'BEGR_GEVEL', `Vlak "${surfaceName}": geen oriëntatie in ${boundaryCode ?? 'de grenscode'}; zuid ingevuld, controleer.`);
       const area = number(begr, 'BEGR_A') ?? 0;
       const tilt = number(begr, 'BEGR_HEL');
       if ((type ?? 'wall') === 'roof' && tilt !== undefined) tilts.push({ surfaceId, tiltDeg: tilt });
 
       const opaque = children(begr, 'CONSTRD');
       const construction = opaque[0] ? constructionByGuid.get(text(opaque[0], 'CONSTRD_LIB') ?? '') : undefined;
-      if (!construction) note(`Vlak "${surfaceName}": geen dichte constructie gekoppeld; kies er een bij Constructies.`);
+      if (!construction) note('unknown_reference', 'CONSTRD_LIB', `Vlak "${surfaceName}": geen dichte constructie gekoppeld; kies er een bij Constructies.`);
       if (opaque.length > 1) {
-        note(`Vlak "${surfaceName}": ${opaque.length} dichte delen (${opaque.map((item) => `${constructionByGuid.get(text(item, 'CONSTRD_LIB') ?? '')?.name ?? '?'} ${text(item, 'CONSTRD_OPP') ?? '?'} m²`).join(', ')}); alleen het eerste is de constructie van het vlak.`);
+        note('multiple', 'CONSTRD', `Vlak "${surfaceName}": ${opaque.length} dichte delen (${opaque.map((item) => `${constructionByGuid.get(text(item, 'CONSTRD_LIB') ?? '')?.name ?? '?'} ${text(item, 'CONSTRD_OPP') ?? '?'} m²`).join(', ')}); alleen het eerste is de constructie van het vlak.`);
       }
       const opaqueArea = opaque.reduce((sum, item) => sum + (number(item, 'CONSTRD_OPP') ?? 0), 0);
 
@@ -264,7 +287,7 @@ export function importUniec3Export(files: Record<string, Uint8Array>, fileName?:
         const kind = windowTypes.get(text(row, 'CONSTRT_LIB') ?? '');
         const count = number(row, 'CONSTRT_AANT') ?? 1;
         const rowArea = number(row, 'CONSTRT_OPP') ?? (kind?.unitArea !== undefined ? round(kind.unitArea * count) : 0);
-        if (!kind) note(`Vlak "${surfaceName}": kozijnrij zonder bekend kozijntype; U 1,5 en g 0,5 ingevuld, controleer.`);
+        if (!kind) note('unknown_reference', 'CONSTRT_LIB', `Vlak "${surfaceName}": kozijnrij zonder bekend kozijntype; U 1,5 en g 0,5 ingevuld, controleer.`);
         const windowName = kind?.name ?? 'Kozijn';
         windows.push({
           id: windowId, name: windowName, area: rowArea, uValue: kind?.uValue ?? 1.5, gValue: kind?.gValue ?? 0.5, orientation: orientation ?? 'S', surfaceId,
@@ -272,13 +295,13 @@ export function importUniec3Export(files: Record<string, Uint8Array>, fileName?:
         });
         const obstruction = obstructionOf(text(row, 'CONSTRT_BESCH'));
         if (obstruction) obstructions.push({ windowId, obstruction });
-        else if (text(row, 'CONSTRT_BESCH')) note(`Raam "${windowName}" op "${surfaceName}": beschaduwing ${text(row, 'CONSTRT_BESCH')} niet overgenomen; vul de belemmering in.`);
+        else if (text(row, 'CONSTRT_BESCH')) note('dropped', 'CONSTRT_BESCH', `Raam "${windowName}" op "${surfaceName}": beschaduwing ${text(row, 'CONSTRT_BESCH')} niet overgenomen; vul de belemmering in.`);
         const shading = shadingOf(text(row, 'CONSTRT_ZONW'), text(row, 'CONSTRT_REGEL'));
         if (shading) shadings.push({ windowId, movableShading: shading });
       }
       const windowArea = windows.reduce((sum, window) => sum + window.area, 0);
       if (Math.abs(area - opaqueArea - windowArea) > 0.05) {
-        note(`Vlak "${surfaceName}": bruto ${area} m² ≠ dicht ${round(opaqueArea, 2)} + kozijnen ${round(windowArea, 2)} m².`);
+        note('invalid', 'BEGR_A', `Vlak "${surfaceName}": bruto ${area} m² ≠ dicht ${round(opaqueArea, 2)} + kozijnen ${round(windowArea, 2)} m².`);
       }
       const perimeter = children(begr, 'CONSTRKENMV').map((item) => number(item, 'KENMV_OMTR_VL')).find((value) => value !== undefined && value > 0);
       if ((type ?? 'wall') === 'floor' && perimeter !== undefined) perimeters.set(surfaceId, perimeter);
@@ -293,9 +316,9 @@ export function importUniec3Export(files: Record<string, Uint8Array>, fileName?:
       surfaces, thermalBridges: [], airTightness: qv10 !== undefined ? { qv10 } : { qv10: 0.4, assumed: true },
     });
   }
-  if (zones.length === 0) note('Geen rekenzone (RZ) in het bestand.');
+  if (zones.length === 0) note('dropped', 'RZ', 'Geen rekenzone (RZ) in het bestand.');
   const linear = ofType('CONSTRL').length;
-  if (linear > 0) note(`${linear} lineaire constructie(s) (koudebruggen) niet ingelezen; voer ze in bij Koudebruggen.`);
+  if (linear > 0) note('dropped', 'CONSTRL', `${linear} lineaire constructie(s) (koudebruggen) niet ingelezen; voer ze in bij Koudebruggen.`);
 
   // ── Installations ──
   const project: IProject = {
@@ -308,15 +331,15 @@ export function importUniec3Export(files: Record<string, Uint8Array>, fileName?:
     const label = text(installation, 'INSTALL_NAAM') ?? kind;
     const description = text(installation, 'INSTALL_OMSCHR');
     const count = number(installation, 'INSTALL_AANTAL') ?? 1;
-    if (count > 1) note(`${label}: ${count} identieke systemen; als één systeem ingelezen.`);
+    if (count > 1) note('duplicate', 'INSTALL_AANTAL', `${label}: ${count} identieke systemen; als één systeem ingelezen.`);
     switch (kind) {
       case 'INST_VERW': {
         const generator = children(children(installation, 'VERW')[0], 'VERW-OPWEK')[0];
         const type = heatingTypeOf(description, text(generator, 'VERW-OPWEK_POMP'));
-        if (!type) note(`${label}: opwekker "${description ?? '?'}" niet herkend; als HR107-ketel ingelezen, controleer.`);
+        if (!type) note('invalid', 'VERW-OPWEK', `${label}: opwekker "${description ?? '?'}" niet herkend; als HR107-ketel ingelezen, controleer.`);
         const cop = number(generator, 'VERW-OPWEK_COP_NON') ?? number(generator, 'VERW-OPWEK_COP');
-        if (cop === undefined) note(`${label}: geen COP of rendement in het bestand; 1 ingevuld.`);
-        if (text(generator, 'VERW-OPWEK_TOEW')) note(`${label}: toestel uit de Uniec3-productlijst (id ${text(generator, 'VERW-OPWEK_TOEW')}); de verklaring is niet meegekomen.`);
+        if (cop === undefined) note('defaulted', 'VERW-OPWEK', `${label}: geen COP of rendement in het bestand; 1 ingevuld.`);
+        if (text(generator, 'VERW-OPWEK_TOEW')) note('dropped', 'VERW-OPWEK_TOEW', `${label}: toestel uit de Uniec3-productlijst (id ${text(generator, 'VERW-OPWEK_TOEW')}); de verklaring is niet meegekomen.`);
         const system: IHeatingSystem = {
           id: `heat-${project.heatingSystems.length + 1}`, name: description ?? label, type: type ?? 'hr107', cop: cop ?? 1,
           coverageFraction: number(generator, 'VERW-OPWEK_ENER_NON') ?? 1,
@@ -329,11 +352,11 @@ export function importUniec3Export(files: Record<string, Uint8Array>, fileName?:
         const generator = children(tapw, 'TAPW-OPWEK')[0];
         const typeName = text(generator, 'TAPW-OPWEK_TOES_NAAM') ?? description;
         const type = hotWaterTypeOf(typeName);
-        if (!type) note(`${label}: tapwatertoestel "${typeName ?? '?'}" niet herkend; als combiketel ingelezen, controleer.`);
+        if (!type) note('invalid', 'TAPW-OPWEK', `${label}: tapwatertoestel "${typeName ?? '?'}" niet herkend; als combiketel ingelezen, controleer.`);
         const efficiency = number(generator, 'TAPW-OPWEK_COP') ?? number(generator, 'TAPW-OPWEK_REND');
-        if (efficiency === undefined) note(`${label}: geen COP of rendement voor warm tapwater; 1 ingevuld.`);
+        if (efficiency === undefined) note('defaulted', 'TAPW-OPWEK', `${label}: geen COP of rendement voor warm tapwater; 1 ingevuld.`);
         const vessel = number(children(tapw, 'TAPW-VAT')[0], 'TAPW-VAT_VOL_B');
-        if (vessel !== undefined) note(`${label}: voorraadvat ${vessel} l niet in het projectmodel opgenomen; vul het in bij de NTA-invoer.`);
+        if (vessel !== undefined) note('dropped', 'TAPW-VAT', `${label}: voorraadvat ${vessel} l niet in het projectmodel opgenomen; vul het in bij de NTA-invoer.`);
         project.hotWaterSystems.push({
           id: `dhw-${project.hotWaterSystems.length + 1}`, name: typeName ?? label, type: type ?? 'hr_combi', efficiency: efficiency ?? 1,
           hasSolarBoiler: false, solarBoilerFraction: 0,
@@ -343,12 +366,12 @@ export function importUniec3Export(files: Record<string, Uint8Array>, fileName?:
       case 'INST_VENT': {
         const vent = children(installation, 'VENT')[0];
         const type = ventilationTypeOf(text(vent, 'VENT_VARIANT'), text(vent, 'VENT_SYS'));
-        if (!type) note(`${label}: ventilatiesysteem ${text(vent, 'VENT_SYS') ?? '?'} / ${text(vent, 'VENT_VARIANT') ?? '?'} niet herkend; als natuurlijk ingelezen, controleer.`);
+        if (!type) note('invalid', 'VENT_SYS', `${label}: ventilatiesysteem ${text(vent, 'VENT_SYS') ?? '?'} / ${text(vent, 'VENT_VARIANT') ?? '?'} niet herkend; als natuurlijk ingelezen, controleer.`);
         const recovery = children(vent, 'WARMTETERUG').find((item) => text(item, 'WARMTETERUG_WTW') === 'WARMTETERUG_WTW_WEL');
         const efficiency = recovery ? number(recovery, 'WARMTETERUG_REND') ?? 0 : 0;
         const fanPower = number(children(vent, 'VENTILATOR')[0], 'VENTILATOR_PNC');
-        if (fanPower !== undefined) note(`${label}: ventilatorvermogen ${fanPower} W uit het bestand niet omgezet naar SFP; vul de ventilatorgegevens in.`);
-        if (text(vent, 'VENT_SYSVAR')) note(`${label}: systeem uit de Uniec3-productlijst (id ${text(vent, 'VENT_SYSVAR')}); de verklaring is niet meegekomen.`);
+        if (fanPower !== undefined) note('dropped', 'VENT_VERM', `${label}: ventilatorvermogen ${fanPower} W uit het bestand niet omgezet naar SFP; vul de ventilatorgegevens in.`);
+        if (text(vent, 'VENT_SYSVAR')) note('dropped', 'VENT_SYSVAR', `${label}: systeem uit de Uniec3-productlijst (id ${text(vent, 'VENT_SYSVAR')}); de verklaring is niet meegekomen.`);
         project.ventilationSystems.push({
           id: `vent-${project.ventilationSystems.length + 1}`, name: description ?? label, type: type ?? 'natural', heatRecoveryEfficiency: efficiency, sfp: 0,
         });
@@ -357,9 +380,9 @@ export function importUniec3Export(files: Record<string, Uint8Array>, fileName?:
       case 'INST_KOEL': {
         const generator = children(children(installation, 'KOEL')[0], 'KOEL-OPWEK')[0];
         const type = coolingTypeOf(description);
-        if (!type) note(`${label}: koelopwekker "${description ?? '?'}" niet herkend; als split-unit ingelezen, controleer.`);
+        if (!type) note('invalid', 'KOEL-OPWEK', `${label}: koelopwekker "${description ?? '?'}" niet herkend; als split-unit ingelezen, controleer.`);
         const eer = number(generator, 'KOEL-OPWEK_EER_NON') ?? number(generator, 'KOEL-OPWEK_EER');
-        if (eer === undefined) note(`${label}: geen EER in het bestand; 3 ingevuld.`);
+        if (eer === undefined) note('defaulted', 'KOEL-OPWEK', `${label}: geen EER in het bestand; 3 ingevuld.`);
         project.coolingSystems.push({ id: `cool-${project.coolingSystems.length + 1}`, name: description ?? label, type: type ?? 'split_unit', eer: eer ?? 3 });
         break;
       }
@@ -367,11 +390,11 @@ export function importUniec3Export(files: Record<string, Uint8Array>, fileName?:
         const pv = children(installation, 'PV')[0];
         const mode = text(pv, 'PV_WATTPIEK');
         const wpPerM2 = mode === 'PVWATTPIEK_EIGWM2' ? number(pv, 'PV_WPM2') : undefined;
-        if (wpPerM2 === undefined) note(`${label}: wattpiekvermogen (${mode ?? 'onbekend'}) niet gelezen; vermogen 0 ingevuld, vul het in bij Opwekking.`);
+        if (wpPerM2 === undefined) note('defaulted', 'PV-VELD', `${label}: wattpiekvermogen (${mode ?? 'onbekend'}) niet gelezen; vermogen 0 ingevuld, vul het in bij Opwekking.`);
         for (const field of children(pv, 'PV-VELD')) {
           const area = number(field, 'PV-VELD_AANTALM2') ?? 0;
           const orientation = orientationOf(text(field, 'PV-VELD_ORIE')) ?? 'S';
-          if (!orientationOf(text(field, 'PV-VELD_ORIE'))) note(`${label}: oriëntatie ${text(field, 'PV-VELD_ORIE') ?? '?'} van een PV-veld niet herkend; zuid ingevuld.`);
+          if (!orientationOf(text(field, 'PV-VELD_ORIE'))) note('defaulted', 'PV-VELD_ORIE', `${label}: oriëntatie ${text(field, 'PV-VELD_ORIE') ?? '?'} van een PV-veld niet herkend; zuid ingevuld.`);
           project.solarPV.push({
             id: `pv-${project.solarPV.length + 1}`, name: `${label} ${orientation}`, area, orientation,
             tilt: number(field, 'PV-VELD_HELLING') ?? 0, peakPower: wpPerM2 !== undefined ? round(area * wpPerM2 / 1000) : 0,
@@ -380,7 +403,7 @@ export function importUniec3Export(files: Record<string, Uint8Array>, fileName?:
         break;
       }
       case 'INST_OVERIG': break;
-      default: note(`${label}: installatietype ${kind || 'onbekend'} niet ingelezen.`);
+      default: note('dropped', 'INSTALL_TYPE', `${label}: installatietype ${kind || 'onbekend'} niet ingelezen.`);
     }
   }
 
@@ -398,13 +421,11 @@ export function importUniec3Export(files: Record<string, Uint8Array>, fileName?:
   if (obstructions.length > 0) nta.windowObstructions = obstructions.map((item) => ({ ...item, sourceReference: UNIEC3_SOURCE }));
   if (shadings.length > 0) nta.windowShadings = shadings.map((item) => ({ ...item, sourceReference: item.movableShading.sourceReference }));
   project.ntaCalculation = nta as unknown as IProject['ntaCalculation'];
-  note('NTA-invoer aangemaakt uit het bestand; wat Uniec3 niet meegeeft (bronnen, leidingen, koudebruggen, ventilatiedebieten) vraagt de rekenkern nog.');
+  note('dropped', 'ntaCalculation', 'NTA-invoer aangemaakt uit het bestand; wat Uniec3 niet meegeeft (bronnen, leidingen, koudebruggen, ventilatiedebieten) vraagt de rekenkern nog.');
 
   project.registration = {
     purpose: newBuild ? 'delivery' : 'existing_building',
     ...(constructionYear !== undefined ? { constructionYear } : {}),
   };
-  const record: ProjectImportRecord = { tool: 'UNIEC3', importedAt: new Date().toISOString(), ...(fileName ? { fileName } : {}), notes };
-  project.importLog = [record];
   return project;
 }

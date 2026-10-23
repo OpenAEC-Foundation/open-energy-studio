@@ -4,11 +4,12 @@
 
 | Programma | Rekenkern (`KERNEL_VERSION`) | Handleiding | Releasetag |
 |---|---|---|---|
-| **0.2.0** | **0.3.0** | gestempeld voor rekenkern 0.3.0 | `oes-v0.2.0-kernel-v0.3.0` |
+| **2026.43.0** | **0.4.0** | gestempeld voor rekenkern 0.4.0 | `v2026.43.0` |
+| 0.2.0 | 0.3.0 | gestempeld voor rekenkern 0.3.0 | `oes-v0.2.0-kernel-v0.3.0` |
 
-Programma 0.2.0 · Rekenkern 0.3.0 · Handleiding gestempeld voor rekenkern 0.3.0.
+Programma 2026.43.0 · Rekenkern 0.4.0 · Handleiding gestempeld voor rekenkern 0.4.0. Het programmanummer volgt het OpenAEC-schema jaar.week.volgnummer.
 
-De tak `nta8800-kernel` is verder dan deze uitgave: daar staat rekenkern **0.4.0** (onuitgebracht, handleiding gestempeld voor 0.4.0). De wijzigingen staan onder "Onuitgebracht" in de releasenotes.
+**Op `main`:** rekenkern **0.5.0** (onuitgebracht, handleiding gestempeld voor 0.5.0). De webapp draait `main`. De wijzigingen staan onder "Onuitgebracht" in de releasenotes.
 
 **Uitgaven:**
 - NTA 8800:2025+C1:2026 (registreerbaar);
@@ -40,4 +41,4 @@ De tak `nta8800-kernel` is verder dan deze uitgave: daar staat rekenkern **0.4.0
 - **Na het pushen van de tag:** GitHub Actions (`release.yml`) controleert dat de tag bij `package.json` en `KERNEL_VERSION` hoort en draait de volledige gate. Daarna bouwt het de installatiepakketten voor Linux (`.deb`, `.rpm`, AppImage), macOS (`.dmg`) en Windows (`-setup.exe`, `.msi`) en hangt ze met `SHA256SUMS-installers.txt` aan de GitHub-release van de tag. Een bestaande release houdt zijn tekst; anders maakt de workflow een concept dat je zelf publiceert.
 - **CI:** elke push en pull request naar `main` en `nta8800-kernel` draait dezelfde gate (`ci.yml`).
 
-Details: [docs/nta8800-versiebeheer.md](https://github.com/Erika98-be/open-energy-studio/blob/nta8800-kernel/docs/nta8800-versiebeheer.md) en de [releasenotes](https://github.com/Erika98-be/open-energy-studio/blob/nta8800-kernel/docs/nta8800-releasenotes.md).
+Details: [docs/nta8800-versiebeheer.md](https://github.com/OpenAEC-Foundation/open-energy-studio/blob/main/docs/nta8800-versiebeheer.md) en de [releasenotes](https://github.com/OpenAEC-Foundation/open-energy-studio/blob/main/docs/nta8800-releasenotes.md).

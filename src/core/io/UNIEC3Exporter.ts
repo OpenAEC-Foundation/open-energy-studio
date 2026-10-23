@@ -742,7 +742,8 @@ export function readUNIEC3(zipData: Uint8Array): ReadResult {
   // A ZIP written by Uniec3 itself (relations with ParentId/ChildId, library constructions): the
   // real-format importer of UNIEC3Import.ts; the rest is the app's own input-draft format.
   if (isUniec3Export(files)) {
-    return { project: importUniec3Export(files), issues: new ImportIssues(), sourceVersion: metaVersion(files['meta.json']) };
+    const issues = new ImportIssues();
+    return { project: importUniec3Export(files, issues), issues, sourceVersion: metaVersion(files['meta.json']) };
   }
   const issues = new ImportIssues();
   const sourceVersion = metaVersion(files['meta.json']);

@@ -10,7 +10,7 @@
 import { Check, X } from 'lucide-react';
 import { useI18n } from '../../i18n/i18n';
 import { formatNumber } from '../../i18n/format';
-import { useEnergy } from '../../context/EnergyContext';
+import { useAutosaveFailed, useEnergy } from '../../context/EnergyContext';
 import { DEFAULT_NORM_VERSION, legacyEdition, projectCalculated } from '../../core/nta/KernelClient';
 import { useKernel } from '../../context/KernelProvider';
 import { summarizeForPreview } from '../../core/nta/PreviewSummary';
@@ -39,6 +39,7 @@ export function StatusBar() {
   const kernel = useKernel();
   const actions = useShellActions();
   const { result, isDirty } = state;
+  const autosaveFailed = useAutosaveFailed();
 
   const assessment = kernel?.settled ?? null;
   const summary = assessment ? summarizeForPreview(assessment) : null;
@@ -96,6 +97,9 @@ export function StatusBar() {
       <div className="status-section status-right">
         <Pill tone="unv">{t('status.unattested')}</Pill>
         <span>{t(isDirty ? 'status.unsaved' : 'status.saved')}</span>
+        {autosaveFailed && (
+          <span role="alert" title={t('status.autosaveFailedTitle')}><Pill tone="warn">{t('status.autosaveFailed')}</Pill></span>
+        )}
         <span className="status-optional" aria-label={t('settings.language')}>{locale.toUpperCase()}</span>
       </div>
     </footer>

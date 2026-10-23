@@ -15,4 +15,4 @@ Het programma heeft tien genummerde stappen in vier groepen:
 - **Concept en toepasbalk:** NTA-invoer wordt pas doorgerekend na **Toepassen**.
 - **Handleiding in de app:** via *Gereedschap › Handleiding* of de knop *Handleiding* bij elke stap.
 
-Details: [hoofdstuk 0 van de handleiding](https://github.com/Erika98-be/open-energy-studio/blob/nta8800-kernel/docs/handleiding-nta8800/00-werken-met-het-programma.md).
+Details: [hoofdstuk 0 van de handleiding](https://github.com/OpenAEC-Foundation/open-energy-studio/blob/main/docs/handleiding-nta8800/00-werken-met-het-programma.md).

@@ -16,4 +16,4 @@
 
 > De upload-XSD van EP-Online is niet openbaar; het overzicht volgt de openbare export-XSD. Zie [[Bekende beperkingen]].
 
-Details: [hoofdstuk 7 van de handleiding](https://github.com/Erika98-be/open-energy-studio/blob/nta8800-kernel/docs/handleiding-nta8800/07-herlabelen-registratie-dossier.md).
+Details: [hoofdstuk 7 van de handleiding](https://github.com/OpenAEC-Foundation/open-energy-studio/blob/main/docs/handleiding-nta8800/07-herlabelen-registratie-dossier.md).

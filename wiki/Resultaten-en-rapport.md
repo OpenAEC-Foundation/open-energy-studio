@@ -11,6 +11,6 @@
 
   Je kunt het rapport exporteren als HTML/PDF of afdrukken.
 - **Labelgegevens:** het rapport toont de labelelementen van de Omgevingsregeling (art. 5.13a), waaronder de verklaringen k en l van de adviseur.
-- **A0-toets:** bij woningen wordt het primair fossiel energiegebruik getoetst op de labelwaarde (EMG-forfaitair). Deze lezing staat als open vraag in [docs/nta8800-vragen-nen.md](https://github.com/Erika98-be/open-energy-studio/blob/nta8800-kernel/docs/nta8800-vragen-nen.md).
+- **A0-toets:** bij woningen wordt het primair fossiel energiegebruik getoetst op de labelwaarde (EMG-forfaitair). Deze lezing staat als open vraag in [docs/nta8800-vragen-nen.md](https://github.com/OpenAEC-Foundation/open-energy-studio/blob/main/docs/nta8800-vragen-nen.md).
 
-Details: [hoofdstuk 4 van de handleiding](https://github.com/Erika98-be/open-energy-studio/blob/nta8800-kernel/docs/handleiding-nta8800/04-uitvoer.md).
+Details: [hoofdstuk 4 van de handleiding](https://github.com/OpenAEC-Foundation/open-energy-studio/blob/main/docs/handleiding-nta8800/04-uitvoer.md).

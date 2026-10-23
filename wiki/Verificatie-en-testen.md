@@ -23,4 +23,4 @@ De gate controleert:
 
 De rekenkern wordt ook getest op Rust 1.77.2 (MSRV). Zie [[Testprotocol]].
 
-Details: [hoofdstuk 5 van de handleiding](https://github.com/Erika98-be/open-energy-studio/blob/nta8800-kernel/docs/handleiding-nta8800/05-validatie.md) en [openbare rapporten](https://github.com/Erika98-be/open-energy-studio/blob/nta8800-kernel/docs/nta8800-vergelijking-openbare-rapporten.md).
+Details: [hoofdstuk 5 van de handleiding](https://github.com/OpenAEC-Foundation/open-energy-studio/blob/main/docs/handleiding-nta8800/05-validatie.md) en [openbare rapporten](https://github.com/OpenAEC-Foundation/open-energy-studio/blob/main/docs/nta8800-vergelijking-openbare-rapporten.md).

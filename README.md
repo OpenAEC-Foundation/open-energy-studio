@@ -18,7 +18,7 @@ The goal is a complete, verifiable NTA 8800 calculation tool that can be atteste
 
 Program 2026.43.0 · Kernel 0.4.0 · Manual stamped for kernel 0.4.0. The program version follows the OpenAEC scheme year.week.n (issue #10); the Windows MSI carries 26.43.0 because an MSI major version stops at 255. `npm run bump` sets the next number of the current week in every file that carries it.
 
-Changes after this release are listed under "Onuitgebracht" in [docs/nta8800-releasenotes.md](docs/nta8800-releasenotes.md).
+**On `main`:** calculation kernel `0.5.0` (not yet released; the web app is deployed from `main`). The table above lists published releases only; the release v2026.43.0 carries kernel 0.4.0. Changes after that release are listed under "Onuitgebracht" in [docs/nta8800-releasenotes.md](docs/nta8800-releasenotes.md).
 
 **Supported norm editions** (`normVersion` in the input → label stamped on results):
 
@@ -95,7 +95,7 @@ The kernel has no I/O and is deterministic. The desktop commands and the HTTP/MC
 ### Development
 
 ```bash
-git clone https://github.com/Erika98-be/open-energy-studio.git
+git clone https://github.com/OpenAEC-Foundation/open-energy-studio.git
 cd open-energy-studio
 npm install
 
@@ -103,7 +103,13 @@ npm run dev          # web UI on http://localhost:3006
 npm run tauri:dev    # desktop app
 ```
 
-The browser build calculates through the local HTTP API (port 3007 by default). `npm run dev` proxies `/api/*` to it; a static `dist/` build needs the same reverse proxy (`/api` → `http://127.0.0.1:3007`, with `/api` stripped). Start the API with:
+The kernel is reached in this order (`src/core/nta/kernelTransport.ts`):
+
+1. **Desktop app (Tauri):** the kernel built into the app.
+2. **Browser:** the WebAssembly kernel in `src/kernel-wasm` (`npm run build:wasm` rebuilds it from `crates/nta8800-wasm`). A static `dist/` build calculates on its own; it needs no server. See [docs/nta8800-wasm.md](docs/nta8800-wasm.md).
+3. **Development server only:** when the WebAssembly module does not load, `npm run dev` falls back to the local HTTP API through its `/api/*` proxy (port 3007).
+
+Without any of the three the app shows that the kernel is unavailable. The HTTP API and the MCP server are for other programs; start them with:
 
 ```bash
 cargo run --release --manifest-path crates/nta8800-service/Cargo.toml --bin api
@@ -168,7 +174,7 @@ The policy is in [docs/nta8800-versiebeheer.md](docs/nta8800-versiebeheer.md).
 | Topic | Where |
 |---|---|
 | User manual (Dutch) | [docs/handleiding-nta8800/](docs/handleiding-nta8800/index.md) |
-| Wiki (Dutch, summary per topic) | [GitHub wiki](https://github.com/Erika98-be/open-energy-studio/wiki) (source in [wiki/](wiki/Home.md)) |
+| Wiki (Dutch, summary per topic) | [GitHub wiki](https://github.com/OpenAEC-Foundation/open-energy-studio/wiki) (source in [wiki/](wiki/Home.md)) |
 | Norm editions and switch points | [docs/nta8800-normversies.md](docs/nta8800-normversies.md) |
 | Test protocol | [docs/nta8800-testprotocol.md](docs/nta8800-testprotocol.md) |
 | BRL 9501 readiness | [docs/nta8800-brl9501-gereedheid.md](docs/nta8800-brl9501-gereedheid.md) |

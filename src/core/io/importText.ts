@@ -1,4 +1,4 @@
-import type { ProjectImportIssue } from '../energy/types';
+import type { ProjectImportIssue, ProjectImportRecord } from '../energy/types';
 import { ImportFormatError } from './importIssues';
 
 type Translate = (key: string, params?: Record<string, string | number>) => string;
@@ -14,6 +14,19 @@ export function importErrorText(err: unknown, t: Translate): string {
   }
   if (err instanceof Error) return err.message;
   return String(err);
+}
+
+/**
+ * Every point of one import record for the adviser to check: the free-text
+ * notes of older Uniec3 imports and the structured issues (kind and the
+ * importer's explanation), so the check page shows what the toast and the
+ * import record show (issue #12).
+ */
+export function importRecordLines(record: Pick<ProjectImportRecord, 'notes' | 'issues'>, t: Translate): string[] {
+  return [
+    ...(record.notes ?? []),
+    ...(record.issues ?? []).map((issue) => `${t(`import.issue.kind.${issue.kind}`)}: ${issue.message}`),
+  ];
 }
 
 /** One line per issue: what happened, and where (NL/EN). */

@@ -8,11 +8,12 @@ Open Energy Studio is open-source software voor de energieprestatie van woningen
 
 | Programma | Rekenkern (`KERNEL_VERSION`) | Handleiding | Releasetag |
 |---|---|---|---|
-| **0.2.0** | **0.3.0** | gestempeld voor rekenkern 0.3.0 | `oes-v0.2.0-kernel-v0.3.0` |
+| **2026.43.0** | **0.4.0** | gestempeld voor rekenkern 0.4.0 | `v2026.43.0` |
+| 0.2.0 | 0.3.0 | gestempeld voor rekenkern 0.3.0 | `oes-v0.2.0-kernel-v0.3.0` |
 
-Programma 0.2.0 · Rekenkern 0.3.0 · Handleiding gestempeld voor rekenkern 0.3.0.
+Programma 2026.43.0 · Rekenkern 0.4.0 · Handleiding gestempeld voor rekenkern 0.4.0. Het programmanummer volgt het OpenAEC-schema jaar.week.volgnummer.
 
-De tak `nta8800-kernel` is verder dan deze uitgave: daar staat rekenkern **0.4.0** (onuitgebracht, handleiding gestempeld voor 0.4.0). De wijzigingen staan onder "Onuitgebracht" in de releasenotes.
+**Op `main`:** rekenkern **0.5.0** (onuitgebracht, handleiding gestempeld voor 0.5.0). De webapp draait `main`. De wijzigingen staan onder "Onuitgebracht" in de releasenotes.
 
 **Uitgaven van NTA 8800:**
 - NTA 8800:2025+C1:2026: de standaard en de enige registreerbare uitgave;
@@ -36,4 +37,4 @@ Zie [[Normversies]].
 - [[Verificatie en testen]], [[Testprotocol]]
 - [[Versiebeheer en releases]], [[BRL 9501 status]]
 
-De volledige handleiding staat in de repository: [handleiding NTA 8800](https://github.com/Erika98-be/open-energy-studio/blob/nta8800-kernel/docs/handleiding-nta8800/index.md).
+De volledige handleiding staat in de repository: [handleiding NTA 8800](https://github.com/OpenAEC-Foundation/open-energy-studio/blob/main/docs/handleiding-nta8800/index.md).

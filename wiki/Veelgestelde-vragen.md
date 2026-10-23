@@ -7,8 +7,8 @@ Nog niet: het programma is niet geattesteerd. Zie [[BRL 9501 status]].
 Het project rekent in een oudere uitgave van NTA 8800. Kies NTA 8800:2025+C1:2026 op de stap *Project*. Zie [[Normversies]].
 
 **Waarom wijkt mijn uitkomst af van Uniec?**
-- De bekende verschillen staan per openbaar rapport verklaard in [de vergelijking](https://github.com/Erika98-be/open-energy-studio/blob/nta8800-kernel/docs/nta8800-vergelijking-openbare-rapporten.md).
-- De interpretatievragen staan in [vragen aan NEN](https://github.com/Erika98-be/open-energy-studio/blob/nta8800-kernel/docs/nta8800-vragen-nen.md).
+- De bekende verschillen staan per openbaar rapport verklaard in [de vergelijking](https://github.com/OpenAEC-Foundation/open-energy-studio/blob/main/docs/nta8800-vergelijking-openbare-rapporten.md).
+- De interpretatievragen staan in [vragen aan NEN](https://github.com/OpenAEC-Foundation/open-energy-studio/blob/main/docs/nta8800-vragen-nen.md).
 
 **Mag ik "0,35" of "0.35" typen?**
 Beide: getalvelden accepteren een decimale komma en een punt.

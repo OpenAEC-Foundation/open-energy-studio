@@ -76,8 +76,14 @@ const readJson = <T,>(store: Store, key: string): T | null => {
     return null;
   }
 };
-const writeJson = (store: Store, key: string, value: unknown) => {
-  try { store.setItem(key, JSON.stringify(value)); } catch { /* storage full or blocked */ }
+/** False when the storage is full or blocked. */
+const writeJson = (store: Store, key: string, value: unknown): boolean => {
+  try {
+    store.setItem(key, JSON.stringify(value));
+    return true;
+  } catch {
+    return false;
+  }
 };
 
 /** FNV-1a of a text, hex: cheap enough for every autosave tick. */
@@ -119,7 +125,8 @@ export function libraryDwellingOf(project: IProject): LibraryDwelling | undefine
 
 export function libraryStatusOf(project: IProject): LibraryStatus {
   const status: LibraryStatus = {};
-  const notes = (project.importLog ?? []).reduce((sum, record) => sum + (record.notes?.length ?? 0), 0);
+  const notes = (project.importLog ?? [])
+    .reduce((sum, record) => sum + (record.notes?.length ?? 0) + (record.issues?.length ?? 0), 0);
   if (notes > 0) status.importNotes = notes;
   const stored = survey(project);
   if (stored && !isNewBuild(project)) {
@@ -173,27 +180,37 @@ export function readLibraryProject(store: Store, id: string): IProject | null {
   return readJson<IProject>(store, PROJECT + id);
 }
 
-function writeEntry(store: Store, entry: LibraryEntry) {
-  writeJson(store, ENTRY + entry.id, entry);
+/** False when the entry or the index could not be written. */
+function writeEntry(store: Store, entry: LibraryEntry): boolean {
+  let written = writeJson(store, ENTRY + entry.id, entry);
   const ids = libraryIds(store);
-  if (!ids.includes(entry.id)) writeJson(store, LIBRARY_INDEX, [...ids, entry.id]);
+  if (!ids.includes(entry.id)) written = writeJson(store, LIBRARY_INDEX, [...ids, entry.id]) && written;
   notify();
+  return written;
 }
 
 /**
  * Saves the open documents whose project changed since `seen` (a map of the
  * projects last written); returns the new map. A document is written in full
- * the first time, so a project also lands here after a restore.
+ * the first time, so a project also lands here after a restore. A snapshot
+ * the storage refused is not counted as written, so the next call writes it
+ * again; its id goes into `failed` (issue #13).
  */
 export function saveDocumentsToLibrary(
-  store: Store, documents: Array<{ id: string; filePath: string | null; project: IProject }>, seen: Map<string, IProject>, now = new Date().toISOString(),
+  store: Store, documents: Array<{ id: string; filePath: string | null; project: IProject }>, seen: Map<string, IProject>,
+  now = new Date().toISOString(), failed: string[] = [],
 ): Map<string, IProject> {
   const next = new Map(seen);
   for (const doc of documents) {
     if (seen.get(doc.id) === doc.project) continue;
-    writeJson(store, PROJECT + doc.project.id, doc.project);
-    writeEntry(store, libraryEntryFrom(doc.project, readLibraryEntry(store, doc.project.id), doc.filePath, now));
-    next.set(doc.id, doc.project);
+    const written = writeJson(store, PROJECT + doc.project.id, doc.project)
+      && writeEntry(store, libraryEntryFrom(doc.project, readLibraryEntry(store, doc.project.id), doc.filePath, now));
+    if (written) {
+      next.set(doc.id, doc.project);
+    } else {
+      next.delete(doc.id);
+      failed.push(doc.id);
+    }
   }
   return next;
 }

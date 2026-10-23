@@ -21,4 +21,4 @@
 - **Bronlabels:** elke bronvermelding in uitvoer, rapport en dossier noemt de uitgave die werkelijk is berekend.
 - **Verschillen tussen uitgaven:** op de openbare gevallen is elk verschil van meer dan 0,5 % tussen opeenvolgende uitgaven herleid tot een schakelpunt (tabel in docs/nta8800-normversies.md).
 
-Details: [Normversies in de handleiding](https://github.com/Erika98-be/open-energy-studio/blob/nta8800-kernel/docs/handleiding-nta8800/10-normversies.md) en [docs/nta8800-normversies.md](https://github.com/Erika98-be/open-energy-studio/blob/nta8800-kernel/docs/nta8800-normversies.md).
+Details: [Normversies in de handleiding](https://github.com/OpenAEC-Foundation/open-energy-studio/blob/main/docs/handleiding-nta8800/10-normversies.md) en [docs/nta8800-normversies.md](https://github.com/OpenAEC-Foundation/open-energy-studio/blob/main/docs/nta8800-normversies.md).

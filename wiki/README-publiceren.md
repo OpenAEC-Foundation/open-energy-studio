@@ -3,7 +3,7 @@
 Deze map is opgezet als GitHub-wiki. Publiceren, vanuit de hoofdmap van de repository:
 
 ```bash
-git clone https://github.com/Erika98-be/open-energy-studio.wiki.git /tmp/oes-wiki
+git clone https://github.com/OpenAEC-Foundation/open-energy-studio.wiki.git /tmp/oes-wiki
 cp wiki/*.md /tmp/oes-wiki/
 rm /tmp/oes-wiki/README-publiceren.md
 cd /tmp/oes-wiki

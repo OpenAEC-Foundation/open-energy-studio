@@ -13,6 +13,12 @@ Dit bestand is de wijzigingsregistratie van de rekenkern (BRL 9501 §5.2, §6.2 
 
 ## Onuitgebracht
 
+### 23 oktober 2026 — Uniec-import, herstelkopie en documentatie, issues #11, #12, #13 en #16 (geen rekenwijziging)
+- **Uniec-import, meer gebouwen (#11):** een echte Uniec-export met meer gebouwmappen leest het gebouw met het laagste nummer en meldt de andere als importpunt *meerdere* (was: het eerste gevonden gebouw, zonder melding).
+- **Uniec-import, importpunten (#12):** wat de import van een echte export aannam, niet las of liet liggen, is nu een importpunt met soort en Uniec-veld. De melding na het inlezen, het importverslag en de controlepagina tonen dezelfde punten. Een import schrijft één regel in het importlogboek (was: twee, waardoor de registratie twee bevestigingen vroeg).
+- **Herstelkopie (#13):** weigert de browser de automatische herstelkopie of de projectbibliotheek (opslag vol of geblokkeerd), dan telt die schrijfactie niet als opgeslagen. De app probeert het elke vijf seconden opnieuw en de statusbalk toont *Herstelkopie mislukt* tot het lukt.
+- **Documentatie (#16):** README en wiki beschrijven de rekenkern in de browser (WebAssembly; HTTP alleen als terugval van de ontwikkelserver), noemen de gepubliceerde release en de rekenkern op `main` apart, en beschrijven de echte Uniec-import met zijn ene geteste export. Links wijzen naar de OpenAEC-repository. `src/__tests__/docs-versions.test.ts` bewaakt de versies en de beschrijving van de transportroute.
+
 ### 22 oktober 2026 — TOjuli narekenbaar en NEN-vragen per uitgave (geen rekenwijziging)
 - **TOjuli (§5.7, issue #8):** de uitkomst geeft per oriëntatie ook Q_ht, Q_gn en Q_rbl van stap B (`heatTransferJulyKwh`, `gainsJulyKwh`, `recoverableJulyKwh`) en per rekenzone de vaste waarden en zonetermen van 5.40 (`july`: t_juli, θ_e;juli, setpoint, a_C;red, interne warmtelast, H_C;ve, H_gr;an, warmtecapaciteit, gebruiksoppervlakte, minimale oppervlakte, grenswaarde). De resultatenpagina toont ze, met de rekenregel; TOjuli zelf verandert niet.
 - **NEN-vragen:** [nta8800-vragen-nen.md](nta8800-vragen-nen.md) heeft een tabel *Stand per uitgave* met per vraag de status bij NEN en de lezing in de rekenkern; een test bewaakt dat elke vraag erin staat en dat de tabel bij de huidige rekenkernversie hoort.

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useReducer, useRef, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useReducer, useRef, useCallback, useSyncExternalStore, ReactNode } from 'react';
 import { normalizeProject } from '../core/energy/normalizeProject';
 import { applyWindowTypes, detachWindowType } from '../core/energy/windowTypes';
 import { saveDocumentsToLibrary } from '../core/io/projectLibrary';
@@ -1140,8 +1140,14 @@ const readJson = <T,>(store: Store, key: string): T | null => {
     return null;
   }
 };
-const writeJson = (store: Store, key: string, value: unknown) => {
-  try { store.setItem(key, JSON.stringify(value)); } catch { /* storage full or blocked */ }
+/** False when the storage is full or blocked; the caller then retries instead of counting it as saved. */
+const writeJson = (store: Store, key: string, value: unknown): boolean => {
+  try {
+    store.setItem(key, JSON.stringify(value));
+    return true;
+  } catch {
+    return false;
+  }
 };
 const savedIds = (store: Store): string[] => {
   const ids = readJson<unknown>(store, AUTOSAVE_INDEX);
@@ -1188,9 +1194,13 @@ export function restoreFrom(store: Store): DocumentManagerState {
 
 /**
  * Saves the documents this tab holds that changed since `previous`, and
- * removes the ones this tab closed. Documents of other tabs stay.
+ * removes the ones this tab closed. Documents of other tabs stay. A document
+ * the storage refused keeps its `previous` entry (or none), so the next call
+ * writes it again; its id goes into `failed` (issue #13).
  */
-export function saveTo(store: Store, state: DocumentManagerState, previous: Map<string, DocumentEntry>): Map<string, DocumentEntry> {
+export function saveTo(
+  store: Store, state: DocumentManagerState, previous: Map<string, DocumentEntry>, failed: string[] = [],
+): Map<string, DocumentEntry> {
   const ids = new Set(savedIds(store));
   const now = new Map(state.documents.map((doc) => [doc.id, doc]));
   for (const doc of state.documents) {
@@ -1200,18 +1210,49 @@ export function saveTo(store: Store, state: DocumentManagerState, previous: Map<
     const saved: AutosavedDocument = {
       id: doc.id, filePath: doc.filePath, project: doc.state.project, route: doc.state.route, isDirty: doc.state.isDirty,
     };
-    writeJson(store, AUTOSAVE_PREFIX + doc.id, saved);
-    ids.add(doc.id);
+    if (writeJson(store, AUTOSAVE_PREFIX + doc.id, saved)) {
+      ids.add(doc.id);
+    } else {
+      failed.push(doc.id);
+      if (before) now.set(doc.id, before);
+      else now.delete(doc.id);
+    }
   }
   for (const id of previous.keys()) {
-    if (now.has(id)) continue;
+    if (state.documents.some((doc) => doc.id === id)) continue;
     try { store.removeItem(AUTOSAVE_PREFIX + id); } catch { /* ignore */ }
     ids.delete(id);
   }
-  writeJson(store, AUTOSAVE_INDEX, [...ids]);
+  if (!writeJson(store, AUTOSAVE_INDEX, [...ids])) {
+    // Without the index no document is restored: write the open ones again
+    // next time, and keep the closed ones so their removal is retried too.
+    failed.push(AUTOSAVE_INDEX);
+    return new Map([...previous].filter(([id]) => !state.documents.some((doc) => doc.id === id)));
+  }
   if (state.activeDocumentId) writeJson(store, AUTOSAVE_ACTIVE, state.activeDocumentId);
   return now;
 }
+
+/**
+ * Whether the last autosave (documents and library) failed, for the status
+ * bar; the autosave retries every few seconds until the storage accepts it.
+ */
+let autosaveFailed = false;
+const autosaveListeners = new Set<() => void>();
+function setAutosaveFailed(value: boolean) {
+  if (autosaveFailed === value) return;
+  autosaveFailed = value;
+  for (const listener of autosaveListeners) listener();
+}
+const subscribeAutosave = (listener: () => void) => {
+  autosaveListeners.add(listener);
+  return () => { autosaveListeners.delete(listener); };
+};
+export function useAutosaveFailed(): boolean {
+  return useSyncExternalStore(subscribeAutosave, () => autosaveFailed, () => false);
+}
+/** Retry interval after a refused write, ms. */
+export const AUTOSAVE_RETRY_MS = 5000;
 
 /** The documents of the last session, or the default document when there is none or none can be read. */
 export function restoreDocuments(): DocumentManagerState {
@@ -1233,14 +1274,30 @@ function useAutosave(docState: DocumentManagerState) {
     const store = storage();
     const gone = previousDocs.current.filter((doc) => !docState.documents.some((item) => item.id === doc.id));
     previousDocs.current = docState.documents;
+    const failed: string[] = [];
     if (store && gone.length > 0) {
-      inLibrary.current = saveDocumentsToLibrary(store, gone.map((doc) => ({ id: doc.id, filePath: doc.filePath, project: doc.state.project })), inLibrary.current);
+      inLibrary.current = saveDocumentsToLibrary(store, gone.map((doc) => ({ id: doc.id, filePath: doc.filePath, project: doc.state.project })), inLibrary.current, undefined, failed);
     }
-    const timer = window.setTimeout(() => {
+    // A write the storage refused is not counted as saved: retry until it is
+    // accepted, and show the failure in the status bar meanwhile (issue #13).
+    // A closed document whose library snapshot failed is in `gone` only once,
+    // so it is retried here too.
+    let pendingGone = failed.length > 0 ? gone : [];
+    let timer = 0;
+    const run = () => {
       const store = storage();
-      if (store && saved.current) saved.current = saveTo(store, docState, saved.current);
-      if (store) inLibrary.current = saveDocumentsToLibrary(store, docState.documents.map((doc) => ({ id: doc.id, filePath: doc.filePath, project: doc.state.project })), inLibrary.current);
-    }, 500);
+      if (!store) return;
+      const failures: string[] = [];
+      if (pendingGone.length > 0) {
+        inLibrary.current = saveDocumentsToLibrary(store, pendingGone.map((doc) => ({ id: doc.id, filePath: doc.filePath, project: doc.state.project })), inLibrary.current, undefined, failures);
+        if (failures.length === 0) pendingGone = [];
+      }
+      if (saved.current) saved.current = saveTo(store, docState, saved.current, failures);
+      inLibrary.current = saveDocumentsToLibrary(store, docState.documents.map((doc) => ({ id: doc.id, filePath: doc.filePath, project: doc.state.project })), inLibrary.current, undefined, failures);
+      setAutosaveFailed(failures.length > 0);
+      if (failures.length > 0) timer = window.setTimeout(run, AUTOSAVE_RETRY_MS);
+    };
+    timer = window.setTimeout(run, 500);
     return () => window.clearTimeout(timer);
   }, [docState]);
 

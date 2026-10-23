@@ -39,9 +39,12 @@ Wat het **niet** bevat of garandeert:
 - geen rekenuitkomsten (de samenvatting is leeg) en geen label;
 - geen garantie dat een ander programma het bestand accepteert of de waarden op dezelfde manier leest. Controleer na het inlezen elders altijd de invoer.
 
-**UNIEC3 import** leest een `.uniec3`-bestand en opent het als een nieuw project. Alleen het projectmodel komt mee: zones, vlakken, ramen, koudebruggen, constructies en installaties. De NTA-invoer, opname en registratie moet je daarna zelf invullen; tot dan geeft de rekenkern invoergaten.
+**UNIEC3 import** leest een `.uniec3`-bestand en opent het als een nieuw project. De import herkent twee soorten bestanden:
 
-Een UNIEC3-begrenzing heeft hier geen hellingshoek. Bij een hellend dak (een dak met een oriëntatie) zet de import daarom, net als de VABI-import zonder `Hellingshoek`, een punt in het importverslag: vul de hellingshoek in bij de NTA-invoer.
+- **Een echte export van Uniec 3.4** (relaties met `ParentId`/`ChildId` en een bibliotheek van constructies). Mee komen: de rekenzones met gebruiksoppervlakte, de begrenzingsvlakken met constructie, de kozijnrijen met kozijntype, aantal en oppervlakte, q_v10, de installaties en een deel van de NTA-invoer: de hellingshoek van daken, de omtrek van de vloer op de grond en de belemmering en zonwering per raam. Niet mee komen onder meer koudebruggen, leidingen, bronnen, ventilatiedebieten en de verklaringen uit de productlijst van Uniec. Bevat het bestand meer gebouwen, dan leest de import het gebouw met het laagste nummer en meldt de andere. Deze route is getest op één geanonimiseerde export van een woning met één rekenzone; dat is geen bewijs dat elke export goed gaat.
+- **Het eigen invoerconcept** (`.input-draft.uniec3` hierboven): alleen het projectmodel komt mee. Een begrenzing heeft daarin geen hellingshoek; bij een hellend dak zet de import, net als de VABI-import zonder `Hellingshoek`, een punt in het importverslag: vul de hellingshoek in bij de NTA-invoer.
+
+In beide gevallen vul je de rest van de NTA-invoer, de opname en de registratie daarna zelf in; tot dan geeft de rekenkern invoergaten. Uitwisseling met Uniec is nooit verliesvrij: elk punt dat de import aannam of liet liggen, staat met soort en veld in het importverslag, en de registratie vraagt per import een bevestiging dat de ingelezen gegevens zijn gecontroleerd ([hoofdstuk 7](07-herlabelen-registratie-dossier.md)).
 
 Getallen worden met volle precisie geschreven (geen afronding op twee decimalen).
 

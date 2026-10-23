@@ -8,4 +8,4 @@
 6. **Bewijs en dossier.** Koppel bewijsstukken via *Bron & bewijs* en maak in stap 9 het projectdossier. Zie [[Bron en bewijs]] en [[Registratie, dossier en EP-Online|Registratie-dossier-en-EP-Online]].
 7. **Registratie.** Stap 10 toont of het project gereed is voor registratie en wat er nog ontbreekt.
 
-Uitgebreid: [werken met het programma](https://github.com/Erika98-be/open-energy-studio/blob/nta8800-kernel/docs/handleiding-nta8800/00-werken-met-het-programma.md).
+Uitgebreid: [werken met het programma](https://github.com/OpenAEC-Foundation/open-energy-studio/blob/main/docs/handleiding-nta8800/00-werken-met-het-programma.md).

@@ -3,13 +3,13 @@
  * The fixture is the anonymised export of a one-zone dwelling: 9 boundary
  * surfaces with 10 window rows from a library of 3 opaque and 9 window
  * types, and 6 installations. Nothing is defaulted in silence: what the
- * model cannot hold goes into the import record's notes.
+ * model cannot hold is an import issue with its kind and Uniec3 field.
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { strToU8, zipSync } from 'fflate';
-import { importFromUNIEC3 } from '../core/io/UNIEC3Exporter';
+import { importFromUNIEC3, readUNIEC3 } from '../core/io/UNIEC3Exporter';
 import { isUniec3Export } from '../core/io/UNIEC3Import';
 
 const fixture = JSON.parse(readFileSync(resolve(__dirname, '../../training-data/uniec3-voorbeeldwoning.json'), 'utf8')) as {
@@ -23,18 +23,19 @@ const archive = () => zipSync({
 });
 
 describe('Uniec3 export import', () => {
-  const project = importFromUNIEC3(archive());
+  const read = readUNIEC3(archive());
+  const project = read.project;
   const surfaces = project.zones.flatMap((zone) => zone.surfaces);
   const byName = (name: string) => surfaces.find((surface) => surface.name === name)!;
   const nta = project.ntaCalculation as unknown as Record<string, Array<Record<string, unknown>>>;
-  const notes = project.importLog?.[0]?.notes ?? [];
+  const notes = read.issues.list.map((issue) => issue.message);
 
   it('recognises the real format and reads the building', () => {
     expect(isUniec3Export({ 'meta.json': strToU8('input draft - unverified'), 'buildings/1/relations.json': strToU8('[]') })).toBe(false);
     expect(project.name).toBe('Voorbeeldwoning (Uniec3)');
     expect(project.buildingFunction).toBe('residential');
     expect(project.registration).toMatchObject({ purpose: 'delivery', constructionYear: 2023 });
-    expect(project.importLog?.[0]).toMatchObject({ tool: 'UNIEC3' });
+    expect(importFromUNIEC3(archive()).name).toBe(project.name);
   });
 
   it('reads the zone with its usable floor area and the measured qv10', () => {
@@ -102,5 +103,40 @@ describe('Uniec3 export import', () => {
     expect(notes.some((line) => line.includes('voorraadvat 150 l'))).toBe(true);
     expect(notes.some((line) => line.includes('ventilatorvermogen 113.3 W'))).toBe(true);
     expect(notes.some((line) => line.includes('productlijst'))).toBe(true);
+  });
+
+  // Issue #12: the points are structured, so the toast and the import record show them too.
+  it('gives every point a kind and the Uniec3 field', () => {
+    const issues = read.issues.list;
+    expect(issues.length).toBeGreaterThan(0);
+    expect(issues.find((issue) => issue.message.includes('voorraadvat 150 l'))).toMatchObject({ kind: 'dropped', path: 'TAPW-VAT' });
+    expect(issues.find((issue) => issue.message.includes('hoogte 3.91 m afgeleid'))).toMatchObject({ kind: 'defaulted', path: 'INFIL_BGH' });
+    // The importer leaves the one import record to the caller.
+    expect(project.importLog).toBeUndefined();
+  });
+});
+
+// Issue #11: an archive with two buildings reads the first and says so.
+describe('Uniec3 export with more than one building', () => {
+  const twoBuildings = () => zipSync({
+    'meta.json': strToU8(JSON.stringify(fixture.meta)),
+    'buildings/10/entities.json': strToU8(JSON.stringify(fixture.entities)),
+    'buildings/10/relations.json': strToU8(JSON.stringify(fixture.relations)),
+    'buildings/2/entities.json': strToU8(JSON.stringify(fixture.entities)),
+    'buildings/2/relations.json': strToU8(JSON.stringify(fixture.relations)),
+  });
+
+  it('reads the lowest building id and reports the other as multiple', () => {
+    const { project, issues } = readUNIEC3(twoBuildings());
+    expect(project.zones).toHaveLength(1);
+    const multiple = issues.list.filter((issue) => issue.kind === 'multiple' && issue.path === 'buildings');
+    expect(multiple).toHaveLength(1);
+    expect(multiple[0]).toMatchObject({ value: 2 });
+    expect(multiple[0].message).toContain('2 gebouwen (2, 10)');
+    expect(multiple[0].message).toContain('alleen gebouw 2 is ingelezen');
+  });
+
+  it('reports nothing about buildings for a single building', () => {
+    expect(readUNIEC3(archive()).issues.list.some((issue) => issue.path === 'buildings')).toBe(false);
   });
 });

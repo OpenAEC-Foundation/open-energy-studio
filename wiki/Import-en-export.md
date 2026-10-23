@@ -11,9 +11,12 @@
   - de bestanden mogen UTF-8, UTF-16 of windows-1252 zijn;
   - bestanden met een `<!DOCTYPE` worden geweigerd.
 - **Export:** de app meldt welke projectgegevens het formaat niet kan bevatten, zoals de NTA-specifieke invoer.
-- **Vloeren op grond:** de grens grond/kruipruimte/kelder, de perimeter P en een verwarmde kelder (z, wandoppervlak) gaan in geen van beide formaten mee. De export noemt `ntaCalculation.groundFloors` apart; na een import vul je ze opnieuw in.
+- **Vloeren op grond:** de export schrijft de grens grond/kruipruimte/kelder, de perimeter P en een verwarmde kelder (z, wandoppervlak) in geen van beide formaten; hij noemt `ntaCalculation.groundFloors` apart. De import van een echte Uniec-export neemt de perimeter over; de rest vul je na een import opnieuw in.
 - **Overige exports:** IFC, het BENG-rapport, het NTA-rekenrapport, het invoerdossier en het projectdossier.
 
-> De veldcodes van Uniec 3 en VABI zijn afgeleid; er is nog geen echt voorbeeldbestand getest. Zie [[Bekende beperkingen]].
+- **Uniec 3, echte export:** de import van een export van Uniec 3.4 is getest op één geanonimiseerde woning. Dakhellingen, de omtrek van de vloer op de grond en belemmering en zonwering per raam komen mee; bij meer gebouwen in één bestand leest de import het eerste en meldt de rest. De registratie vraagt per import een bevestiging dat de gegevens zijn gecontroleerd.
+- **Uniec 3, export:** een nagebouwd invoerconcept (`.input-draft.uniec3`); niet vastgesteld is dat Uniec het accepteert.
 
-Details: [hoofdstuk 9 van de handleiding](https://github.com/Erika98-be/open-energy-studio/blob/nta8800-kernel/docs/handleiding-nta8800/09-bestanden-en-uitwisseling.md).
+> Brede compatibiliteit met Uniec- en VABI-bestanden is niet aangetoond; de VABI-veldcodes zijn afgeleid. Zie [[Bekende beperkingen]].
+
+Details: [hoofdstuk 9 van de handleiding](https://github.com/OpenAEC-Foundation/open-energy-studio/blob/main/docs/handleiding-nta8800/09-bestanden-en-uitwisseling.md).

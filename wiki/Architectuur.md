@@ -10,4 +10,4 @@
 - Desktop, API en MCP roepen dezelfde kernfuncties aan, met dezelfde uitgavebehandeling.
 - Elk resultaat draagt `KERNEL_VERSION`, de normversie en een invoer-fingerprint.
 
-Zie ook de [programmabeschrijving](https://github.com/Erika98-be/open-energy-studio/blob/nta8800-kernel/docs/nta8800-programmabeschrijving.md).
+Zie ook de [programmabeschrijving](https://github.com/OpenAEC-Foundation/open-energy-studio/blob/main/docs/nta8800-programmabeschrijving.md).

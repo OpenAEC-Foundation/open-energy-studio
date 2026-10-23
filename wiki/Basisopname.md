@@ -13,4 +13,4 @@ De rekenkern leidt uit de antwoorden de projectinvoer af, met de forfaitaire waa
 - **Foto's** koppel je per opname-onderdeel. Zie [[Bron en bewijs]].
 - **Oudere uitgaven:** onder NTA 8800:2022 en 2020+A1 vraagt de opname bij een vloer boven een kruipruimte ook de hoogte H2 boven maaiveld.
 
-Details: [hoofdstuk 2 van de handleiding](https://github.com/Erika98-be/open-energy-studio/blob/nta8800-kernel/docs/handleiding-nta8800/02-basisopname.md) en [docs/nta8800-basisopname.md](https://github.com/Erika98-be/open-energy-studio/blob/nta8800-kernel/docs/nta8800-basisopname.md).
+Details: [hoofdstuk 2 van de handleiding](https://github.com/OpenAEC-Foundation/open-energy-studio/blob/main/docs/handleiding-nta8800/02-basisopname.md) en [docs/nta8800-basisopname.md](https://github.com/OpenAEC-Foundation/open-energy-studio/blob/main/docs/nta8800-basisopname.md).
