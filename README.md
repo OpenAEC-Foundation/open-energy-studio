@@ -185,6 +185,7 @@ The policy is in [docs/nta8800-versiebeheer.md](docs/nta8800-versiebeheer.md).
 | Public-report comparisons | [docs/nta8800-vergelijking-openbare-rapporten.md](docs/nta8800-vergelijking-openbare-rapporten.md) |
 | Open interpretation questions | [docs/nta8800-vragen-nen.md](docs/nta8800-vragen-nen.md) |
 | HTTP API / MCP | [docs/nta8800-api.md](docs/nta8800-api.md), [docs/nta8800-mcp.md](docs/nta8800-mcp.md) |
+| Platforms, versions and integrations | [docs/nta8800-platforms-en-koppelingen.md](docs/nta8800-platforms-en-koppelingen.md) (Dutch): forms per platform, signing, version policy, library boundary, what is not delivered yet |
 | Form coverage | [docs/ui-redesign/formulierdekking.md](docs/ui-redesign/formulierdekking.md) |
 | Quality procedures (concept) | [docs/kwaliteit/](docs/kwaliteit/kwaliteitshandboek.md) |
 

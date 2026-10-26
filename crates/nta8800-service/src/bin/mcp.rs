@@ -13,7 +13,7 @@ use rmcp::{
         CallToolRequestParams, CallToolResponse, CallToolResult, Implementation,
         ListResourcesResult, ListToolsResult, PaginatedRequestParams, ReadResourceRequestParams,
         ReadResourceResponse, ReadResourceResult, Resource, ResourceContents, ServerCapabilities,
-        ServerConfig, Tool,
+        ServerConfig, Tool, ToolAnnotations,
     },
     service::RequestContext,
     transport::stdio,
@@ -74,9 +74,20 @@ fn tools() -> Vec<Tool> {
                 Method::Get => format!("{} (HTTP GET {})", op.description, op.path),
                 Method::Post => format!("{} (HTTP POST {})", op.description, op.path),
             };
-            Tool::new(op.name, description, tool_schema(op))
+            Tool::new(op.name, description, tool_schema(op)).annotate(calculation_annotations())
         })
         .collect()
+}
+
+/// Every tool is a calculation: it reads its arguments and returns a
+/// result, and changes nothing (no files, no network, no state between
+/// calls). Clients may call it without asking for write permission.
+fn calculation_annotations() -> ToolAnnotations {
+    ToolAnnotations::new()
+        .read_only(true)
+        .destructive(false)
+        .idempotent(true)
+        .open_world(false)
 }
 
 /// Runs a tool and returns its result. Failures the caller can act on
@@ -571,6 +582,17 @@ mod tests {
                 "{}",
                 tool.name
             );
+        }
+    }
+
+    #[test]
+    fn every_tool_says_it_only_calculates() {
+        for tool in tools() {
+            let annotations = tool.annotations.as_ref().expect("annotations");
+            assert_eq!(annotations.read_only_hint, Some(true), "{}", tool.name);
+            assert_eq!(annotations.destructive_hint, Some(false), "{}", tool.name);
+            assert_eq!(annotations.idempotent_hint, Some(true), "{}", tool.name);
+            assert_eq!(annotations.open_world_hint, Some(false), "{}", tool.name);
         }
     }
 

@@ -1,7 +1,7 @@
 # NTA 8800 MCP-server
 
 De MCP-server maakt de Rust-rekenkern bruikbaar voor AI-assistenten zoals Claude Code en Claude Desktop, via het Model Context Protocol over stdio.
-- **Tools:** elke tool is een bewerking uit hetzelfde register als de HTTP-API (`crates/nta8800-service/src/operations.rs`). Tool `x` en route `x` geven dus dezelfde uitkomst; de tabel staat in [nta8800-api.md](nta8800-api.md#bewerkingen).
+- **Tools:** elke tool is een bewerking uit hetzelfde register als de HTTP-API (`crates/nta8800-operations/src/lib.rs`). Tool `x` en route `x` geven dus dezelfde uitkomst; de tabel staat in [nta8800-api.md](nta8800-api.md#bewerkingen).
 - **Resources:** de voorbeeldprojecten, de opnamefixtures, de interpretatielijst, de handleiding en het OpenAPI-document.
 
 Uitkomsten zijn **onverifieerd**: het programma heeft nog geen BRL 9501-attest.
@@ -49,7 +49,8 @@ Herstart daarna Claude Desktop.
 - **`tools/list`:**
   - per tool een naam;
   - een beschrijving in het Engels met Nederlandse vaktermen, waaronder de HTTP-route;
-  - een JSON Schema van de invoer: een object met het vereiste invoerlid (`project`, `survey`, `input`, `case`, of `original` en `current`).
+  - een JSON Schema van de invoer: een object met het vereiste invoerlid (`project`, `survey`, `input`, `case`, of `original` en `current`);
+  - annotaties: elke tool is een berekening zonder bijwerkingen (`readOnlyHint: true`, `destructiveHint: false`, `idempotentHint: true`, `openWorldHint: false`). Een tool leest alleen zijn argumenten en geeft een uitkomst; hij schrijft geen bestanden, gebruikt geen netwerk en bewaart niets tussen aanroepen. Er is dus ook niets terug te draaien. Een client kan de tools daarom zonder schrijfrechten toestaan.
 - **`tools/call`:**
   - **Inhoud:** het resultaat is precies de JSON-body die de HTTP-route teruggeeft, als `structuredContent` en als tekst in `content`. Eén uitzondering: MCP vraagt een object als `structuredContent`, dus de lijst van `list_interpretations` komt verpakt als `{"result": [...]}`.
   - **`isError`:** dit staat op `true` als de route met 4xx of 5xx zou antwoorden.

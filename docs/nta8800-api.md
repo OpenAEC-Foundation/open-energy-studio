@@ -1,6 +1,6 @@
 # NTA 8800 HTTP-API
 
-De HTTP-API stelt de Rust-rekenkern van Open Energy Studio beschikbaar voor andere programma's. Elke bewerking bestaat precies één keer, in het register `crates/nta8800-service/src/operations.rs`. Daaruit worden drie dingen afgeleid:
+De HTTP-API stelt de Rust-rekenkern van Open Energy Studio beschikbaar voor andere programma's. Elke bewerking bestaat precies één keer, in het register `crates/nta8800-operations/src/lib.rs`. Daaruit worden drie dingen afgeleid:
 - de HTTP-route;
 - de MCP-tool met dezelfde naam (zie [nta8800-mcp.md](nta8800-mcp.md));
 - het OpenAPI-document.
