@@ -16,6 +16,9 @@ Dit bestand is de wijzigingsregistratie van de rekenkern (BRL 9501 §5.2, §6.2 
 ## Rekenkern 0.5.0 — 26 oktober 2026
 <!-- kernel-version: 0.5.0 -->
 
+### 26 oktober 2026 — Desktop-app meldt een nieuwe versie (geen rekenwijziging)
+- **Nieuwe versie:** de desktop-app vraagt bij het starten en dagelijks aan GitHub naar de releases en toont *Versie … staat klaar* als er een nieuwere is, met **Naar de download** en **Later** (`src/core/io/desktopUpdate.ts`). Hij installeert niets zelf. De link opent alleen een releasepagina van dit programma (Tauri-commando `open_release_page`, zonder extra plugin). Uit te zetten onder Instellingen › Algemeen › Nieuwe versies. De webversie laadt nieuwe versies al zelf.
+
 ### 26 oktober 2026 — Uitgave 2026.44.0: melding "niet geattesteerd" bij de installatie (geen rekenwijziging)
 - **Installatie:** de Windows-setup (NSIS en MSI) toont vóór het installeren de pagina *Lees dit eerst* (`src-tauri/installer-notice.txt`, `bundle.licenseFile`): testversie, niet geattesteerd volgens BRL 9501, uitkomsten indicatief en niet bruikbaar voor een officieel label, een BENG-toets of EP-Online, met de licentie (LGPL-3.0-or-later). README en wiki zeggen hetzelfde; `src/__tests__/docs-versions.test.ts` bewaakt dat zolang `attest.json` geen attestnummer heeft.
 

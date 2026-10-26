@@ -243,7 +243,7 @@ describe('webview hardening', () => {
     expect(csp['connect-src']).toMatch(/ipc:/);
     // Every external origin the app fetches must be allowed.
     const fetched = new Set<string>();
-    for (const file of ['src/components/dialogs/FeedbackDialog/FeedbackDialog.tsx']) {
+    for (const file of ['src/components/dialogs/FeedbackDialog/FeedbackDialog.tsx', 'src/core/io/desktopUpdate.ts']) {
       for (const url of read(file).match(/https:\/\/[a-z0-9.-]+/g) ?? []) fetched.add(url);
     }
     expect(fetched.size).toBeGreaterThan(0);

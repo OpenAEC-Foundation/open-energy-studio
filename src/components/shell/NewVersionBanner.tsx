@@ -1,11 +1,17 @@
 /**
  * Says when a newer build of the web app is online, with a button to load it
  * (feedback 9 Oct 2026: a fix was live, the open tab still ran the old build).
+ * In the desktop app it says when a newer release is published, with a button
+ * to its download page (desktopUpdate.ts).
  */
 import { useEffect, useState } from 'react';
-import { isTauri } from '@tauri-apps/api/core';
+import { invoke, isTauri } from '@tauri-apps/api/core';
+import { version as programVersion } from '../../../package.json';
 import { useI18n } from '../../i18n/i18n';
 import { newerBuildAvailable } from '../../core/io/newVersion';
+import {
+  UPDATE_CHECK_EVERY_MS, checkForUpdate, dismissUpdate, updateCheckEnabled, updateDismissed, type AvailableUpdate,
+} from '../../core/io/desktopUpdate';
 
 const CHECK_EVERY_MS = 5 * 60 * 1000;
 const AUTO_RELOAD_KEY = 'oes.autoReloaded.v1';
@@ -13,6 +19,7 @@ const AUTO_RELOAD_KEY = 'oes.autoReloaded.v1';
 export function NewVersionBanner() {
   const { t } = useI18n();
   const [newer, setNewer] = useState(false);
+  const [release, setRelease] = useState<AvailableUpdate | null>(null);
   useEffect(() => {
     if (import.meta.env.DEV || import.meta.env.MODE === 'test' || isTauri()) return undefined;
     let stopped = false;
@@ -31,6 +38,28 @@ export function NewVersionBanner() {
     document.addEventListener('visibilitychange', onVisible);
     return () => { stopped = true; window.clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); };
   }, []);
+  useEffect(() => {
+    if (import.meta.env.MODE === 'test' || !isTauri()) return undefined;
+    let stopped = false;
+    const check = () => {
+      if (!updateCheckEnabled()) return;
+      void checkForUpdate(programVersion).then((found) => {
+        if (found && !stopped && !updateDismissed(found.version)) setRelease(found);
+      });
+    };
+    check();
+    const timer = window.setInterval(check, UPDATE_CHECK_EVERY_MS);
+    return () => { stopped = true; window.clearInterval(timer); };
+  }, []);
+  if (release) {
+    return <div className="new-version-banner" role="status">
+      <span>{t('shell.newRelease', { version: release.version, current: programVersion })}</span>
+      <button type="button" className="btn btn-sm btn-primary"
+        onClick={() => { void invoke('open_release_page', { tag: release.tag }); }}>{t('shell.newReleaseOpen')}</button>
+      <button type="button" className="btn btn-sm"
+        onClick={() => { dismissUpdate(release.version); setRelease(null); }}>{t('shell.newReleaseLater')}</button>
+    </div>;
+  }
   if (!newer) return null;
   return <div className="new-version-banner" role="status">
     <span>{t('shell.newVersion')}</span>

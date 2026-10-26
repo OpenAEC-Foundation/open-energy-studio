@@ -17,6 +17,13 @@ Herlabelen moet met de rekenkern van de oorspronkelijke berekening (BRL 9500-W �
 
 Een nieuwere build kan dus geen labels van een oudere build herlabelen. De certificaathouder bewaart daarom elke gebruikte geattesteerde build minstens 24 maanden na de opname. BRL 9501 §5.3 (p. 9) vraagt daarnaast dat de attesthouder een oude rekenversie minstens drie jaar na een normwijziging beschikbaar houdt. Het versiebeleid (opbouw van het versienummer, uitwisselbaarheid tussen versies, registratie van de rekenkernversie bij RVO) staat in [`docs/nta8800-versiebeheer.md`](../nta8800-versiebeheer.md). Zie ook [`docs/nta8800-attestdossier.md`](../nta8800-attestdossier.md).
 
+## Nieuwe versies
+
+- **Webversie:** laadt een nieuwe versie zelf bij het openen. Staat er een nieuwere online terwijl je werkt, dan verschijnt bovenaan *Er staat een nieuwe versie van Open Energy Studio klaar* met de knop **Nu laden**.
+- **Desktop-app:** vraagt bij het starten en daarna dagelijks aan GitHub welke versie de nieuwste is. Is die nieuwer dan de geïnstalleerde, dan verschijnt bovenaan *Versie … staat klaar; je werkt met …*, met **Naar de download** (opent de releasepagina in de browser) en **Later** (verbergt de melding tot een volgende versie). De app installeert niets zelf en stuurt geen projectgegevens mee. De controle staat uit te zetten onder **Instellingen › Algemeen › Nieuwe versies**.
+
+Een nieuwe versie kan een andere rekenkern hebben. Lees dan de wijzigingen hieronder voordat je een opgeslagen project opnieuw berekent.
+
 ## Wijzigingen
 
 Wijzigingen die de uitkomst of de status van opgeslagen projecten veranderen, staan per datum in de [releasenotes](../nta8800-releasenotes.md). Lees ze bij elke nieuwe versie. Dat geldt vooral voor regels die opgeslagen projecten `incomplete` of `invalid` maken.

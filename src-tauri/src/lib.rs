@@ -805,6 +805,49 @@ fn list_printers() -> Vec<PrinterInfo> {
     }
 }
 
+/// The GitHub page of a release of this program, for a tag `vJJJJ.W.N`
+/// only, so the command below cannot open anything else.
+fn release_page_url(tag: &str) -> Option<String> {
+    let version = tag.strip_prefix('v')?;
+    let parts: Vec<&str> = version.split('.').collect();
+    let valid = parts.len() == 3
+        && parts.iter().all(|part| {
+            !part.is_empty() && part.len() <= 4 && part.bytes().all(|b| b.is_ascii_digit())
+        });
+    valid.then(|| {
+        format!("https://github.com/OpenAEC-Foundation/open-energy-studio/releases/tag/{tag}")
+    })
+}
+
+/// Opens the release page of a newer version in the default browser (the
+/// update notice of the desktop app); no plugin, no other URLs.
+#[tauri::command]
+fn open_release_page(tag: String) -> Result<(), String> {
+    let url = release_page_url(&tag).ok_or_else(|| format!("Ongeldige releasetag: {tag}"))?;
+    #[cfg(target_os = "windows")]
+    let mut command = {
+        let mut command = std::process::Command::new("rundll32");
+        command.args(["url.dll,FileProtocolHandler", &url]);
+        command
+    };
+    #[cfg(target_os = "macos")]
+    let mut command = {
+        let mut command = std::process::Command::new("open");
+        command.arg(&url);
+        command
+    };
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let mut command = {
+        let mut command = std::process::Command::new("xdg-open");
+        command.arg(&url);
+        command
+    };
+    command
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| format!("Browser niet te openen: {e}"))
+}
+
 #[tauri::command]
 fn open_printer_properties(
     window: tauri::WebviewWindow,
@@ -1071,7 +1114,8 @@ pub fn run() {
             diagnose_bacs_draft,
             diagnose_indicators_draft,
             diagnose_heating_aux_draft,
-            diagnose_heating_aux_measured_draft
+            diagnose_heating_aux_measured_draft,
+            open_release_page
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {
@@ -1099,6 +1143,27 @@ pub fn run() {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn the_update_notice_opens_only_release_pages_of_this_program() {
+        assert_eq!(
+            release_page_url("v2026.45.0").as_deref(),
+            Some(
+                "https://github.com/OpenAEC-Foundation/open-energy-studio/releases/tag/v2026.45.0"
+            )
+        );
+        for tag in [
+            "2026.45.0",
+            "v2026.45",
+            "v2026.45.0.1",
+            "v2026.45.x",
+            "v2026.45.0&calc",
+            "v2026..0",
+            "https://x",
+        ] {
+            assert_eq!(release_page_url(tag), None, "{tag}");
+        }
+    }
 
     fn fixture(json: &str) -> Value {
         serde_json::from_str(json).unwrap()

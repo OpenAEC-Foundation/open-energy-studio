@@ -13,6 +13,8 @@ import { readDefaultEdition, writeDefaultEdition } from '../../core/nta/defaultE
 import { softwareIdentity } from '../../core/nta/Registration';
 import { attestMark } from '../../core/nta/Attest';
 import { MANUAL_KERNEL_VERSION } from '../../core/manual/manual-version';
+import { isTauri } from '@tauri-apps/api/core';
+import { setUpdateCheckEnabled, updateCheckEnabled } from '../../core/io/desktopUpdate';
 import { DialogShell } from '../dialogs/DialogShell';
 import { Pill, Select, Switch } from '../ui';
 import './SettingsDialog.css';
@@ -105,6 +107,9 @@ export function SettingsDialog({ onClose, previewSetting, onOpenManual }: Settin
   const [draftTheme, setDraftTheme] = useState<Theme>(storedTheme);
   const [draftPreview, setDraftPreview] = useState(previewSetting?.enabled ?? true);
   const [draftEdition, setDraftEdition] = useState<NormVersion>(readDefaultEdition);
+  // The update check of the desktop app (the web app loads new builds by itself).
+  const desktop = isTauri();
+  const [draftUpdateCheck, setDraftUpdateCheck] = useState(updateCheckEnabled);
 
   const resolveTheme = (theme: Theme) =>
     theme === 'system'
@@ -122,6 +127,7 @@ export function SettingsDialog({ onClose, previewSetting, onOpenManual }: Settin
     localStorage.setItem('energy-theme', draftTheme);
     localStorage.setItem('energy-locale', draftLocale);
     writeDefaultEdition(draftEdition);
+    if (desktop) setUpdateCheckEnabled(draftUpdateCheck);
     if (previewSetting && draftPreview !== previewSetting.enabled) previewSetting.onChange(draftPreview);
     onClose();
   };
@@ -221,6 +227,13 @@ export function SettingsDialog({ onClose, previewSetting, onOpenManual }: Settin
               }))} />
             <p className="settings-hint">{t('settings.language.hint')}</p>
           </div>
+          {desktop && (
+            <div className="settings-section">
+              <h3 className="settings-section-title">{t('settings.updates.title')}</h3>
+              <Switch label={t('settings.updates.check')} checked={draftUpdateCheck} onChange={setDraftUpdateCheck} />
+              <p className="settings-hint">{t('settings.updates.hint')}</p>
+            </div>
+          )}
         </>)}
 
         {activeTab === 'calculation' && (<>
