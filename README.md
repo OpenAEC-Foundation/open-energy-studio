@@ -13,12 +13,15 @@ The goal is a complete, verifiable NTA 8800 calculation tool that can be atteste
 
 | Program | Calculation kernel (`KERNEL_VERSION`) | Manual | Release tag |
 |---|---|---|---|
-| **2026.43.0** | **0.4.0** | stamped for kernel 0.4.0 | `v2026.43.0` |
+| **2026.44.0** | **0.5.0** | stamped for kernel 0.5.0 | `v2026.44.0` |
+| 2026.43.0 | 0.4.0 | stamped for kernel 0.4.0 | `v2026.43.0` |
 | 0.2.0 | 0.3.0 | stamped for kernel 0.3.0 | `oes-v0.2.0-kernel-v0.3.0` |
 
-Program 2026.43.0 · Kernel 0.4.0 · Manual stamped for kernel 0.4.0. The program version follows the OpenAEC scheme year.week.n (issue #10); the Windows MSI carries 26.43.0 because an MSI major version stops at 255. `npm run bump` sets the next number of the current week in every file that carries it.
+Program 2026.44.0 · Kernel 0.5.0 · Manual stamped for kernel 0.5.0. The program version follows the OpenAEC scheme year.week.n (issue #10); the Windows MSI carries 26.44.0 because an MSI major version stops at 255. `npm run bump` sets the next number of the current week in every file that carries it.
 
-**On `main`:** calculation kernel `0.5.0` (not yet released; the web app is deployed from `main`). The table above lists published releases only; the release v2026.43.0 carries kernel 0.4.0. Changes after that release are listed under "Onuitgebracht" in [docs/nta8800-releasenotes.md](docs/nta8800-releasenotes.md).
+The web app is deployed from `main`. The table lists published releases only; changes after the latest release are listed under "Onuitgebracht" in [docs/nta8800-releasenotes.md](docs/nta8800-releasenotes.md).
+
+> **Not attested.** Open Energy Studio does not (yet) hold a BRL 9501 attest. Results are indicative and cannot be used for an official energy label, a BENG check for a permit or registration in EP-Online. The app, the reports and every release say so.
 
 **Supported norm editions** (`normVersion` in the input → label stamped on results):
 

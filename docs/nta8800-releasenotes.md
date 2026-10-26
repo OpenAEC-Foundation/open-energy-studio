@@ -13,6 +13,12 @@ Dit bestand is de wijzigingsregistratie van de rekenkern (BRL 9501 §5.2, §6.2 
 
 ## Onuitgebracht
 
+## Rekenkern 0.5.0 — 26 oktober 2026
+<!-- kernel-version: 0.5.0 -->
+
+### 26 oktober 2026 — Uitgave 2026.44.0: melding "niet geattesteerd" bij de installatie (geen rekenwijziging)
+- **Installatie:** de Windows-setup (NSIS en MSI) toont vóór het installeren de pagina *Lees dit eerst* (`src-tauri/installer-notice.txt`, `bundle.licenseFile`): testversie, niet geattesteerd volgens BRL 9501, uitkomsten indicatief en niet bruikbaar voor een officieel label, een BENG-toets of EP-Online, met de licentie (LGPL-3.0-or-later). README en wiki zeggen hetzelfde; `src/__tests__/docs-versions.test.ts` bewaakt dat zolang `attest.json` geen attestnummer heeft.
+
 ### 23 oktober 2026 — Export naar de geometrie-import van Uniec, issue #14 (geen rekenwijziging)
 - **Uniec-geometrie (Excel, concept):** nieuwe export onder Exports › Uitwisseling. Hij schrijft een grondgebonden woning in het Excel-formaat van de geometrie-import van Uniec (specificatie 18-09-2026, SHA-256 `312f5028…0cd`): de algemene gegevens en per rekenzone de dichte delen, ramen en deuren, vloeren op de grond met perimeter, belemmering en zonwering, met de afrondingsregels van de specificatie. Ontbreken verplichte gegevens of vraagt het contract iets wat deze versie nog niet kan (kruipruimte, kelder, belemmering met maten, utiliteitsbouw, appartementen), dan maakt de app geen bestand en noemt hij elk punt. Vergeleken met het voorbeeldbestand van Uniec (28-05-2026); nog niet in Uniec zelf geïmporteerd. Vertaling en vergelijking: [nta8800-uniec-geometrie-export.md](nta8800-uniec-geometrie-export.md).
 

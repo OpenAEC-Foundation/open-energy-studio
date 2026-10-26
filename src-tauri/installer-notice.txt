@@ -1,0 +1,33 @@
+OPEN ENERGY STUDIO - LEES DIT EERST / READ THIS FIRST
+
+TESTVERSIE, NIET GEATTESTEERD
+
+Open Energy Studio rekent volgens NTA 8800:2025+C1:2026, maar heeft (nog)
+geen attest volgens BRL 9501. Dat betekent:
+
+- De uitkomsten (BENG 1, 2 en 3, energielabel, TOjuli) zijn indicatief.
+- Ze zijn niet bruikbaar voor een officieel energielabel, een BENG-toets
+  bij een omgevingsvergunning of registratie in EP-Online.
+- Gebruik voor een officiele berekening een geattesteerd rekenprogramma.
+
+Het programma, de rapporten en het rekenrapport vermelden dit ook.
+Fouten en opmerkingen zijn welkom via
+https://github.com/OpenAEC-Foundation/open-energy-studio/issues
+
+TEST VERSION, NOT ATTESTED
+
+Open Energy Studio calculates according to NTA 8800:2025+C1:2026 but does
+not (yet) hold a BRL 9501 attest. Results are indicative and cannot be used
+for an official energy label, a BENG check for a permit or registration in
+EP-Online.
+
+LICENSE
+
+Open Energy Studio is free software under the GNU Lesser General Public
+License, version 3 or later (LGPL-3.0-or-later). It comes without any
+warranty. The full license text is at
+https://www.gnu.org/licenses/lgpl-3.0.html and in the source repository:
+https://github.com/OpenAEC-Foundation/open-energy-studio
+
+Standards texts (NEN, ISSO, BRL) are not included; the program refers to
+page numbers only.

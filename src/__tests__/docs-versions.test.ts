@@ -42,6 +42,25 @@ describe('versions in the README and the wiki', () => {
   });
 });
 
+describe('the missing attest', () => {
+  const attested = (JSON.parse(read('src/core/nta/attest.json')) as { attestNumber: string }).attestNumber.trim() !== '';
+
+  it('is stated in the README, the wiki and the installer while there is no attest number', () => {
+    if (attested) return;
+    expect(read('README.md')).toContain('**Not attested.**');
+    for (const path of ['wiki/Home.md', 'wiki/Versiebeheer-en-releases.md']) expect(read(path), path).toContain('**Niet geattesteerd.**');
+    expect(read('wiki/_Footer.md')).toContain('niet geattesteerd');
+    // The Windows setup shows this page before it installs (bundle.licenseFile).
+    const conf = JSON.parse(read('src-tauri/tauri.conf.json')) as { bundle: { licenseFile?: string } };
+    expect(conf.bundle.licenseFile).toBe('installer-notice.txt');
+    const notice = read('src-tauri/installer-notice.txt');
+    expect(notice).toContain('NIET GEATTESTEERD');
+    expect(notice).toContain('NOT ATTESTED');
+    // Plain ASCII, so the setup shows it the same in every code page.
+    expect(/^[\x20-\x7e\n]*$/.test(notice)).toBe(true);
+  });
+});
+
 describe('how the app reaches the kernel', () => {
   it('describes WebAssembly in the browser and HTTP only as the development fallback', () => {
     const readme = read('README.md');
