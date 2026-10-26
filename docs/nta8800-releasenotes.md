@@ -13,6 +13,12 @@ Dit bestand is de wijzigingsregistratie van de rekenkern (BRL 9501 §5.2, §6.2 
 
 ## Onuitgebracht
 
+### 26 oktober 2026 — Registermomentopname van een kwaliteitsverklaring, issue #15
+- **Rekenkern.** `KERNEL_VERSION` 0.5.0 → 0.6.0; de handleiding is opnieuw gestempeld.
+- **Registermomentopname:** een bewijsstuk van een kwaliteits- of prestatieverklaring kan vastleggen wat de adviseur uit het register (bijvoorbeeld BCRG) heeft overgenomen: register, verklaringnummer, revisie, product, fabrikant, normuitgave en toepassingsvoorwaarden, datum, de waarden met het invoerveld dat elke waarde vult, en een SHA-256 over die waarden (`registerSnapshot`). Er is nog geen registerkoppeling; de route is `manual` ([nta8800-bcrg-register.md](nta8800-bcrg-register.md)).
+- **Registratiecontrole:** de kern controleert elke momentopname. Blokkerend: niet bevestigd door de adviseur, ontbrekend verklaringnummer of product, ontbrekende waarde, een invoerveld dat niet bestaat, invoer die afwijkt van de overgenomen waarde, een hash die niet meer klopt, een ander product dan in de invoer, en een ingetrokken verklaring. Als waarschuwing: status in het register niet gecontroleerd, of verklaring gewijzigd. Een project zonder momentopname rekent en registreert gelijk; uitkomsten veranderen niet.
+- **App en dossier:** het bewijsregister heeft per verklaring het blok *Registermomentopname*; elke wijziging van waarden of identiteit laat de bevestiging vervallen, en de momentopname verandert nooit zelf de invoer. Het projectdossier neemt de momentopname op in het manifest en de checklist.
+
 ### 26 oktober 2026 — Uniec-import: onvolledige gebouwmap gemeld, issue #11 (geen rekenwijziging)
 - **Uniec-import:** een gebouwmap zonder `entities.json` of `relations.json` werd stil overgeslagen. Nu meldt de import hem als importpunt *weggelaten* met het pad (`buildings/2`), telt hij mee in de melding over meerdere gebouwen, en leest de import het eerste complete gebouw.
 

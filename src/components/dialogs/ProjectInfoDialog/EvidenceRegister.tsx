@@ -10,6 +10,8 @@ import {
   forgetSessionEvidence, releaseEvidenceIds,
 } from '../../../core/nta/Evidence';
 import { evidenceErrorText } from '../../EvidenceLink/EvidenceLink';
+import { canHoldSnapshot } from '../../../core/nta/registerSnapshot';
+import { RegisterSnapshotFields } from './RegisterSnapshotFields';
 
 interface EvidenceRegisterProps {
   evidence: NtaEvidenceItem[];
@@ -143,6 +145,9 @@ export function EvidenceRegister({ evidence, onChange }: EvidenceRegisterProps) 
             onChange={(linkedPaths) => update(index, { linkedPaths })} />
           <ParsedTextField id={`evidence-${item.id}-gps`} label={t('evidence.gps')} placeholder="52.37, 4.89"
             value={item.gps} format={formatGps} parse={parseGps} onChange={(gps) => update(index, { gps })} />
+          {(canHoldSnapshot(item) || item.registerSnapshot) && (
+            <RegisterSnapshotFields item={item} onChange={(registerSnapshot) => update(index, { registerSnapshot })} />
+          )}
           <button type="button" onClick={() => {
             const next = evidence.filter((_, i) => i !== index);
             onChange(next);

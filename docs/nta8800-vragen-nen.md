@@ -8,7 +8,7 @@ Alle achtentwintig vragen staan ook in een verzendklare brief aan NEN en RVO, me
 
 Per vraag de status bij NEN en de lezing die de rekenkern volgt. Werk deze tabel bij elke uitgave bij: komt er een antwoord, zet dan de datum en het antwoord in de kolom *Status bij NEN* en noem de rekenkernversie die het antwoord volgt. De releasenotes van die versie vermelden de wijziging. `src/__tests__/nen-questions-status.test.ts` controleert dat elke vraag hier een regel heeft.
 
-Stand bij rekenkern 0.5.0 (22 oktober 2026). De vragen zijn gebundeld in de [brief](nta8800-vragen-nen-brief.md); die is nog niet verstuurd.
+Stand bij rekenkern 0.6.0 (26 oktober 2026). De vragen zijn gebundeld in de [brief](nta8800-vragen-nen-brief.md); die is nog niet verstuurd.
 
 | Nr | Onderwerp | Status bij NEN | Lezing in de rekenkern |
 | --- | --- | --- | --- |

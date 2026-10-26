@@ -306,6 +306,9 @@ pub struct EvidenceItem {
     /// photo of PV or solar thermal with its shading.
     #[serde(default)]
     pub relabel_proof: Option<RelabelProof>,
+    /// What the adviser took over from a register declaration (issue #15).
+    #[serde(default)]
+    pub register_snapshot: Option<crate::register_snapshot::RegisterSnapshot>,
 }
 
 /// All fields are optional so projects without registration data stay
@@ -1843,6 +1846,12 @@ pub fn assess_project_registration(
     result
         .issues
         .extend(check_evidence_links(project, registration));
+    crate::register_snapshot::check_register_snapshots(
+        project,
+        registration,
+        &mut result.issues,
+        &mut result.plausibility,
+    );
     result.data_import = Some(data_import_declaration(project, &mut result.issues));
     result.dossier_complete = result.issues.is_empty();
     result.ready_for_registration = result.dossier_complete && result.software_attested;
@@ -1961,6 +1970,7 @@ mod tests {
             linked_paths: Vec::new(),
             stored_path: None,
             relabel_proof: Some(RelabelProof::SpecifiedInvoice),
+            register_snapshot: None,
         });
     }
 
@@ -2368,6 +2378,7 @@ mod tests {
             linked_paths: vec!["/zones/0".into()],
             stored_path: None,
             relabel_proof: None,
+            register_snapshot: None,
         }
     }
 

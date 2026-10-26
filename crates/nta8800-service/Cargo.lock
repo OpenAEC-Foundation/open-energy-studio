@@ -624,7 +624,7 @@ dependencies = [
 
 [[package]]
 name = "nta8800-core"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "rust_decimal",
  "serde",

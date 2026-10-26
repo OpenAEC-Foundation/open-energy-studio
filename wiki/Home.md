@@ -14,7 +14,7 @@ Open Energy Studio is open-source software voor de energieprestatie van woningen
 
 Programma 2026.44.0 · Rekenkern 0.5.0 · Handleiding gestempeld voor rekenkern 0.5.0. Het programmanummer volgt het OpenAEC-schema jaar.week.volgnummer.
 
-De webapp draait `main`. Wijzigingen na de laatste uitgave staan onder "Onuitgebracht" in de releasenotes.
+**Op `main`:** rekenkern **0.6.0** (onuitgebracht, handleiding gestempeld voor 0.6.0). De webapp draait `main`. Wijzigingen na de laatste uitgave staan onder "Onuitgebracht" in de releasenotes.
 
 > **Niet geattesteerd.** Open Energy Studio heeft (nog) geen BRL 9501-attest. Uitkomsten zijn indicatief en niet bruikbaar voor een officieel energielabel, een BENG-toets bij een vergunning of registratie in EP-Online.
 

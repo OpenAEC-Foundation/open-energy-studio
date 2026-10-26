@@ -4452,6 +4452,39 @@ export interface NtaEvidenceItem {
   storedPath?: string;
   /** Relabel: proof of the improvement at this address, or a PV/solar photo with shading. */
   relabelProof?: NtaRelabelProof;
+  /** What the adviser took over from a register declaration (issue #15; src/core/nta/registerSnapshot.ts). */
+  registerSnapshot?: NtaRegisterSnapshot;
+}
+
+/** One value copied from a register declaration. */
+export interface NtaRegisterValue {
+  label: string;
+  /** As on the declaration, e.g. "4,21". */
+  value: string;
+  unit?: string;
+  /** JSON pointer of the project input this value fills. */
+  path?: string;
+}
+
+/** Snapshot of a register declaration; only the manual route exists (no register API contract). */
+export interface NtaRegisterSnapshot {
+  register: string;
+  route: 'manual';
+  declarationNumber: string;
+  revision?: string;
+  productName: string;
+  manufacturer?: string;
+  /** NTA 8800 edition and application conditions as the declaration states them. */
+  scope?: string;
+  /** YYYY-MM-DD. */
+  capturedOn: string;
+  values: NtaRegisterValue[];
+  /** SHA-256 over the values (label TAB value TAB unit TAB path LF per value). */
+  valuesSha256: string;
+  confirmedBy?: string;
+  /** YYYY-MM-DD. */
+  confirmedOn?: string;
+  registryCheck?: { state: 'not_checked' | 'current' | 'changed' | 'withdrawn'; checkedOn?: string; note?: string };
 }
 
 export interface RelabelChange {

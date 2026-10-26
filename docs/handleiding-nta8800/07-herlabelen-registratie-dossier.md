@@ -65,6 +65,15 @@ Bij herlabelen heeft een bewijsstuk een **rol bij herlabelen**:
 - gespecificeerde factuur van de verbetering op dit adres;
 - foto van PV of zonthermie met beschaduwing.
 
+**Registermomentopname.** Bij een kwaliteitsverklaring of prestatieverklaring uit een register (bijvoorbeeld de BCRG-databank) leg je met **Registermomentopname vastleggen** vast wat je eruit hebt overgenomen:
+- register, verklaringnummer, revisie, product, fabrikant en de normuitgave en toepassingsvoorwaarden die op de verklaring staan;
+- de datum waarop je de waarden overnam;
+- per waarde de grootheid, de waarde zoals op de verklaring, de eenheid en, als de waarde een invoerveld vult, dat veld (een JSON-pointer, bijvoorbeeld `/heatingSystems/0/cop`).
+
+De app berekent een SHA-256 over de waarden. Daarna bevestig je met je naam en **Waarden en toepassing bevestigen** dat de waarden, het product en de toepassingsvoorwaarden kloppen. Verander je later iets in de momentopname, dan vervalt de bevestiging. De momentopname verandert de invoer nooit, en de invoer verandert de momentopname niet: wijkt een invoerveld af van de overgenomen waarde, dan meldt de registratiecontrole dat.
+
+Er is nog geen koppeling met het register; je neemt de waarden met de hand over (route *handmatig*). Of de verklaring nog actueel is, leg je apart vast onder **Status in het register**: *niet gecontroleerd* (standaard), *actueel*, *gewijzigd* of *ingetrokken*, met de datum van de controle. Dat verandert de overgenomen waarden niet. Een ingetrokken verklaring blokkeert de registratie; bij een gewijzigde kies je zelf hoe je verder rekent. Een momentopname laat zien welke waarden uit welke verklaring komen; het is geen bewijs dat de verklaring echt of geldig is.
+
 ## Herlabelen (BRL 9500 bijlagen 6a/6b)
 
 Herlabelen kan alleen bij bestaande bouw. Het geldt voor verbeteringen die binnen 24 maanden na de oorspronkelijke opnamedatum zijn aangebracht. Er wordt gerekend met dezelfde rekenkern en dezelfde opnamedatum (BRL 9500-W §4.2.3–4.2.4, p. 23–24; 9500-U p. 18–20).

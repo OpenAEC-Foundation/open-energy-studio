@@ -248,6 +248,18 @@ function dossierItems({ project, assessment, opname, relabel: given, labelInputS
     declared || bbl ? declarationShown && declarationProven : null,
     declared && !declarationShown ? 'de invoer gebruikt een kwaliteitsverklaring; voeg de verklaring toe'
       : declared && !declarationProven ? 'voeg een foto of factuur van het product toe' : undefined);
+  // Register snapshots (issue #15): confirmed by the adviser and not withdrawn;
+  // the kernel's registration check gives the finding per snapshot.
+  const snapshots = evidence.flatMap((item) => (item.registerSnapshot ? [item.registerSnapshot] : []));
+  if (snapshots.length > 0) {
+    const unconfirmed = snapshots.filter((snapshot) => !snapshot.confirmedBy?.trim() || !snapshot.confirmedOn).length;
+    const withdrawn = snapshots.filter((snapshot) => snapshot.registryCheck?.state === 'withdrawn').length;
+    const unchecked = snapshots.filter((snapshot) => (snapshot.registryCheck?.state ?? 'not_checked') === 'not_checked').length;
+    add('register_snapshots', 'evidence', 'Overgenomen registerverklaringen: momentopname bevestigd, niet ingetrokken',
+      unconfirmed === 0 && withdrawn === 0,
+      [unconfirmed ? `${unconfirmed} niet bevestigd` : '', withdrawn ? `${withdrawn} ingetrokken` : '',
+        unchecked ? `${unchecked} niet in het register gecontroleerd` : ''].filter(Boolean).join('; ') || undefined);
+  }
   add('photos', 'evidence', 'Leesbare foto\'s van typeaanduiding en maatvoering',
     bbl ? null : has(evidence, 'photo_detail'));
   add('invoices', 'evidence', 'Facturen op naam en/of adres', bbl ? null : has(evidence, 'invoice'));
@@ -358,6 +370,8 @@ export interface DossierEvidenceEntry {
   checkedBy: string | null;
   /** Inputs it supports: JSON pointers into the project (linked paths and `evidence:<id>` references). */
   supports: string[];
+  /** What was taken over from a register declaration, with the adviser's confirmation and register check (issue #15). */
+  registerSnapshot?: NtaEvidenceItem['registerSnapshot'];
 }
 
 export interface DossierBundle {
@@ -419,6 +433,7 @@ export async function buildProjectDossier(
       id: item.id, kind: item.kind, fileName: item.fileName, sha256: item.sha256, date: item.date ?? null,
       archivePath, checkedBy: item.checkedBy ?? null,
       supports: usage.get(item.id) ?? [],
+      ...(item.registerSnapshot ? { registerSnapshot: item.registerSnapshot } : {}),
     });
   }
   const checklist = checkDossierCompleteness({ ...context, pending: false, labelInputSha256: labelSha, reportPresent: Boolean(context.reportHtml) });

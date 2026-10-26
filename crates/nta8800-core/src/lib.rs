@@ -82,6 +82,7 @@ pub mod opname;
 pub mod project_performance;
 pub mod pv;
 pub mod reference;
+pub mod register_snapshot;
 pub mod registration;
 pub mod relabel;
 pub mod significant_figures;
