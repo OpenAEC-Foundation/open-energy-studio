@@ -19,8 +19,8 @@ Een nieuwere build kan dus geen labels van een oudere build herlabelen. De certi
 
 ## Nieuwe versies
 
-- **Webversie:** laadt een nieuwe versie zelf bij het openen. Staat er een nieuwere online terwijl je werkt, dan verschijnt bovenaan *Er staat een nieuwe versie van Open Energy Studio klaar* met de knop **Nu laden**.
-- **Desktop-app:** vraagt bij het starten en daarna dagelijks aan GitHub welke versie de nieuwste is. Is die nieuwer dan de geïnstalleerde, dan verschijnt bovenaan *Versie … staat klaar; je werkt met …*, met **Naar de download** (opent de releasepagina in de browser) en **Later** (verbergt de melding tot een volgende versie). De app installeert niets zelf en stuurt geen projectgegevens mee. De controle staat uit te zetten onder **Instellingen › Algemeen › Nieuwe versies**.
+- **Webversie:** laadt een nieuwe versie zelf bij het openen. Staat er een nieuwere online terwijl je werkt, dan verschijnt onderaan, boven de statusbalk, *Er staat een nieuwe versie van Open Energy Studio klaar* met de knop **Nu laden**.
+- **Desktop-app:** vraagt bij het starten en daarna dagelijks aan GitHub welke versie de nieuwste is. Is die nieuwer dan de geïnstalleerde, dan verschijnt onderaan, boven de statusbalk, *Versie … staat klaar; je werkt met …*, met **Naar de download** (opent de releasepagina in de browser) en **Later** (verbergt de melding tot een volgende versie). De app installeert niets zelf en stuurt geen projectgegevens mee. De controle staat uit te zetten onder **Instellingen › Algemeen › Nieuwe versies**.
 
 Een nieuwe versie kan een andere rekenkern hebben. Lees dan de wijzigingen hieronder voordat je een opgeslagen project opnieuw berekent.
 
