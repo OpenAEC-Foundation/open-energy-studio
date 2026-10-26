@@ -13,6 +13,9 @@ Dit bestand is de wijzigingsregistratie van de rekenkern (BRL 9501 §5.2, §6.2 
 
 ## Onuitgebracht
 
+### 26 oktober 2026 — Uniec-import: onvolledige gebouwmap gemeld, issue #11 (geen rekenwijziging)
+- **Uniec-import:** een gebouwmap zonder `entities.json` of `relations.json` werd stil overgeslagen. Nu meldt de import hem als importpunt *weggelaten* met het pad (`buildings/2`), telt hij mee in de melding over meerdere gebouwen, en leest de import het eerste complete gebouw.
+
 ### 26 oktober 2026 — Platforms en koppelingen, MCP-annotaties, issue #9 (geen rekenwijziging)
 - **MCP:** elke tool meldt nu dat hij alleen rekent (`readOnlyHint: true`, `destructiveHint: false`, `idempotentHint: true`, `openWorldHint: false`); een client kan de tools zonder schrijfrechten toestaan. Een test bewaakt dat elke tool die annotaties heeft.
 - **Smoketest:** API en MCP opnieuw als losse processen getest op 2026.44.0 / rekenkern 0.5.0, met het foutmodel (400, 403, 404, 413, 415, 422) en dezelfde uitkomst via API en MCP: [nta8800-api-mcp-smoketest-2026-10-26.md](nta8800-api-mcp-smoketest-2026-10-26.md).

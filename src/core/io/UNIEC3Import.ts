@@ -152,21 +152,25 @@ function coolingTypeOf(description: string | undefined): CoolingSystemType | und
  * read or left out goes into `issues` (kind and Uniec3 field), so the import
  * toast, the import record and the check page show the same points (issue
  * #12); the caller writes the one import record. An archive with more than
- * one building reads the first (lowest id) and reports the others as
- * `multiple` (issue #11).
+ * one building reads the first complete one (lowest id) and reports the
+ * others as `multiple`; a building folder without its entities or relations
+ * is reported by its path as `dropped`, never skipped in silence (issue #11).
  */
 export function importUniec3Export(files: Record<string, Uint8Array>, issues: ImportIssues = new ImportIssues()): IProject {
-  const buildingDirs = Object.keys(files)
-    .map((path) => /^(buildings\/([^/]+))\/entities\.json$/.exec(path))
-    .filter((match): match is RegExpExecArray => match !== null && files[`${match[1]}/relations.json`] !== undefined)
-    .sort((a, b) => a[2].localeCompare(b[2], undefined, { numeric: true }))
-    .map((match) => match[1]);
-  const buildingDir = buildingDirs[0];
-  if (!buildingDir) throw new Error('Geen gebouw gevonden in het Uniec3-bestand');
-  if (buildingDirs.length > 1) {
-    const ids = buildingDirs.map((dir) => dir.slice('buildings/'.length));
+  const ids = [...new Set(Object.keys(files)
+    .map((path) => /^buildings\/([^/]+)\/(?:entities|relations)\.json$/.exec(path)?.[1])
+    .filter((id): id is string => id !== undefined))]
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  const complete = ids.filter((id) => files[`buildings/${id}/entities.json`] && files[`buildings/${id}/relations.json`]);
+  for (const id of ids.filter((item) => !complete.includes(item))) {
+    const missingFile = files[`buildings/${id}/entities.json`] ? 'relations.json' : 'entities.json';
+    issues.add('dropped', `buildings/${id}`, `Gebouw ${id} is onvolledig (${missingFile} ontbreekt) en is niet ingelezen.`);
+  }
+  if (complete.length === 0) throw new Error('Geen gebouw gevonden in het Uniec3-bestand');
+  const buildingDir = `buildings/${complete[0]}`;
+  if (ids.length > 1) {
     issues.add('multiple', 'buildings',
-      `Het bestand bevat ${ids.length} gebouwen (${ids.join(', ')}); alleen gebouw ${ids[0]} is ingelezen. Lees de andere gebouwen in vanuit een eigen export per gebouw.`,
+      `Het bestand bevat ${ids.length} gebouwen (${ids.join(', ')}); alleen gebouw ${complete[0]} is ingelezen. Lees de andere gebouwen in vanuit een eigen export per gebouw.`,
       ids.length);
   }
   const entities = (JSON.parse(strFromU8(files[`${buildingDir}/entities.json`])) as Entity[]).filter((entity) => Array.isArray(entity.NTAPropertyDatas));

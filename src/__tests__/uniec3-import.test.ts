@@ -136,6 +136,34 @@ describe('Uniec3 export with more than one building', () => {
     expect(multiple[0].message).toContain('alleen gebouw 2 is ingelezen');
   });
 
+  // Re-check 26 Oct 2026: a second building folder without relations.json was dropped in silence.
+  it('reports an incomplete second building by its path', () => {
+    const { project, issues } = readUNIEC3(zipSync({
+      'meta.json': strToU8(JSON.stringify(fixture.meta)),
+      'buildings/1/entities.json': strToU8(JSON.stringify(fixture.entities)),
+      'buildings/1/relations.json': strToU8(JSON.stringify(fixture.relations)),
+      'buildings/2/entities.json': strToU8(JSON.stringify(fixture.entities)),
+    }));
+    expect(project.zones).toHaveLength(1);
+    expect(issues.list.find((issue) => issue.path === 'buildings/2')).toMatchObject({ kind: 'dropped' });
+    expect(issues.list.find((issue) => issue.path === 'buildings/2')?.message).toContain('relations.json ontbreekt');
+    const multiple = issues.list.find((issue) => issue.kind === 'multiple' && issue.path === 'buildings');
+    expect(multiple?.message).toContain('2 gebouwen (1, 2)');
+    expect(multiple?.message).toContain('alleen gebouw 1 is ingelezen');
+  });
+
+  it('reads the complete building when the first is incomplete', () => {
+    const { project, issues } = readUNIEC3(zipSync({
+      'meta.json': strToU8(JSON.stringify(fixture.meta)),
+      'buildings/1/relations.json': strToU8(JSON.stringify(fixture.relations)),
+      'buildings/3/entities.json': strToU8(JSON.stringify(fixture.entities)),
+      'buildings/3/relations.json': strToU8(JSON.stringify(fixture.relations)),
+    }));
+    expect(project.zones).toHaveLength(1);
+    expect(issues.list.find((issue) => issue.path === 'buildings/1')?.message).toContain('entities.json ontbreekt');
+    expect(issues.list.find((issue) => issue.kind === 'multiple')?.message).toContain('alleen gebouw 3 is ingelezen');
+  });
+
   it('reports nothing about buildings for a single building', () => {
     expect(readUNIEC3(archive()).issues.list.some((issue) => issue.path === 'buildings')).toBe(false);
   });
