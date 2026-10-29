@@ -8,8 +8,11 @@ ontwikkelartefacten en vormen geen ondertekende releaseacceptatie.
 ## Bestaande organisatiecredentials koppelen
 
 Op 29 oktober 2026 waren de namen van alle zes onderstaande Azure-secrets
-zichtbaar in deze repository. De waarden zijn niet uitgelezen. Apple- en
-OpenPGP-secrets en de uitgevervariabele waren niet zichtbaar. Organisatiebrede
+zichtbaar in deze repository. De waarden zijn niet uitgelezen. De configuratieproef op GitHub vond ook gedeelde Apple-certificaatsecrets en
+`APPLE_TEAM_ID`. De niet-destructieve proef van [29 oktober](https://github.com/OpenAEC-Foundation/open-energy-studio/actions/runs/40875838037)
+bevestigde dat `WINDOWS_SIGNING_SUBJECT`, `APPLE_ID`, `APPLE_PASSWORD` en
+`RELEASE_GPG_PRIVATE_KEY` niet beschikbaar waren voor de workflow. Het tijdelijke
+keychainwachtwoord wordt nu per run willekeurig aangemaakt. Organisatiebrede
 secretinventarisatie gaf HTTP 403; dit bewijst niet dat de organisatie die
 credentials niet heeft. Deel bestaande credentials met deze repository via
 GitHub Actions secrets; vraag geen nieuwe licentie aan op basis van deze audit.
@@ -19,7 +22,7 @@ De controle `signing-config` stopt bij ontbrekende namen, vóór installerupload
 | --- | --- |
 | Windows | Secrets `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_TENANT_ID`, `AZURE_ENDPOINT`, `AZURE_TRUSTED_SIGNING_ACCOUNT_NAME`, `AZURE_CERTIFICATE_PROFILE_NAME` |
 | Windows-uitgever | Repositoryvariabele `WINDOWS_SIGNING_SUBJECT`: de volledige verwachte certificaat-Subject, exact zoals `Get-AuthenticodeSignature` deze levert. Bevestigen met de organisatiebeheerder; nooit afleiden uit een willekeurige nieuwe download. Korte Azure-certificaatgeldigheid maakt een vast leaf-thumbprint ongeschikt. |
-| macOS | Secrets `APPLE_CERTIFICATE` (base64 P12), `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY` (`Developer ID Application: …`), `KEYCHAIN_PASSWORD`, `APPLE_ID`, `APPLE_PASSWORD` (app-specifiek), `APPLE_TEAM_ID` |
+| macOS | Secrets `APPLE_CERTIFICATE` (base64 P12), `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY` (`Developer ID Application: …`), `APPLE_ID`, `APPLE_PASSWORD` (app-specifiek), `APPLE_TEAM_ID` |
 | OpenPGP | Secret `RELEASE_GPG_PRIVATE_KEY` met de bestaande releasekey; optioneel `RELEASE_GPG_PASSPHRASE` als die key beveiligd is. Geen sleutel genereren ter vervanging van de organisatiekey. |
 
 Vertrouwde OpenPGP-primaryfingerprint uit de audit:

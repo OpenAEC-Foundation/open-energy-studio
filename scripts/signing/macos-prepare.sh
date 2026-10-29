@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# This temporary keychain needs no long-lived organization password.
+KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
 keychain="$RUNNER_TEMP/oes-signing.keychain-db"
 cert="$RUNNER_TEMP/oes-signing.p12"
 trap 'rm -f "$cert"' EXIT
