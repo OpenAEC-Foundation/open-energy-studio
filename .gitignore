@@ -42,3 +42,6 @@ npm-debug.log*
 # NTA gate evidence and release archives (scripts/verify-nta.sh, scripts/release-nta.sh)
 /nta-evidence/
 /release/
+
+# Python signing policy checks
+__pycache__/

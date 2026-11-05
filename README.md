@@ -208,3 +208,5 @@ The software is licensed under **LGPL-3.0-or-later**, as declared in the crate m
 
 - Built with [Tauri](https://tauri.app/), [React](https://react.dev/) and [Rust](https://www.rust-lang.org/).
 - Icons by [Lucide](https://lucide.dev/).
+
+Voor de ondertekende desktopvrijgave, bestaande organisatiecredentials en verificatie van de aangeboden downloads: [installer-signing](docs/installer-signing.md).

@@ -11,8 +11,8 @@ name: Build and Release
 #              untouched); otherwise creates it as a draft pre-release.
 # 3. build   - installers for Linux (deb, rpm, AppImage), macOS (universal
 #              dmg) and Windows (NSIS, MSI), uploaded to that release; an
-#              asset already on it (the .deb from release-nta.sh) is kept.
-# 4. checksums - SHA256SUMS-installers.txt over all uploaded installers.
+#              existing installer assets are rejected to avoid retaining unsigned bytes.
+# 4. checksums - OpenPGP-sign and re-download/verify the final installer manifest.
 # A draft created here stays a draft: publishing is a manual decision.
 
 on:
@@ -132,8 +132,33 @@ jobs:
           if-no-files-found: ignore
           retention-days: 90
 
+  signing-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - name: Require the existing organization signing credentials
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_ENDPOINT: ${{ secrets.AZURE_ENDPOINT }}
+          AZURE_TRUSTED_SIGNING_ACCOUNT_NAME: ${{ secrets.AZURE_TRUSTED_SIGNING_ACCOUNT_NAME }}
+          AZURE_CERTIFICATE_PROFILE_NAME: ${{ secrets.AZURE_CERTIFICATE_PROFILE_NAME }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          RELEASE_GPG_PRIVATE_KEY: ${{ secrets.RELEASE_GPG_PRIVATE_KEY }}
+          RELEASE_GPG_PASSPHRASE: ${{ secrets.RELEASE_GPG_PASSPHRASE }}
+          WINDOWS_SIGNING_SUBJECT: ${{ vars.WINDOWS_SIGNING_SUBJECT }}
+        run: python3 scripts/signing/credentials.py
+
   release:
-    needs: verify
+    needs: [verify, signing-config]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -145,7 +170,12 @@ jobs:
         run: |
           set -euo pipefail
           if gh release view "$RELEASE_TAG" --repo "$REPO" > /dev/null 2>&1; then
-            echo "Release $RELEASE_TAG exists; its notes are left as they are."
+            draft="$(gh release view "$RELEASE_TAG" --repo "$REPO" --json isDraft --jq .isDraft)"
+            if [ "$draft" != true ]; then
+              echo "Refusing to change an already published release. Create a new draft release/tag." >&2
+              exit 1
+            fi
+            echo "Draft $RELEASE_TAG exists; its notes are left as they are."
           else
             gh release create "$RELEASE_TAG" --repo "$REPO" --verify-tag --draft --prerelease \
               --title "Open Energy Studio ${RELEASE_TAG}" \
@@ -167,11 +197,21 @@ jobs:
             args: '--target universal-apple-darwin --bundles dmg'
             bundles: 'dmg'
           - platform: windows-latest
-            args: '--bundles nsis,msi'
+            args: '--config src-tauri/tauri.release.windows.conf.json --bundles nsis,msi'
             bundles: 'nsis msi'
     runs-on: ${{ matrix.platform }}
     env:
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_ENDPOINT: ${{ secrets.AZURE_ENDPOINT }}
+      AZURE_TRUSTED_SIGNING_ACCOUNT_NAME: ${{ secrets.AZURE_TRUSTED_SIGNING_ACCOUNT_NAME }}
+      AZURE_CERTIFICATE_PROFILE_NAME: ${{ secrets.AZURE_CERTIFICATE_PROFILE_NAME }}
+      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      WINDOWS_SIGNING_SUBJECT: ${{ vars.WINDOWS_SIGNING_SUBJECT }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -204,6 +244,18 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Install the Microsoft Artifact Signing module
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Install-Module ArtifactSigning -RequiredVersion 0.1.20 -Scope CurrentUser -Force -Repository PSGallery
+
+      - name: Import the existing Developer ID certificate
+        if: runner.os == 'macOS'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: scripts/signing/macos-prepare.sh
+
       - name: Build installers
         shell: bash
         env:
@@ -220,22 +272,17 @@ jobs:
           echo "Desktop binary architectures: $archs"
           [[ " $archs " == *" x86_64 "* && " $archs " == *" arm64 "* ]]
 
-      - name: Sign Windows installers (when signing secrets are configured)
-        if: runner.os == 'Windows' && env.AZURE_CLIENT_ID != ''
-        uses: azure/trusted-signing-action@v1
-        with:
-          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
-          endpoint: ${{ secrets.AZURE_ENDPOINT }}
-          signing-account-name: ${{ secrets.AZURE_TRUSTED_SIGNING_ACCOUNT_NAME }}
-          certificate-profile-name: ${{ secrets.AZURE_CERTIFICATE_PROFILE_NAME }}
-          files-folder: ${{ github.workspace }}/src-tauri/target/release/bundle
-          files-folder-filter: exe,msi
-          files-folder-depth: 2
-          file-digest: SHA256
-          timestamp-rfc3161: http://timestamp.acs.microsoft.com
-          timestamp-digest: SHA256
+      - name: Sign and notarize the DMG container
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for dmg in src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg; do
+            codesign --force --sign "$APPLE_SIGNING_IDENTITY" --timestamp "$dmg"
+            xcrun notarytool submit "$dmg" --apple-id "$APPLE_ID" --password "$APPLE_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
+            xcrun stapler staple "$dmg"
+            scripts/signing/macos-verify.sh "$dmg"
+          done
 
       - name: Upload installers to the release
         shell: bash
@@ -261,17 +308,17 @@ jobs:
             echo "No installers found under $root" >&2
             exit 1
           fi
-          # An asset already on the release (the .deb that scripts/release-nta.sh
-          # built and recorded in its leveringsdocument and SHA256SUMS) is kept:
-          # replacing it would break those checksums. GitHub stores spaces in
-          # asset names as dots. To rebuild an asset, delete it from the release first.
+          # Never retain an older installer without verifying its payload. This
+          # workflow uses a fresh draft; local release-nta.sh packages stay in the
+          # local evidence archive, not pre-uploaded as release installers.
           existing="$(gh release view "$RELEASE_TAG" --repo "$REPO" --json assets --jq '.assets[].name')"
           upload=()
           for f in "${files[@]}"; do
             name="$(basename "$f")"
             name="${name// /.}"
             if grep -qxF -- "$name" <<< "$existing"; then
-              echo "Keeping existing release asset $name"
+              echo "Refusing to keep an unverified existing installer $name. Use a fresh draft/tag." >&2
+              exit 1
             else
               upload+=("$f")
             fi
@@ -283,27 +330,69 @@ jobs:
           printf 'Uploading %s\n' "${upload[@]}"
           gh release upload "$RELEASE_TAG" "${upload[@]}" --repo "$REPO"
 
+      - name: Download the offered Windows installers and check installed files
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $directory = Join-Path $env:RUNNER_TEMP 'release-downloads'
+          New-Item -ItemType Directory -Path $directory | Out-Null
+          gh release download $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --pattern '*.exe' --pattern '*.msi' --dir $directory
+          if ($LASTEXITCODE -ne 0) { throw 'Release download failed.' }
+          ./scripts/signing/windows-install-check.ps1 -Directory $directory
+
+      - name: Download and verify the offered macOS DMG
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/release-downloads"
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern '*.dmg' --dir "$RUNNER_TEMP/release-downloads"
+          for dmg in "$RUNNER_TEMP/release-downloads/"*.dmg; do scripts/signing/macos-verify.sh "$dmg"; done
+
+      - name: Remove the temporary macOS signing keychain
+        if: always() && runner.os == 'macOS'
+        run: security delete-keychain "$RUNNER_TEMP/oes-signing.keychain-db"
+
   checksums:
     needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: SHA256SUMS over the uploaded installers
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - name: Download every installer and sign the final checksum manifest
         env:
           GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
+          RELEASE_GPG_PRIVATE_KEY: ${{ secrets.RELEASE_GPG_PRIVATE_KEY }}
+          RELEASE_GPG_PASSPHRASE: ${{ secrets.RELEASE_GPG_PASSPHRASE }}
         run: |
           set -euo pipefail
           mkdir installers && cd installers
           for pattern in '*.deb' '*.rpm' '*.AppImage' '*.dmg' '*.exe' '*.msi'; do
-            gh release download "$RELEASE_TAG" --repo "$REPO" --pattern "$pattern" || true
+            gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern "$pattern"
           done
-          if [ -z "$(ls -A)" ]; then
-            echo "No installers on release $RELEASE_TAG" >&2
-            exit 1
-          fi
-          sha256sum -- * > ../SHA256SUMS-installers.txt
-          cat ../SHA256SUMS-installers.txt
-          cd ..
-          gh release upload "$RELEASE_TAG" SHA256SUMS-installers.txt --clobber --repo "$REPO"
+          "$GITHUB_WORKSPACE/scripts/signing/linux-manifest.sh"
+          gh release upload "$RELEASE_TAG" SHA256SUMS-installers.txt SHA256SUMS-installers.txt.asc OpenAEC-release-signing.asc --repo "$GITHUB_REPOSITORY"
+
+      - name: Independently verify downloaded signatures, key and checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir downloaded && cd downloaded
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY"
+          export GNUPGHOME
+          GNUPGHOME="$(mktemp -d)"
+          trap 'rm -rf "$GNUPGHOME"' EXIT
+          gpg --batch --import OpenAEC-release-signing.asc
+          gpg --batch --export 13F6D414ADEE4ED4CD09AC60601D86C93C504D29 > trusted-key.gpg
+          test -s trusted-key.gpg
+          gpgv --keyring "$PWD/trusted-key.gpg" SHA256SUMS-installers.txt.asc SHA256SUMS-installers.txt
+          python3 "$GITHUB_WORKSPACE/scripts/signing/manifest.py" verify .
+          echo 'All signing gates passed; release remains a draft for manual publication.' >> "$GITHUB_STEP_SUMMARY"

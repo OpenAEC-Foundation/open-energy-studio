@@ -38,9 +38,10 @@ describe('CI runs the same gate as a local checkout', () => {
     expect(read('scripts/release-nta.sh')).toContain('check-released');
   });
 
-  it('the release workflow keeps assets that are already on the release', () => {
+  it('the release workflow rejects unverified existing assets and never silently overwrites them', () => {
     const build = job(read('.github/workflows/release.yml'), 'build');
-    expect(build).toContain('Keeping existing release asset');
+    expect(build).toContain('Refusing to keep an unverified existing installer');
+    expect(job(read('.github/workflows/release.yml'), 'release')).toContain('Refusing to change an already published release');
     expect(build).not.toMatch(/gh release upload[^\n]*--clobber/);
   });
 
@@ -67,7 +68,7 @@ describe('CI runs the same gate as a local checkout', () => {
     const ci = pins(read('.github/workflows/ci.yml'));
     const release = pins(read('.github/workflows/release.yml'));
     const shared = [...ci.keys()].filter((action) => release.has(action));
-    expect(shared).toEqual(expect.arrayContaining(['actions/checkout', 'actions/setup-node', 'azure/trusted-signing-action']));
+    expect(shared).toEqual(expect.arrayContaining(['actions/checkout', 'actions/setup-node']));
     for (const action of shared) {
       // The action name rides along so a failure names the action that differs.
       const versions = [...new Set([...ci.get(action)!, ...release.get(action)!])];
@@ -75,8 +76,9 @@ describe('CI runs the same gate as a local checkout', () => {
     }
   });
 
-  it('the signing step uses the input names of the pinned trusted-signing-action major', () => {
-    for (const file of ['.github/workflows/ci.yml', '.github/workflows/release.yml']) {
+  it('the development CI signing action uses the input names of its pinned major', () => {
+    // Release signing uses the Tauri hook and the ArtifactSigning module instead.
+    for (const file of ['.github/workflows/ci.yml']) {
       const workflow = read(file);
       expect(workflow).toContain('azure/trusted-signing-action@v1');
       expect(workflow).toContain('signing-account-name:');
