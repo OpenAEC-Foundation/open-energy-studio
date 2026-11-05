@@ -1,17 +1,35 @@
-import { useState, useRef, useEffect, useId } from 'react';
+/**
+ * Feedback dialog, the same flow as the one on open-aec.com
+ * (website/shared/feedback.js): a report goes to Open Feedback Studio, whose
+ * /api/feedback opens a GitHub issue in the repository mapped to the app id.
+ * Here the app is always Open Energy Studio, so every report becomes an issue
+ * in OpenAEC-Foundation/open-energy-studio. The report is public; the email
+ * address is optional and does not go into the issue.
+ */
+import { useId, useState } from 'react';
+import { invoke, isTauri } from '@tauri-apps/api/core';
 import { DialogShell } from '../DialogShell';
 import { useI18n } from '../../../i18n/i18n';
+import { useKernel } from '../../../context/KernelProvider';
+import { MANUAL_KERNEL_VERSION } from '../../../core/manual/manual-version';
 import { version } from '../../../../package.json';
 import './FeedbackDialog.css';
 
-const API_URL = 'https://open-feedback-studio.pages.dev/api/feedback';
-const APP_ID = 'open-energy-studio';
-const MAX_IMAGES = 3;
-const MAX_TOTAL_SIZE = 1024 * 1024; // 1MB
-const MAX_MESSAGE = 5000;
-const MIN_MESSAGE = 10;
+export const FEEDBACK_API = 'https://open-feedback-studio.pages.dev/api/feedback';
+export const FEEDBACK_APP_ID = 'open-energy-studio';
+export const FEEDBACK_REPO = 'OpenAEC-Foundation/open-energy-studio';
+const MAX_SUBJECT = 120;
+const MAX_TEXT = 4500;
+const MIN_TOTAL = 10;
 
-const SENTIMENT_LABELS: Record<number, string> = { 1: 'Frustrated', 2: 'Neutral', 3: 'Happy' };
+type Category = 'bug' | 'feature' | 'general';
+type Status = 'idle' | 'submitting' | 'success';
+
+/** The issue number of a GitHub issue URL of this repository, or null. */
+export function issueNumber(url: string | null | undefined): number | null {
+  const match = /^https:\/\/github\.com\/OpenAEC-Foundation\/open-energy-studio\/issues\/(\d+)$/.exec(url ?? '');
+  return match ? Number(match[1]) : null;
+}
 
 interface FeedbackDialogProps {
   onClose: () => void;
@@ -19,290 +37,144 @@ interface FeedbackDialogProps {
 
 export function FeedbackDialog({ onClose }: FeedbackDialogProps) {
   const fieldId = useId();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const kernelVersion = useKernel()?.settled?.kernelVersion ?? MANUAL_KERNEL_VERSION;
+  const desktop = isTauri();
 
-  const [email, setEmail] = useState(() => localStorage.getItem('feedback-email') || '');
-  const [fullName, setFullName] = useState(() => localStorage.getItem('feedback-name') || '');
-  const [category, setCategory] = useState('general');
-  const [message, setMessage] = useState('');
-  const [images, setImages] = useState<{ file: File; url: string }[]>([]);
-  const [sentiment, setSentiment] = useState<number | null>(null);
-  const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
-  const [errorMsg, setErrorMsg] = useState('');
+  const [category, setCategory] = useState<Category>('bug');
+  const [subject, setSubject] = useState('');
+  const [text, setText] = useState('');
+  const [email, setEmail] = useState(() => {
+    try { return localStorage.getItem('feedback-email') ?? ''; } catch { return ''; }
+  });
+  const [status, setStatus] = useState<Status>('idle');
+  const [error, setError] = useState('');
+  const [issueUrl, setIssueUrl] = useState<string | null>(null);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const imagesRef = useRef(images);
-  imagesRef.current = images;
+  // What goes with the report, so the makers can reproduce it.
+  const context = [
+    `Open Energy Studio ${version}`,
+    kernelVersion ? `${t('feedback.kernel')} ${kernelVersion}` : '',
+    desktop ? 'desktop' : 'web',
+    locale,
+  ].filter(Boolean).join(' · ');
 
-  useEffect(() => {
-    return () => {
-      imagesRef.current.forEach(img => URL.revokeObjectURL(img.url));
-    };
-  }, []);
+  const problem = (() => {
+    const s = subject.trim();
+    const d = text.trim();
+    if (!s) return t('feedback.needTitle');
+    if ((s + d).length < MIN_TOTAL) return t('feedback.needText');
+    if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return t('feedback.badMail');
+    return '';
+  })();
+  const touched = Boolean(subject || text);
 
-  const isValidEmail = () => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-
-  const canSubmit = () =>
-    isValidEmail() &&
-    message.length >= MIN_MESSAGE &&
-    message.length <= MAX_MESSAGE &&
-    status !== 'submitting';
-
-  const charCountWarning = message.length >= 4500;
-
-  function handleAttach() {
-    if (images.length >= MAX_IMAGES) return;
-    fileInputRef.current?.click();
-  }
-
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files || []);
-    if (!files.length) return;
-
-    const currentSize = images.reduce((sum, img) => sum + img.file.size, 0);
-    const remaining = MAX_IMAGES - images.length;
-    const toAdd = files.slice(0, remaining);
-
-    const newImages: { file: File; url: string }[] = [];
-    let newSize = currentSize;
-
-    for (const file of toAdd) {
-      if (!file.type.startsWith('image/')) continue;
-      if (newSize + file.size > MAX_TOTAL_SIZE) break;
-      newSize += file.size;
-      newImages.push({ file, url: URL.createObjectURL(file) });
-    }
-
-    setImages(prev => [...prev, ...newImages]);
-    e.target.value = '';
-  }
-
-  function removeImage(index: number) {
-    setImages(prev => {
-      const updated = [...prev];
-      URL.revokeObjectURL(updated[index].url);
-      updated.splice(index, 1);
-      return updated;
-    });
-  }
-
-  function resetForm() {
-    setCategory('general');
-    setMessage('');
-    images.forEach(img => URL.revokeObjectURL(img.url));
-    setImages([]);
-    setSentiment(null);
-    setStatus('idle');
-    setErrorMsg('');
-  }
-
-  async function handleSubmit() {
-    if (!canSubmit()) return;
-
+  async function submit() {
+    if (problem || status === 'submitting') return;
     setStatus('submitting');
-    setErrorMsg('');
-
+    setError('');
+    const fields: Record<string, string> = {
+      app: FEEDBACK_APP_ID,
+      category,
+      message: `${subject.trim()}\n\n${text.trim()}\n\n_${t('feedback.via')} ${context}_`,
+      appVersion: version,
+    };
+    if (email.trim()) fields.email = email.trim();
     try {
-      const sentimentValue = sentiment;
-      const sentimentLabel = sentimentValue ? SENTIMENT_LABELS[sentimentValue] : undefined;
-
-      const emailVal = email.trim();
-      const nameVal = fullName.trim() || undefined;
-
-      let response: Response;
-
-      if (images.length > 0) {
-        const formData = new FormData();
-        formData.append('app', APP_ID);
-        formData.append('email', emailVal);
-        if (nameVal) formData.append('fullname', nameVal);
-        formData.append('category', category);
-        formData.append('message', message.trim());
-        if (sentimentLabel) formData.append('sentiment', sentimentLabel);
-        formData.append('appVersion', version);
-        images.forEach(img => {
-          formData.append('images', img.file);
-        });
-
-        response = await fetch(API_URL, {
-          method: 'POST',
-          body: formData,
-        });
-      } else {
-        response = await fetch(API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            app: APP_ID,
-            email: emailVal,
-            fullname: nameVal,
-            category,
-            message: message.trim(),
-            sentiment: sentimentLabel,
-            appVersion: version,
-          }),
-        });
+      const response = await fetch(FEEDBACK_API, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(fields),
+      });
+      const body = await response.json().catch(() => ({})) as { success?: boolean; githubIssueUrl?: string };
+      if (response.ok && body.success) {
+        try { localStorage.setItem('feedback-email', email.trim()); } catch { /* not remembered */ }
+        setIssueUrl(issueNumber(body.githubIssueUrl) ? body.githubIssueUrl! : null);
+        setStatus('success');
+        return;
       }
+      setError(t(response.status === 429 ? 'feedback.errorRate' : response.status === 409 ? 'feedback.errorDuplicate'
+        : response.status === 400 ? 'feedback.errorRejected' : 'feedback.errorGeneric'));
+    } catch {
+      setError(t('feedback.errorGeneric'));
+    }
+    setStatus('idle');
+  }
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      // Remember email and name for next time
-      localStorage.setItem('feedback-email', email.trim());
-      localStorage.setItem('feedback-name', fullName.trim());
-
-      setStatus('success');
-    } catch (e) {
-      console.error('Feedback submission failed:', e);
-      setStatus('error');
-      setErrorMsg(t('feedback.errorGeneric'));
+  function openIssue(event: React.MouseEvent) {
+    const number = issueNumber(issueUrl);
+    // The desktop app opens only pages of this repository in the browser (Tauri command).
+    if (desktop && number) {
+      event.preventDefault();
+      void invoke('open_issue_page', { number });
     }
   }
 
-  const categories = [
-    { key: 'general', label: t('feedback.categoryGeneral') },
+  function again() {
+    setSubject('');
+    setText('');
+    setCategory('bug');
+    setIssueUrl(null);
+    setError('');
+    setStatus('idle');
+  }
+
+  const categories: Array<{ key: Category; label: string }> = [
     { key: 'bug', label: t('feedback.categoryBug') },
     { key: 'feature', label: t('feedback.categoryFeature') },
-  ];
-
-  const sentiments = [
-    { value: 1, emoji: '\u{1F61E}', label: t('feedback.sentimentFrustrated') },
-    { value: 2, emoji: '\u{1F610}', label: t('feedback.sentimentNeutral') },
-    { value: 3, emoji: '\u{1F60A}', label: t('feedback.sentimentHappy') },
+    { key: 'general', label: t('feedback.categoryGeneral') },
   ];
 
   return (
-    <DialogShell
-      title={t('feedback.title')}
-      onClose={onClose}
-      className="feedback-dialog"
-      footer={null}
-    >
+    <DialogShell title={t('feedback.title')} onClose={onClose} className="feedback-dialog" footer={null}>
       {status === 'success' ? (
-        <div className="feedback-success">
+        <div className="feedback-success" role="status">
           <h3>{t('feedback.successTitle')}</h3>
-          <p>{t('feedback.successMessage')}</p>
-          <button className="btn btn-primary feedback-submit-btn" onClick={resetForm}>
-            {t('feedback.sendAnother')}
-          </button>
+          <p>{issueUrl ? t('feedback.madeIssue', { repo: FEEDBACK_REPO }) : t('feedback.stored')}</p>
+          <div className="feedback-actions">
+            {issueUrl && (
+              <a className="btn btn-primary" href={issueUrl} target="_blank" rel="noopener noreferrer" onClick={openIssue}>
+                {t('feedback.onGithub')}
+              </a>
+            )}
+            <button type="button" className="btn" onClick={again}>{t('feedback.sendAnother')}</button>
+            <button type="button" className="btn" onClick={onClose}>{t('dialog.close')}</button>
+          </div>
         </div>
       ) : (
-        <div className="feedback-form">
-          {/* Email & Name */}
+        <form className="feedback-form" noValidate onSubmit={(event) => { event.preventDefault(); void submit(); }}>
           <div className="feedback-section">
-            <div className="dialog-field">
-              <label htmlFor={`${fieldId}-a1`}>{t('feedback.email')} <span className="feedback-required">*</span></label>
-              <input id={`${fieldId}-a1`}
-                type="email"
-                placeholder={t('feedback.emailPlaceholder')}
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-              />
-            </div>
-            <div className="dialog-field">
-              <label htmlFor={`${fieldId}-a2`}>{t('feedback.fullName')}</label>
-              <input id={`${fieldId}-a2`}
-                type="text"
-                placeholder={t('feedback.fullNamePlaceholder')}
-                value={fullName}
-                onChange={e => setFullName(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* Category */}
-          <div className="feedback-section">
-            <div className="feedback-categories">
-              {categories.map(cat => (
-                <button
-                  key={cat.key}
-                  className={`feedback-category-btn${category === cat.key ? ' active' : ''}`}
-                  aria-pressed={category === cat.key}
-                  onClick={() => setCategory(cat.key)}
-                >
-                  {cat.label}
-                </button>
+            <span className="feedback-legend" id={`${fieldId}-kind`}>{t('feedback.kind')}</span>
+            <div className="feedback-categories" role="group" aria-labelledby={`${fieldId}-kind`}>
+              {categories.map((item) => (
+                <button key={item.key} type="button" aria-pressed={category === item.key}
+                  className={`feedback-category-btn${category === item.key ? ' active' : ''}`}
+                  onClick={() => setCategory(item.key)}>{item.label}</button>
               ))}
             </div>
           </div>
-
-          {/* Message */}
-          <div className="feedback-section">
-            <div className="dialog-field">
-              <textarea
-                className="feedback-message"
-                aria-label={t('feedback.message')}
-                placeholder={t('feedback.messagePlaceholder')}
-                maxLength={MAX_MESSAGE}
-                value={message}
-                onChange={e => setMessage(e.target.value)}
-              />
-              <div className={`feedback-char-count${charCountWarning ? ' warning' : ''}`}>
-                {message.length} / {MAX_MESSAGE}
-              </div>
-            </div>
+          <div className="dialog-field">
+            <label htmlFor={`${fieldId}-subject`}>{t('feedback.subject')}</label>
+            <input id={`${fieldId}-subject`} type="text" maxLength={MAX_SUBJECT} value={subject}
+              placeholder={t('feedback.subjectPlaceholder')} onChange={(event) => setSubject(event.target.value)} />
           </div>
-
-          {/* Image Attachments */}
-          <div className="feedback-section">
-            <div className="feedback-images">
-              {images.map((img, i) => (
-                <div key={img.url} className="feedback-image-thumb">
-                  <img src={img.url} alt="" />
-                  <button className="feedback-image-remove" onClick={() => removeImage(i)}>
-                    &times;
-                  </button>
-                </div>
-              ))}
-            </div>
-            {images.length < MAX_IMAGES && (
-              <button className="feedback-attach-btn" onClick={handleAttach}>
-                {t('feedback.attachImages')}
-              </button>
-            )}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              style={{ display: 'none' }}
-              aria-label={t('feedback.attachImages')}
-              onChange={handleFileChange}
-            />
-            <div className="feedback-hint">{t('feedback.imageLimit')}</div>
+          <div className="dialog-field">
+            <label htmlFor={`${fieldId}-text`}>{t('feedback.message')}</label>
+            <textarea id={`${fieldId}-text`} className="feedback-message" maxLength={MAX_TEXT} value={text}
+              placeholder={t('feedback.messagePlaceholder')} onChange={(event) => setText(event.target.value)} />
           </div>
-
-          {/* Sentiment */}
-          <div className="feedback-section">
-            <div className="feedback-hint">{t('feedback.sentiment')}</div>
-            <div className="feedback-sentiment">
-              {sentiments.map(s => (
-                <button
-                  key={s.value}
-                  className={`feedback-sentiment-btn${sentiment === s.value ? ' active' : ''}`}
-                  onClick={() => setSentiment(sentiment === s.value ? null : s.value)}
-                  title={s.label}
-                >
-                  {s.emoji}
-                </button>
-              ))}
-            </div>
+          <div className="dialog-field">
+            <label htmlFor={`${fieldId}-mail`}>{t('feedback.email')} <span className="feedback-optional">{t('feedback.emailOptional')}</span></label>
+            <input id={`${fieldId}-mail`} type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} />
           </div>
-
-          {/* Submit */}
-          <button
-            className="btn btn-primary feedback-submit-btn"
-            disabled={!canSubmit()}
-            onClick={handleSubmit}
-          >
-            {status === 'submitting' ? t('feedback.submitting') : t('feedback.submit')}
-          </button>
-
-          {status === 'error' && (
-            <div className="feedback-error">{errorMsg}</div>
-          )}
-        </div>
+          <p className="feedback-note">{t('feedback.publicNote', { repo: FEEDBACK_REPO })}</p>
+          <p className="feedback-meta">{t('feedback.included', { context })}</p>
+          <p className="feedback-hint" aria-live="polite">{error || (touched ? problem : '')}</p>
+          <div className="feedback-actions">
+            <button type="button" className="btn" onClick={onClose}>{t('dialog.cancel')}</button>
+            <button type="submit" className="btn btn-primary feedback-submit-btn" disabled={Boolean(problem) || status === 'submitting'}>
+              {status === 'submitting' ? t('feedback.submitting') : t('feedback.submit')}
+            </button>
+          </div>
+        </form>
       )}
     </DialogShell>
   );

@@ -177,6 +177,11 @@ export function TopBar(props: TopBarProps) {
           <IconButton icon={<PanelRight aria-hidden="true" />} aria-label={t('shell.inspector')} aria-pressed={props.inspectorOpen}
             aria-keyshortcuts="Control+." onClick={props.onToggleInspector} />
         </>}
+        {/* Always in sight: a report becomes a GitHub issue in this program's repository. */}
+        <Button variant="ghost" className="top-bar-feedback" icon={<MessageSquare aria-hidden="true" />}
+          onClick={props.onOpenFeedback} title={t('nav.feedback')}>
+          <span className="top-bar-label">{t('shell.feedback')}</span>
+        </Button>
       </div>
 
       {/* Window controls only exist in the desktop build; the browser has its own. */}

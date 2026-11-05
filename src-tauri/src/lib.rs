@@ -819,33 +819,53 @@ fn release_page_url(tag: &str) -> Option<String> {
     })
 }
 
-/// Opens the release page of a newer version in the default browser (the
-/// update notice of the desktop app); no plugin, no other URLs.
-#[tauri::command]
-fn open_release_page(tag: String) -> Result<(), String> {
-    let url = release_page_url(&tag).ok_or_else(|| format!("Ongeldige releasetag: {tag}"))?;
+/// Opens a page of this program's GitHub repository in the default browser;
+/// the callers below build the URL, so no other address can be opened.
+fn open_in_browser(url: &str) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     let mut command = {
         let mut command = std::process::Command::new("rundll32");
-        command.args(["url.dll,FileProtocolHandler", &url]);
+        command.args(["url.dll,FileProtocolHandler", url]);
         command
     };
     #[cfg(target_os = "macos")]
     let mut command = {
         let mut command = std::process::Command::new("open");
-        command.arg(&url);
+        command.arg(url);
         command
     };
     #[cfg(all(unix, not(target_os = "macos")))]
     let mut command = {
         let mut command = std::process::Command::new("xdg-open");
-        command.arg(&url);
+        command.arg(url);
         command
     };
     command
         .spawn()
         .map(|_| ())
         .map_err(|e| format!("Browser niet te openen: {e}"))
+}
+
+/// Opens the release page of a newer version (the update notice of the
+/// desktop app); no plugin, no other URLs.
+#[tauri::command]
+fn open_release_page(tag: String) -> Result<(), String> {
+    let url = release_page_url(&tag).ok_or_else(|| format!("Ongeldige releasetag: {tag}"))?;
+    open_in_browser(&url)
+}
+
+/// The GitHub page of an issue of this program (the feedback dialog).
+fn issue_page_url(number: u64) -> Option<String> {
+    (number > 0).then(|| {
+        format!("https://github.com/OpenAEC-Foundation/open-energy-studio/issues/{number}")
+    })
+}
+
+/// Opens the issue a feedback report created; only issues of this repository.
+#[tauri::command]
+fn open_issue_page(number: u64) -> Result<(), String> {
+    let url = issue_page_url(number).ok_or_else(|| format!("Ongeldig issuenummer: {number}"))?;
+    open_in_browser(&url)
 }
 
 #[tauri::command]
@@ -1115,7 +1135,8 @@ pub fn run() {
             diagnose_indicators_draft,
             diagnose_heating_aux_draft,
             diagnose_heating_aux_measured_draft,
-            open_release_page
+            open_release_page,
+            open_issue_page
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {
@@ -1143,6 +1164,15 @@ pub fn run() {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn the_feedback_dialog_opens_only_issues_of_this_program() {
+        assert_eq!(
+            issue_page_url(42).as_deref(),
+            Some("https://github.com/OpenAEC-Foundation/open-energy-studio/issues/42")
+        );
+        assert_eq!(issue_page_url(0), None);
+    }
 
     #[test]
     fn the_update_notice_opens_only_release_pages_of_this_program() {

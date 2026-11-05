@@ -19,7 +19,7 @@ Bij het starten opent het programma het demoproject *2467 Goejanverwelledijk 85 
 
 Het venster heeft vijf delen:
 
-1. **Bovenbalk**: projecttabbladen, het zoekveld (Ctrl+K), het menu **Bestand**, **Opslaan** (Ctrl+S), **Herberekenen** (Ctrl+Enter) en de knop voor het contextpaneel (Ctrl+.).
+1. **Bovenbalk**: projecttabbladen, het zoekveld (Ctrl+K), het menu **Bestand**, **Opslaan** (Ctrl+S), **Herberekenen** (Ctrl+Enter), de knop voor het contextpaneel (Ctrl+.) en **Feedback**. Een melding via Feedback (iets werkt niet, een idee, of een vraag) wordt een openbaar issue in de GitHub-repository van Open Energy Studio, net als via de feedbackknop op open-aec.com. Programmaversie, rekenkernversie, web of desktop en de taal gaan mee; een e-mailadres is optioneel en komt niet in het issue. Na het versturen opent **Bekijk op GitHub** het issue.
 2. **Werkstappen** links, genummerd en in vier groepen:
    - *Invoer*: 1 Project, 2 Gebouw, 3 Installaties;
    - *Berekening*: 4 Controle, 5 Resultaten;
