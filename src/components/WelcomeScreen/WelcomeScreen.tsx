@@ -221,7 +221,7 @@ export function WelcomeScreen({
       <div className="welcome-content library-content">
         <header className="welcome-hero">
           {/* The logo with text of the logo package (9 Oct 2026); white text, so always on its dark plate. */}
-          <span className="welcome-logo"><img src="/logo-text.png" alt="Open Energy Studio" /></span>
+          <span className="welcome-logo"><img src="/logo-mark.png" alt="Open Energy Studio" /></span>
           <div>
             <h1 className="welcome-title">{t('library.title')}</h1>
             <p className="welcome-subtitle">{t('library.subtitle')}</p>

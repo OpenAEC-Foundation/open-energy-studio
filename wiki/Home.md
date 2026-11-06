@@ -8,13 +8,14 @@ Open Energy Studio is open-source software voor de energieprestatie van woningen
 
 | Programma | Rekenkern (`KERNEL_VERSION`) | Handleiding | Releasetag |
 |---|---|---|---|
-| **2026.44.0** | **0.5.0** | gestempeld voor rekenkern 0.5.0 | `v2026.44.0` |
+| **2026.45.0** | **0.6.0** | gestempeld voor rekenkern 0.6.0 | `v2026.45.0` |
+| 2026.44.0 | 0.5.0 | gestempeld voor rekenkern 0.5.0 | `v2026.44.0` |
 | 2026.43.0 | 0.4.0 | gestempeld voor rekenkern 0.4.0 | `v2026.43.0` |
 | 0.2.0 | 0.3.0 | gestempeld voor rekenkern 0.3.0 | `oes-v0.2.0-kernel-v0.3.0` |
 
-Programma 2026.44.0 · Rekenkern 0.5.0 · Handleiding gestempeld voor rekenkern 0.5.0. Het programmanummer volgt het OpenAEC-schema jaar.week.volgnummer.
+Programma 2026.45.0 · Rekenkern 0.6.0 · Handleiding gestempeld voor rekenkern 0.6.0. Het programmanummer volgt het OpenAEC-schema jaar.week.volgnummer.
 
-**Op `main`:** rekenkern **0.6.0** (onuitgebracht, handleiding gestempeld voor 0.6.0). De webapp draait `main`. Wijzigingen na de laatste uitgave staan onder "Onuitgebracht" in de releasenotes.
+**Op `main`:** rekenkern **0.6.0**, gelijk aan deze uitgavekandidaat (handleiding gestempeld voor 0.6.0). De webapp draait `main`. Wijzigingen na de laatste uitgave staan onder "Onuitgebracht" in de releasenotes.
 
 > **Niet geattesteerd.** Open Energy Studio heeft (nog) geen BRL 9501-attest. Uitkomsten zijn indicatief en niet bruikbaar voor een officieel energielabel, een BENG-toets bij een vergunning of registratie in EP-Online.
 

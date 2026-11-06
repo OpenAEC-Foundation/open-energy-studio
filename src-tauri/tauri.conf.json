@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Open Energy Studio",
-  "version": "2026.44.0",
+  "version": "2026.45.0",
   "identifier": "com.openaec.open-energy-studio",
   "build": {
     "frontendDist": "../dist",
@@ -61,7 +61,7 @@
     "licenseFile": "installer-notice.txt",
     "windows": {
       "wix": {
-        "version": "26.44.0"
+        "version": "26.45.0"
       },
       "nsis": {
         "installerIcon": "icons/icon.ico"
