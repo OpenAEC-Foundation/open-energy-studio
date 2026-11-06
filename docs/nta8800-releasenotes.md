@@ -13,6 +13,9 @@ Dit bestand is de wijzigingsregistratie van de rekenkern (BRL 9501 §5.2, §6.2 
 
 ## Onuitgebracht
 
+## Rekenkern 0.6.0 — 6 november 2026
+<!-- kernel-version: 0.6.0 -->
+
 ### 5 november 2026 — Feedbackknop maakt een GitHub-issue (geen rekenwijziging)
 - **Feedback:** rechtsboven in de titelbalk staat de knop **Feedback**. De dialoog werkt zoals die op open-aec.com: soort melding (iets werkt niet, idee, vraag of opmerking), titel, omschrijving en een optioneel e-mailadres. Open Feedback Studio maakt er een issue van in `OpenAEC-Foundation/open-energy-studio`, alleen voor dit programma (app-id `open-energy-studio`). De dialoog zegt vooraf dat het issue openbaar is, stuurt programmaversie, rekenkernversie, web of desktop en taal mee, en toont na het versturen de link naar het issue. Een geweigerde melding (te veel meldingen, dubbel, afgekeurd) krijgt een eigen uitleg. Vervangt de oude dialoog met verplicht e-mailadres, naam, stemming en afbeeldingen.
 - **Desktop:** de link naar het issue opent in de browser via een Tauri-commando dat alleen issues van deze repository opent (`open_issue_page`).
