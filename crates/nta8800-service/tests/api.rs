@@ -816,6 +816,40 @@ async fn energy_by_service_keeps_identity_fields() {
     }
 }
 
+/// With API keys every route but `/health` needs `Authorization: Bearer`
+/// with a key whose SHA-256 the service knows; the key itself is not stored.
+#[tokio::test]
+async fn api_keys_guard_every_route_but_health() {
+    let hash = {
+        use sha2::{Digest, Sha256};
+        Sha256::digest(b"geheim").iter().map(|b| format!("{b:02x}")).collect::<String>()
+    };
+    let config = HttpConfig {
+        api_key_hashes: vec![hash],
+        ..HttpConfig::default()
+    };
+    let get = |path: &str, key: Option<&str>| {
+        let mut request = Request::get(path);
+        if let Some(key) = key {
+            request = request.header(header::AUTHORIZATION, format!("Bearer {key}"));
+        }
+        request.body(Body::empty()).unwrap()
+    };
+    let (status, _, _) = send(app_with(config.clone()), get("/health", None)).await;
+    assert_eq!(status, StatusCode::OK);
+    for key in [None, Some("fout")] {
+        let (status, headers, body) = send(app_with(config.clone()), get("/v1/version", key)).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED, "{key:?}");
+        assert_eq!(headers[header::WWW_AUTHENTICATE], "Bearer");
+        assert_envelope(&body, "api_key_required");
+    }
+    let (status, _, _) = send(app_with(config), get("/v1/version", Some("geheim"))).await;
+    assert_eq!(status, StatusCode::OK);
+    // Without keys nothing changes (local use).
+    let (status, _, _) = send(app(), get("/v1/version", None)).await;
+    assert_eq!(status, StatusCode::OK);
+}
+
 /// On a loopback service only the loopback host names are answered, so a
 /// page that rebinds its own DNS name to 127.0.0.1 is refused.
 #[tokio::test]

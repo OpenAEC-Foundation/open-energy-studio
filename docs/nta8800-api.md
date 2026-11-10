@@ -21,6 +21,7 @@ cargo run --release --manifest-path crates/nta8800-service/Cargo.toml --bin api
 | `--port POORT` | `OES_API_PORT` | `3007` |
 | `--cors-origin ORIGIN` (herhaalbaar, `*` voor alles) | `OES_API_CORS_ORIGINS` (kommagescheiden) | geen CORS |
 | `--allowed-host HOST` (herhaalbaar) | `OES_API_ALLOWED_HOSTS` (kommagescheiden) | op een loopback-adres: `localhost`, `127.0.0.1` en `::1`, plus de opgegeven namen; op een ander adres alleen de opgegeven namen (geen: geen controle) |
+| `--api-key-sha256 HASH` (herhaalbaar) | `OES_API_KEY_SHA256` (kommagescheiden) | geen: geen sleutel nodig. Met hashes vraagt elke route behalve `/health` `Authorization: Bearer <sleutel>` met een sleutel waarvan de SHA-256 (hex) in de lijst staat; anders 401 `api_key_required`. De service kent alleen de hashes, niet de sleutels. |
 | `--body-limit-mb N` | `OES_API_BODY_LIMIT_MB` | `16` (1–1024) |
 | `--max-json-values N` | `OES_API_MAX_JSON_VALUES` | `500000` (1000–100000000): het grootste aantal JSON-waarden (array-elementen, objectleden, getallen, teksten) in een verzoek |
 | `--max-calculations N` | `OES_API_MAX_CALCULATIONS` | aantal processorkernen (1–1024): zoveel berekeningen lopen tegelijk, de rest wacht |
@@ -80,6 +81,7 @@ De ontwikkelserver (`npm run dev`) stuurt `/api/*` door naar poort 3007; de desk
 |---|---|---|
 | 200 | Uitkomst | het resultaat van de kern |
 | 400 | Ongeldig verzoek: geen geldige JSON (ook: dieper genest dan 128 niveaus), geen object, een onbekend of ontbrekend lid, verkeerde vorm of een `normVersion` die niet past | foutenvelop |
+| 401 | De service is gestart met API-sleutels en het verzoek heeft geen geldige `Authorization: Bearer <sleutel>` (`api_key_required`) | foutenvelop, met `WWW-Authenticate: Bearer` |
 | 403 | De `Host`-header noemt een naam die de service niet beantwoordt (`host_not_allowed`) | foutenvelop |
 | 404 / 405 | Onbekende route of verkeerde methode | foutenvelop |
 | 413 | Body groter dan de bytelimiet of met meer JSON-waarden dan `--max-json-values` (`payload_too_large`) | foutenvelop |
@@ -104,7 +106,7 @@ De foutenvelop:
 `error` en `code` zijn gelijk; `error` blijft bestaan voor oudere clients. `path` is het JSON-pad van de foute invoer of, bij `non_finite_result`, van de niet-eindige uitkomst. Codes:
 - `invalid_json`, `invalid_request_shape` (ook: een onbekend lid naast het invoerlid en `normVersion`), `missing_request_member`, `invalid_project_shape` (ook: `original`, `current` of `project` bij herlabelen is geen object), `invalid_maatwerkadvies_shape`;
 - `invalid_norm_version` (onbekende editie; `details.supportedNormVersions`), `norm_version_conflict` (de invoer of het referentiegeval heeft al een andere editie), `norm_version_not_applicable` (geen plek voor de editie, of een diagnosevergelijking buiten 2025+C1), `edition_not_implemented` (een editie zonder profiel van de kern; geen enkele bekende editie heeft dat nu);
-- `payload_too_large` (`details.maxJsonValues` als het aantal waarden te groot is), `unsupported_media_type`, `host_not_allowed`, `not_found`, `method_not_allowed`;
+- `payload_too_large` (`details.maxJsonValues` als het aantal waarden te groot is), `unsupported_media_type`, `host_not_allowed`, `api_key_required`, `not_found`, `method_not_allowed`;
 - `non_finite_result`, `serialization_failed`, `kernel_panic`, `calculation_unavailable`, `server_busy`, `calculation_timeout`;
 - alleen via MCP: `unknown_tool`.
 

@@ -44,6 +44,12 @@ pub struct HttpConfig {
     /// rebinds its own DNS name to 127.0.0.1 cannot reach the service; any
     /// other host gets 403 `host_not_allowed`.
     pub allowed_hosts: Vec<String>,
+    /// SHA-256 (lowercase hex) of the API keys the service accepts as
+    /// `Authorization: Bearer <key>`. Empty: no key needed (local use). With
+    /// keys every route but `/health` needs one; a request without a valid
+    /// key gets 401 `api_key_required`. The service never sees the keys
+    /// themselves, so its configuration holds no secret.
+    pub api_key_hashes: Vec<String>,
     /// Write one line per request to stderr.
     pub log_requests: bool,
     /// Calculations that may run at the same time. Further requests wait
@@ -98,6 +104,7 @@ impl Default for HttpConfig {
             max_json_values: DEFAULT_MAX_JSON_VALUES,
             cors_origins: Vec::new(),
             allowed_hosts: Vec::new(),
+            api_key_hashes: Vec::new(),
             log_requests: false,
             max_concurrent_calculations: default_max_concurrent_calculations(),
             max_waiting_requests: default_max_waiting_requests(),
@@ -504,6 +511,57 @@ async fn host_check(
     next.run(request).await
 }
 
+/// SHA-256 of `text` as lowercase hex.
+fn sha256_hex(text: &str) -> String {
+    use sha2::{Digest, Sha256};
+    Sha256::digest(text.as_bytes())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+/// Refuses a request without a valid API key when the service has keys
+/// ([`HttpConfig::api_key_hashes`]); `/health` and CORS preflights pass.
+async fn api_key_check(
+    State(config): State<Arc<HttpConfig>>,
+    request: Request,
+    next: Next,
+) -> Response {
+    if config.api_key_hashes.is_empty()
+        || request.uri().path() == "/health"
+        || request.method() == HttpMethod::OPTIONS
+    {
+        return next.run(request).await;
+    }
+    let key = request
+        .headers()
+        .get(header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("Bearer "))
+        .map(str::trim)
+        .filter(|key| !key.is_empty());
+    if let Some(key) = key {
+        let hash = sha256_hex(key);
+        if config.api_key_hashes.iter().any(|known| *known == hash) {
+            return next.run(request).await;
+        }
+    }
+    let mut response = refusal(
+        401,
+        error_body(
+            "api_key_required",
+            "This service needs an API key: Authorization: Bearer <key>".to_string(),
+            None,
+            Value::Null,
+        ),
+    );
+    response.headers_mut().insert(
+        header::WWW_AUTHENTICATE,
+        HeaderValue::from_static("Bearer"),
+    );
+    response
+}
+
 async fn log_requests(
     State(config): State<Arc<HttpConfig>>,
     request: Request,
@@ -562,6 +620,7 @@ pub fn app_with(config: HttpConfig) -> Router {
         .fallback(not_found)
         .layer(middleware::from_fn(method_not_allowed))
         .layer(DefaultBodyLimit::max(config.body_limit_bytes))
+        .layer(middleware::from_fn_with_state(config.clone(), api_key_check))
         .layer(middleware::from_fn_with_state(config.clone(), cors))
         .layer(middleware::from_fn_with_state(config.clone(), host_check))
         .layer(middleware::from_fn_with_state(config, log_requests))
@@ -693,6 +752,7 @@ fn method_not_allowed_response(method: Method, error: &Value) -> Value {
 pub fn openapi_document() -> Value {
     let error = json!({ "$ref": "#/components/schemas/Error" });
     let host_refused = json!({ "description": "The Host header names a host the service does not answer (host_not_allowed; protection against DNS rebinding)", "content": { "application/json": { "schema": error } } });
+    let key_refused = json!({ "description": "The service was started with API keys and the request has no valid Authorization: Bearer <key> (api_key_required)", "headers": { "WWW-Authenticate": { "description": "Bearer", "schema": { "type": "string" } } }, "content": { "application/json": { "schema": error } } });
     let mut paths = serde_json::Map::new();
     paths.insert(
         "/health".to_string(),
@@ -717,6 +777,7 @@ pub fn openapi_document() -> Value {
             "responses": {
                 "200": { "description": "OpenAPI document",
                     "content": { "application/json": { "schema": { "type": "object" } } } },
+                "401": key_refused,
                 "403": host_refused,
                 "405": method_not_allowed_response(Method::Get, &error),
             }
@@ -733,6 +794,7 @@ pub fn openapi_document() -> Value {
             "200".into(),
             json!({ "description": "Result", "content": { "application/json": { "schema": result_schema(op) } } }),
         );
+        responses.insert("401".into(), key_refused.clone());
         responses.insert("403".into(), host_refused.clone());
         responses.insert("405".into(), method_not_allowed_response(op.method, &error));
         if op.method == Method::Post {

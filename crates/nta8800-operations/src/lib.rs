@@ -110,6 +110,7 @@ pub const ERROR_CODES: &[&str] = &[
     "payload_too_large",
     "unsupported_media_type",
     "host_not_allowed",
+    "api_key_required",
     "not_found",
     "method_not_allowed",
     "non_finite_result",

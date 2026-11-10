@@ -10,6 +10,7 @@
 //! | `--body-limit-mb N` | `OES_API_BODY_LIMIT_MB` | `16` |
 //! | `--max-json-values N` | `OES_API_MAX_JSON_VALUES` | `500000` |
 //! | `--allowed-host HOST` (repeatable) | `OES_API_ALLOWED_HOSTS` (comma separated) | on a loopback address: `localhost`, `127.0.0.1`, `::1` |
+//! | `--api-key-sha256 HASH` (repeatable) | `OES_API_KEY_SHA256` (comma separated) | none: no key needed |
 //! | `--max-calculations N` | `OES_API_MAX_CALCULATIONS` | number of cores (at most 1024) |
 //! | `--max-waiting N` | `OES_API_MAX_WAITING` | twice the calculations |
 //! | `--queue-timeout-s N` | `OES_API_QUEUE_TIMEOUT_S` | `30` |
@@ -29,7 +30,7 @@ struct Options {
     http: HttpConfig,
 }
 
-const USAGE: &str = "usage: api [--bind ADDR] [--port PORT] [--cors-origin ORIGIN]... [--allowed-host HOST]... [--body-limit-mb N] [--max-json-values N] [--max-calculations N] [--max-waiting N] [--queue-timeout-s N] [--calculation-timeout-s N] [--log|--no-log] [--version]";
+const USAGE: &str = "usage: api [--bind ADDR] [--port PORT] [--cors-origin ORIGIN]... [--allowed-host HOST]... [--api-key-sha256 HASH]... [--body-limit-mb N] [--max-json-values N] [--max-calculations N] [--max-waiting N] [--queue-timeout-s N] [--calculation-timeout-s N] [--log|--no-log] [--version]";
 
 /// Splits a comma-separated environment list.
 fn list(value: Option<String>) -> Vec<String> {
@@ -53,6 +54,7 @@ fn parse(args: Vec<String>) -> Result<Options, String> {
     let mut port = env("OES_API_PORT").unwrap_or_else(|| "3007".into());
     let mut origins = list(env("OES_API_CORS_ORIGINS"));
     let mut hosts = list(env("OES_API_ALLOWED_HOSTS"));
+    let mut keys = list(env("OES_API_KEY_SHA256"));
     let mut limit = env("OES_API_BODY_LIMIT_MB").unwrap_or_else(|| "16".into());
     let mut values = env("OES_API_MAX_JSON_VALUES")
         .unwrap_or_else(|| nta8800_service::http::DEFAULT_MAX_JSON_VALUES.to_string());
@@ -71,6 +73,7 @@ fn parse(args: Vec<String>) -> Result<Options, String> {
             "--port" => port = value("--port")?,
             "--cors-origin" => origins.push(value("--cors-origin")?),
             "--allowed-host" => hosts.push(value("--allowed-host")?),
+            "--api-key-sha256" => keys.push(value("--api-key-sha256")?),
             "--body-limit-mb" => limit = value("--body-limit-mb")?,
             "--max-json-values" => values = value("--max-json-values")?,
             "--max-calculations" => calculations = value("--max-calculations")?,
@@ -99,6 +102,13 @@ fn parse(args: Vec<String>) -> Result<Options, String> {
         .ok_or(format!(
             "invalid JSON value limit {values} (1000–100000000)"
         ))?;
+    let keys: Vec<String> = keys.iter().map(|key| key.to_ascii_lowercase()).collect();
+    if let Some(bad) = keys
+        .iter()
+        .find(|key| key.len() != 64 || !key.bytes().all(|b| b.is_ascii_hexdigit()))
+    {
+        return Err(format!("invalid API key hash {bad} (64 hex characters, SHA-256)"));
+    }
     // On a loopback address only the loopback names are served (DNS
     // rebinding); extra names come from --allowed-host. On any other
     // address only the configured names are checked, if any.
@@ -144,6 +154,7 @@ fn parse(args: Vec<String>) -> Result<Options, String> {
             max_json_values: values,
             cors_origins: origins,
             allowed_hosts: hosts,
+            api_key_hashes: keys,
             log_requests: log,
             max_concurrent_calculations: calculations,
             max_waiting_requests: waiting,
