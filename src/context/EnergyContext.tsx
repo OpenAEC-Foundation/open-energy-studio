@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useEffect, useReducer, useRef, useCallback, useSyncExternalStore, ReactNode } from 'react';
+import { flushSync } from 'react-dom';
+import { setDocumentStore } from './documentStore';
 import { normalizeProject } from '../core/energy/normalizeProject';
 import { applyWindowTypes, detachWindowType } from '../core/energy/windowTypes';
 import { saveDocumentsToLibrary } from '../core/io/projectLibrary';
@@ -1315,6 +1317,7 @@ function useAutosave(docState: DocumentManagerState) {
 export function EnergyProvider({ children }: { children: ReactNode }) {
   const [docState, docDispatch] = useReducer(documentManagerReducer, undefined, restoreDocuments);
   useAutosave(docState);
+  useDocumentStore(docState, docDispatch);
 
   return (
     <DocumentManagerContext.Provider value={{ docState, docDispatch }}>
@@ -1323,6 +1326,20 @@ export function EnergyProvider({ children }: { children: ReactNode }) {
       </ActiveDocumentBridge>
     </DocumentManagerContext.Provider>
   );
+}
+
+/** Registers the document state for the assistant tools (context/documentStore.ts). */
+function useDocumentStore(docState: DocumentManagerState, docDispatch: React.Dispatch<DocumentManagerAction>) {
+  const latest = useRef(docState);
+  latest.current = docState;
+  useEffect(() => {
+    setDocumentStore({
+      getState: () => latest.current,
+      // flushSync renders and commits the action before it returns, so the caller reads what the user sees.
+      dispatch: (action) => { flushSync(() => docDispatch(action)); return latest.current; },
+    });
+    return () => setDocumentStore(null);
+  }, [docDispatch]);
 }
 
 // ============================================================

@@ -1,0 +1,136 @@
+{
+  "tools": [
+    {
+      "name": "energy_stand",
+      "description": "Stand van Open Energy Studio: open documenten, het actieve project (naam, gebruiksfunctie, adres), het gebouw (zones met Ag, aantallen constructies en installaties), het open scherm en of er een uitkomst is.",
+      "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
+    },
+    {
+      "name": "energy_zones",
+      "description": "Zones met vloeroppervlak (Ag), volume, hoogte, qv10 en hun vlakken (id, soort, grens, oppervlakte, oriëntatie, constructie) met ramen (oppervlakte, U, g). Met zoneId: alleen die zone.",
+      "inputSchema": {
+        "type": "object",
+        "properties": { "zoneId": { "type": "string" } },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "energy_constructies",
+      "description": "Constructies (id, naam, Rc, U, lagen) met het aantal vlakken dat ze gebruikt, en de kozijntypen (U, g).",
+      "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
+    },
+    {
+      "name": "energy_installaties",
+      "description": "Installaties: verwarming, ventilatie, koeling, warm tapwater, PV en zonthermisch, met hun id en kenmerken.",
+      "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
+    },
+    {
+      "name": "energy_project_bijwerken",
+      "description": "Projectgegevens wijzigen: naam, omschrijving, gebruiksfunctie, adres, plaats. Alleen de meegegeven velden.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "buildingFunction": { "type": "string", "enum": ["residential", "office", "education", "healthcare", "retail", "industrial", "other"] },
+          "address": { "type": "string" },
+          "city": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "energy_zone_wijzigen",
+      "description": "Een zone wijzigen: naam, vloeroppervlak Ag (m²), volume (m³), hoogte (m) en luchtdoorlatendheid qv10 (dm³/s·m²).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "zoneId": { "type": "string" },
+          "name": { "type": "string" },
+          "floorArea": { "type": "number", "minimum": 0 },
+          "volume": { "type": "number", "minimum": 0 },
+          "height": { "type": "number", "minimum": 0 },
+          "qv10": { "type": "number", "minimum": 0 }
+        },
+        "required": ["zoneId"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "energy_vlak_wijzigen",
+      "description": "Een vlak (gevel, dak, vloer) wijzigen: naam, bruto oppervlakte (m²), oriëntatie, constructie (constructionId) of grens.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "zoneId": { "type": "string" },
+          "surfaceId": { "type": "string" },
+          "name": { "type": "string" },
+          "area": { "type": "number", "minimum": 0 },
+          "orientation": { "type": "string", "enum": ["N", "NE", "E", "SE", "S", "SW", "W", "NW", "horizontal"] },
+          "constructionId": { "type": "string" },
+          "thermalBoundary": { "type": "string", "enum": ["outdoor", "ground", "unheated_space", "adjacent_conditioned", "internal"] }
+        },
+        "required": ["zoneId", "surfaceId"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "energy_raam_wijzigen",
+      "description": "Een raam of deur in een vlak wijzigen: naam, oppervlakte (m²), Uw, g-waarde, oriëntatie. Bij een raam met een kozijntype komen U en g van het type.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "zoneId": { "type": "string" },
+          "surfaceId": { "type": "string" },
+          "windowId": { "type": "string" },
+          "name": { "type": "string" },
+          "area": { "type": "number", "minimum": 0 },
+          "uValue": { "type": "number", "exclusiveMinimum": 0 },
+          "gValue": { "type": "number", "minimum": 0, "maximum": 1 },
+          "orientation": { "type": "string", "enum": ["N", "NE", "E", "SE", "S", "SW", "W", "NW", "horizontal"] }
+        },
+        "required": ["zoneId", "surfaceId", "windowId"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "energy_constructie_wijzigen",
+      "description": "Rc (m²K/W) of U (W/m²K) van een constructie zetten; de andere waarde volgt met Rsi + Rse van het vlak. Ook de naam.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "constructionId": { "type": "string" },
+          "name": { "type": "string" },
+          "rcValue": { "type": "number", "minimum": 0 },
+          "uValue": { "type": "number", "exclusiveMinimum": 0 }
+        },
+        "required": ["constructionId"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "energy_installatie_wijzigen",
+      "description": "Een installatie wijzigen, of zonder id toevoegen. Velden per soort: verwarming (name, type, cop, coverageFraction), ventilatie (name, type, heatRecoveryEfficiency, sfp), koeling (name, type, eer), tapwater (name, type, efficiency, hasSolarBoiler, solarBoilerFraction), pv (name, peakPower, orientation, tilt, area), zonthermisch (name, type, collectorArea, orientation, tilt).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "kind": { "type": "string", "enum": ["verwarming", "ventilatie", "koeling", "tapwater", "pv", "zonthermisch"] },
+          "id": { "type": "string" },
+          "fields": { "type": "object" }
+        },
+        "required": ["kind", "fields"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "energy_bereken",
+      "description": "De berekening starten zoals de knop Bereken: de NTA 8800-rekenkern en de indicatieve BENG-berekening; het scherm gaat naar de resultaten. Geeft de uitkomst zoals energy_uitkomst.",
+      "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
+    },
+    {
+      "name": "energy_uitkomst",
+      "description": "Uitkomst van de NTA 8800-rekenkern: status, indicatief energielabel, BENG 1/2/3 met eisen, TOjuli, en wat ontbreekt; daarnaast de indicatieve BENG-uitkomst van de laatste berekening.",
+      "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
+    }
+  ]
+}

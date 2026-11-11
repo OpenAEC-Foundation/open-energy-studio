@@ -36,8 +36,7 @@ import { Inspector } from './components/shell/Inspector';
 import { StepRouter } from './components/shell/StepRouter';
 import { CommandPalette, buildPaletteEntries } from './components/shell/CommandPalette';
 import { ShellActionsProvider, type ShellActions } from './components/shell/ShellActions';
-import { calculateBENGMonthly } from './core/energy/BENGCalculatorMonthly';
-import { hasUnmodelledHeatPumpDetails, legacyHeatPumpInputIssue, validProjectFloorArea } from './core/energy/ProjectArea';
+import { indicativeCalculation } from './core/energy/indicativeCalculation';
 import { useI18n } from './i18n/i18n';
 import { downloadReportHTML } from './core/report/ReportGenerator';
 import { bengIfcModel, downloadBENGIFC } from './core/ifc/IFCEnergyExporter';
@@ -160,37 +159,10 @@ function ActiveDocumentShell({ files, paletteOpen, setPaletteOpen }: {
 
   const handleCalculate = useCallback(() => {
     kernel?.refresh();
-    if (project.ntaHeatPumps?.length) {
-      dispatch({ type: 'SET_RESULT', payload: null });
-      setCalculationError(t('calculation.standaloneHeatPumps'));
-      return;
-    }
-    if (hasUnmodelledHeatPumpDetails(project)) {
-      dispatch({ type: 'SET_RESULT', payload: null });
-      setCalculationError(t('calculation.performancePointsUnsupported'));
-      return;
-    }
-    if (validProjectFloorArea(project) === null) {
-      dispatch({ type: 'SET_RESULT', payload: null });
-      setCalculationError(t('calculation.invalidFloorArea'));
-      return;
-    }
-    const heatPumpIssue = legacyHeatPumpInputIssue(project);
-    if (heatPumpIssue) {
-      dispatch({ type: 'SET_RESULT', payload: null });
-      setCalculationError(t(heatPumpIssue === 'cop'
-        ? 'calculation.invalidHeatPumpCop' : 'calculation.invalidHeatPumpCoverage'));
-      return;
-    }
-    try {
-      const bengResult = calculateBENGMonthly(project);
-      dispatch({ type: 'SET_RESULT', payload: bengResult });
-      dispatch({ type: 'NAVIGATE', payload: { step: 'results' } });
-      setCalculationError(null);
-    } catch (error) {
-      dispatch({ type: 'SET_RESULT', payload: null });
-      setCalculationError(error instanceof Error ? error.message : String(error));
-    }
+    const outcome = indicativeCalculation(project);
+    dispatch({ type: 'SET_RESULT', payload: outcome.result });
+    if (outcome.result) dispatch({ type: 'NAVIGATE', payload: { step: 'results' } });
+    setCalculationError(outcome.errorKey ? t(outcome.errorKey) : outcome.error);
   }, [project, dispatch, t, kernel]);
 
   const handleExportReport = useCallback(() => {
@@ -467,6 +439,14 @@ function AppContent() {
     shownDocumentId.current = activeDocumentId;
     setLibraryOpen(false);
   }, [activeDocumentId]);
+  // Navigating in the open document (the assistant of the site going to the results) shows it as well.
+  const activeRoute = docState.documents.find((doc) => doc.id === activeDocumentId)?.state.route;
+  const shownRoute = useRef(activeRoute);
+  useEffect(() => {
+    if (shownRoute.current === activeRoute) return;
+    shownRoute.current = activeRoute;
+    setLibraryOpen(false);
+  }, [activeRoute]);
   useEffect(() => { writeStartView(hasActiveDoc && !libraryOpen ? 'project' : 'library'); }, [hasActiveDoc, libraryOpen]);
   const { t } = useI18n();
   const toast = useToast();
