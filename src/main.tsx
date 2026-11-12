@@ -1,3 +1,5 @@
+// First: storage for a sandboxed frame without allow-same-origin, before any module reads it.
+import './core/io/storageFallback';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { isTauri } from '@tauri-apps/api/core';
